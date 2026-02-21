@@ -1,0 +1,14 @@
+package dev.ayagmar.quarkusforge.ui;
+
+enum FocusTarget {
+  GROUP_ID,
+  ARTIFACT_ID,
+  VERSION,
+  PACKAGE_NAME,
+  OUTPUT_DIR,
+  BUILD_TOOL,
+  JAVA_VERSION,
+  EXTENSION_SEARCH,
+  EXTENSION_LIST,
+  SUBMIT
+}

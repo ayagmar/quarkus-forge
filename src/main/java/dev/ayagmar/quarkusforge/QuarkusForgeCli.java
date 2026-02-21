@@ -10,11 +10,8 @@ import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
 import dev.ayagmar.quarkusforge.domain.ValidationError;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
-import dev.tamboui.text.Text;
+import dev.ayagmar.quarkusforge.ui.CoreTuiController;
 import dev.tamboui.tui.TuiRunner;
-import dev.tamboui.tui.event.Event;
-import dev.tamboui.tui.event.KeyEvent;
-import dev.tamboui.widgets.paragraph.Paragraph;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -112,13 +109,20 @@ public final class QuarkusForgeCli implements Callable<Integer> {
 
   static void runTui(boolean smokeMode, ForgeUiState initialState) throws Exception {
     try (var tui = TuiRunner.create()) {
+      CoreTuiController controller = CoreTuiController.from(initialState);
       if (smokeMode) {
         tui.scheduler().schedule(tui::quit, 350, TimeUnit.MILLISECONDS);
       }
 
       tui.run(
-          QuarkusForgeCli::handleEvent,
-          frame -> frame.renderWidget(renderHome(initialState.request()), frame.area()));
+          (event, runner) -> {
+            CoreTuiController.UiAction action = controller.onEvent(event);
+            if (action.shouldQuit()) {
+              runner.quit();
+            }
+            return action.handled();
+          },
+          controller::render);
     }
   }
 
@@ -142,41 +146,6 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       errors.add(new ValidationError("metadata", contractException.getMessage()));
       return new ValidationReport(errors);
     }
-  }
-
-  private static boolean handleEvent(Event event, TuiRunner runner) {
-    if (event instanceof KeyEvent keyEvent && (keyEvent.isQuit() || keyEvent.isCancel())) {
-      runner.quit();
-      return true;
-    }
-    return false;
-  }
-
-  private static Paragraph renderHome(ProjectRequest request) {
-    String content =
-        "Quarkus Forge is ready. Press 'q' to quit.\n\n"
-            + "groupId="
-            + request.groupId()
-            + "\n"
-            + "artifactId="
-            + request.artifactId()
-            + "\n"
-            + "version="
-            + request.version()
-            + "\n"
-            + "packageName="
-            + request.packageName()
-            + "\n"
-            + "outputDir="
-            + request.outputDirectory()
-            + "\n"
-            + "buildTool="
-            + request.buildTool()
-            + "\n"
-            + "javaVersion="
-            + request.javaVersion();
-
-    return Paragraph.builder().text(Text.from(content)).build();
   }
 
   private static void printValidationErrors(ValidationReport validation) {
