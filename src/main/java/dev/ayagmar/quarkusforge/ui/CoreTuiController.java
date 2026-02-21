@@ -1,6 +1,7 @@
 package dev.ayagmar.quarkusforge.ui;
 
 import dev.ayagmar.quarkusforge.api.ApiContractException;
+import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.api.MetadataSnapshotLoader;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
@@ -34,9 +35,9 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 public final class CoreTuiController {
   private static final List<FocusTarget> FOCUS_ORDER =
@@ -52,26 +53,27 @@ public final class CoreTuiController {
           FocusTarget.EXTENSION_LIST,
           FocusTarget.SUBMIT);
 
-  private static final List<ExtensionItem> DEFAULT_EXTENSIONS =
+  private static final List<ExtensionCatalogItem> DEFAULT_EXTENSIONS =
       List.of(
-          new ExtensionItem("io.quarkus:quarkus-rest", "REST", "rest"),
-          new ExtensionItem("io.quarkus:quarkus-resteasy-jackson", "REST Jackson", "rest-jackson"),
-          new ExtensionItem(
+          new ExtensionCatalogItem("io.quarkus:quarkus-rest", "REST", "rest"),
+          new ExtensionCatalogItem(
+              "io.quarkus:quarkus-resteasy-jackson", "REST Jackson", "rest-jackson"),
+          new ExtensionCatalogItem(
               "io.quarkus:quarkus-jdbc-postgresql", "JDBC PostgreSQL", "jdbc-postgresql"),
-          new ExtensionItem("io.quarkus:quarkus-hibernate-orm", "Hibernate ORM", "hibernate-orm"),
-          new ExtensionItem("io.quarkus:quarkus-smallrye-openapi", "OpenAPI", "openapi"),
-          new ExtensionItem("io.quarkus:quarkus-arc", "CDI", "cdi"),
-          new ExtensionItem("io.quarkus:quarkus-junit5", "JUnit 5", "junit5"));
+          new ExtensionCatalogItem(
+              "io.quarkus:quarkus-hibernate-orm", "Hibernate ORM", "hibernate-orm"),
+          new ExtensionCatalogItem("io.quarkus:quarkus-smallrye-openapi", "OpenAPI", "openapi"),
+          new ExtensionCatalogItem("io.quarkus:quarkus-arc", "CDI", "cdi"),
+          new ExtensionCatalogItem("io.quarkus:quarkus-junit5", "JUnit 5", "junit5"));
 
   private static final int NARROW_WIDTH_THRESHOLD = 100;
-  private static final Duration DEFAULT_EXTENSION_SEARCH_DEBOUNCE = Duration.ofMillis(120);
-
   private final EnumMap<FocusTarget, TextInputState> inputStates = new EnumMap<>(FocusTarget.class);
   private final ListState extensionListState = new ListState();
   private final Set<String> selectedExtensionIds = new LinkedHashSet<>();
   private final ProjectRequestValidator requestValidator = new ProjectRequestValidator();
   private final MetadataCompatibilityValidator compatibilityValidator =
       new MetadataCompatibilityValidator();
+  private final UiScheduler scheduler;
   private final Debouncer extensionSearchDebouncer;
   private final LatestResultGate extensionSearchResultGate = new LatestResultGate();
 
@@ -81,7 +83,8 @@ public final class CoreTuiController {
   private ProjectRequest request;
   private ValidationReport validation;
   private FocusTarget focusTarget;
-  private List<ExtensionItem> filteredExtensions;
+  private ExtensionCatalogIndex extensionCatalogIndex;
+  private List<ExtensionCatalogItem> filteredExtensions;
   private String statusMessage;
   private String errorMessage;
   private boolean submitRequested;
@@ -97,6 +100,7 @@ public final class CoreTuiController {
     statusMessage = "Ready";
     errorMessage = "";
     submitRequested = false;
+    this.scheduler = scheduler;
     extensionSearchDebouncer = new Debouncer(scheduler, debounceDelay);
 
     for (FocusTarget target : FocusTarget.values()) {
@@ -125,6 +129,7 @@ public final class CoreTuiController {
     metadataSnapshot = loadedSnapshot;
     metadataLoadError = loadedError;
 
+    extensionCatalogIndex = new ExtensionCatalogIndex(DEFAULT_EXTENSIONS);
     applyFilteredExtensions(
         inputStates.get(FocusTarget.EXTENSION_SEARCH).text(),
         extensionSearchResultGate.nextToken());
@@ -138,6 +143,41 @@ public final class CoreTuiController {
   public static CoreTuiController from(
       ForgeUiState initialState, UiScheduler scheduler, Duration debounceDelay) {
     return new CoreTuiController(initialState, scheduler, debounceDelay);
+  }
+
+  public void loadExtensionCatalogAsync(ExtensionCatalogLoader loader) {
+    Objects.requireNonNull(loader);
+    statusMessage = "Loading extension catalog...";
+
+    loader
+        .load()
+        .whenComplete(
+            (extensions, throwable) ->
+                scheduler.schedule(
+                    Duration.ZERO,
+                    () -> {
+                      if (throwable != null) {
+                        errorMessage = "Catalog load failed: " + throwable.getMessage();
+                        statusMessage = "Using fallback extension catalog";
+                        return;
+                      }
+
+                      List<ExtensionCatalogItem> items =
+                          extensions.stream()
+                              .map(
+                                  extension ->
+                                      new ExtensionCatalogItem(
+                                          extension.id(), extension.name(), extension.shortName()))
+                              .toList();
+                      if (items.isEmpty()) {
+                        errorMessage = "Catalog load returned no extensions";
+                        statusMessage = "Using fallback extension catalog";
+                        return;
+                      }
+
+                      extensionCatalogIndex = new ExtensionCatalogIndex(items);
+                      scheduleFilteredExtensionsRefresh();
+                    }));
   }
 
   public UiAction onEvent(Event event) {
@@ -334,7 +374,7 @@ public final class CoreTuiController {
 
   private void renderExtensionList(Frame frame, Rect area) {
     List<ListItem> items = new ArrayList<>();
-    for (ExtensionItem extension : filteredExtensions) {
+    for (ExtensionCatalogItem extension : filteredExtensions) {
       boolean selected = selectedExtensionIds.contains(extension.id());
       String prefix = selected ? "[x] " : "[ ] ";
       items.add(ListItem.from(prefix + extension.name() + " (" + extension.shortName() + ")"));
@@ -471,7 +511,7 @@ public final class CoreTuiController {
       if (selected == null || selected < 0 || selected >= size) {
         return false;
       }
-      ExtensionItem extension = filteredExtensions.get(selected);
+      ExtensionCatalogItem extension = filteredExtensions.get(selected);
       if (!selectedExtensionIds.add(extension.id())) {
         selectedExtensionIds.remove(extension.id());
       }
@@ -518,19 +558,7 @@ public final class CoreTuiController {
       return;
     }
 
-    String query = queryText.toLowerCase(Locale.ROOT).trim();
-    if (query.isBlank()) {
-      filteredExtensions = DEFAULT_EXTENSIONS;
-    } else {
-      filteredExtensions =
-          DEFAULT_EXTENSIONS.stream()
-              .filter(
-                  extension ->
-                      extension.id().toLowerCase(Locale.ROOT).contains(query)
-                          || extension.name().toLowerCase(Locale.ROOT).contains(query)
-                          || extension.shortName().toLowerCase(Locale.ROOT).contains(query))
-              .toList();
-    }
+    filteredExtensions = extensionCatalogIndex.search(queryText);
 
     if (filteredExtensions.isEmpty()) {
       extensionListState.select(null);
@@ -570,6 +598,11 @@ public final class CoreTuiController {
   private void cancelPendingAsyncOperations() {
     extensionSearchDebouncer.cancel();
     extensionSearchResultGate.cancel();
+  }
+
+  @FunctionalInterface
+  public interface ExtensionCatalogLoader {
+    CompletableFuture<List<ExtensionDto>> load();
   }
 
   private static boolean isTextInputFocus(FocusTarget focusTarget) {
@@ -632,8 +665,6 @@ public final class CoreTuiController {
     }
     return false;
   }
-
-  private record ExtensionItem(String id, String name, String shortName) {}
 
   public record UiAction(boolean handled, boolean shouldQuit) {
     static UiAction ignored() {

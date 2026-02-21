@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge;
 
 import dev.ayagmar.quarkusforge.api.ApiContractException;
 import dev.ayagmar.quarkusforge.api.MetadataSnapshotLoader;
+import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.CliPrefillMapper;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
@@ -13,6 +14,7 @@ import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.ayagmar.quarkusforge.ui.CoreTuiController;
 import dev.ayagmar.quarkusforge.ui.UiScheduler;
 import dev.tamboui.tui.TuiRunner;
+import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -81,6 +83,12 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       description = "Start the TUI and auto-exit after a short delay")
   private boolean smokeMode;
 
+  @Option(
+      names = "--search-debounce-ms",
+      defaultValue = "120",
+      description = "Debounce delay for extension search updates")
+  private int searchDebounceMs;
+
   @Override
   public Integer call() throws Exception {
     ForgeUiState initialState = buildInitialState();
@@ -94,7 +102,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       return CommandLine.ExitCode.OK;
     }
 
-    runTui(smokeMode, initialState);
+    runTui(smokeMode, initialState, searchDebounceMs);
     return CommandLine.ExitCode.OK;
   }
 
@@ -109,13 +117,16 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     }
   }
 
-  static void runTui(boolean smokeMode, ForgeUiState initialState) throws Exception {
+  static void runTui(boolean smokeMode, ForgeUiState initialState, int searchDebounceMs)
+      throws Exception {
     try (var tui = TuiRunner.create()) {
+      QuarkusApiClient apiClient = new QuarkusApiClient(URI.create("https://code.quarkus.io"));
       CoreTuiController controller =
           CoreTuiController.from(
               initialState,
               UiScheduler.fromScheduledExecutor(tui.scheduler(), tui::runOnRenderThread),
-              Duration.ofMillis(120));
+              Duration.ofMillis(Math.max(0, searchDebounceMs)));
+      controller.loadExtensionCatalogAsync(apiClient::fetchExtensions);
       if (smokeMode) {
         tui.scheduler().schedule(tui::quit, 350, TimeUnit.MILLISECONDS);
       }
