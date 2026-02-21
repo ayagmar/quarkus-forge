@@ -116,6 +116,26 @@ class SafeZipExtractorTest {
   }
 
   @Test
+  void rejectsEntryThatExceedsDeclaredUncompressedSizeDuringStreaming() throws IOException {
+    byte[] payload = new byte[8 * 1024 * 1024];
+    for (int i = 0; i < payload.length; i++) {
+      payload[i] = 'A';
+    }
+    Path zipPath = createZip(tempDir.resolve("size-mismatch.zip"), Map.of("demo/big.txt", payload));
+    patchUncompressedSize(zipPath, "demo/big.txt", 1L);
+
+    SafeZipExtractor extractor =
+        new SafeZipExtractor(new ArchiveSafetyPolicy(1_000, 32L * 1024L * 1024L, 500.0d, 1L));
+
+    assertThatThrownBy(
+            () ->
+                extractor.extract(
+                    zipPath, tempDir.resolve("generated-project"), OverwritePolicy.FAIL_IF_EXISTS))
+        .isInstanceOf(ArchiveException.class)
+        .hasMessageContaining("exceeds declared uncompressed size");
+  }
+
+  @Test
   void rejectsZipWhenEntryCountExceedsPolicy() throws IOException {
     Map<String, byte[]> entries = new LinkedHashMap<>();
     entries.put("demo/a.txt", "a".getBytes(StandardCharsets.UTF_8));
@@ -242,6 +262,32 @@ class SafeZipExtractorTest {
         long currentExternalAttributes = u32(bytes, index + 38);
         long patched = (currentExternalAttributes & 0xFFFFL) | (((long) unixMode) << 16);
         writeU32(bytes, index + 38, patched);
+        Files.write(zipPath, bytes);
+        return;
+      }
+
+      index += 46 + nameLength + extraLength + commentLength;
+    }
+    throw new IllegalArgumentException("Entry not found in ZIP central directory: " + entryName);
+  }
+
+  private static void patchUncompressedSize(Path zipPath, String entryName, long uncompressedSize)
+      throws IOException {
+    byte[] bytes = Files.readAllBytes(zipPath);
+    int index = 0;
+    while (index <= bytes.length - 46) {
+      if (u32(bytes, index) != 0x02014B50) {
+        index++;
+        continue;
+      }
+
+      int nameLength = u16(bytes, index + 28);
+      int extraLength = u16(bytes, index + 30);
+      int commentLength = u16(bytes, index + 32);
+      String currentName = new String(bytes, index + 46, nameLength, StandardCharsets.UTF_8);
+
+      if (currentName.equals(entryName)) {
+        writeU32(bytes, index + 24, uncompressedSize);
         Files.write(zipPath, bytes);
         return;
       }

@@ -159,13 +159,15 @@ public final class SafeZipExtractor {
           Files.createDirectories(parent);
         }
 
-        long copied = copyEntry(zipInputStream, destination);
-        extractedBytes = safeAdd(extractedBytes, copied);
-        if (extractedBytes > safetyPolicy.maxTotalUncompressedBytes()) {
-          throw new ArchiveException(
-              "ZIP extracted bytes exceed configured maximum "
-                  + safetyPolicy.maxTotalUncompressedBytes());
-        }
+        CopyResult copyResult =
+            copyEntry(
+                zipInputStream,
+                destination,
+                normalizedName,
+                metadata.uncompressedSize(),
+                extractedBytes);
+        long copied = copyResult.entryBytes();
+        extractedBytes = copyResult.totalExtractedBytes();
 
         if (metadata.uncompressedSize() > 0 && copied != metadata.uncompressedSize()) {
           throw new ArchiveException(
@@ -229,20 +231,47 @@ public final class SafeZipExtractor {
     }
   }
 
-  private static long copyEntry(ZipInputStream inputStream, Path destination) throws IOException {
+  private CopyResult copyEntry(
+      ZipInputStream inputStream,
+      Path destination,
+      String entryName,
+      long expectedUncompressedSize,
+      long extractedBytesSoFar)
+      throws IOException {
     long copied = 0L;
+    long totalExtractedBytes = extractedBytesSoFar;
     byte[] buffer = new byte[COPY_BUFFER_SIZE];
     try (OutputStream outputStream =
         Files.newOutputStream(
             destination, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
       int read;
       while ((read = inputStream.read(buffer)) != -1) {
+        long nextCopied = safeAdd(copied, read);
+        if (expectedUncompressedSize > 0 && nextCopied > expectedUncompressedSize) {
+          throw new ArchiveException(
+              "ZIP entry '"
+                  + entryName
+                  + "' exceeds declared uncompressed size "
+                  + expectedUncompressedSize
+                  + " bytes");
+        }
+
+        long nextTotalExtractedBytes = safeAdd(totalExtractedBytes, read);
+        if (nextTotalExtractedBytes > safetyPolicy.maxTotalUncompressedBytes()) {
+          throw new ArchiveException(
+              "ZIP extracted bytes exceed configured maximum "
+                  + safetyPolicy.maxTotalUncompressedBytes());
+        }
+
         outputStream.write(buffer, 0, read);
-        copied += read;
+        copied = nextCopied;
+        totalExtractedBytes = nextTotalExtractedBytes;
       }
     }
-    return copied;
+    return new CopyResult(copied, totalExtractedBytes);
   }
+
+  private record CopyResult(long entryBytes, long totalExtractedBytes) {}
 
   static String normalizeEntryName(String rawName) {
     if (rawName == null || rawName.isBlank()) {
