@@ -58,4 +58,32 @@ class MetadataCompatibilityValidatorTest {
 
     assertThat(report.errors()).extracting(ValidationError::field).contains("metadata");
   }
+
+  @Test
+  void acceptsSupportedCombinationWhenMetadataUsesDifferentBuildToolCasing() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example", "forge-app", "1.0.0", "com.example.forge", ".", "maven", "25");
+    MetadataDto metadata =
+        new MetadataDto(
+            List.of("17", "21", "25"),
+            List.of("Maven", "Gradle"),
+            Map.of("MAVEN", List.of("17", "21", "25"), "GRADLE", List.of("21", "25")));
+
+    ValidationReport report = validator.validate(request, metadata);
+
+    assertThat(report.isValid()).isTrue();
+  }
+
+  @Test
+  void rejectsWhenCompatibilityMatrixIsMissing() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example", "forge-app", "1.0.0", "com.example.forge", ".", "maven", "25");
+    MetadataDto metadata = new MetadataDto(List.of("17", "21", "25"), List.of("maven"), Map.of());
+
+    ValidationReport report = validator.validate(request, metadata);
+
+    assertThat(report.errors()).extracting(ValidationError::field).containsExactly("metadata");
+  }
 }

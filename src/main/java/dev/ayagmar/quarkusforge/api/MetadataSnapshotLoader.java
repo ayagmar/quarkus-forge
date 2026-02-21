@@ -1,8 +1,8 @@
 package dev.ayagmar.quarkusforge.api;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 public final class MetadataSnapshotLoader {
   private static final String SNAPSHOT_RESOURCE = "metadata/platform-metadata.json";
@@ -15,8 +15,8 @@ public final class MetadataSnapshotLoader {
       if (inputStream == null) {
         throw new ApiContractException("Missing metadata snapshot resource: " + SNAPSHOT_RESOURCE);
       }
-      String payload = new String(inputStream.readAllBytes());
-      return QuarkusApiClient.parseMetadataPayload(payload, new ObjectMapper());
+      String payload = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+      return QuarkusApiClient.parseMetadataPayload(payload, ObjectMapperProvider.shared());
     } catch (IOException ioException) {
       throw new ApiContractException("Failed to read metadata snapshot resource", ioException);
     }

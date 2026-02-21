@@ -29,6 +29,23 @@ class QuarkusForgeCliTest {
   }
 
   @Test
+  void dryRunWithNumericArtifactStillBuildsValidDerivedPackage() {
+    int exitCode =
+        QuarkusForgeCli.runWithArgs(
+            new String[] {
+              "--dry-run",
+              "--group-id",
+              "com.example",
+              "--artifact-id",
+              "123app",
+              "--output-dir",
+              "./tmp/output"
+            });
+
+    assertThat(exitCode).isZero();
+  }
+
+  @Test
   void dryRunWithInvalidPrefillReturnsUsageCode() {
     int exitCode =
         QuarkusForgeCli.runWithArgs(

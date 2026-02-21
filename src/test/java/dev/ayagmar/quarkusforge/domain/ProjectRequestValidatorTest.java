@@ -48,6 +48,34 @@ class ProjectRequestValidatorTest {
   }
 
   @Test
+  void acceptsVersionWithBuildMetadataSuffix() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example",
+            "forge-app",
+            "1.0.0+build.1",
+            "com.example.forge",
+            "./out",
+            "maven",
+            "25");
+
+    ValidationReport report = validator.validate(request);
+
+    assertThat(report.errors()).extracting(ValidationError::field).doesNotContain("version");
+  }
+
+  @Test
+  void acceptsArtifactIdWithUnderscore() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example", "forge_app", "1.0.0", "com.example.forge_app", "./out", "maven", "25");
+
+    ValidationReport report = validator.validate(request);
+
+    assertThat(report.errors()).extracting(ValidationError::field).doesNotContain("artifactId");
+  }
+
+  @Test
   void rejectsWindowsReservedOutputSegment() {
     ProjectRequest request =
         new ProjectRequest(
@@ -77,5 +105,16 @@ class ProjectRequestValidatorTest {
     ProjectRequest request = CliPrefillMapper.map(prefill);
 
     assertThat(request.packageName()).isEqualTo("com.example.my.app");
+  }
+
+  @Test
+  void derivesPackageNameFromNumericArtifactUsingSafePrefix() {
+    CliPrefill prefill =
+        new CliPrefill("Com.Example", "123app", "1.0.0", "", "./tmp", "maven", "25");
+
+    ProjectRequest request = CliPrefillMapper.map(prefill);
+
+    assertThat(request.packageName()).isEqualTo("com.example.x123app");
+    assertThat(validator.validate(request).isValid()).isTrue();
   }
 }

@@ -1,17 +1,18 @@
 package dev.ayagmar.quarkusforge.api;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.verify;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import java.net.URI;
@@ -190,10 +191,28 @@ class QuarkusApiClientTest {
         .hasMessageContaining("Unexpected HTTP status 400");
   }
 
+  @Test
+  void generateProjectZipRequestsZipContentType() {
+    stubFor(
+        get(urlPathEqualTo("/api/download"))
+            .willReturn(aResponse().withStatus(200).withBody("zip-data")));
+
+    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+    GenerationRequest request =
+        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+
+    byte[] payload = client.generateProjectZip(request).join();
+
+    assertThat(payload).isEqualTo("zip-data".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    verify(
+        getRequestedFor(urlPathEqualTo("/api/download"))
+            .withHeader("Accept", equalTo("application/zip, application/octet-stream")));
+  }
+
   private QuarkusApiClient newClient(RetryPolicy retryPolicy, RecordingSleeper sleeper) {
     return new QuarkusApiClient(
         HttpClient.newHttpClient(),
-        new ObjectMapper(),
+        ObjectMapperProvider.shared(),
         URI.create(wireMockServer.baseUrl()),
         retryPolicy,
         sleeper,

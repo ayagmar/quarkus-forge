@@ -4,7 +4,7 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 public final class CliPrefillMapper {
-  private static final Pattern NON_PACKAGE_CHARS = Pattern.compile("[^A-Za-z0-9_.]");
+  private static final Pattern NON_PACKAGE_CHARS = Pattern.compile("[^A-Za-z0-9_]");
 
   private CliPrefillMapper() {}
 
@@ -26,8 +26,7 @@ public final class CliPrefillMapper {
 
   static String derivePackageName(String groupId, String artifactId) {
     String group = trim(groupId).toLowerCase(Locale.ROOT);
-    String artifact = trim(artifactId).toLowerCase(Locale.ROOT).replace('-', '.');
-    artifact = NON_PACKAGE_CHARS.matcher(artifact).replaceAll("");
+    String artifact = normalizeArtifactForPackage(trim(artifactId));
 
     if (artifact.isBlank()) {
       return group;
@@ -36,6 +35,26 @@ public final class CliPrefillMapper {
       return artifact;
     }
     return group + "." + artifact;
+  }
+
+  private static String normalizeArtifactForPackage(String artifactId) {
+    String[] segments = artifactId.toLowerCase(Locale.ROOT).replace('-', '.').split("\\.");
+    StringBuilder normalized = new StringBuilder();
+    for (String rawSegment : segments) {
+      String segment = NON_PACKAGE_CHARS.matcher(rawSegment).replaceAll("");
+      if (segment.isBlank()) {
+        continue;
+      }
+      if (Character.isDigit(segment.charAt(0))) {
+        segment = "x" + segment;
+      }
+
+      if (normalized.length() > 0) {
+        normalized.append('.');
+      }
+      normalized.append(segment);
+    }
+    return normalized.toString();
   }
 
   private static String trim(String value) {

@@ -12,8 +12,8 @@ public final class ProjectRequestValidator {
   private static final Pattern GROUP_ID_PATTERN =
       Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$");
   private static final Pattern ARTIFACT_ID_PATTERN =
-      Pattern.compile("^[A-Za-z0-9]+([.-][A-Za-z0-9]+)*$");
-  private static final Pattern VERSION_PATTERN = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._-]*$");
+      Pattern.compile("^[A-Za-z0-9_]+([._-][A-Za-z0-9_]+)*$");
+  private static final Pattern VERSION_PATTERN = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._+-]*$");
   private static final Pattern PACKAGE_NAME_PATTERN =
       Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$");
   private static final Pattern WINDOWS_INVALID_CHARS = Pattern.compile("[<>:\"|?*\\u0000-\\u001F]");
@@ -38,13 +38,13 @@ public final class ProjectRequestValidator {
         request.artifactId(),
         ARTIFACT_ID_PATTERN,
         "artifactId",
-        "must contain only alphanumeric segments separated by '.' or '-'",
+        "must contain only letters, digits, '.', '-' or '_'",
         errors);
     validatePattern(
         request.version(),
         VERSION_PATTERN,
         "version",
-        "must contain only letters, digits, '.', '_' or '-'",
+        "must contain only letters, digits, '.', '_', '-' or '+'",
         errors);
     validatePattern(
         request.packageName(),

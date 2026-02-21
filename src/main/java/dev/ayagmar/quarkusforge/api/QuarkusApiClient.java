@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.ayagmar.quarkusforge.util.CaseInsensitiveLookup;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -40,7 +41,7 @@ public final class QuarkusApiClient {
   public QuarkusApiClient(URI baseUri) {
     this(
         HttpClient.newHttpClient(),
-        new ObjectMapper(),
+        ObjectMapperProvider.shared(),
         baseUri,
         RetryPolicy.defaults(),
         AsyncSleeper.system(),
@@ -66,14 +67,14 @@ public final class QuarkusApiClient {
   }
 
   public CompletableFuture<List<ExtensionDto>> fetchExtensions() {
-    HttpRequest request = newGetRequest(baseUri.resolve("/api/extensions"));
+    HttpRequest request = newGetRequest(baseUri.resolve("/api/extensions"), "application/json");
     return sendWithRetry(request, BodyHandlers.ofString(), 1)
         .thenApply(this::assertSuccessful)
         .thenApply(response -> parseExtensionsPayload(response.body(), objectMapper));
   }
 
   public CompletableFuture<MetadataDto> fetchMetadata() {
-    HttpRequest request = newGetRequest(baseUri.resolve("/api/metadata"));
+    HttpRequest request = newGetRequest(baseUri.resolve("/api/metadata"), "application/json");
     return sendWithRetry(request, BodyHandlers.ofString(), 1)
         .thenApply(this::assertSuccessful)
         .thenApply(response -> parseMetadataPayload(response.body(), objectMapper));
@@ -81,7 +82,7 @@ public final class QuarkusApiClient {
 
   public CompletableFuture<byte[]> generateProjectZip(GenerationRequest generationRequest) {
     URI uri = GenerationQueryBuilder.build(baseUri, generationRequest);
-    HttpRequest request = newGetRequest(uri);
+    HttpRequest request = newGetRequest(uri, "application/zip, application/octet-stream");
 
     return sendWithRetry(request, BodyHandlers.ofByteArray(), 1)
         .thenApply(this::assertSuccessful)
@@ -122,7 +123,7 @@ public final class QuarkusApiClient {
     List<String> javaVersions = toStringList(javaVersionsNode, "javaVersions");
     List<String> buildTools = toStringList(buildToolsNode, "buildTools");
     Map<String, List<String>> compatibility =
-        parseCompatibility(root.get("compatibility"), buildTools, javaVersions);
+        parseCompatibility(root.get("compatibility"), buildTools);
     return new MetadataDto(javaVersions, buildTools, compatibility);
   }
 
@@ -228,10 +229,10 @@ public final class QuarkusApiClient {
     }
   }
 
-  private HttpRequest newGetRequest(URI uri) {
+  private HttpRequest newGetRequest(URI uri, String acceptHeader) {
     return HttpRequest.newBuilder(uri)
         .GET()
-        .header("Accept", "application/json")
+        .header("Accept", acceptHeader)
         .timeout(retryPolicy.requestTimeout())
         .build();
   }
@@ -274,21 +275,22 @@ public final class QuarkusApiClient {
   }
 
   private static Map<String, List<String>> parseCompatibility(
-      JsonNode node, List<String> buildTools, List<String> javaVersions) {
+      JsonNode node, List<String> buildTools) {
     Map<String, List<String>> compatibility = new LinkedHashMap<>();
     if (node == null || node.isNull()) {
-      for (String buildTool : buildTools) {
-        compatibility.put(buildTool, javaVersions);
-      }
-      return compatibility;
+      return Map.of();
     }
 
     if (!node.isObject()) {
       throw new ApiContractException("Metadata payload field 'compatibility' must be an object");
     }
 
+    Map<String, JsonNode> compatibilityByBuildTool = new LinkedHashMap<>();
+    node.fields()
+        .forEachRemaining(entry -> compatibilityByBuildTool.put(entry.getKey(), entry.getValue()));
+
     for (String buildTool : buildTools) {
-      JsonNode javaVersionsNode = node.get(buildTool);
+      JsonNode javaVersionsNode = CaseInsensitiveLookup.find(compatibilityByBuildTool, buildTool);
       if (javaVersionsNode == null || !javaVersionsNode.isArray()) {
         throw new ApiContractException(
             "Metadata payload compatibility missing build tool entry '" + buildTool + "'");

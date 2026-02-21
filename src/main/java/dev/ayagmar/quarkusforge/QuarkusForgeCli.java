@@ -26,22 +26,9 @@ import picocli.CommandLine.Option;
 @Command(
     name = "quarkus-forge",
     version = "0.1.0-SNAPSHOT",
+    mixinStandardHelpOptions = true,
     description = "Quarkus forge terminal UI")
 public final class QuarkusForgeCli implements Callable<Integer> {
-  @Option(
-      names = {"-h", "--help"},
-      usageHelp = true,
-      defaultValue = "false",
-      description = "Show this help message and exit")
-  private boolean helpRequested;
-
-  @Option(
-      names = {"-V", "--version"},
-      versionHelp = true,
-      defaultValue = "false",
-      description = "Print version information and exit")
-  private boolean versionRequested;
-
   @Option(
       names = {"-g", "--group-id"},
       defaultValue = "org.acme",

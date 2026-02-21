@@ -1,9 +1,9 @@
 package dev.ayagmar.quarkusforge.domain;
 
 import dev.ayagmar.quarkusforge.api.MetadataDto;
+import dev.ayagmar.quarkusforge.util.CaseInsensitiveLookup;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -11,13 +11,13 @@ public final class MetadataCompatibilityValidator {
   public ValidationReport validate(ProjectRequest request, MetadataDto metadata) {
     List<ValidationError> errors = new ArrayList<>();
 
-    String buildTool = request.buildTool().toLowerCase(Locale.ROOT);
+    String buildTool = request.buildTool();
     String javaVersion = request.javaVersion();
 
     List<String> availableBuildTools = metadata.buildTools();
     List<String> availableJavaVersions = metadata.javaVersions();
 
-    if (!availableBuildTools.contains(buildTool)) {
+    if (!CaseInsensitiveLookup.contains(availableBuildTools, buildTool)) {
       errors.add(
           new ValidationError(
               "buildTool",
@@ -41,7 +41,7 @@ public final class MetadataCompatibilityValidator {
     if (compatibility.isEmpty()) {
       errors.add(new ValidationError("metadata", "compatibility matrix is missing from metadata"));
     } else {
-      List<String> allowedForBuildTool = compatibility.get(buildTool);
+      List<String> allowedForBuildTool = CaseInsensitiveLookup.find(compatibility, buildTool);
       if (allowedForBuildTool == null) {
         errors.add(
             new ValidationError(
