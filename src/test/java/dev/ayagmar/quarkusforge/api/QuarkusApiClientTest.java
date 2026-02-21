@@ -27,8 +27,10 @@ import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class QuarkusApiClientTest {
+  @TempDir java.nio.file.Path tempDir;
   private WireMockServer wireMockServer;
 
   @BeforeEach
@@ -207,6 +209,23 @@ class QuarkusApiClientTest {
     verify(
         getRequestedFor(urlPathEqualTo("/api/download"))
             .withHeader("Accept", equalTo("application/zip, application/octet-stream")));
+  }
+
+  @Test
+  void downloadProjectZipToFileStreamsPayloadToDestinationPath() throws Exception {
+    stubFor(
+        get(urlPathEqualTo("/api/download"))
+            .willReturn(aResponse().withStatus(200).withBody("zip-data")));
+
+    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+    GenerationRequest request =
+        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+    java.nio.file.Path destination = tempDir.resolve("download.zip");
+
+    java.nio.file.Path downloaded = client.downloadProjectZipToFile(request, destination).join();
+
+    assertThat(downloaded).isEqualTo(destination);
+    assertThat(java.nio.file.Files.readString(destination)).isEqualTo("zip-data");
   }
 
   private QuarkusApiClient newClient(RetryPolicy retryPolicy, RecordingSleeper sleeper) {

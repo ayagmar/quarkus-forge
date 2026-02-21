@@ -1,0 +1,157 @@
+package dev.ayagmar.quarkusforge.archive;
+
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.github.tomakehurst.wiremock.WireMockServer;
+import dev.ayagmar.quarkusforge.api.GenerationRequest;
+import dev.ayagmar.quarkusforge.api.ObjectMapperProvider;
+import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
+import dev.ayagmar.quarkusforge.api.RetryPolicy;
+import java.io.ByteArrayOutputStream;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.concurrent.CompletionException;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+class ProjectArchiveServiceTest {
+  @TempDir Path tempDir;
+  private WireMockServer wireMockServer;
+
+  @BeforeEach
+  void setUp() {
+    wireMockServer = new WireMockServer(0);
+    wireMockServer.start();
+    com.github.tomakehurst.wiremock.client.WireMock.configureFor(
+        "localhost", wireMockServer.port());
+  }
+
+  @AfterEach
+  void tearDown() {
+    if (wireMockServer != null) {
+      wireMockServer.stop();
+    }
+  }
+
+  @Test
+  void cancellationDeletesDownloadedArchiveAndSkipsExtraction() throws Exception {
+    stubFor(
+        get(urlPathEqualTo("/api/download"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withBody(createZipPayload("demo/pom.xml", "<project/>"))));
+
+    Path tempArchive = tempDir.resolve("download.zip");
+    ProjectArchiveService service =
+        new ProjectArchiveService(newClient(), new SafeZipExtractor(), () -> tempArchive);
+
+    GenerationRequest request =
+        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+
+    assertThatThrownBy(
+            () ->
+                service
+                    .downloadAndExtract(
+                        request,
+                        tempDir.resolve("generated-project"),
+                        OverwritePolicy.FAIL_IF_EXISTS,
+                        () -> true)
+                    .join())
+        .isInstanceOf(CompletionException.class)
+        .hasCauseInstanceOf(java.util.concurrent.CancellationException.class);
+    assertThat(Files.exists(tempArchive)).isFalse();
+    assertThat(Files.exists(tempDir.resolve("generated-project"))).isFalse();
+  }
+
+  @Test
+  void extractionFailureCleansTemporaryArchive() {
+    stubFor(
+        get(urlPathEqualTo("/api/download"))
+            .willReturn(
+                aResponse().withStatus(200).withBody("corrupt".getBytes(StandardCharsets.UTF_8))));
+
+    Path tempArchive = tempDir.resolve("download.zip");
+    ProjectArchiveService service =
+        new ProjectArchiveService(newClient(), new SafeZipExtractor(), () -> tempArchive);
+
+    GenerationRequest request =
+        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+
+    assertThatThrownBy(
+            () ->
+                service
+                    .downloadAndExtract(
+                        request,
+                        tempDir.resolve("generated-project"),
+                        OverwritePolicy.FAIL_IF_EXISTS)
+                    .join())
+        .isInstanceOf(CompletionException.class)
+        .hasRootCauseInstanceOf(ArchiveException.class);
+    assertThat(Files.exists(tempArchive)).isFalse();
+    assertThat(Files.exists(tempDir.resolve("generated-project"))).isFalse();
+  }
+
+  @Test
+  void successfulExtractionDeletesTemporaryArchive() throws Exception {
+    stubFor(
+        get(urlPathEqualTo("/api/download"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withBody(createZipPayload("demo/pom.xml", "<project/>"))));
+
+    Path tempArchive = tempDir.resolve("download.zip");
+    ProjectArchiveService service =
+        new ProjectArchiveService(newClient(), new SafeZipExtractor(), () -> tempArchive);
+
+    GenerationRequest request =
+        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+
+    Path output = tempDir.resolve("generated-project");
+    Path extracted =
+        service.downloadAndExtract(request, output, OverwritePolicy.FAIL_IF_EXISTS).join();
+
+    assertThat(extracted).isEqualTo(output);
+    assertThat(Files.exists(output.resolve("pom.xml"))).isTrue();
+    assertThat(Files.exists(tempArchive)).isFalse();
+  }
+
+  private QuarkusApiClient newClient() {
+    return new QuarkusApiClient(
+        HttpClient.newHttpClient(),
+        ObjectMapperProvider.shared(),
+        URI.create(wireMockServer.baseUrl()),
+        new RetryPolicy(1, Duration.ofSeconds(3), Duration.ofMillis(1), 0.0d),
+        delay -> java.util.concurrent.CompletableFuture.completedFuture(null),
+        Clock.fixed(Instant.parse("2026-02-21T00:00:00Z"), ZoneOffset.UTC),
+        () -> 0.5d);
+  }
+
+  private static byte[] createZipPayload(String entryName, String content) throws Exception {
+    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+    try (ZipOutputStream zipOutputStream = new ZipOutputStream(byteArrayOutputStream)) {
+      zipOutputStream.putNextEntry(new ZipEntry(entryName));
+      zipOutputStream.write(content.getBytes(StandardCharsets.UTF_8));
+      zipOutputStream.closeEntry();
+    }
+    return byteArrayOutputStream.toByteArray();
+  }
+}

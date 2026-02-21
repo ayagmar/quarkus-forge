@@ -4,6 +4,7 @@
 - `GET /api/extensions`: fetch extension catalog.
 - `GET /api/metadata`: fetch Java/build-tool metadata.
 - `GET /api/download`: generate project ZIP with encoded query parameters.
+- ZIP download supports both byte-array payload usage and streaming-to-file usage.
 
 ## Retry Policy
 - Async HTTP client based on `java.net.http.HttpClient`.
@@ -28,3 +29,8 @@
   - `b` = build tool
   - `j` = Java version
   - `e` = comma-separated extension IDs
+
+## Streaming ZIP Download
+- `QuarkusApiClient#downloadProjectZipToFile(...)` writes the ZIP response directly to a destination
+  path via `BodyHandlers.ofFile(...)`.
+- Use this path for generation flows that need bounded memory behavior for large archives.

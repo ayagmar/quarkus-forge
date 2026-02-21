@@ -1,0 +1,272 @@
+package dev.ayagmar.quarkusforge.archive;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.zip.Deflater;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+class SafeZipExtractorTest {
+  @TempDir Path tempDir;
+
+  @Test
+  void extractsZipUsingSingleRootDirectory() throws IOException {
+    Path zipPath =
+        createZip(
+            tempDir.resolve("project.zip"),
+            Map.of(
+                "demo/pom.xml", "<project/>".getBytes(StandardCharsets.UTF_8),
+                "demo/src/main/java/App.java", "class App {}".getBytes(StandardCharsets.UTF_8)));
+
+    SafeZipExtractor extractor = new SafeZipExtractor();
+    Path destination = tempDir.resolve("generated-project");
+
+    SafeZipExtractor.ExtractionResult result =
+        extractor.extract(zipPath, destination, OverwritePolicy.FAIL_IF_EXISTS);
+
+    assertThat(result.extractedRoot()).isEqualTo(destination);
+    assertThat(Files.readString(destination.resolve("pom.xml"))).isEqualTo("<project/>");
+    assertThat(Files.readString(destination.resolve("src/main/java/App.java")))
+        .isEqualTo("class App {}");
+  }
+
+  @Test
+  void rejectsZipSlipTraversalEntries() throws IOException {
+    Path zipPath =
+        createZip(
+            tempDir.resolve("traversal.zip"),
+            Map.of(
+                "../evil.txt", "evil".getBytes(StandardCharsets.UTF_8),
+                "demo/pom.xml", "<project/>".getBytes(StandardCharsets.UTF_8)));
+
+    SafeZipExtractor extractor = new SafeZipExtractor();
+
+    assertThatThrownBy(
+            () ->
+                extractor.extract(
+                    zipPath, tempDir.resolve("generated-project"), OverwritePolicy.FAIL_IF_EXISTS))
+        .isInstanceOf(ArchiveException.class)
+        .hasMessageContaining("parent traversal");
+  }
+
+  @Test
+  void rejectsSymlinkEntriesFromUnixModeMetadata() throws IOException {
+    Path zipPath =
+        createZip(
+            tempDir.resolve("symlink.zip"),
+            Map.of(
+                "demo/pom.xml", "<project/>".getBytes(StandardCharsets.UTF_8),
+                "demo/link", "pom.xml".getBytes(StandardCharsets.UTF_8)));
+    patchUnixMode(zipPath, "demo/link", 0120777);
+
+    SafeZipExtractor extractor = new SafeZipExtractor();
+
+    assertThatThrownBy(
+            () ->
+                extractor.extract(
+                    zipPath, tempDir.resolve("generated-project"), OverwritePolicy.FAIL_IF_EXISTS))
+        .isInstanceOf(ArchiveException.class)
+        .hasMessageContaining("symlink");
+  }
+
+  @Test
+  void rejectsSuspiciousUnixModeBits() throws IOException {
+    Path zipPath =
+        createZip(
+            tempDir.resolve("mode.zip"),
+            Map.of("demo/pom.xml", "<project/>".getBytes(StandardCharsets.UTF_8)));
+    patchUnixMode(zipPath, "demo/pom.xml", 0104755);
+
+    SafeZipExtractor extractor = new SafeZipExtractor();
+
+    assertThatThrownBy(
+            () ->
+                extractor.extract(
+                    zipPath, tempDir.resolve("generated-project"), OverwritePolicy.FAIL_IF_EXISTS))
+        .isInstanceOf(ArchiveException.class)
+        .hasMessageContaining("suspicious unix mode");
+  }
+
+  @Test
+  void rejectsHighCompressionRatioZipBomb() throws IOException {
+    byte[] payload = new byte[2 * 1024 * 1024];
+    for (int i = 0; i < payload.length; i++) {
+      payload[i] = 'A';
+    }
+    Path zipPath = createZip(tempDir.resolve("bomb.zip"), Map.of("demo/big.txt", payload));
+
+    SafeZipExtractor extractor =
+        new SafeZipExtractor(new ArchiveSafetyPolicy(1_000, 10L * 1024L * 1024L, 5.0d, 1_024L));
+
+    assertThatThrownBy(
+            () ->
+                extractor.extract(
+                    zipPath, tempDir.resolve("generated-project"), OverwritePolicy.FAIL_IF_EXISTS))
+        .isInstanceOf(ArchiveException.class)
+        .hasMessageContaining("compression ratio");
+  }
+
+  @Test
+  void rejectsZipWhenEntryCountExceedsPolicy() throws IOException {
+    Map<String, byte[]> entries = new LinkedHashMap<>();
+    entries.put("demo/a.txt", "a".getBytes(StandardCharsets.UTF_8));
+    entries.put("demo/b.txt", "b".getBytes(StandardCharsets.UTF_8));
+    entries.put("demo/c.txt", "c".getBytes(StandardCharsets.UTF_8));
+    Path zipPath = createZip(tempDir.resolve("many.zip"), entries);
+
+    SafeZipExtractor extractor =
+        new SafeZipExtractor(new ArchiveSafetyPolicy(2, 1024L * 1024L, 20.0d, 1L));
+
+    assertThatThrownBy(
+            () ->
+                extractor.extract(
+                    zipPath, tempDir.resolve("generated-project"), OverwritePolicy.FAIL_IF_EXISTS))
+        .isInstanceOf(ArchiveException.class)
+        .hasMessageContaining("entry count");
+  }
+
+  @Test
+  void failIfExistsPolicyRefusesToOverwriteTargetDirectory() throws IOException {
+    Path zipPath =
+        createZip(
+            tempDir.resolve("replace.zip"),
+            Map.of("demo/new.txt", "new".getBytes(StandardCharsets.UTF_8)));
+    Path destination = tempDir.resolve("generated-project");
+    Files.createDirectories(destination);
+    Files.writeString(destination.resolve("old.txt"), "old");
+
+    SafeZipExtractor extractor = new SafeZipExtractor();
+
+    assertThatThrownBy(
+            () -> extractor.extract(zipPath, destination, OverwritePolicy.FAIL_IF_EXISTS))
+        .isInstanceOf(ArchiveException.class)
+        .hasRootCauseInstanceOf(java.nio.file.FileAlreadyExistsException.class)
+        .hasRootCauseMessage("Output directory already exists: " + destination);
+    assertThat(Files.readString(destination.resolve("old.txt"))).isEqualTo("old");
+  }
+
+  @Test
+  void replaceExistingPolicyReplacesTargetDirectory() throws IOException {
+    Path zipPath =
+        createZip(
+            tempDir.resolve("replace-ok.zip"),
+            Map.of("demo/new.txt", "new".getBytes(StandardCharsets.UTF_8)));
+    Path destination = tempDir.resolve("generated-project");
+    Files.createDirectories(destination);
+    Files.writeString(destination.resolve("old.txt"), "old");
+
+    SafeZipExtractor extractor = new SafeZipExtractor();
+    extractor.extract(zipPath, destination, OverwritePolicy.REPLACE_EXISTING);
+
+    assertThat(Files.exists(destination.resolve("old.txt"))).isFalse();
+    assertThat(Files.readString(destination.resolve("new.txt"))).isEqualTo("new");
+  }
+
+  @Test
+  void cleanupRemovesStagingDirectoryOnExtractionFailure() throws IOException {
+    Path zipPath =
+        createZip(
+            tempDir.resolve("cleanup.zip"),
+            Map.of(
+                "../evil.txt", "evil".getBytes(StandardCharsets.UTF_8),
+                "demo/pom.xml", "<project/>".getBytes(StandardCharsets.UTF_8)));
+
+    SafeZipExtractor extractor = new SafeZipExtractor();
+    Path destination = tempDir.resolve("generated-project");
+
+    assertThatThrownBy(
+            () -> extractor.extract(zipPath, destination, OverwritePolicy.FAIL_IF_EXISTS))
+        .isInstanceOf(ArchiveException.class);
+
+    assertThat(Files.exists(destination)).isFalse();
+    try (var stream = Files.list(tempDir)) {
+      assertThat(stream.anyMatch(path -> path.getFileName().toString().contains("-extract-")))
+          .isFalse();
+    }
+  }
+
+  @Test
+  void rejectsCorruptZipArchive() throws IOException {
+    Path zipPath = tempDir.resolve("corrupt.zip");
+    Files.writeString(zipPath, "not-a-zip");
+
+    SafeZipExtractor extractor = new SafeZipExtractor();
+
+    assertThatThrownBy(
+            () ->
+                extractor.extract(
+                    zipPath, tempDir.resolve("generated-project"), OverwritePolicy.FAIL_IF_EXISTS))
+        .isInstanceOf(ArchiveException.class)
+        .hasMessageContaining("Invalid ZIP");
+  }
+
+  private static Path createZip(Path zipPath, Map<String, byte[]> entries) throws IOException {
+    try (ZipOutputStream zipOutputStream =
+        new ZipOutputStream(Files.newOutputStream(zipPath), StandardCharsets.UTF_8)) {
+      zipOutputStream.setLevel(Deflater.BEST_COMPRESSION);
+      for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
+        ZipEntry zipEntry = new ZipEntry(entry.getKey());
+        zipOutputStream.putNextEntry(zipEntry);
+        zipOutputStream.write(entry.getValue());
+        zipOutputStream.closeEntry();
+      }
+    }
+    return zipPath;
+  }
+
+  private static void patchUnixMode(Path zipPath, String entryName, int unixMode)
+      throws IOException {
+    byte[] bytes = Files.readAllBytes(zipPath);
+    int index = 0;
+    while (index <= bytes.length - 46) {
+      if (u32(bytes, index) != 0x02014B50) {
+        index++;
+        continue;
+      }
+
+      int nameLength = u16(bytes, index + 28);
+      int extraLength = u16(bytes, index + 30);
+      int commentLength = u16(bytes, index + 32);
+      String currentName = new String(bytes, index + 46, nameLength, StandardCharsets.UTF_8);
+
+      if (currentName.equals(entryName)) {
+        long currentExternalAttributes = u32(bytes, index + 38);
+        long patched = (currentExternalAttributes & 0xFFFFL) | (((long) unixMode) << 16);
+        writeU32(bytes, index + 38, patched);
+        Files.write(zipPath, bytes);
+        return;
+      }
+
+      index += 46 + nameLength + extraLength + commentLength;
+    }
+    throw new IllegalArgumentException("Entry not found in ZIP central directory: " + entryName);
+  }
+
+  private static int u16(byte[] bytes, int offset) {
+    return (bytes[offset] & 0xFF) | ((bytes[offset + 1] & 0xFF) << 8);
+  }
+
+  private static long u32(byte[] bytes, int offset) {
+    return Integer.toUnsignedLong(
+        (bytes[offset] & 0xFF)
+            | ((bytes[offset + 1] & 0xFF) << 8)
+            | ((bytes[offset + 2] & 0xFF) << 16)
+            | ((bytes[offset + 3] & 0xFF) << 24));
+  }
+
+  private static void writeU32(byte[] bytes, int offset, long value) {
+    bytes[offset] = (byte) (value & 0xFF);
+    bytes[offset + 1] = (byte) ((value >> 8) & 0xFF);
+    bytes[offset + 2] = (byte) ((value >> 16) & 0xFF);
+    bytes[offset + 3] = (byte) ((value >> 24) & 0xFF);
+  }
+}

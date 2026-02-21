@@ -12,6 +12,8 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandler;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.net.http.HttpTimeoutException;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -85,6 +87,23 @@ public final class QuarkusApiClient {
     HttpRequest request = newGetRequest(uri, "application/zip, application/octet-stream");
 
     return sendWithRetry(request, BodyHandlers.ofByteArray(), 1)
+        .thenApply(this::assertSuccessful)
+        .thenApply(HttpResponse::body);
+  }
+
+  public CompletableFuture<Path> downloadProjectZipToFile(
+      GenerationRequest generationRequest, Path destinationFile) {
+    URI uri = GenerationQueryBuilder.build(baseUri, generationRequest);
+    HttpRequest request = newGetRequest(uri, "application/zip, application/octet-stream");
+
+    return sendWithRetry(
+            request,
+            BodyHandlers.ofFile(
+                destinationFile,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.TRUNCATE_EXISTING),
+            1)
         .thenApply(this::assertSuccessful)
         .thenApply(HttpResponse::body);
   }

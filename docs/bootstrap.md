@@ -19,6 +19,10 @@ Use these gates after each issue:
 - `mvn -q verify`
 - `mvn -q -Pnative package`
 
+## Archive Generation Safety
+- Archive download/extraction hardening is documented in `docs/archive-safety.md`.
+- Generated ZIPs are downloaded as streams to temporary files and extracted with zip-slip/symlink/zip-bomb guards.
+
 ## Native Profile Notes
 - Native profile is wired with `org.graalvm.buildtools:native-maven-plugin`.
 - In this environment, `native-image` is not installed, so `native.skip=true` is the default.
