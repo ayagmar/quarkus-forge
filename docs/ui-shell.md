@@ -36,3 +36,8 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - Metadata + field validation are recalculated as project inputs change.
 - Footer status area is non-modal and always visible.
 - Errors are surfaced inline in footer as actionable messages.
+
+## Deterministic Async Search
+- Extension search filtering uses a debounced async scheduler (`120ms` default).
+- The scheduler/debouncer layer is injectable so tests can run with virtual time instead of wall-clock delays.
+- Cancellation and stale-result protection ensure outdated async callbacks never overwrite newer search state.

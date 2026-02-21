@@ -29,6 +29,7 @@ import dev.tamboui.widgets.list.ListItem;
 import dev.tamboui.widgets.list.ListState;
 import dev.tamboui.widgets.list.ListWidget;
 import dev.tamboui.widgets.paragraph.Paragraph;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashSet;
@@ -63,6 +64,7 @@ public final class CoreTuiController {
           new ExtensionItem("io.quarkus:quarkus-junit5", "JUnit 5", "junit5"));
 
   private static final int NARROW_WIDTH_THRESHOLD = 100;
+  private static final Duration DEFAULT_EXTENSION_SEARCH_DEBOUNCE = Duration.ofMillis(120);
 
   private final EnumMap<FocusTarget, TextInputState> inputStates = new EnumMap<>(FocusTarget.class);
   private final ListState extensionListState = new ListState();
@@ -70,6 +72,8 @@ public final class CoreTuiController {
   private final ProjectRequestValidator requestValidator = new ProjectRequestValidator();
   private final MetadataCompatibilityValidator compatibilityValidator =
       new MetadataCompatibilityValidator();
+  private final Debouncer extensionSearchDebouncer;
+  private final LatestResultGate extensionSearchResultGate = new LatestResultGate();
 
   private final MetadataDto metadataSnapshot;
   private final String metadataLoadError;
@@ -82,14 +86,18 @@ public final class CoreTuiController {
   private String errorMessage;
   private boolean submitRequested;
 
-  private CoreTuiController(ForgeUiState initialState) {
+  private CoreTuiController(
+      ForgeUiState initialState, UiScheduler scheduler, Duration debounceDelay) {
     Objects.requireNonNull(initialState);
+    Objects.requireNonNull(scheduler);
+    Objects.requireNonNull(debounceDelay);
     request = initialState.request();
     validation = initialState.validation();
     focusTarget = FocusTarget.GROUP_ID;
     statusMessage = "Ready";
     errorMessage = "";
     submitRequested = false;
+    extensionSearchDebouncer = new Debouncer(scheduler, debounceDelay);
 
     for (FocusTarget target : FocusTarget.values()) {
       inputStates.put(target, new TextInputState(""));
@@ -117,12 +125,19 @@ public final class CoreTuiController {
     metadataSnapshot = loadedSnapshot;
     metadataLoadError = loadedError;
 
-    refreshFilteredExtensions();
+    applyFilteredExtensions(
+        inputStates.get(FocusTarget.EXTENSION_SEARCH).text(),
+        extensionSearchResultGate.nextToken());
     revalidate();
   }
 
   public static CoreTuiController from(ForgeUiState initialState) {
-    return new CoreTuiController(initialState);
+    return from(initialState, UiScheduler.immediate(), Duration.ZERO);
+  }
+
+  public static CoreTuiController from(
+      ForgeUiState initialState, UiScheduler scheduler, Duration debounceDelay) {
+    return new CoreTuiController(initialState, scheduler, debounceDelay);
   }
 
   public UiAction onEvent(Event event) {
@@ -135,6 +150,7 @@ public final class CoreTuiController {
     }
 
     if (keyEvent.isQuit() || keyEvent.isCancel()) {
+      cancelPendingAsyncOperations();
       return UiAction.handled(true);
     }
     if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && keyEvent.hasShift()) {
@@ -161,7 +177,7 @@ public final class CoreTuiController {
     if (isTextInputFocus(focusTarget)
         && handleTextInputKey(inputStates.get(focusTarget), keyEvent)) {
       if (focusTarget == FocusTarget.EXTENSION_SEARCH) {
-        refreshFilteredExtensions();
+        scheduleFilteredExtensionsRefresh();
       } else {
         rebuildRequestFromInputs();
         revalidate();
@@ -221,6 +237,14 @@ public final class CoreTuiController {
 
   boolean submitRequested() {
     return submitRequested;
+  }
+
+  int filteredExtensionCount() {
+    return filteredExtensions.size();
+  }
+
+  String firstFilteredExtensionId() {
+    return filteredExtensions.isEmpty() ? "" : filteredExtensions.getFirst().id();
   }
 
   private void renderHeader(Frame frame, Rect area) {
@@ -482,9 +506,19 @@ public final class CoreTuiController {
         || focusTarget == FocusTarget.SUBMIT;
   }
 
-  private void refreshFilteredExtensions() {
-    String query =
-        inputStates.get(FocusTarget.EXTENSION_SEARCH).text().toLowerCase(Locale.ROOT).trim();
+  private void scheduleFilteredExtensionsRefresh() {
+    String query = inputStates.get(FocusTarget.EXTENSION_SEARCH).text();
+    long token = extensionSearchResultGate.nextToken();
+    statusMessage = "Searching extensions...";
+    extensionSearchDebouncer.submit(() -> applyFilteredExtensions(query, token));
+  }
+
+  private void applyFilteredExtensions(String queryText, long token) {
+    if (!extensionSearchResultGate.shouldApply(token)) {
+      return;
+    }
+
+    String query = queryText.toLowerCase(Locale.ROOT).trim();
     if (query.isBlank()) {
       filteredExtensions = DEFAULT_EXTENSIONS;
     } else {
@@ -504,6 +538,8 @@ public final class CoreTuiController {
         || extensionListState.selected() >= filteredExtensions.size()) {
       extensionListState.selectFirst();
     }
+
+    statusMessage = "Extensions filtered: " + filteredExtensions.size();
   }
 
   private void rebuildRequestFromInputs() {
@@ -529,6 +565,11 @@ public final class CoreTuiController {
       report = report.merge(compatibilityValidator.validate(request, metadataSnapshot));
     }
     validation = report;
+  }
+
+  private void cancelPendingAsyncOperations() {
+    extensionSearchDebouncer.cancel();
+    extensionSearchResultGate.cancel();
   }
 
   private static boolean isTextInputFocus(FocusTarget focusTarget) {

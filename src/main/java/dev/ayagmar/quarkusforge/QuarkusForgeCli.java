@@ -11,7 +11,9 @@ import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
 import dev.ayagmar.quarkusforge.domain.ValidationError;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.ayagmar.quarkusforge.ui.CoreTuiController;
+import dev.ayagmar.quarkusforge.ui.UiScheduler;
 import dev.tamboui.tui.TuiRunner;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -109,7 +111,11 @@ public final class QuarkusForgeCli implements Callable<Integer> {
 
   static void runTui(boolean smokeMode, ForgeUiState initialState) throws Exception {
     try (var tui = TuiRunner.create()) {
-      CoreTuiController controller = CoreTuiController.from(initialState);
+      CoreTuiController controller =
+          CoreTuiController.from(
+              initialState,
+              UiScheduler.fromScheduledExecutor(tui.scheduler(), tui::runOnRenderThread),
+              Duration.ofMillis(120));
       if (smokeMode) {
         tui.scheduler().schedule(tui::quit, 350, TimeUnit.MILLISECONDS);
       }
