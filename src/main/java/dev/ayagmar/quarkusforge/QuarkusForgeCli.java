@@ -1,16 +1,22 @@
 package dev.ayagmar.quarkusforge;
 
+import dev.ayagmar.quarkusforge.api.ApiContractException;
+import dev.ayagmar.quarkusforge.api.MetadataSnapshotLoader;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.CliPrefillMapper;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
+import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityValidator;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
+import dev.ayagmar.quarkusforge.domain.ValidationError;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.tamboui.text.Text;
 import dev.tamboui.tui.TuiRunner;
 import dev.tamboui.tui.event.Event;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.widgets.paragraph.Paragraph;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import picocli.CommandLine;
@@ -66,6 +72,18 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   private String outputDirectory;
 
   @Option(
+      names = {"-b", "--build-tool"},
+      defaultValue = "maven",
+      description = "Build tool (metadata-driven)")
+  private String buildTool;
+
+  @Option(
+      names = {"-j", "--java-version"},
+      defaultValue = "25",
+      description = "Java version for generated project (metadata-driven)")
+  private String javaVersion;
+
+  @Option(
       names = "--dry-run",
       defaultValue = "false",
       description = "Validate CLI prefill and print summary without starting TUI")
@@ -118,10 +136,25 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   }
 
   private ForgeUiState buildInitialState() {
-    CliPrefill prefill = new CliPrefill(groupId, artifactId, version, packageName, outputDirectory);
+    CliPrefill prefill =
+        new CliPrefill(
+            groupId, artifactId, version, packageName, outputDirectory, buildTool, javaVersion);
     ProjectRequest request = CliPrefillMapper.map(prefill);
-    ValidationReport validation = new ProjectRequestValidator().validate(request);
-    return new ForgeUiState(request, validation);
+
+    ValidationReport fieldValidation = new ProjectRequestValidator().validate(request);
+    ValidationReport compatibilityValidation = metadataCompatibilityValidation(request);
+    return new ForgeUiState(request, fieldValidation.merge(compatibilityValidation));
+  }
+
+  private ValidationReport metadataCompatibilityValidation(ProjectRequest request) {
+    try {
+      return new MetadataCompatibilityValidator()
+          .validate(request, MetadataSnapshotLoader.loadDefault());
+    } catch (ApiContractException contractException) {
+      List<ValidationError> errors = new ArrayList<>();
+      errors.add(new ValidationError("metadata", contractException.getMessage()));
+      return new ValidationReport(errors);
+    }
   }
 
   private static boolean handleEvent(Event event, TuiRunner runner) {
@@ -148,7 +181,13 @@ public final class QuarkusForgeCli implements Callable<Integer> {
             + request.packageName()
             + "\n"
             + "outputDir="
-            + request.outputDirectory();
+            + request.outputDirectory()
+            + "\n"
+            + "buildTool="
+            + request.buildTool()
+            + "\n"
+            + "javaVersion="
+            + request.javaVersion();
 
     return Paragraph.builder().text(Text.from(content)).build();
   }
@@ -167,5 +206,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     System.out.println(" - version: " + request.version());
     System.out.println(" - packageName: " + request.packageName());
     System.out.println(" - outputDirectory: " + request.outputDirectory());
+    System.out.println(" - buildTool: " + request.buildTool());
+    System.out.println(" - javaVersion: " + request.javaVersion());
   }
 }

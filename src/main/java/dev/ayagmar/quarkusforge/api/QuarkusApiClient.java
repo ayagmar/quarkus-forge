@@ -18,7 +18,9 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -119,7 +121,9 @@ public final class QuarkusApiClient {
 
     List<String> javaVersions = toStringList(javaVersionsNode, "javaVersions");
     List<String> buildTools = toStringList(buildToolsNode, "buildTools");
-    return new MetadataDto(javaVersions, buildTools);
+    Map<String, List<String>> compatibility =
+        parseCompatibility(root.get("compatibility"), buildTools, javaVersions);
+    return new MetadataDto(javaVersions, buildTools, compatibility);
   }
 
   private <T> CompletableFuture<HttpResponse<T>> sendWithRetry(
@@ -267,6 +271,31 @@ public final class QuarkusApiClient {
       values.add(element.textValue());
     }
     return List.copyOf(values);
+  }
+
+  private static Map<String, List<String>> parseCompatibility(
+      JsonNode node, List<String> buildTools, List<String> javaVersions) {
+    Map<String, List<String>> compatibility = new LinkedHashMap<>();
+    if (node == null || node.isNull()) {
+      for (String buildTool : buildTools) {
+        compatibility.put(buildTool, javaVersions);
+      }
+      return compatibility;
+    }
+
+    if (!node.isObject()) {
+      throw new ApiContractException("Metadata payload field 'compatibility' must be an object");
+    }
+
+    for (String buildTool : buildTools) {
+      JsonNode javaVersionsNode = node.get(buildTool);
+      if (javaVersionsNode == null || !javaVersionsNode.isArray()) {
+        throw new ApiContractException(
+            "Metadata payload compatibility missing build tool entry '" + buildTool + "'");
+      }
+      compatibility.put(buildTool, toStringList(javaVersionsNode, "compatibility." + buildTool));
+    }
+    return compatibility;
   }
 
   private static Throwable unwrapThrowable(Throwable throwable) {

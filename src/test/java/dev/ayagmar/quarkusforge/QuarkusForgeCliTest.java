@@ -38,4 +38,23 @@ class QuarkusForgeCliTest {
 
     assertThat(exitCode).isEqualTo(2);
   }
+
+  @Test
+  void dryRunBlocksUnsupportedMetadataCombination() {
+    int exitCode =
+        QuarkusForgeCli.runWithArgs(
+            new String[] {
+              "--dry-run",
+              "--group-id",
+              "com.example",
+              "--artifact-id",
+              "forge-app",
+              "--build-tool",
+              "gradle",
+              "--java-version",
+              "17"
+            });
+
+    assertThat(exitCode).isEqualTo(2);
+  }
 }

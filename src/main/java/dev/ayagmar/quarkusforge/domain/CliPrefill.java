@@ -5,4 +5,6 @@ public record CliPrefill(
     String artifactId,
     String version,
     String packageName,
-    String outputDirectory) {}
+    String outputDirectory,
+    String buildTool,
+    String javaVersion) {}

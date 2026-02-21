@@ -26,6 +26,7 @@ class QuarkusApiContractDriftTest {
     assertThat(extensions).isNotEmpty();
     assertThat(metadata.javaVersions()).contains("25");
     assertThat(metadata.buildTools()).contains("maven");
+    assertThat(metadata.compatibility()).containsKey("gradle");
   }
 
   @Test

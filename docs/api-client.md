@@ -16,6 +16,7 @@
 
 ## Contract Safety
 - JSON payloads are parsed with strict required fields.
+- Metadata contract includes compatibility matrix entries per build tool.
 - Missing/renamed required fields raise `ApiContractException`.
 - Snapshot contract drift test is pinned at `src/test/resources/contracts/quarkus-api-snapshot.json`.
 

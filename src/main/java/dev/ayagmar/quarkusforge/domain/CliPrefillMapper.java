@@ -19,7 +19,9 @@ public final class CliPrefillMapper {
         trim(prefill.artifactId()),
         trim(prefill.version()),
         trim(effectivePackage),
-        trim(prefill.outputDirectory()));
+        trim(prefill.outputDirectory()),
+        trim(prefill.buildTool()),
+        trim(prefill.javaVersion()));
   }
 
   static String derivePackageName(String groupId, String artifactId) {

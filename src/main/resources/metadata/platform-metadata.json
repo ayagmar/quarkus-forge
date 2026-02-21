@@ -1,0 +1,8 @@
+{
+  "javaVersions": ["17", "21", "25"],
+  "buildTools": ["maven", "gradle"],
+  "compatibility": {
+    "maven": ["17", "21", "25"],
+    "gradle": ["21", "25"]
+  }
+}
