@@ -26,6 +26,9 @@ Use these gates after each issue:
 ## Core TUI Shell
 - The core two-panel shell, focus routing model, and key bindings are documented in `docs/ui-shell.md`.
 
+## Performance and Footprint
+- Runtime dependency inventory, version audit, and artifact-size baselines are tracked in `docs/performance.md`.
+
 ## Native Profile Notes
 - Native profile is wired with `org.graalvm.buildtools:native-maven-plugin`.
 - In this environment, `native-image` is not installed, so `native.skip=true` is the default.
