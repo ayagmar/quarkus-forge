@@ -1,0 +1,41 @@
+package dev.ayagmar.quarkusforge.api;
+
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+public final class GenerationQueryBuilder {
+  private GenerationQueryBuilder() {}
+
+  public static URI build(URI baseUri, GenerationRequest request) {
+    URI endpoint = baseUri.resolve("/api/download");
+
+    Map<String, String> parameters = new LinkedHashMap<>();
+    parameters.put("g", request.groupId());
+    parameters.put("a", request.artifactId());
+    parameters.put("v", request.version());
+    parameters.put("b", request.buildTool());
+    parameters.put("j", request.javaVersion());
+    parameters.put("e", String.join(",", request.extensions()));
+
+    List<String> queryParts =
+        parameters.entrySet().stream()
+            .filter(entry -> entry.getValue() != null && !entry.getValue().isBlank())
+            .map(entry -> urlEncode(entry.getKey()) + "=" + urlEncode(entry.getValue()))
+            .collect(Collectors.toList());
+
+    String query = String.join("&", queryParts);
+    if (query.isBlank()) {
+      return endpoint;
+    }
+    return URI.create(endpoint + "?" + query);
+  }
+
+  private static String urlEncode(String value) {
+    return URLEncoder.encode(value, StandardCharsets.UTF_8);
+  }
+}

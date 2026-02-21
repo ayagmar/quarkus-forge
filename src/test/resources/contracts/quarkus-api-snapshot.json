@@ -1,0 +1,18 @@
+{
+  "extensions": [
+    {
+      "id": "io.quarkus:quarkus-rest",
+      "name": "REST",
+      "shortName": "rest"
+    },
+    {
+      "id": "io.quarkus:quarkus-jdbc-postgresql",
+      "name": "JDBC PostgreSQL",
+      "shortName": "jdbc-postgresql"
+    }
+  ],
+  "metadata": {
+    "javaVersions": ["17", "21", "25"],
+    "buildTools": ["maven", "gradle"]
+  }
+}
