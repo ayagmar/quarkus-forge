@@ -40,6 +40,45 @@ class SafeZipExtractorTest {
   }
 
   @Test
+  void keepsOutputDirectoryForSingleTopLevelFileArchive() throws IOException {
+    Path zipPath =
+        createZip(
+            tempDir.resolve("single-file-root.zip"),
+            Map.of("pom.xml", "<project/>".getBytes(StandardCharsets.UTF_8)));
+
+    SafeZipExtractor extractor = new SafeZipExtractor();
+    Path destination = tempDir.resolve("generated-project");
+
+    SafeZipExtractor.ExtractionResult result =
+        extractor.extract(zipPath, destination, OverwritePolicy.FAIL_IF_EXISTS);
+
+    assertThat(result.extractedRoot()).isEqualTo(destination);
+    assertThat(Files.isDirectory(destination)).isTrue();
+    assertThat(Files.readString(destination.resolve("pom.xml"))).isEqualTo("<project/>");
+  }
+
+  @Test
+  void acceptsBackslashEntryNamesFromTheCentralDirectory() throws IOException {
+    Path zipPath =
+        createZip(
+            tempDir.resolve("backslash.zip"),
+            Map.of(
+                "demo\\pom.xml", "<project/>".getBytes(StandardCharsets.UTF_8),
+                "demo/src/main/java/App.java", "class App {}".getBytes(StandardCharsets.UTF_8)));
+
+    SafeZipExtractor extractor = new SafeZipExtractor();
+    Path destination = tempDir.resolve("generated-project");
+
+    SafeZipExtractor.ExtractionResult result =
+        extractor.extract(zipPath, destination, OverwritePolicy.FAIL_IF_EXISTS);
+
+    assertThat(result.extractedRoot()).isEqualTo(destination);
+    assertThat(Files.readString(destination.resolve("pom.xml"))).isEqualTo("<project/>");
+    assertThat(Files.readString(destination.resolve("src/main/java/App.java")))
+        .isEqualTo("class App {}");
+  }
+
+  @Test
   void rejectsZipSlipTraversalEntries() throws IOException {
     Path zipPath =
         createZip(
@@ -133,6 +172,43 @@ class SafeZipExtractorTest {
                     zipPath, tempDir.resolve("generated-project"), OverwritePolicy.FAIL_IF_EXISTS))
         .isInstanceOf(ArchiveException.class)
         .hasMessageContaining("exceeds declared uncompressed size");
+  }
+
+  @Test
+  void rejectsEntryThatExceedsDeclaredZeroUncompressedSizeDuringStreaming() throws IOException {
+    byte[] payload = new byte[8 * 1024];
+    for (int i = 0; i < payload.length; i++) {
+      payload[i] = 'A';
+    }
+    Path zipPath = createZip(tempDir.resolve("zero-size-mismatch.zip"), Map.of("demo/big.txt", payload));
+    patchUncompressedSize(zipPath, "demo/big.txt", 0L);
+
+    SafeZipExtractor extractor =
+        new SafeZipExtractor(new ArchiveSafetyPolicy(1_000, 32L * 1024L * 1024L, 500.0d, 1L));
+
+    assertThatThrownBy(
+            () ->
+                extractor.extract(
+                    zipPath, tempDir.resolve("generated-project"), OverwritePolicy.FAIL_IF_EXISTS))
+        .isInstanceOf(ArchiveException.class)
+        .hasMessageContaining("exceeds declared uncompressed size");
+  }
+
+  @Test
+  void rejectsEntriesThatCollideAfterNameNormalization() throws IOException {
+    Map<String, byte[]> entries = new LinkedHashMap<>();
+    entries.put("demo\\pom.xml", "<project/>".getBytes(StandardCharsets.UTF_8));
+    entries.put("demo/pom.xml", "<project/>".getBytes(StandardCharsets.UTF_8));
+    Path zipPath = createZip(tempDir.resolve("normalized-collision.zip"), entries);
+
+    SafeZipExtractor extractor = new SafeZipExtractor();
+
+    assertThatThrownBy(
+            () ->
+                extractor.extract(
+                    zipPath, tempDir.resolve("generated-project"), OverwritePolicy.FAIL_IF_EXISTS))
+        .isInstanceOf(ArchiveException.class)
+        .hasMessageContaining("after normalization");
   }
 
   @Test

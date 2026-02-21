@@ -169,7 +169,7 @@ public final class SafeZipExtractor {
         long copied = copyResult.entryBytes();
         extractedBytes = copyResult.totalExtractedBytes();
 
-        if (metadata.uncompressedSize() > 0 && copied != metadata.uncompressedSize()) {
+        if (copied != metadata.uncompressedSize()) {
           throw new ArchiveException(
               "ZIP entry size mismatch for '"
                   + normalizedName
@@ -196,7 +196,7 @@ public final class SafeZipExtractor {
     Path extractedRoot = stagingContent;
     if (topLevelSegments.size() == 1) {
       Path singleRoot = stagingContent.resolve(topLevelSegments.iterator().next());
-      if (Files.exists(singleRoot)) {
+      if (Files.isDirectory(singleRoot)) {
         extractedRoot = singleRoot;
       }
     }
@@ -247,7 +247,7 @@ public final class SafeZipExtractor {
       int read;
       while ((read = inputStream.read(buffer)) != -1) {
         long nextCopied = safeAdd(copied, read);
-        if (expectedUncompressedSize > 0 && nextCopied > expectedUncompressedSize) {
+        if (nextCopied > expectedUncompressedSize) {
           throw new ArchiveException(
               "ZIP entry '"
                   + entryName

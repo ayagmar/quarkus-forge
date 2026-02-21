@@ -89,15 +89,19 @@ final class ZipCentralDirectoryReader {
       ByteBuffer nameBuffer = ByteBuffer.wrap(nameBytes);
       readFully(channel, nameBuffer);
       String entryName = new String(nameBytes, StandardCharsets.UTF_8);
+      String normalizedEntryName = SafeZipExtractor.normalizeEntryName(entryName);
 
       long skip = (long) extraLength + commentLength;
       channel.position(channel.position() + skip);
 
-      if (entries.containsKey(entryName)) {
-        throw new ArchiveException("Duplicate ZIP entry found: " + entryName);
+      if (entries.containsKey(normalizedEntryName)) {
+        throw new ArchiveException(
+            "Duplicate ZIP entry found after normalization: " + normalizedEntryName);
       }
       entries.put(
-          entryName, new ZipEntryMetadata(entryName, compressedSize, uncompressedSize, unixMode));
+          normalizedEntryName,
+          new ZipEntryMetadata(
+              normalizedEntryName, compressedSize, uncompressedSize, unixMode));
 
       consumed += CEN_FIXED_LENGTH + fileNameLength + skip;
     }
