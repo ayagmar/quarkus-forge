@@ -32,3 +32,8 @@ If an archive exceeds any limit, extraction fails fast before writing to final o
 - Extraction always happens in a staging directory.
 - On failure, staging content is deleted.
 - `ProjectArchiveService` also deletes the temporary downloaded ZIP on success, failure, and cancellation.
+
+## Threading Boundary
+- Archive extraction is explicitly offloaded to a dedicated async executor boundary after download
+  completion.
+- HTTP completion threads are no longer used to run disk-heavy extraction work.

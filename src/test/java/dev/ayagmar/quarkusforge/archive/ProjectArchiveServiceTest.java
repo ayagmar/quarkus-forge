@@ -24,6 +24,11 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.AfterEach;
@@ -132,6 +137,89 @@ class ProjectArchiveServiceTest {
     assertThat(extracted).isEqualTo(output);
     assertThat(Files.exists(output.resolve("pom.xml"))).isTrue();
     assertThat(Files.exists(tempArchive)).isFalse();
+  }
+
+  @Test
+  void extractionRunsOnConfiguredExecutor() throws Exception {
+    stubFor(
+        get(urlPathEqualTo("/api/download"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withBody(createZipPayload("demo/pom.xml", "<project/>"))));
+
+    Path tempArchive = tempDir.resolve("download.zip");
+    ExecutorService extractionExecutor =
+        Executors.newSingleThreadExecutor(
+            runnable -> {
+              Thread thread = new Thread(runnable, "archive-extractor-test");
+              thread.setDaemon(true);
+              return thread;
+            });
+    try {
+      ProjectArchiveService service =
+          new ProjectArchiveService(
+              newClient(), new SafeZipExtractor(), () -> tempArchive, extractionExecutor);
+
+      GenerationRequest request =
+          new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+
+      AtomicReference<String> extractionThreadName = new AtomicReference<>();
+      Path output = tempDir.resolve("generated-project");
+      service
+          .downloadAndExtract(
+              request,
+              output,
+              OverwritePolicy.FAIL_IF_EXISTS,
+              () -> false,
+              progress -> {
+                if (progress == ProjectArchiveService.ProgressStep.EXTRACTING_ARCHIVE) {
+                  extractionThreadName.set(Thread.currentThread().getName());
+                }
+              })
+          .join();
+
+      assertThat(extractionThreadName.get()).contains("archive-extractor-test");
+      assertThat(Files.exists(output.resolve("pom.xml"))).isTrue();
+      assertThat(Files.exists(tempArchive)).isFalse();
+    } finally {
+      extractionExecutor.shutdownNow();
+    }
+  }
+
+  @Test
+  void rejectedExtractionExecutorFailsFastAndCleansTemporaryArchive() throws Exception {
+    stubFor(
+        get(urlPathEqualTo("/api/download"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withBody(createZipPayload("demo/pom.xml", "<project/>"))));
+
+    Path tempArchive = tempDir.resolve("download.zip");
+    Executor rejectingExecutor =
+        command -> {
+          throw new RejectedExecutionException("executor saturated");
+        };
+    ProjectArchiveService service =
+        new ProjectArchiveService(
+            newClient(), new SafeZipExtractor(), () -> tempArchive, rejectingExecutor);
+
+    GenerationRequest request =
+        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+
+    assertThatThrownBy(
+            () ->
+                service
+                    .downloadAndExtract(
+                        request,
+                        tempDir.resolve("generated-project"),
+                        OverwritePolicy.FAIL_IF_EXISTS)
+                    .join())
+        .isInstanceOf(CompletionException.class)
+        .hasCauseInstanceOf(RejectedExecutionException.class);
+    assertThat(Files.exists(tempArchive)).isFalse();
+    assertThat(Files.exists(tempDir.resolve("generated-project"))).isFalse();
   }
 
   private QuarkusApiClient newClient() {
