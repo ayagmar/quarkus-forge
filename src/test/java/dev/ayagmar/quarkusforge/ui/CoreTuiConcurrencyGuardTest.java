@@ -11,6 +11,7 @@ class CoreTuiConcurrencyGuardTest {
   void generationCancellationVisibilityFieldsRemainVolatile() throws Exception {
     assertThat(isVolatileField("generationCancelRequested")).isTrue();
     assertThat(isVolatileField("generationToken")).isTrue();
+    assertThat(isVolatileField("extensionCatalogLoadToken")).isTrue();
   }
 
   private static boolean isVolatileField(String fieldName) throws NoSuchFieldException {

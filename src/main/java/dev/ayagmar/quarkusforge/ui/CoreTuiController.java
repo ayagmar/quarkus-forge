@@ -77,6 +77,7 @@ public final class CoreTuiController {
   private CompletableFuture<Path> generationFuture;
   private volatile boolean generationCancelRequested;
   private volatile long generationToken;
+  private volatile long extensionCatalogLoadToken;
   private volatile boolean asyncOperationsCancelled;
   private String successHint;
 
@@ -103,6 +104,7 @@ public final class CoreTuiController {
     generationFuture = null;
     generationCancelRequested = false;
     generationToken = 0L;
+    extensionCatalogLoadToken = 0L;
     asyncOperationsCancelled = false;
     successHint = "";
 
@@ -149,19 +151,19 @@ public final class CoreTuiController {
   public void loadExtensionCatalogAsync(ExtensionCatalogLoader loader) {
     Objects.requireNonNull(loader);
     asyncOperationsCancelled = false;
+    long loadToken = ++extensionCatalogLoadToken;
     statusMessage = "Loading extension catalog...";
 
     loader
         .load()
         .whenComplete(
             (extensions, throwable) -> {
-              if (asyncOperationsCancelled) {
+              if (asyncOperationsCancelled || loadToken != extensionCatalogLoadToken) {
                 return;
               }
-              scheduler.schedule(
-                  Duration.ZERO,
+              scheduleOnRenderThread(
                   () -> {
-                    if (asyncOperationsCancelled) {
+                    if (asyncOperationsCancelled || loadToken != extensionCatalogLoadToken) {
                       return;
                     }
                     if (throwable != null) {
@@ -237,10 +239,16 @@ public final class CoreTuiController {
 
     if (keyEvent.isConfirm()) {
       submitRequested = true;
+      resetGenerationStateAfterTerminalOutcome();
+      if (!transitionGenerationState(GenerationState.VALIDATING)) {
+        statusMessage = "Submit ignored in state: " + generationStateLabel();
+        return UiAction.handled(false);
+      }
       if (!validation.isValid()) {
         submitBlockedByValidation = true;
         errorMessage = firstValidationError(validation);
         statusMessage = "Submit blocked: invalid input";
+        transitionGenerationState(GenerationState.ERROR);
       } else {
         submitBlockedByValidation = false;
         errorMessage = "";
@@ -249,6 +257,7 @@ public final class CoreTuiController {
               "Submit requested with "
                   + extensionCatalogState.selectedExtensionCount()
                   + " extension(s), but generation service is not configured.";
+          transitionGenerationState(GenerationState.IDLE);
         } else {
           startGenerationFlow();
         }
@@ -317,6 +326,10 @@ public final class CoreTuiController {
 
   boolean submitRequested() {
     return submitRequested;
+  }
+
+  GenerationState generationState() {
+    return generationState;
   }
 
   int filteredExtensionCount() {
@@ -420,8 +433,7 @@ public final class CoreTuiController {
       boolean selected = extensionCatalogState.isSelected(extension.id());
       String prefix = selected ? "[x] " : "[ ] ";
       String displayLabel = extensionDisplayLabel(extension);
-      items.add(
-          ListItem.from(prefix + displayLabel).toSizedWidget());
+      items.add(ListItem.from(prefix + displayLabel).toSizedWidget());
     }
 
     Block listBlock =
@@ -605,10 +617,12 @@ public final class CoreTuiController {
   private void startGenerationFlow() {
     successHint = "";
     extensionCatalogState.cancelPendingAsync();
-    generatedProjectCleanup();
     generationCancelRequested = false;
     long token = ++generationToken;
-    generationState = GenerationState.GENERATING;
+    if (!transitionGenerationState(GenerationState.LOADING)) {
+      statusMessage = "Submit ignored in state: " + generationStateLabel();
+      return;
+    }
     statusMessage = "Generation in progress: preparing request...";
 
     GenerationRequest generationRequest = toGenerationRequest();
@@ -620,31 +634,29 @@ public final class CoreTuiController {
             outputDirectory,
             () -> generationCancelRequested || token != generationToken,
             progressMessage ->
-                scheduler.schedule(
-                    Duration.ZERO, () -> onGenerationProgress(token, progressMessage)));
+                scheduleOnRenderThread(() -> onGenerationProgress(token, progressMessage)));
 
     generationFuture.whenComplete(
         (generatedPath, throwable) ->
-            scheduler.schedule(
-                Duration.ZERO, () -> onGenerationCompleted(token, generatedPath, throwable)));
+            scheduleOnRenderThread(() -> onGenerationCompleted(token, generatedPath, throwable)));
   }
 
   private void onGenerationProgress(long token, String progressMessage) {
-    if (token != generationToken || generationState != GenerationState.GENERATING) {
+    if (token != generationToken || generationState != GenerationState.LOADING) {
       return;
     }
     statusMessage = "Generation in progress: " + progressMessage;
   }
 
   private void onGenerationCompleted(long token, Path generatedPath, Throwable throwable) {
-    if (token != generationToken) {
+    if (token != generationToken || generationState != GenerationState.LOADING) {
       return;
     }
     generationFuture = null;
 
     Throwable cause = unwrapCompletionCause(throwable);
     if (cause == null && generatedPath != null) {
-      generationState = GenerationState.SUCCESS;
+      transitionGenerationState(GenerationState.SUCCESS);
       Path normalizedPath = generatedPath.toAbsolutePath().normalize();
       statusMessage = "Generation succeeded: " + normalizedPath;
       errorMessage = "";
@@ -657,20 +669,23 @@ public final class CoreTuiController {
     }
 
     if (cause instanceof CancellationException || generationCancelRequested) {
-      generationState = GenerationState.CANCELLED;
+      transitionGenerationState(GenerationState.CANCELLED);
       statusMessage = "Generation cancelled. Update inputs and press Enter to retry.";
       errorMessage = "";
       successHint = "";
       return;
     }
 
-    generationState = GenerationState.ERROR;
+    transitionGenerationState(GenerationState.ERROR);
     statusMessage = "Generation failed.";
     errorMessage = userFriendlyError(cause);
     successHint = "";
   }
 
   private void requestGenerationCancellation() {
+    if (generationState != GenerationState.LOADING) {
+      return;
+    }
     generationCancelRequested = true;
     statusMessage = "Cancellation requested. Waiting for cleanup...";
     errorMessage = "";
@@ -680,7 +695,7 @@ public final class CoreTuiController {
   }
 
   private boolean isGenerationInProgress() {
-    return generationState == GenerationState.GENERATING;
+    return generationState == GenerationState.LOADING;
   }
 
   private GenerationRequest toGenerationRequest() {
@@ -698,21 +713,52 @@ public final class CoreTuiController {
     return outputRoot.resolve(request.artifactId());
   }
 
-  private void generatedProjectCleanup() {
+  private void resetGenerationStateAfterTerminalOutcome() {
     if (generationState == GenerationState.SUCCESS
         || generationState == GenerationState.ERROR
         || generationState == GenerationState.CANCELLED) {
-      generationState = GenerationState.IDLE;
+      transitionGenerationState(GenerationState.IDLE);
     }
   }
 
   private String generationStateLabel() {
     return switch (generationState) {
       case IDLE -> "idle";
-      case GENERATING -> "running (Esc to cancel)";
+      case VALIDATING -> "validating";
+      case LOADING -> "loading (Esc to cancel)";
       case SUCCESS -> "success";
       case ERROR -> "failed";
       case CANCELLED -> "cancelled";
+    };
+  }
+
+  private void scheduleOnRenderThread(Runnable task) {
+    scheduler.schedule(Duration.ZERO, task);
+  }
+
+  private boolean transitionGenerationState(GenerationState targetState) {
+    if (!isValidTransition(generationState, targetState)) {
+      return false;
+    }
+    generationState = targetState;
+    return true;
+  }
+
+  static boolean isValidTransition(GenerationState currentState, GenerationState targetState) {
+    if (currentState == targetState) {
+      return false;
+    }
+    return switch (currentState) {
+      case IDLE -> targetState == GenerationState.VALIDATING;
+      case VALIDATING ->
+          targetState == GenerationState.LOADING
+              || targetState == GenerationState.ERROR
+              || targetState == GenerationState.IDLE;
+      case LOADING ->
+          targetState == GenerationState.SUCCESS
+              || targetState == GenerationState.ERROR
+              || targetState == GenerationState.CANCELLED;
+      case SUCCESS, ERROR, CANCELLED -> targetState == GenerationState.IDLE;
     };
   }
 
@@ -770,7 +816,10 @@ public final class CoreTuiController {
     if (extension.shortName().equalsIgnoreCase(extension.name())) {
       return extension.name();
     }
-    return extension.name() + " (" + truncate(extension.shortName(), LIST_SHORT_NAME_MAX_LENGTH) + ")";
+    return extension.name()
+        + " ("
+        + truncate(extension.shortName(), LIST_SHORT_NAME_MAX_LENGTH)
+        + ")";
   }
 
   private static String truncate(String value, int maxLength) {
@@ -802,9 +851,10 @@ public final class CoreTuiController {
         Consumer<String> progressListener);
   }
 
-  private enum GenerationState {
+  enum GenerationState {
     IDLE,
-    GENERATING,
+    VALIDATING,
+    LOADING,
     SUCCESS,
     ERROR,
     CANCELLED

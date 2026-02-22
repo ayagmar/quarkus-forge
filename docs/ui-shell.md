@@ -36,7 +36,8 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - Metadata + field validation are recalculated as project inputs change.
 - Footer status area is non-modal and always visible.
 - Errors are surfaced inline in footer as actionable messages.
-- Footer includes generation state (`idle`, `running`, `success`, `failed`, `cancelled`).
+- Footer includes generation state (`idle`, `validating`, `loading`, `success`, `failed`, `cancelled`).
+- Transition contract is documented in `docs/ui-state-machine.md`.
 
 ## Generation Flow
 - On valid `Enter`, the UI starts async generation:

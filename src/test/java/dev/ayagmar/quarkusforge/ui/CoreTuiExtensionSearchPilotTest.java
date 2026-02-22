@@ -134,8 +134,7 @@ class CoreTuiExtensionSearchPilotTest {
     CoreTuiController.UiAction quitAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(quitAction.shouldQuit()).isTrue();
 
-    loadFuture.complete(
-        List.of(new ExtensionDto("io.quarkus:quarkus-funqy", "Funqy", "funqy")));
+    loadFuture.complete(List.of(new ExtensionDto("io.quarkus:quarkus-funqy", "Funqy", "funqy")));
     scheduler.runAll();
 
     assertThat(controller.statusMessage()).isEqualTo("Loading extension catalog...");

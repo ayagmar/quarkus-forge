@@ -92,7 +92,8 @@ class QuarkusApiClientTest {
 
     List<ExtensionDto> extensions = client.fetchExtensions().join();
 
-    assertThat(extensions).containsExactly(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "REST"));
+    assertThat(extensions)
+        .containsExactly(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "REST"));
   }
 
   @Test
@@ -114,7 +115,8 @@ class QuarkusApiClientTest {
 
     List<ExtensionDto> extensions = client.fetchExtensions().join();
 
-    assertThat(extensions).containsExactly(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "REST"));
+    assertThat(extensions)
+        .containsExactly(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "REST"));
   }
 
   @Test
@@ -140,7 +142,10 @@ class QuarkusApiClientTest {
 
     assertThat(extensions)
         .containsExactly(
-            new ExtensionDto("io.quarkus:quarkus-agroal", "Agroal - DB connection pool", "Agroal - DB connection pool"));
+            new ExtensionDto(
+                "io.quarkus:quarkus-agroal",
+                "Agroal - DB connection pool",
+                "Agroal - DB connection pool"));
   }
 
   @Test
