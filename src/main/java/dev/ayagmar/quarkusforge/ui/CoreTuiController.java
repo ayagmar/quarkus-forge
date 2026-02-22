@@ -1,16 +1,12 @@
 package dev.ayagmar.quarkusforge.ui;
 
-import dev.ayagmar.quarkusforge.api.ApiContractException;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
-import dev.ayagmar.quarkusforge.api.MetadataDto;
-import dev.ayagmar.quarkusforge.api.MetadataSnapshotLoader;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.CliPrefillMapper;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
-import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityValidator;
+import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
-import dev.ayagmar.quarkusforge.domain.ValidationError;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.tamboui.layout.Constraint;
 import dev.tamboui.layout.Layout;
@@ -71,14 +67,10 @@ public final class CoreTuiController {
   private final ListState extensionListState = new ListState();
   private final Set<String> selectedExtensionIds = new LinkedHashSet<>();
   private final ProjectRequestValidator requestValidator = new ProjectRequestValidator();
-  private final MetadataCompatibilityValidator compatibilityValidator =
-      new MetadataCompatibilityValidator();
+  private final MetadataCompatibilityContext metadataCompatibility;
   private final UiScheduler scheduler;
   private final Debouncer extensionSearchDebouncer;
   private final LatestResultGate extensionSearchResultGate = new LatestResultGate();
-
-  private final MetadataDto metadataSnapshot;
-  private final String metadataLoadError;
 
   private ProjectRequest request;
   private ValidationReport validation;
@@ -100,6 +92,7 @@ public final class CoreTuiController {
     statusMessage = "Ready";
     errorMessage = "";
     submitRequested = false;
+    metadataCompatibility = initialState.metadataCompatibility();
     this.scheduler = scheduler;
     extensionSearchDebouncer = new Debouncer(scheduler, debounceDelay);
 
@@ -118,16 +111,6 @@ public final class CoreTuiController {
         inputStates.get(target).moveCursorToEnd();
       }
     }
-
-    MetadataDto loadedSnapshot = null;
-    String loadedError = null;
-    try {
-      loadedSnapshot = MetadataSnapshotLoader.loadDefault();
-    } catch (ApiContractException contractException) {
-      loadedError = contractException.getMessage();
-    }
-    metadataSnapshot = loadedSnapshot;
-    metadataLoadError = loadedError;
 
     extensionCatalogIndex = new ExtensionCatalogIndex(DEFAULT_EXTENSIONS);
     applyFilteredExtensions(
@@ -587,14 +570,7 @@ public final class CoreTuiController {
 
   private void revalidate() {
     ValidationReport report = requestValidator.validate(request);
-    if (metadataLoadError != null) {
-      report =
-          report.merge(
-              new ValidationReport(List.of(new ValidationError("metadata", metadataLoadError))));
-    } else if (metadataSnapshot != null) {
-      report = report.merge(compatibilityValidator.validate(request, metadataSnapshot));
-    }
-    validation = report;
+    validation = report.merge(metadataCompatibility.validate(request));
   }
 
   private void refreshValidationFeedbackAfterEdit() {

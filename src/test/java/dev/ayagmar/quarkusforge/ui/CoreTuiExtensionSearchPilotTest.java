@@ -3,9 +3,8 @@ package dev.ayagmar.quarkusforge.ui;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
-import dev.ayagmar.quarkusforge.api.MetadataSnapshotLoader;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
-import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityValidator;
+import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
@@ -81,6 +80,7 @@ class CoreTuiExtensionSearchPilotTest {
   }
 
   private static ForgeUiState validInitialState() {
+    MetadataCompatibilityContext metadataCompatibility = MetadataCompatibilityContext.loadDefault();
     ProjectRequest request =
         new ProjectRequest(
             "com.example",
@@ -93,9 +93,7 @@ class CoreTuiExtensionSearchPilotTest {
     ValidationReport validation =
         new ProjectRequestValidator()
             .validate(request)
-            .merge(
-                new MetadataCompatibilityValidator()
-                    .validate(request, MetadataSnapshotLoader.loadDefault()));
-    return new ForgeUiState(request, validation);
+            .merge(metadataCompatibility.validate(request));
+    return new ForgeUiState(request, validation, metadataCompatibility);
   }
 }

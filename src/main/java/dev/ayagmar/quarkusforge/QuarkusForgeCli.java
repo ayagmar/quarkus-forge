@@ -1,23 +1,18 @@
 package dev.ayagmar.quarkusforge;
 
-import dev.ayagmar.quarkusforge.api.ApiContractException;
-import dev.ayagmar.quarkusforge.api.MetadataSnapshotLoader;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.CliPrefillMapper;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
-import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityValidator;
+import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
-import dev.ayagmar.quarkusforge.domain.ValidationError;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.ayagmar.quarkusforge.ui.CoreTuiController;
 import dev.ayagmar.quarkusforge.ui.UiScheduler;
 import dev.tamboui.tui.TuiRunner;
 import java.net.URI;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import picocli.CommandLine;
@@ -148,21 +143,12 @@ public final class QuarkusForgeCli implements Callable<Integer> {
         new CliPrefill(
             groupId, artifactId, version, packageName, outputDirectory, buildTool, javaVersion);
     ProjectRequest request = CliPrefillMapper.map(prefill);
+    MetadataCompatibilityContext metadataCompatibility = MetadataCompatibilityContext.loadDefault();
 
     ValidationReport fieldValidation = new ProjectRequestValidator().validate(request);
-    ValidationReport compatibilityValidation = metadataCompatibilityValidation(request);
-    return new ForgeUiState(request, fieldValidation.merge(compatibilityValidation));
-  }
-
-  private ValidationReport metadataCompatibilityValidation(ProjectRequest request) {
-    try {
-      return new MetadataCompatibilityValidator()
-          .validate(request, MetadataSnapshotLoader.loadDefault());
-    } catch (ApiContractException contractException) {
-      List<ValidationError> errors = new ArrayList<>();
-      errors.add(new ValidationError("metadata", contractException.getMessage()));
-      return new ValidationReport(errors);
-    }
+    ValidationReport compatibilityValidation = metadataCompatibility.validate(request);
+    return new ForgeUiState(
+        request, fieldValidation.merge(compatibilityValidation), metadataCompatibility);
   }
 
   private static void printValidationErrors(ValidationReport validation) {

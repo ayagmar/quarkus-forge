@@ -1,6 +1,17 @@
 package dev.ayagmar.quarkusforge.domain;
 
-public record ForgeUiState(ProjectRequest request, ValidationReport validation) {
+import java.util.Objects;
+
+public record ForgeUiState(
+    ProjectRequest request,
+    ValidationReport validation,
+    MetadataCompatibilityContext metadataCompatibility) {
+  public ForgeUiState {
+    Objects.requireNonNull(request);
+    Objects.requireNonNull(validation);
+    Objects.requireNonNull(metadataCompatibility);
+  }
+
   public boolean canSubmit() {
     return validation.isValid();
   }
