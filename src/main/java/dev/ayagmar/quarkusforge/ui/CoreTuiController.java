@@ -76,6 +76,7 @@ public final class CoreTuiController {
   private CompletableFuture<Path> generationFuture;
   private volatile boolean generationCancelRequested;
   private volatile long generationToken;
+  private volatile boolean asyncOperationsCancelled;
   private String successHint;
 
   private CoreTuiController(
@@ -101,6 +102,7 @@ public final class CoreTuiController {
     generationFuture = null;
     generationCancelRequested = false;
     generationToken = 0L;
+    asyncOperationsCancelled = false;
     successHint = "";
 
     for (FocusTarget target : FocusTarget.values()) {
@@ -145,40 +147,48 @@ public final class CoreTuiController {
 
   public void loadExtensionCatalogAsync(ExtensionCatalogLoader loader) {
     Objects.requireNonNull(loader);
+    asyncOperationsCancelled = false;
     statusMessage = "Loading extension catalog...";
 
     loader
         .load()
         .whenComplete(
-            (extensions, throwable) ->
-                scheduler.schedule(
-                    Duration.ZERO,
-                    () -> {
-                      if (throwable != null) {
-                        errorMessage = "Catalog load failed: " + throwable.getMessage();
-                        statusMessage = "Using fallback extension catalog";
-                        return;
-                      }
+            (extensions, throwable) -> {
+              if (asyncOperationsCancelled) {
+                return;
+              }
+              scheduler.schedule(
+                  Duration.ZERO,
+                  () -> {
+                    if (asyncOperationsCancelled) {
+                      return;
+                    }
+                    if (throwable != null) {
+                      errorMessage = "Catalog load failed: " + throwable.getMessage();
+                      statusMessage = "Using fallback extension catalog";
+                      return;
+                    }
 
-                      List<ExtensionCatalogItem> items =
-                          extensions.stream()
-                              .map(
-                                  extension ->
-                                      new ExtensionCatalogItem(
-                                          extension.id(), extension.name(), extension.shortName()))
-                              .toList();
-                      if (items.isEmpty()) {
-                        errorMessage = "Catalog load returned no extensions";
-                        statusMessage = "Using fallback extension catalog";
-                        return;
-                      }
+                    List<ExtensionCatalogItem> items =
+                        extensions.stream()
+                            .map(
+                                extension ->
+                                    new ExtensionCatalogItem(
+                                        extension.id(), extension.name(), extension.shortName()))
+                            .toList();
+                    if (items.isEmpty()) {
+                      errorMessage = "Catalog load returned no extensions";
+                      statusMessage = "Using fallback extension catalog";
+                      return;
+                    }
 
-                      statusMessage = "Searching extensions...";
-                      extensionCatalogState.replaceCatalog(
-                          items,
-                          inputStates.get(FocusTarget.EXTENSION_SEARCH).text(),
-                          filteredCount -> statusMessage = "Extensions filtered: " + filteredCount);
-                    }));
+                    statusMessage = "Searching extensions...";
+                    extensionCatalogState.replaceCatalog(
+                        items,
+                        inputStates.get(FocusTarget.EXTENSION_SEARCH).text(),
+                        this::updateExtensionFilterStatus);
+                  });
+            });
   }
 
   public UiAction onEvent(Event event) {
@@ -552,8 +562,7 @@ public final class CoreTuiController {
   private void scheduleFilteredExtensionsRefresh() {
     String query = inputStates.get(FocusTarget.EXTENSION_SEARCH).text();
     statusMessage = "Searching extensions...";
-    extensionCatalogState.scheduleRefresh(
-        query, filteredCount -> statusMessage = "Extensions filtered: " + filteredCount);
+    extensionCatalogState.scheduleRefresh(query, this::updateExtensionFilterStatus);
   }
 
   private void rebuildRequestFromInputs() {
@@ -588,11 +597,13 @@ public final class CoreTuiController {
   }
 
   private void cancelPendingAsyncOperations() {
+    asyncOperationsCancelled = true;
     extensionCatalogState.cancelPendingAsync();
   }
 
   private void startGenerationFlow() {
     successHint = "";
+    extensionCatalogState.cancelPendingAsync();
     generatedProjectCleanup();
     generationCancelRequested = false;
     long token = ++generationToken;
@@ -758,6 +769,13 @@ public final class CoreTuiController {
     return report.errors().isEmpty()
         ? ""
         : report.errors().getFirst().field() + ": " + report.errors().getFirst().message();
+  }
+
+  private void updateExtensionFilterStatus(int filteredCount) {
+    if (asyncOperationsCancelled || isGenerationInProgress()) {
+      return;
+    }
+    statusMessage = "Extensions filtered: " + filteredCount;
   }
 
   @FunctionalInterface

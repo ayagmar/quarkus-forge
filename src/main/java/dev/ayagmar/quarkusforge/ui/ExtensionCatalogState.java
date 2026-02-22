@@ -45,6 +45,12 @@ final class ExtensionCatalogState {
   void replaceCatalog(List<ExtensionCatalogItem> items, String query, IntConsumer onFiltered) {
     Objects.requireNonNull(items);
     Objects.requireNonNull(onFiltered);
+    Set<String> availableExtensionIds = new LinkedHashSet<>();
+    for (ExtensionCatalogItem item : items) {
+      availableExtensionIds.add(item.id());
+    }
+    selectedExtensionIds.removeIf(
+        selectedExtensionId -> !availableExtensionIds.contains(selectedExtensionId));
     catalogIndex = new ExtensionCatalogIndex(items);
     applyFiltered(query, searchResultGate.nextToken(), onFiltered);
   }

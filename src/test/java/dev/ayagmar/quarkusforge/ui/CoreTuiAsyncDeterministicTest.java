@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
 class CoreTuiAsyncDeterministicTest {
@@ -72,6 +73,31 @@ class CoreTuiAsyncDeterministicTest {
 
     scheduler.advanceBy(Duration.ofMillis(500));
     assertThat(controller.filteredExtensionCount()).isEqualTo(7);
+  }
+
+  @Test
+  void pendingSearchRefreshDoesNotOverrideGenerationStatus() {
+    ManualUiScheduler scheduler = new ManualUiScheduler(false);
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(),
+            scheduler,
+            Duration.ofMillis(120),
+            (generationRequest, outputDirectory, cancelled, progressListener) -> {
+              progressListener.accept("downloading project archive...");
+              return new CompletableFuture<>();
+            });
+    moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
+
+    for (char character : "jdbc".toCharArray()) {
+      controller.onEvent(KeyEvent.ofChar(character));
+    }
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    assertThat(controller.statusMessage()).contains("Generation in progress");
+
+    scheduler.advanceBy(Duration.ofMillis(120));
+    assertThat(controller.statusMessage()).contains("Generation in progress");
   }
 
   private static void moveFocusTo(CoreTuiController controller, FocusTarget target) {

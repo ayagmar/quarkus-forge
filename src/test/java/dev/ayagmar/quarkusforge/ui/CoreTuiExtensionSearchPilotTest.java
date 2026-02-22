@@ -9,6 +9,7 @@ import dev.tamboui.terminal.Frame;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
@@ -99,6 +100,48 @@ class CoreTuiExtensionSearchPilotTest {
     assertThat(renderToString(controller)).contains("Error: Catalog load returned no extensions");
   }
 
+  @Test
+  void selectionsArePrunedWhenCatalogReloadRemovesIds() {
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    controller.onEvent(KeyEvent.ofChar(' '));
+    assertThat(controller.selectedExtensionIds()).hasSize(1);
+
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                List.of(
+                    new ExtensionDto(
+                        "io.quarkus:quarkus-jdbc-postgresql",
+                        "JDBC PostgreSQL",
+                        "jdbc-postgresql"))));
+
+    assertThat(controller.selectedExtensionIds()).isEmpty();
+  }
+
+  @Test
+  void asyncCatalogCompletionIsIgnoredAfterQuit() {
+    QueueingScheduler scheduler = new QueueingScheduler();
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ZERO);
+    CompletableFuture<List<ExtensionDto>> loadFuture = new CompletableFuture<>();
+    controller.loadExtensionCatalogAsync(() -> loadFuture);
+    assertThat(controller.statusMessage()).isEqualTo("Loading extension catalog...");
+
+    CoreTuiController.UiAction quitAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(quitAction.shouldQuit()).isTrue();
+
+    loadFuture.complete(
+        List.of(new ExtensionDto("io.quarkus:quarkus-funqy", "Funqy", "funqy")));
+    scheduler.runAll();
+
+    assertThat(controller.statusMessage()).isEqualTo("Loading extension catalog...");
+    assertThat(controller.filteredExtensionCount()).isEqualTo(7);
+  }
+
   private static void moveFocusTo(CoreTuiController controller, FocusTarget target) {
     for (int i = 0; i < 20 && controller.focusTarget() != target; i++) {
       controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
@@ -111,5 +154,23 @@ class CoreTuiExtensionSearchPilotTest {
     Frame frame = Frame.forTesting(buffer);
     controller.render(frame);
     return buffer.toAnsiStringTrimmed();
+  }
+
+  private static final class QueueingScheduler implements UiScheduler {
+    private final List<Runnable> queuedTasks = new ArrayList<>();
+
+    @Override
+    public Cancellable schedule(Duration delay, Runnable task) {
+      queuedTasks.add(task);
+      return () -> queuedTasks.remove(task);
+    }
+
+    void runAll() {
+      List<Runnable> pending = new ArrayList<>(queuedTasks);
+      queuedTasks.clear();
+      for (Runnable runnable : pending) {
+        runnable.run();
+      }
+    }
   }
 }
