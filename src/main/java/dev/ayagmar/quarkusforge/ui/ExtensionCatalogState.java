@@ -4,7 +4,6 @@ import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.widgets.list.ListState;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -36,20 +35,6 @@ final class ExtensionCatalogState {
               41),
           new ExtensionCatalogItem(
               "io.quarkus:quarkus-junit5", "JUnit 5", "junit5", "Testing", 90));
-
-  private static final Map<String, Integer> CATEGORY_PRIORITY =
-      Map.ofEntries(
-          Map.entry("core", 0),
-          Map.entry("web", 1),
-          Map.entry("data", 2),
-          Map.entry("serialization", 3),
-          Map.entry("messaging", 4),
-          Map.entry("security", 5),
-          Map.entry("cloud", 6),
-          Map.entry("observability", 7),
-          Map.entry("testing", 8),
-          Map.entry("misc", 9),
-          Map.entry("other", 10));
 
   private final ListState listState;
   private final Set<String> selectedExtensionIds;
@@ -285,54 +270,16 @@ final class ExtensionCatalogState {
     }
 
     List<ExtensionCatalogRow> rows = new ArrayList<>();
-    List<ExtensionCatalogItem> favorites =
-        rankedItems.stream().filter(item -> favoriteExtensionIds.contains(item.id())).toList();
-    if (!favorites.isEmpty()) {
-      rows.add(ExtensionCatalogRow.section("Favorites"));
-      for (ExtensionCatalogItem favorite : favorites) {
-        rows.add(ExtensionCatalogRow.item(favorite));
+    String previousCategoryTitle = null;
+    for (ExtensionCatalogItem item : rankedItems) {
+      String categoryTitle = resolveCategoryTitle(item.categoryKey(), item.category());
+      if (!categoryTitle.equals(previousCategoryTitle)) {
+        rows.add(ExtensionCatalogRow.section(categoryTitle));
+        previousCategoryTitle = categoryTitle;
       }
-    }
-
-    List<ExtensionCatalogItem> remaining =
-        favorites.isEmpty()
-            ? rankedItems
-            : rankedItems.stream()
-                .filter(item -> !favoriteExtensionIds.contains(item.id()))
-                .toList();
-    if (remaining.isEmpty()) {
-      return List.copyOf(rows);
-    }
-
-    Map<String, CategorySection> sectionsByCategory = new LinkedHashMap<>();
-    for (ExtensionCatalogItem item : remaining) {
-      sectionsByCategory
-          .computeIfAbsent(
-              item.categoryKey(),
-              ignored ->
-                  new CategorySection(resolveCategoryTitle(item.categoryKey(), item.category())))
-          .items()
-          .add(item);
-    }
-
-    List<Map.Entry<String, CategorySection>> sortedSections =
-        new ArrayList<>(sectionsByCategory.entrySet());
-    sortedSections.sort(
-        Comparator.comparingInt(
-                (Map.Entry<String, CategorySection> entry) -> categoryRank(entry.getKey()))
-            .thenComparing(entry -> entry.getValue().title().toLowerCase(Locale.ROOT)));
-
-    for (Map.Entry<String, CategorySection> entry : sortedSections) {
-      rows.add(ExtensionCatalogRow.section(entry.getValue().title()));
-      for (ExtensionCatalogItem item : entry.getValue().items()) {
-        rows.add(ExtensionCatalogRow.item(item));
-      }
+      rows.add(ExtensionCatalogRow.item(item));
     }
     return List.copyOf(rows);
-  }
-
-  private static int categoryRank(String categoryKey) {
-    return CATEGORY_PRIORITY.getOrDefault(categoryKey, Integer.MAX_VALUE);
   }
 
   private static String resolveCategoryTitle(String categoryKey, String rawCategory) {
@@ -467,12 +414,6 @@ final class ExtensionCatalogState {
             .thenRunAsync(
                 () -> favoritesStore.saveFavoriteExtensionIds(snapshot),
                 favoritesPersistenceExecutor);
-  }
-
-  private record CategorySection(String title, List<ExtensionCatalogItem> items) {
-    private CategorySection(String title) {
-      this(title, new ArrayList<>());
-    }
   }
 
   record FavoriteToggleResult(boolean changed, String extensionName, boolean favoriteNow) {

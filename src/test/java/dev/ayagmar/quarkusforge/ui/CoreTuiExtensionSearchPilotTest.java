@@ -247,6 +247,35 @@ class CoreTuiExtensionSearchPilotTest {
   }
 
   @Test
+  void failedReloadKeepsPreviouslyLoadedCatalogSourceAndItems() {
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto(
+                            "io.quarkus:quarkus-jdbc-postgresql",
+                            "JDBC PostgreSQL",
+                            "jdbc-postgresql")))));
+    assertThat(controller.firstFilteredExtensionId())
+        .isEqualTo("io.quarkus:quarkus-jdbc-postgresql");
+    assertThat(renderToString(controller)).contains("Catalog: live");
+
+    controller.loadExtensionCatalogAsync(
+        () -> CompletableFuture.failedFuture(new IllegalStateException("network down")));
+
+    assertThat(controller.firstFilteredExtensionId())
+        .isEqualTo("io.quarkus:quarkus-jdbc-postgresql");
+    assertThat(renderToString(controller)).contains("Catalog: live");
+    assertThat(controller.statusMessage())
+        .isEqualTo("Catalog reload failed; keeping current catalog");
+  }
+
+  @Test
   void extensionListAutoScrollKeepsDeepSelectionVisible() {
     CoreTuiController controller =
         CoreTuiController.from(
@@ -294,6 +323,50 @@ class CoreTuiExtensionSearchPilotTest {
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10)))));
 
     assertThat(controller.catalogSectionHeaders()).containsExactly("Core", "Web", "Data");
+  }
+
+  @Test
+  void listOrderFollowsRankingAcrossCategories() {
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto(
+                            "io.quarkus:quarkus-jdbc-postgresql",
+                            "JDBC PostgreSQL",
+                            "jdbc-postgresql",
+                            "Data",
+                            5),
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 10)))));
+
+    assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-jdbc-postgresql");
+  }
+
+  @Test
+  void favoritingDoesNotOverrideApiOrderPrecedenceInList() {
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20)))));
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    controller.onEvent(KeyEvent.ofChar('f'));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.HOME));
+
+    assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
+    assertThat(controller.favoriteExtensionCount()).isEqualTo(1);
   }
 
   @Test
@@ -351,8 +424,7 @@ class CoreTuiExtensionSearchPilotTest {
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10)))));
 
     assertThat(secondController.favoriteExtensionCount()).isEqualTo(1);
-    assertThat(secondController.catalogSectionHeaders()).contains("Favorites");
-    assertThat(secondController.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-rest");
+    assertThat(secondController.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
   }
 
   private static void moveFocusTo(CoreTuiController controller, FocusTarget target) {

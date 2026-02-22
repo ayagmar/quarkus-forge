@@ -42,7 +42,7 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - `Esc` or `Ctrl+C`: cancel active generation if running, otherwise exit the TUI.
 - Backend startup preference is deterministic:
   - JVM with native access enabled: `panama,jline3`.
-  - JVM without native access: `jline` (with guidance to use `--enable-native-access=ALL-UNNAMED`; some terminal-native warnings can still appear).
+  - JVM without native access: `jline3` (with guidance to use `--enable-native-access=ALL-UNNAMED`; some terminal-native warnings can still appear).
   - Native image runtime: `panama,jline3`.
 
 ## Validation and Status
@@ -79,8 +79,9 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - Cancellation and stale-result protection ensure outdated async callbacks never overwrite newer search state.
 - Multi-selection is tracked by stable extension IDs, independent from list navigation cursor state.
 - Favorites are persisted under `~/.quarkus-forge/favorites.json` and restored on startup.
-- Catalog rows are grouped by stable section headers (`Favorites` + category sections), and keyboard
-  navigation skips section-header rows deterministically.
+- Catalog rows are grouped with stable category section headers, and keyboard navigation skips
+  section-header rows deterministically.
+- Favorites keep ranked position (API order precedence is preserved) and are marked/toggled via `*` indicator and favorite key actions.
 - Extension list labels use one rule: display extension `name` only (no alias/short-name suffix noise).
 - Catalog rendering has explicit loading and fallback/degraded visuals.
 - Source labeling is explicit: `live`, `cache`, or `snapshot`; stale cache is marked `[stale]`.

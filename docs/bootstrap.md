@@ -38,7 +38,7 @@ Use these gates after each issue:
 - Produced binary path: `target/quarkus-forge`.
 - JVM TUI runtime backend policy:
   - With `--enable-native-access=ALL-UNNAMED`, backend preference is `panama,jline3`.
-  - Without native-access flag, runtime prefers `jline` and prints guidance; some terminal-native warnings may still appear depending on environment.
+  - Without native-access flag, runtime prefers `jline3` and prints guidance; some terminal-native warnings may still appear depending on environment.
 - Native image build includes `--enable-native-access=ALL-UNNAMED` during compilation so the produced binary does not require extra launcher flags for terminal FFM access.
 
 ## Maven Repository Notes

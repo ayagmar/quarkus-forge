@@ -218,8 +218,6 @@ public final class CoreTuiController {
     long loadToken = ++extensionCatalogLoadToken;
     extensionCatalogLoading = true;
     extensionCatalogErrorMessage = "";
-    extensionCatalogSource = "live";
-    extensionCatalogStale = false;
     statusMessage = "Loading extension catalog...";
 
     CompletableFuture<ExtensionCatalogLoadResult> loadFuture;
@@ -248,20 +246,16 @@ public final class CoreTuiController {
                   String message = catalogLoadFailureMessage(cause);
                   extensionCatalogLoading = false;
                   extensionCatalogErrorMessage = message;
-                  extensionCatalogSource = "snapshot";
-                  extensionCatalogStale = false;
                   errorMessage = message;
-                  statusMessage = "Using fallback extension catalog";
+                  statusMessage = catalogReloadFailureStatusMessage();
                   return;
                 }
 
                 if (result == null) {
                   extensionCatalogLoading = false;
                   extensionCatalogErrorMessage = "Catalog load failed: empty load result";
-                  extensionCatalogSource = "snapshot";
-                  extensionCatalogStale = false;
                   errorMessage = "Catalog load failed: empty load result";
-                  statusMessage = "Using fallback extension catalog";
+                  statusMessage = catalogReloadFailureStatusMessage();
                   return;
                 }
 
@@ -279,10 +273,8 @@ public final class CoreTuiController {
                 if (items.isEmpty()) {
                   extensionCatalogLoading = false;
                   extensionCatalogErrorMessage = "Catalog load returned no extensions";
-                  extensionCatalogSource = "snapshot";
-                  extensionCatalogStale = false;
                   errorMessage = "Catalog load returned no extensions";
-                  statusMessage = "Using fallback extension catalog";
+                  statusMessage = catalogReloadFailureStatusMessage();
                   return;
                 }
 
@@ -1172,6 +1164,13 @@ public final class CoreTuiController {
       return "Live catalog/cache unavailable. Using bundled snapshot (Ctrl+R to retry).";
     }
     return "Catalog load failed: " + message;
+  }
+
+  private String catalogReloadFailureStatusMessage() {
+    if ("snapshot".equals(extensionCatalogSource) && !extensionCatalogStale) {
+      return "Using fallback extension catalog";
+    }
+    return "Catalog reload failed; keeping current catalog";
   }
 
   private static String nextStepCommand(String buildTool) {
