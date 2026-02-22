@@ -11,6 +11,7 @@ import dev.tamboui.terminal.Frame;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.KeyModifiers;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,8 +19,11 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class CoreTuiExtensionSearchPilotTest {
+  @TempDir Path tempDir;
+
   @Test
   void apiLoadedCatalogIsIndexedAndSearchable() {
     CoreTuiController controller =
@@ -269,6 +273,88 @@ class CoreTuiExtensionSearchPilotTest {
     assertThat(rendered).doesNotContain("Test Extension 000");
   }
 
+  @Test
+  void catalogUsesStableCategorySectionHeaders() {
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto(
+                            "io.quarkus:quarkus-jdbc-postgresql",
+                            "JDBC PostgreSQL",
+                            "jdbc-postgresql",
+                            "Data",
+                            30),
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10)))));
+
+    assertThat(controller.catalogSectionHeaders()).containsExactly("Core", "Web", "Data");
+  }
+
+  @Test
+  void selectionAndFavoriteRemainStableWhenCatalogOrderChanges() {
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+    String favoriteId = "io.quarkus:quarkus-rest";
+    String otherId = "io.quarkus:quarkus-arc";
+
+    controller.loadExtensionCatalogAsync(
+        () -> CompletableFuture.completedFuture(withOrder(favoriteId, 30, otherId, 10)));
+
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    assertThat(controller.focusedListExtensionId()).isEqualTo(favoriteId);
+    controller.onEvent(KeyEvent.ofChar(' '));
+    controller.onEvent(KeyEvent.ofChar('f'));
+    assertThat(controller.selectedExtensionIds()).contains(favoriteId);
+    assertThat(controller.favoriteExtensionCount()).isEqualTo(1);
+
+    controller.loadExtensionCatalogAsync(
+        () -> CompletableFuture.completedFuture(withOrder(favoriteId, 5, otherId, 40)));
+
+    assertThat(controller.selectedExtensionIds()).contains(favoriteId);
+    assertThat(controller.favoriteExtensionCount()).isEqualTo(1);
+    assertThat(controller.focusedListExtensionId()).isEqualTo(favoriteId);
+  }
+
+  @Test
+  void favoritesPersistAcrossControllerRestarts() {
+    Path favoritesFile = tempDir.resolve("favorites.json");
+    ExtensionFavoritesStore favoritesStore = ExtensionFavoritesStore.fileBacked(favoritesFile);
+
+    CoreTuiController firstController = controllerWithFavoritesStore(favoritesStore);
+    firstController.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10)))));
+    moveFocusTo(firstController, FocusTarget.EXTENSION_LIST);
+    firstController.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    firstController.onEvent(KeyEvent.ofChar('f'));
+    assertThat(firstController.favoriteExtensionCount()).isEqualTo(1);
+
+    CoreTuiController secondController = controllerWithFavoritesStore(favoritesStore);
+    secondController.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10)))));
+
+    assertThat(secondController.favoriteExtensionCount()).isEqualTo(1);
+    assertThat(secondController.catalogSectionHeaders()).contains("Favorites");
+    assertThat(secondController.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-rest");
+  }
+
   private static void moveFocusTo(CoreTuiController controller, FocusTarget target) {
     for (int i = 0; i < 20 && controller.focusTarget() != target; i++) {
       controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
@@ -288,6 +374,27 @@ class CoreTuiExtensionSearchPilotTest {
         List.of("21", "25"),
         List.of("maven", "gradle"),
         Map.of("maven", List.of("21", "25"), "gradle", List.of("25")));
+  }
+
+  private static CoreTuiController controllerWithFavoritesStore(
+      ExtensionFavoritesStore favoritesStore) {
+    return CoreTuiController.from(
+        UiTestFixtureFactory.defaultForgeUiState(),
+        UiScheduler.immediate(),
+        Duration.ZERO,
+        (generationRequest, outputDirectory, cancelled, progressListener) ->
+            CompletableFuture.failedFuture(new IllegalStateException("not used in this test")),
+        favoritesStore,
+        Runnable::run);
+  }
+
+  private static CoreTuiController.ExtensionCatalogLoadResult withOrder(
+      String primaryId, Integer primaryOrder, String secondaryId, Integer secondaryOrder) {
+    List<ExtensionDto> extensions =
+        List.of(
+            new ExtensionDto(primaryId, "REST", "rest", "Web", primaryOrder),
+            new ExtensionDto(secondaryId, "CDI", "cdi", "Core", secondaryOrder));
+    return CoreTuiController.ExtensionCatalogLoadResult.live(extensions);
   }
 
   private static final class QueueingScheduler implements UiScheduler {

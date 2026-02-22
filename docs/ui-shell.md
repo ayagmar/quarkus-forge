@@ -33,7 +33,11 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 
 ## Key Bindings
 - `Up` / `Down`: navigate extension list when focused.
+- `Home` / `End`: jump to first/last selectable extension row.
 - `Space`: toggle extension selection when list is focused.
+- `f`: toggle favorite for the focused extension when list is focused.
+- `Ctrl+J`: jump to next visible favorite extension.
+- `Ctrl+K`: toggle favorites-only filter mode.
 - `Enter`: attempt submit (blocked with validation feedback if invalid).
 - `Esc` or `Ctrl+C`: cancel active generation if running, otherwise exit the TUI.
 
@@ -61,10 +65,18 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - Extension catalog is loaded from Quarkus API and indexed in-memory by stable extension identifier.
 - Extension search filtering uses a configurable async debounce (`0ms` default for instant updates).
 - The scheduler/debouncer layer is injectable so tests can run with virtual time instead of wall-clock delays.
+- Empty-query ranking is deterministic and uses this precedence:
+  1. API `order` value (ascending) when present.
+  2. Curated popular baseline (with favorites as a ranking signal inside this stage).
+  3. Alphabetical fallback by extension name then id.
 - Extension catalog/filter/selection state is isolated in a dedicated UI component
   (`ExtensionCatalogState`) and consumed by `CoreTuiController`.
 - Cancellation and stale-result protection ensure outdated async callbacks never overwrite newer search state.
 - Multi-selection is tracked by stable extension IDs, independent from list navigation cursor state.
+- Favorites are persisted under `~/.quarkus-forge/favorites.json` and restored on startup.
+- Catalog rows are grouped by stable section headers (`Favorites` + category sections), and keyboard
+  navigation skips section-header rows deterministically.
+- Extension list labels use one rule: display extension `name` only (no alias/short-name suffix noise).
 - Catalog rendering has explicit loading and fallback/degraded visuals.
 - Source labeling is explicit: `live`, `cache`, or `snapshot`; stale cache is marked `[stale]`.
 - `Ctrl+R` triggers catalog refresh/retry without restarting the TUI.

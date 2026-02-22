@@ -15,6 +15,7 @@ import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.ayagmar.quarkusforge.ui.CoreTuiController;
+import dev.ayagmar.quarkusforge.ui.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.ui.UiScheduler;
 import dev.tamboui.tui.TuiRunner;
 import java.net.URI;
@@ -144,7 +145,9 @@ public final class QuarkusForgeCli implements Callable<Integer> {
                               switch (progress) {
                                 case DOWNLOADING_ARCHIVE -> "downloading project archive...";
                                 case EXTRACTING_ARCHIVE -> "extracting project archive...";
-                              })));
+                              })),
+              ExtensionFavoritesStore.fileBacked(ExtensionFavoritesStore.defaultFile()),
+              CoreTuiController.defaultFavoritesPersistenceExecutor());
       controller.loadExtensionCatalogAsync(
           () -> catalogDataService.load().thenApply(QuarkusForgeCli::toExtensionCatalogLoadResult));
       if (smokeMode) {

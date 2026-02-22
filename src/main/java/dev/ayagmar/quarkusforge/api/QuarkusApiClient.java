@@ -251,7 +251,9 @@ public final class QuarkusApiClient {
       String id = requiredText(node, "id");
       String name = requiredText(node, "name");
       String shortName = resolvedShortName(node, name);
-      extensions.add(new ExtensionDto(id, name, shortName));
+      String category = resolvedCategory(node);
+      Integer order = optionalInt(node, "order");
+      extensions.add(new ExtensionDto(id, name, shortName, category, order));
     }
     return List.copyOf(extensions);
   }
@@ -406,6 +408,26 @@ public final class QuarkusApiClient {
       return shortName;
     }
     return name;
+  }
+
+  private static String resolvedCategory(JsonNode node) {
+    String category = optionalText(node, "category");
+    if (!category.isBlank()) {
+      return category;
+    }
+    return "Other";
+  }
+
+  private static Integer optionalInt(JsonNode node, String fieldName) {
+    JsonNode child = node.get(fieldName);
+    if (child == null || child.isNull()) {
+      return null;
+    }
+    if (!child.canConvertToInt()) {
+      throw new ApiContractException(
+          "Contract field '" + fieldName + "' must be an integer when present");
+    }
+    return child.intValue();
   }
 
   private static List<String> toStringList(JsonNode node, String fieldName) {

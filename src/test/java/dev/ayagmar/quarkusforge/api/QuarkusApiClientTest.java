@@ -72,6 +72,32 @@ class QuarkusApiClientTest {
   }
 
   @Test
+  void fetchExtensionsRetainsCategoryAndOrderMetadataWhenPresent() {
+    stubFor(
+        get(urlEqualTo("/api/extensions"))
+            .willReturn(
+                okJson(
+                    """
+                    [
+                      {
+                        "id":"io.quarkus:quarkus-rest",
+                        "name":"REST",
+                        "shortName":"rest",
+                        "category":"Web",
+                        "order":15
+                      }
+                    ]
+                    """)));
+
+    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+
+    List<ExtensionDto> extensions = client.fetchExtensions().join();
+
+    assertThat(extensions)
+        .containsExactly(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 15));
+  }
+
+  @Test
   void fetchExtensionsUsesNameWhenShortNameIsBlank() {
     stubFor(
         get(urlEqualTo("/api/extensions"))

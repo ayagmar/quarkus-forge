@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.tamboui.buffer.Buffer;
 import dev.tamboui.layout.Rect;
 import dev.tamboui.terminal.Frame;
@@ -9,6 +10,8 @@ import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.KeyModifiers;
 import dev.tamboui.tui.event.ResizeEvent;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
 class CoreTuiShellPilotTest {
@@ -180,6 +183,75 @@ class CoreTuiShellPilotTest {
 
     assertThat(action.shouldQuit()).isTrue();
     assertThat(action.handled()).isTrue();
+  }
+
+  @Test
+  void listNavigationSkipsSectionHeadersAcrossCategoryBoundaries() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
+                        new ExtensionDto(
+                            "io.quarkus:quarkus-jdbc-postgresql",
+                            "JDBC PostgreSQL",
+                            "jdbc-postgresql",
+                            "Data",
+                            30)))));
+
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-rest");
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-jdbc-postgresql");
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.UP));
+    assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-rest");
+
+    controller.onEvent(KeyEvent.ofChar(' '));
+    assertThat(controller.selectedExtensionIds()).containsExactly("io.quarkus:quarkus-rest");
+  }
+
+  @Test
+  void favoriteQuickActionsToggleJumpAndFilterRemainDeterministic() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20)))));
+
+    controller.onEvent(KeyEvent.ofChar('j', KeyModifiers.CTRL));
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
+    assertThat(controller.statusMessage()).contains("No favorite extension");
+
+    controller.onEvent(KeyEvent.ofChar('f'));
+    assertThat(controller.favoriteExtensionCount()).isEqualTo(1);
+
+    moveFocusTo(controller, FocusTarget.GROUP_ID);
+    controller.onEvent(KeyEvent.ofChar('k', KeyModifiers.CTRL));
+    assertThat(controller.favoritesOnlyFilterEnabled()).isTrue();
+    assertThat(controller.filteredExtensionCount()).isEqualTo(1);
+    assertThat(controller.firstFilteredExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
+
+    controller.onEvent(KeyEvent.ofChar('k', KeyModifiers.CTRL));
+    assertThat(controller.favoritesOnlyFilterEnabled()).isFalse();
+    assertThat(controller.filteredExtensionCount()).isEqualTo(2);
+
+    moveFocusTo(controller, FocusTarget.GROUP_ID);
+    controller.onEvent(KeyEvent.ofChar('j', KeyModifiers.CTRL));
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
+    assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
   }
 
   private static void moveFocusTo(CoreTuiController controller, FocusTarget target) {

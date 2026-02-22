@@ -27,6 +27,8 @@
 - JSON payloads are parsed with strict required fields.
 - Extension parsing requires `id` and `name`; `shortName` is tolerant and falls back to `name`
   when missing/blank.
+- Extension parsing also retains optional `category` and `order` fields for UI grouping/ranking;
+  missing `category` defaults to `Other`.
 - Metadata is synthesized from live contract sources:
   - Java versions: union of `/api/streams[].javaCompatibility.versions`
   - Build tools: `/q/openapi` enum at `/api/download` parameter `b`

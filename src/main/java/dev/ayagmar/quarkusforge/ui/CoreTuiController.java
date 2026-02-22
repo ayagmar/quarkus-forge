@@ -41,11 +41,12 @@ import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ForkJoinPool;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 public final class CoreTuiController {
-  private static final int LIST_SHORT_NAME_MAX_LENGTH = 36;
   private static final List<FocusTarget> FOCUS_ORDER =
       List.of(
           FocusTarget.GROUP_ID,
@@ -96,11 +97,15 @@ public final class CoreTuiController {
       ForgeUiState initialState,
       UiScheduler scheduler,
       Duration debounceDelay,
-      ProjectGenerationRunner projectGenerationRunner) {
+      ProjectGenerationRunner projectGenerationRunner,
+      ExtensionFavoritesStore favoritesStore,
+      Executor favoritesPersistenceExecutor) {
     Objects.requireNonNull(initialState);
     Objects.requireNonNull(scheduler);
     Objects.requireNonNull(debounceDelay);
     Objects.requireNonNull(projectGenerationRunner);
+    Objects.requireNonNull(favoritesStore);
+    Objects.requireNonNull(favoritesPersistenceExecutor);
     request = initialState.request();
     validation = initialState.validation();
     focusTarget = FocusTarget.GROUP_ID;
@@ -142,19 +147,34 @@ public final class CoreTuiController {
     }
     extensionCatalogState =
         new ExtensionCatalogState(
-            scheduler, debounceDelay, inputStates.get(FocusTarget.EXTENSION_SEARCH).text());
+            scheduler,
+            debounceDelay,
+            inputStates.get(FocusTarget.EXTENSION_SEARCH).text(),
+            favoritesStore,
+            favoritesPersistenceExecutor);
 
     revalidate();
   }
 
   public static CoreTuiController from(ForgeUiState initialState) {
     return from(
-        initialState, UiScheduler.immediate(), Duration.ZERO, NOOP_PROJECT_GENERATION_RUNNER);
+        initialState,
+        UiScheduler.immediate(),
+        Duration.ZERO,
+        NOOP_PROJECT_GENERATION_RUNNER,
+        ExtensionFavoritesStore.inMemory(),
+        Runnable::run);
   }
 
   public static CoreTuiController from(
       ForgeUiState initialState, UiScheduler scheduler, Duration debounceDelay) {
-    return from(initialState, scheduler, debounceDelay, NOOP_PROJECT_GENERATION_RUNNER);
+    return from(
+        initialState,
+        scheduler,
+        debounceDelay,
+        NOOP_PROJECT_GENERATION_RUNNER,
+        ExtensionFavoritesStore.inMemory(),
+        Runnable::run);
   }
 
   public static CoreTuiController from(
@@ -162,7 +182,33 @@ public final class CoreTuiController {
       UiScheduler scheduler,
       Duration debounceDelay,
       ProjectGenerationRunner projectGenerationRunner) {
-    return new CoreTuiController(initialState, scheduler, debounceDelay, projectGenerationRunner);
+    return from(
+        initialState,
+        scheduler,
+        debounceDelay,
+        projectGenerationRunner,
+        ExtensionFavoritesStore.inMemory(),
+        Runnable::run);
+  }
+
+  public static CoreTuiController from(
+      ForgeUiState initialState,
+      UiScheduler scheduler,
+      Duration debounceDelay,
+      ProjectGenerationRunner projectGenerationRunner,
+      ExtensionFavoritesStore favoritesStore,
+      Executor favoritesPersistenceExecutor) {
+    return new CoreTuiController(
+        initialState,
+        scheduler,
+        debounceDelay,
+        projectGenerationRunner,
+        favoritesStore,
+        favoritesPersistenceExecutor);
+  }
+
+  public static Executor defaultFavoritesPersistenceExecutor() {
+    return ForkJoinPool.commonPool();
   }
 
   public void loadExtensionCatalogAsync(ExtensionCatalogLoader loader) {
@@ -224,7 +270,11 @@ public final class CoreTuiController {
                         .map(
                             extension ->
                                 new ExtensionCatalogItem(
-                                    extension.id(), extension.name(), extension.shortName()))
+                                    extension.id(),
+                                    extension.name(),
+                                    extension.shortName(),
+                                    extension.category(),
+                                    extension.order()))
                         .toList();
                 if (items.isEmpty()) {
                   extensionCatalogLoading = false;
@@ -299,6 +349,14 @@ public final class CoreTuiController {
       requestCatalogReload();
       return UiAction.handled(false);
     }
+    if (isFavoritesFilterToggleKey(keyEvent)) {
+      toggleFavoritesOnlyFilter();
+      return UiAction.handled(false);
+    }
+    if (isJumpToFavoriteKey(keyEvent)) {
+      jumpToFavorite();
+      return UiAction.handled(false);
+    }
     if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && keyEvent.hasShift()) {
       moveFocus(-1);
       return UiAction.handled(false);
@@ -354,11 +412,14 @@ public final class CoreTuiController {
       focusExtensionSearch();
       return UiAction.handled(false);
     }
+    if (focusTarget == FocusTarget.EXTENSION_LIST && isFavoriteToggleKey(keyEvent)) {
+      toggleFavoriteAtSelection();
+      return UiAction.handled(false);
+    }
 
     if (focusTarget == FocusTarget.EXTENSION_LIST
         && extensionCatalogState.handleListKeys(
-            keyEvent,
-            toggledShortName -> statusMessage = "Toggled extension: " + toggledShortName)) {
+            keyEvent, toggledName -> statusMessage = "Toggled extension: " + toggledName)) {
       return UiAction.handled(false);
     }
 
@@ -432,6 +493,31 @@ public final class CoreTuiController {
   String firstFilteredExtensionId() {
     List<ExtensionCatalogItem> filteredExtensions = extensionCatalogState.filteredExtensions();
     return filteredExtensions.isEmpty() ? "" : filteredExtensions.getFirst().id();
+  }
+
+  List<String> filteredExtensionIds() {
+    return extensionCatalogState.filteredExtensions().stream()
+        .map(ExtensionCatalogItem::id)
+        .toList();
+  }
+
+  List<String> catalogSectionHeaders() {
+    return extensionCatalogState.filteredRows().stream()
+        .filter(ExtensionCatalogRow::isSectionHeader)
+        .map(ExtensionCatalogRow::label)
+        .toList();
+  }
+
+  boolean favoritesOnlyFilterEnabled() {
+    return extensionCatalogState.favoritesOnlyFilterEnabled();
+  }
+
+  int favoriteExtensionCount() {
+    return extensionCatalogState.favoriteExtensionCount();
+  }
+
+  String focusedListExtensionId() {
+    return extensionCatalogState.focusedExtensionId();
   }
 
   private void renderHeader(Frame frame, Rect area) {
@@ -530,7 +616,7 @@ public final class CoreTuiController {
   }
 
   private void renderExtensionList(Frame frame, Rect area) {
-    List<ExtensionCatalogItem> filteredExtensions = extensionCatalogState.filteredExtensions();
+    List<ExtensionCatalogRow> filteredRows = extensionCatalogState.filteredRows();
     boolean extensionError = !extensionCatalogErrorMessage.isBlank();
     Block listBlock =
         Block.builder()
@@ -557,18 +643,29 @@ public final class CoreTuiController {
     }
 
     List<SizedWidget> items = new ArrayList<>();
-    for (ExtensionCatalogItem extension : filteredExtensions) {
+    for (ExtensionCatalogRow row : filteredRows) {
+      if (row.isSectionHeader()) {
+        items.add(ListItem.from(sectionHeaderLabel(row.label())).toSizedWidget());
+        continue;
+      }
+      ExtensionCatalogItem extension = row.extension();
       boolean selected = extensionCatalogState.isSelected(extension.id());
-      String prefix = selected ? "[x] " : "[ ] ";
+      boolean favorite = extensionCatalogState.isFavorite(extension.id());
+      String checkedPrefix = selected ? "[x] " : "[ ] ";
+      String favoritePrefix = favorite ? "* " : "  ";
       String displayLabel = extensionDisplayLabel(extension);
-      items.add(ListItem.from(prefix + displayLabel).toSizedWidget());
+      items.add(ListItem.from(checkedPrefix + favoritePrefix + displayLabel).toSizedWidget());
     }
 
     if (items.isEmpty()) {
-      String emptyMessage =
-          extensionError
-              ? "Catalog unavailable - using fallback snapshot"
-              : "No extension matches current filter";
+      String emptyMessage;
+      if (extensionError) {
+        emptyMessage = "Catalog unavailable - using fallback snapshot";
+      } else if (extensionCatalogState.favoritesOnlyFilterEnabled()) {
+        emptyMessage = "No favorite extension matches current filter";
+      } else {
+        emptyMessage = "No extension matches current filter";
+      }
       Paragraph empty =
           Paragraph.builder()
               .text(emptyMessage)
@@ -604,6 +701,10 @@ public final class CoreTuiController {
     }
     if (!extensionCatalogErrorMessage.isBlank()) {
       summary += " | error: " + extensionCatalogErrorMessage;
+    }
+    summary += "\nFavorites: " + extensionCatalogState.favoriteExtensionCount();
+    if (extensionCatalogState.favoritesOnlyFilterEnabled()) {
+      summary += " [filter:on]";
     }
     if (focusTarget == FocusTarget.SUBMIT) {
       summary += "\nSubmit focus active - press Enter to submit";
@@ -793,17 +894,17 @@ public final class CoreTuiController {
     }
     if (focusTarget == FocusTarget.EXTENSION_LIST) {
       return width < NARROW_WIDTH_THRESHOLD
-          ? "Up/Down: nav | Space: toggle | Ctrl+R: reload"
-          : "Up/Down: list nav | Space: toggle extension | Ctrl+R: reload | Enter: submit | /: search";
+          ? "Up/Down: nav | Space: select | F: favorite | Ctrl+R: reload"
+          : "Up/Down/Home/End: list nav | Space: select | F: favorite | Ctrl+J: jump favorite | Ctrl+K: favorite filter | Ctrl+R: reload";
     }
     if (focusTarget == FocusTarget.EXTENSION_SEARCH) {
       return width < NARROW_WIDTH_THRESHOLD
-          ? "Type: filter | Down: list | Enter: submit"
-          : "Type: filter extensions | Down: list | Ctrl+R: reload | Enter: submit | Esc: cancel/quit";
+          ? "Type: filter | Down: list | Ctrl+K: fav filter"
+          : "Type: filter extensions | Down: list | Ctrl+R: reload | Ctrl+J: jump favorite | Ctrl+K: favorite filter";
     }
     return width < NARROW_WIDTH_THRESHOLD
         ? "Tab: focus | Enter: submit | Esc: quit"
-        : "Tab/Shift+Tab: focus | Enter: submit | /: search | Esc: cancel/quit";
+        : "Tab/Shift+Tab: focus | Enter: submit | /: search | Ctrl+K: favorite filter | Esc: cancel/quit";
   }
 
   private String footerModeLabel() {
@@ -1111,13 +1212,11 @@ public final class CoreTuiController {
   }
 
   private static String extensionDisplayLabel(ExtensionCatalogItem extension) {
-    if (extension.shortName().equalsIgnoreCase(extension.name())) {
-      return extension.name();
-    }
-    return extension.name()
-        + " ("
-        + truncate(extension.shortName(), LIST_SHORT_NAME_MAX_LENGTH)
-        + ")";
+    return extension.name();
+  }
+
+  private static String sectionHeaderLabel(String sectionTitle) {
+    return "-- " + sectionTitle + " --";
   }
 
   private static String truncate(String value, int maxLength) {
@@ -1140,6 +1239,36 @@ public final class CoreTuiController {
     statusMessage = "Extensions filtered: " + filteredCount;
   }
 
+  private void toggleFavoriteAtSelection() {
+    ExtensionCatalogState.FavoriteToggleResult toggleResult =
+        extensionCatalogState.toggleFavoriteAtSelection(this::updateExtensionFilterStatus);
+    if (!toggleResult.changed()) {
+      statusMessage = "No extension selected to favorite";
+      return;
+    }
+    statusMessage =
+        (toggleResult.favoriteNow() ? "Favorited extension: " : "Unfavorited extension: ")
+            + toggleResult.extensionName();
+  }
+
+  private void jumpToFavorite() {
+    if (focusTarget != FocusTarget.EXTENSION_LIST) {
+      focusExtensionList();
+    }
+    ExtensionCatalogState.JumpToFavoriteResult jumpResult = extensionCatalogState.jumpToFavorite();
+    if (!jumpResult.jumped()) {
+      statusMessage = "No favorite extension in current catalog view";
+      return;
+    }
+    statusMessage = "Jumped to favorite: " + jumpResult.extensionName();
+  }
+
+  private void toggleFavoritesOnlyFilter() {
+    boolean enabled =
+        extensionCatalogState.toggleFavoritesOnlyFilter(this::updateExtensionFilterStatus);
+    statusMessage = enabled ? "Favorites filter enabled" : "Favorites filter disabled";
+  }
+
   private void requestCatalogReload() {
     if (extensionCatalogLoader == null) {
       statusMessage = "Catalog reload unavailable";
@@ -1153,6 +1282,25 @@ public final class CoreTuiController {
     return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
         && keyEvent.hasCtrl()
         && (keyEvent.character() == 'r' || keyEvent.character() == 'R');
+  }
+
+  private static boolean isFavoriteToggleKey(KeyEvent keyEvent) {
+    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
+        && !keyEvent.hasCtrl()
+        && !keyEvent.hasAlt()
+        && (keyEvent.character() == 'f' || keyEvent.character() == 'F');
+  }
+
+  private static boolean isJumpToFavoriteKey(KeyEvent keyEvent) {
+    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
+        && keyEvent.hasCtrl()
+        && (keyEvent.character() == 'j' || keyEvent.character() == 'J');
+  }
+
+  private static boolean isFavoritesFilterToggleKey(KeyEvent keyEvent) {
+    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
+        && keyEvent.hasCtrl()
+        && (keyEvent.character() == 'k' || keyEvent.character() == 'K');
   }
 
   private static boolean shouldQuitKeyEvent(KeyEvent keyEvent) {
