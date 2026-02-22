@@ -70,6 +70,11 @@ public final class ProjectArchiveService {
     Objects.requireNonNull(cancelled);
     Objects.requireNonNull(progressListener);
 
+    if (cancelled.getAsBoolean()) {
+      return CompletableFuture.failedFuture(
+          new CancellationException("Generation cancelled before download"));
+    }
+
     final Path tempZip;
     try {
       tempZip = tempFileProvider.create();
@@ -95,6 +100,9 @@ public final class ProjectArchiveService {
                     progressListener.accept(ProgressStep.EXTRACTING_ARCHIVE);
                     SafeZipExtractor.ExtractionResult result =
                         zipExtractor.extract(archivePath, outputDirectory, overwritePolicy);
+                    if (cancelled.getAsBoolean()) {
+                      throw new CancellationException("Generation cancelled during extraction");
+                    }
                     return result.extractedRoot();
                   },
                   extractionExecutor);
