@@ -9,9 +9,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.zip.Deflater;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -21,7 +18,7 @@ class SafeZipExtractorTest {
   @Test
   void extractsZipUsingSingleRootDirectory() throws IOException {
     Path zipPath =
-        createZip(
+        ArchiveTestUtils.createZip(
             tempDir.resolve("project.zip"),
             Map.of(
                 "demo/pom.xml", "<project/>".getBytes(StandardCharsets.UTF_8),
@@ -42,7 +39,7 @@ class SafeZipExtractorTest {
   @Test
   void keepsOutputDirectoryForSingleTopLevelFileArchive() throws IOException {
     Path zipPath =
-        createZip(
+        ArchiveTestUtils.createZip(
             tempDir.resolve("single-file-root.zip"),
             Map.of("pom.xml", "<project/>".getBytes(StandardCharsets.UTF_8)));
 
@@ -60,7 +57,7 @@ class SafeZipExtractorTest {
   @Test
   void acceptsBackslashEntryNamesFromTheCentralDirectory() throws IOException {
     Path zipPath =
-        createZip(
+        ArchiveTestUtils.createZip(
             tempDir.resolve("backslash.zip"),
             Map.of(
                 "demo\\pom.xml", "<project/>".getBytes(StandardCharsets.UTF_8),
@@ -81,7 +78,7 @@ class SafeZipExtractorTest {
   @Test
   void rejectsZipSlipTraversalEntries() throws IOException {
     Path zipPath =
-        createZip(
+        ArchiveTestUtils.createZip(
             tempDir.resolve("traversal.zip"),
             Map.of(
                 "../evil.txt", "evil".getBytes(StandardCharsets.UTF_8),
@@ -100,12 +97,12 @@ class SafeZipExtractorTest {
   @Test
   void rejectsSymlinkEntriesFromUnixModeMetadata() throws IOException {
     Path zipPath =
-        createZip(
+        ArchiveTestUtils.createZip(
             tempDir.resolve("symlink.zip"),
             Map.of(
                 "demo/pom.xml", "<project/>".getBytes(StandardCharsets.UTF_8),
                 "demo/link", "pom.xml".getBytes(StandardCharsets.UTF_8)));
-    patchUnixMode(zipPath, "demo/link", 0120777);
+    ArchiveTestUtils.patchUnixMode(zipPath, "demo/link", 0120777);
 
     SafeZipExtractor extractor = new SafeZipExtractor();
 
@@ -120,10 +117,10 @@ class SafeZipExtractorTest {
   @Test
   void rejectsSuspiciousUnixModeBits() throws IOException {
     Path zipPath =
-        createZip(
+        ArchiveTestUtils.createZip(
             tempDir.resolve("mode.zip"),
             Map.of("demo/pom.xml", "<project/>".getBytes(StandardCharsets.UTF_8)));
-    patchUnixMode(zipPath, "demo/pom.xml", 0104755);
+    ArchiveTestUtils.patchUnixMode(zipPath, "demo/pom.xml", 0104755);
 
     SafeZipExtractor extractor = new SafeZipExtractor();
 
@@ -141,7 +138,8 @@ class SafeZipExtractorTest {
     for (int i = 0; i < payload.length; i++) {
       payload[i] = 'A';
     }
-    Path zipPath = createZip(tempDir.resolve("bomb.zip"), Map.of("demo/big.txt", payload));
+    Path zipPath =
+        ArchiveTestUtils.createZip(tempDir.resolve("bomb.zip"), Map.of("demo/big.txt", payload));
 
     SafeZipExtractor extractor =
         new SafeZipExtractor(new ArchiveSafetyPolicy(1_000, 10L * 1024L * 1024L, 5.0d, 1_024L));
@@ -160,8 +158,10 @@ class SafeZipExtractorTest {
     for (int i = 0; i < payload.length; i++) {
       payload[i] = 'A';
     }
-    Path zipPath = createZip(tempDir.resolve("size-mismatch.zip"), Map.of("demo/big.txt", payload));
-    patchUncompressedSize(zipPath, "demo/big.txt", 1L);
+    Path zipPath =
+        ArchiveTestUtils.createZip(
+            tempDir.resolve("size-mismatch.zip"), Map.of("demo/big.txt", payload));
+    ArchiveTestUtils.patchUncompressedSize(zipPath, "demo/big.txt", 1L);
 
     SafeZipExtractor extractor =
         new SafeZipExtractor(new ArchiveSafetyPolicy(1_000, 32L * 1024L * 1024L, 500.0d, 1L));
@@ -181,8 +181,9 @@ class SafeZipExtractorTest {
       payload[i] = 'A';
     }
     Path zipPath =
-        createZip(tempDir.resolve("zero-size-mismatch.zip"), Map.of("demo/big.txt", payload));
-    patchUncompressedSize(zipPath, "demo/big.txt", 0L);
+        ArchiveTestUtils.createZip(
+            tempDir.resolve("zero-size-mismatch.zip"), Map.of("demo/big.txt", payload));
+    ArchiveTestUtils.patchUncompressedSize(zipPath, "demo/big.txt", 0L);
 
     SafeZipExtractor extractor =
         new SafeZipExtractor(new ArchiveSafetyPolicy(1_000, 32L * 1024L * 1024L, 500.0d, 1L));
@@ -200,7 +201,7 @@ class SafeZipExtractorTest {
     Map<String, byte[]> entries = new LinkedHashMap<>();
     entries.put("demo\\pom.xml", "<project/>".getBytes(StandardCharsets.UTF_8));
     entries.put("demo/pom.xml", "<project/>".getBytes(StandardCharsets.UTF_8));
-    Path zipPath = createZip(tempDir.resolve("normalized-collision.zip"), entries);
+    Path zipPath = ArchiveTestUtils.createZip(tempDir.resolve("normalized-collision.zip"), entries);
 
     SafeZipExtractor extractor = new SafeZipExtractor();
 
@@ -218,7 +219,7 @@ class SafeZipExtractorTest {
     entries.put("demo/a.txt", "a".getBytes(StandardCharsets.UTF_8));
     entries.put("demo/b.txt", "b".getBytes(StandardCharsets.UTF_8));
     entries.put("demo/c.txt", "c".getBytes(StandardCharsets.UTF_8));
-    Path zipPath = createZip(tempDir.resolve("many.zip"), entries);
+    Path zipPath = ArchiveTestUtils.createZip(tempDir.resolve("many.zip"), entries);
 
     SafeZipExtractor extractor =
         new SafeZipExtractor(new ArchiveSafetyPolicy(2, 1024L * 1024L, 20.0d, 1L));
@@ -234,7 +235,7 @@ class SafeZipExtractorTest {
   @Test
   void failIfExistsPolicyRefusesToOverwriteTargetDirectory() throws IOException {
     Path zipPath =
-        createZip(
+        ArchiveTestUtils.createZip(
             tempDir.resolve("replace.zip"),
             Map.of("demo/new.txt", "new".getBytes(StandardCharsets.UTF_8)));
     Path destination = tempDir.resolve("generated-project");
@@ -254,7 +255,7 @@ class SafeZipExtractorTest {
   @Test
   void failIfExistsOnRootOutputPathDoesNotCrashOnNullFileName() throws IOException {
     Path zipPath =
-        createZip(
+        ArchiveTestUtils.createZip(
             tempDir.resolve("root-output.zip"),
             Map.of("demo/new.txt", "new".getBytes(StandardCharsets.UTF_8)));
     Path rootOutput = tempDir.getRoot();
@@ -269,7 +270,7 @@ class SafeZipExtractorTest {
   @Test
   void replaceExistingPolicyReplacesTargetDirectory() throws IOException {
     Path zipPath =
-        createZip(
+        ArchiveTestUtils.createZip(
             tempDir.resolve("replace-ok.zip"),
             Map.of("demo/new.txt", "new".getBytes(StandardCharsets.UTF_8)));
     Path destination = tempDir.resolve("generated-project");
@@ -286,7 +287,7 @@ class SafeZipExtractorTest {
   @Test
   void cleanupRemovesStagingDirectoryOnExtractionFailure() throws IOException {
     Path zipPath =
-        createZip(
+        ArchiveTestUtils.createZip(
             tempDir.resolve("cleanup.zip"),
             Map.of(
                 "../evil.txt", "evil".getBytes(StandardCharsets.UTF_8),
@@ -319,92 +320,5 @@ class SafeZipExtractorTest {
                     zipPath, tempDir.resolve("generated-project"), OverwritePolicy.FAIL_IF_EXISTS))
         .isInstanceOf(ArchiveException.class)
         .hasMessageContaining("Invalid ZIP");
-  }
-
-  private static Path createZip(Path zipPath, Map<String, byte[]> entries) throws IOException {
-    try (ZipOutputStream zipOutputStream =
-        new ZipOutputStream(Files.newOutputStream(zipPath), StandardCharsets.UTF_8)) {
-      zipOutputStream.setLevel(Deflater.BEST_COMPRESSION);
-      for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
-        ZipEntry zipEntry = new ZipEntry(entry.getKey());
-        zipOutputStream.putNextEntry(zipEntry);
-        zipOutputStream.write(entry.getValue());
-        zipOutputStream.closeEntry();
-      }
-    }
-    return zipPath;
-  }
-
-  private static void patchUnixMode(Path zipPath, String entryName, int unixMode)
-      throws IOException {
-    byte[] bytes = Files.readAllBytes(zipPath);
-    int index = 0;
-    while (index <= bytes.length - 46) {
-      if (u32(bytes, index) != 0x02014B50) {
-        index++;
-        continue;
-      }
-
-      int nameLength = u16(bytes, index + 28);
-      int extraLength = u16(bytes, index + 30);
-      int commentLength = u16(bytes, index + 32);
-      String currentName = new String(bytes, index + 46, nameLength, StandardCharsets.UTF_8);
-
-      if (currentName.equals(entryName)) {
-        long currentExternalAttributes = u32(bytes, index + 38);
-        long patched = (currentExternalAttributes & 0xFFFFL) | (((long) unixMode) << 16);
-        writeU32(bytes, index + 38, patched);
-        Files.write(zipPath, bytes);
-        return;
-      }
-
-      index += 46 + nameLength + extraLength + commentLength;
-    }
-    throw new IllegalArgumentException("Entry not found in ZIP central directory: " + entryName);
-  }
-
-  private static void patchUncompressedSize(Path zipPath, String entryName, long uncompressedSize)
-      throws IOException {
-    byte[] bytes = Files.readAllBytes(zipPath);
-    int index = 0;
-    while (index <= bytes.length - 46) {
-      if (u32(bytes, index) != 0x02014B50) {
-        index++;
-        continue;
-      }
-
-      int nameLength = u16(bytes, index + 28);
-      int extraLength = u16(bytes, index + 30);
-      int commentLength = u16(bytes, index + 32);
-      String currentName = new String(bytes, index + 46, nameLength, StandardCharsets.UTF_8);
-
-      if (currentName.equals(entryName)) {
-        writeU32(bytes, index + 24, uncompressedSize);
-        Files.write(zipPath, bytes);
-        return;
-      }
-
-      index += 46 + nameLength + extraLength + commentLength;
-    }
-    throw new IllegalArgumentException("Entry not found in ZIP central directory: " + entryName);
-  }
-
-  private static int u16(byte[] bytes, int offset) {
-    return (bytes[offset] & 0xFF) | ((bytes[offset + 1] & 0xFF) << 8);
-  }
-
-  private static long u32(byte[] bytes, int offset) {
-    return Integer.toUnsignedLong(
-        (bytes[offset] & 0xFF)
-            | ((bytes[offset + 1] & 0xFF) << 8)
-            | ((bytes[offset + 2] & 0xFF) << 16)
-            | ((bytes[offset + 3] & 0xFF) << 24));
-  }
-
-  private static void writeU32(byte[] bytes, int offset, long value) {
-    bytes[offset] = (byte) (value & 0xFF);
-    bytes[offset + 1] = (byte) ((value >> 8) & 0xFF);
-    bytes[offset + 2] = (byte) ((value >> 16) & 0xFF);
-    bytes[offset + 3] = (byte) ((value >> 24) & 0xFF);
   }
 }
