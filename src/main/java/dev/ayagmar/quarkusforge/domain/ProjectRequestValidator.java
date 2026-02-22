@@ -18,7 +18,7 @@ public final class ProjectRequestValidator {
       Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$");
   private static final Pattern WINDOWS_INVALID_CHARS = Pattern.compile("[<>:\"|?*\\u0000-\\u001F]");
   private static final Pattern BUILD_TOOL_PATTERN = Pattern.compile("^[A-Za-z][A-Za-z0-9_-]*$");
-  private static final Pattern JAVA_VERSION_PATTERN = Pattern.compile("^[0-9]{2}$");
+  private static final Pattern JAVA_VERSION_PATTERN = Pattern.compile("^[0-9]+$");
 
   private static final Set<String> WINDOWS_RESERVED_NAMES =
       Set.of(
@@ -62,7 +62,7 @@ public final class ProjectRequestValidator {
         request.javaVersion(),
         JAVA_VERSION_PATTERN,
         "javaVersion",
-        "must be a two-digit Java feature version",
+        "must be a numeric Java feature version",
         errors);
 
     validateOutputDirectory(request.outputDirectory(), errors);

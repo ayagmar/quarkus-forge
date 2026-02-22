@@ -12,6 +12,7 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandler;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.net.http.HttpTimeoutException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Clock;
@@ -70,14 +71,14 @@ public final class QuarkusApiClient {
 
   public CompletableFuture<List<ExtensionDto>> fetchExtensions() {
     HttpRequest request = newGetRequest(baseUri.resolve("/api/extensions"), "application/json");
-    return sendWithRetry(request, BodyHandlers.ofString(), 1)
+    return sendWithRetry(request, BodyHandlers.ofString(StandardCharsets.UTF_8), 1)
         .thenApply(this::assertSuccessful)
         .thenApply(response -> parseExtensionsPayload(response.body(), objectMapper));
   }
 
   public CompletableFuture<MetadataDto> fetchMetadata() {
     HttpRequest request = newGetRequest(baseUri.resolve("/api/metadata"), "application/json");
-    return sendWithRetry(request, BodyHandlers.ofString(), 1)
+    return sendWithRetry(request, BodyHandlers.ofString(StandardCharsets.UTF_8), 1)
         .thenApply(this::assertSuccessful)
         .thenApply(response -> parseMetadataPayload(response.body(), objectMapper));
   }

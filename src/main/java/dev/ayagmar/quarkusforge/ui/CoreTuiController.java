@@ -210,21 +210,6 @@ public final class CoreTuiController {
       return UiAction.handled(false);
     }
 
-    if (focusTarget == FocusTarget.EXTENSION_LIST && handleExtensionListKeys(keyEvent)) {
-      return UiAction.handled(false);
-    }
-
-    if (isTextInputFocus(focusTarget)
-        && handleTextInputKey(inputStates.get(focusTarget), keyEvent)) {
-      if (focusTarget == FocusTarget.EXTENSION_SEARCH) {
-        scheduleFilteredExtensionsRefresh();
-      } else {
-        rebuildRequestFromInputs();
-        revalidate();
-      }
-      return UiAction.handled(false);
-    }
-
     if (keyEvent.isConfirm()) {
       submitRequested = true;
       if (!validation.isValid()) {
@@ -240,14 +225,31 @@ public final class CoreTuiController {
       return UiAction.handled(false);
     }
 
+    if (focusTarget == FocusTarget.EXTENSION_LIST && handleExtensionListKeys(keyEvent)) {
+      return UiAction.handled(false);
+    }
+
+    if (isTextInputFocus(focusTarget)
+        && handleTextInputKey(inputStates.get(focusTarget), keyEvent)) {
+      if (focusTarget == FocusTarget.EXTENSION_SEARCH) {
+        scheduleFilteredExtensionsRefresh();
+      } else {
+        rebuildRequestFromInputs();
+        revalidate();
+        refreshValidationFeedbackAfterEdit();
+      }
+      return UiAction.handled(false);
+    }
+
     return UiAction.ignored();
   }
 
   public void render(Frame frame) {
     Rect area = frame.area();
+    int footerHeight = errorMessage.isBlank() ? 5 : 6;
     List<Rect> rootLayout =
         Layout.vertical()
-            .constraints(Constraint.length(3), Constraint.fill(), Constraint.length(4))
+            .constraints(Constraint.length(3), Constraint.fill(), Constraint.length(footerHeight))
             .split(area);
 
     renderHeader(frame, rootLayout.get(0));
@@ -593,6 +595,18 @@ public final class CoreTuiController {
       report = report.merge(compatibilityValidator.validate(request, metadataSnapshot));
     }
     validation = report;
+  }
+
+  private void refreshValidationFeedbackAfterEdit() {
+    if (!statusMessage.startsWith("Submit blocked")) {
+      return;
+    }
+    if (validation.isValid()) {
+      errorMessage = "";
+      statusMessage = "Validation restored";
+      return;
+    }
+    errorMessage = firstValidationError(validation);
   }
 
   private void cancelPendingAsyncOperations() {

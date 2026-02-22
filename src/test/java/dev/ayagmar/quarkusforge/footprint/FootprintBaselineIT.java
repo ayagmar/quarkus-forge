@@ -19,7 +19,7 @@ class FootprintBaselineIT {
   private static final Path RUNTIME_TREE_PATH = Path.of("target/runtime-dependency-tree.txt");
   private static final Path SHADED_JAR_PATH = Path.of("target/quarkus-forge.jar");
   private static final Pattern RUNTIME_DEPENDENCY_PATTERN =
-      Pattern.compile("([A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+):jar:[^:]+:(compile|runtime)");
+      Pattern.compile("([A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+):jar(?::[^:]+)?:[^:]+:(compile|runtime)");
 
   @Test
   void runtimeDependencyGrowthStaysWithinBaselineBudget() throws IOException {
@@ -93,6 +93,17 @@ class FootprintBaselineIT {
         .isLessThanOrEqualTo(maxAllowedBytes);
   }
 
+  @Test
+  void runtimeDependencyParserIncludesClassifierCoordinates() {
+    Set<String> dependencies =
+        parseRuntimeDependenciesLines(
+            List.of(
+                "[INFO] +- io.example:core:jar:1.0.0:runtime",
+                "[INFO] \\- io.example:native:jar:linux-x86_64:1.0.0:runtime"));
+
+    assertThat(dependencies).containsExactly("io.example:core", "io.example:native");
+  }
+
   private static Properties loadBaseline() throws IOException {
     Properties properties = new Properties();
     assertThat(Files.exists(BASELINE_PATH))
@@ -105,8 +116,11 @@ class FootprintBaselineIT {
   }
 
   private static Set<String> parseRuntimeDependencies(Path dependencyTreePath) throws IOException {
+    return parseRuntimeDependenciesLines(Files.readAllLines(dependencyTreePath));
+  }
+
+  private static Set<String> parseRuntimeDependenciesLines(List<String> lines) {
     Set<String> runtimeDependencies = new LinkedHashSet<>();
-    List<String> lines = Files.readAllLines(dependencyTreePath);
     for (String line : lines) {
       Matcher matcher = RUNTIME_DEPENDENCY_PATTERN.matcher(line);
       if (matcher.find()) {

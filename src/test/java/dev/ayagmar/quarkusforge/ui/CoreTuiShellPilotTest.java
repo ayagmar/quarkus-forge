@@ -8,6 +8,9 @@ import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityValidator;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
+import dev.tamboui.buffer.Buffer;
+import dev.tamboui.layout.Rect;
+import dev.tamboui.terminal.Frame;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.KeyModifiers;
@@ -58,11 +61,48 @@ class CoreTuiShellPilotTest {
     assertThat(controller.statusMessage()).contains("Submit blocked");
   }
 
+  @Test
+  void enterSubmitsInsteadOfTogglingWhenExtensionListIsFocused() {
+    CoreTuiController controller = CoreTuiController.from(validInitialState());
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    assertThat(controller.submitRequested()).isTrue();
+    assertThat(controller.selectedExtensionIds()).isEmpty();
+    assertThat(controller.statusMessage()).contains("Submit requested");
+  }
+
+  @Test
+  void fixingInputWithoutChangingFocusClearsBlockedSubmitErrorFromFooter() {
+    CoreTuiController controller = CoreTuiController.from(validInitialState());
+    moveFocusTo(controller, FocusTarget.JAVA_VERSION);
+
+    controller.onEvent(KeyEvent.ofChar('x'));
+    assertThat(controller.validation().isValid()).isFalse();
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    assertThat(renderToString(controller)).contains("Error:");
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.BACKSPACE));
+
+    assertThat(controller.validation().isValid()).isTrue();
+    assertThat(controller.statusMessage()).contains("Validation restored");
+    assertThat(renderToString(controller)).doesNotContain("Error:");
+  }
+
   private static void moveFocusTo(CoreTuiController controller, FocusTarget target) {
     for (int i = 0; i < 20 && controller.focusTarget() != target; i++) {
       controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
     }
     assertThat(controller.focusTarget()).isEqualTo(target);
+  }
+
+  private static String renderToString(CoreTuiController controller) {
+    Buffer buffer = Buffer.empty(new Rect(0, 0, 120, 32));
+    Frame frame = Frame.forTesting(buffer);
+    controller.render(frame);
+    return buffer.toAnsiStringTrimmed();
   }
 
   private static ForgeUiState validInitialState() {

@@ -117,4 +117,15 @@ class ProjectRequestValidatorTest {
     assertThat(request.packageName()).isEqualTo("com.example.x123app");
     assertThat(validator.validate(request).isValid()).isTrue();
   }
+
+  @Test
+  void acceptsNumericJavaFeatureVersionWithoutTwoDigitConstraint() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example", "forge-app", "1.0.0", "com.example.forge", "./out", "maven", "8");
+
+    ValidationReport report = validator.validate(request);
+
+    assertThat(report.errors()).extracting(ValidationError::field).doesNotContain("javaVersion");
+  }
 }

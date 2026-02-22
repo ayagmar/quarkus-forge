@@ -20,7 +20,9 @@ import java.net.http.HttpClient;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZonedDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -125,6 +127,38 @@ class QuarkusApiClientTest {
 
     verify(2, getRequestedFor(urlEqualTo("/api/extensions")));
     assertThat(sleeper.delays).containsExactly(Duration.ofSeconds(2));
+  }
+
+  @Test
+  void fetchExtensionsRespectsHttpDateRetryAfterHeaderOn429() {
+    String retryAfter =
+        DateTimeFormatter.RFC_1123_DATE_TIME.format(
+            ZonedDateTime.ofInstant(Instant.parse("2026-02-21T00:00:03Z"), ZoneOffset.UTC));
+    stubFor(
+        get(urlEqualTo("/api/extensions"))
+            .inScenario("retry-after-http-date")
+            .whenScenarioStateIs(Scenario.STARTED)
+            .willSetStateTo("second")
+            .willReturn(aResponse().withStatus(429).withHeader("Retry-After", retryAfter)));
+
+    stubFor(
+        get(urlEqualTo("/api/extensions"))
+            .inScenario("retry-after-http-date")
+            .whenScenarioStateIs("second")
+            .willReturn(
+                okJson(
+                    """
+                    [{"id":"io.quarkus:quarkus-rest","name":"REST","shortName":"rest"}]
+                    """)));
+
+    RecordingSleeper sleeper = new RecordingSleeper();
+    RetryPolicy retryPolicy = new RetryPolicy(3, Duration.ofMillis(300), Duration.ofMillis(20), 0d);
+    QuarkusApiClient client = newClient(retryPolicy, sleeper);
+
+    client.fetchExtensions().join();
+
+    verify(2, getRequestedFor(urlEqualTo("/api/extensions")));
+    assertThat(sleeper.delays).containsExactly(Duration.ofSeconds(3));
   }
 
   @Test
