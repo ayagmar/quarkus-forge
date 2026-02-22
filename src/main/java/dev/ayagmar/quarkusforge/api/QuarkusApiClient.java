@@ -2,7 +2,6 @@ package dev.ayagmar.quarkusforge.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.ayagmar.quarkusforge.util.CaseInsensitiveLookup;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -24,6 +23,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -306,12 +306,30 @@ public final class QuarkusApiClient {
       throw new ApiContractException("Metadata payload field 'compatibility' must be an object");
     }
 
-    Map<String, JsonNode> compatibilityByBuildTool = new LinkedHashMap<>();
+    Map<String, CompatibilityEntry> compatibilityByNormalizedBuildTool = new LinkedHashMap<>();
     node.fields()
-        .forEachRemaining(entry -> compatibilityByBuildTool.put(entry.getKey(), entry.getValue()));
+        .forEachRemaining(
+            entry -> {
+              String normalizedBuildTool = normalizeKey(entry.getKey());
+              CompatibilityEntry previous =
+                  compatibilityByNormalizedBuildTool.putIfAbsent(
+                      normalizedBuildTool,
+                      new CompatibilityEntry(entry.getKey(), entry.getValue()));
+              if (previous != null) {
+                throw new ApiContractException(
+                    "Metadata payload compatibility contains duplicate build tool entries differing"
+                        + " only by case: '"
+                        + previous.originalBuildTool()
+                        + "' and '"
+                        + entry.getKey()
+                        + "'");
+              }
+            });
 
     for (String buildTool : buildTools) {
-      JsonNode javaVersionsNode = CaseInsensitiveLookup.find(compatibilityByBuildTool, buildTool);
+      CompatibilityEntry compatibilityEntry =
+          compatibilityByNormalizedBuildTool.get(normalizeKey(buildTool));
+      JsonNode javaVersionsNode = compatibilityEntry == null ? null : compatibilityEntry.value();
       if (javaVersionsNode == null || !javaVersionsNode.isArray()) {
         throw new ApiContractException(
             "Metadata payload compatibility missing build tool entry '" + buildTool + "'");
@@ -331,4 +349,10 @@ public final class QuarkusApiClient {
     }
     return throwable;
   }
+
+  private static String normalizeKey(String key) {
+    return key == null ? "" : key.trim().toLowerCase(Locale.ROOT);
+  }
+
+  private record CompatibilityEntry(String originalBuildTool, JsonNode value) {}
 }

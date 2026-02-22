@@ -74,4 +74,26 @@ class QuarkusApiContractDriftTest {
     assertThat(metadata.compatibility()).containsEntry("Maven", List.of("21", "25"));
     assertThat(metadata.compatibility()).containsEntry("Gradle", List.of("25"));
   }
+
+  @Test
+  void compatibilityCaseCollisionsAreRejectedDuringParsing() {
+    String duplicateCaseCompatibilityPayload =
+        """
+        {
+          "javaVersions": ["21", "25"],
+          "buildTools": ["maven"],
+          "compatibility": {
+            "maven": ["25"],
+            "MAVEN": ["21"]
+          }
+        }
+        """;
+
+    assertThatThrownBy(
+            () ->
+                QuarkusApiClient.parseMetadataPayload(
+                    duplicateCaseCompatibilityPayload, objectMapper))
+        .isInstanceOf(ApiContractException.class)
+        .hasMessageContaining("differing only by case");
+  }
 }

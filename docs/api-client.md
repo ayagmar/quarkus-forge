@@ -18,6 +18,10 @@
 ## Contract Safety
 - JSON payloads are parsed with strict required fields.
 - Metadata contract includes compatibility matrix entries per build tool.
+- Compatibility lookup is normalized once during parsing (case-insensitive key normalization), then
+  resolved by direct map lookup.
+- Case-colliding compatibility keys (for example `maven` and `MAVEN`) are rejected as contract
+  errors to avoid ambiguous behavior.
 - Missing/renamed required fields raise `ApiContractException`.
 - Snapshot contract drift test is pinned at `src/test/resources/contracts/quarkus-api-snapshot.json`.
 
