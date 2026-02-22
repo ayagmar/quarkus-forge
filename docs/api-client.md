@@ -17,8 +17,8 @@
 
 ## Contract Safety
 - JSON payloads are parsed with strict required fields.
-- Extension parsing requires `id` and `name`; `shortName` is now tolerant (`shortName` ->
-  `shortId` -> derived from extension `id`) to handle current upstream payload variance.
+- Extension parsing requires `id` and `name`; `shortName` is tolerant and falls back to `name`
+  when missing/blank.
 - Metadata contract includes compatibility matrix entries per build tool.
 - Compatibility lookup is normalized once during parsing (case-insensitive key normalization), then
   resolved by direct map lookup.

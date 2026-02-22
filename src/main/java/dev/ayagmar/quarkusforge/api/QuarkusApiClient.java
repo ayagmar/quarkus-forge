@@ -120,7 +120,7 @@ public final class QuarkusApiClient {
     for (JsonNode node : root) {
       String id = requiredText(node, "id");
       String name = requiredText(node, "name");
-      String shortName = resolvedShortName(node, id);
+      String shortName = resolvedShortName(node, name);
       extensions.add(new ExtensionDto(id, name, shortName));
     }
     return List.copyOf(extensions);
@@ -292,26 +292,12 @@ public final class QuarkusApiClient {
     return child.textValue().trim();
   }
 
-  private static String resolvedShortName(JsonNode node, String id) {
+  private static String resolvedShortName(JsonNode node, String name) {
     String shortName = optionalText(node, "shortName");
     if (!shortName.isBlank()) {
       return shortName;
     }
-
-    String shortId = optionalText(node, "shortId");
-    if (!shortId.isBlank()) {
-      return shortId;
-    }
-
-    return deriveShortNameFromId(id);
-  }
-
-  private static String deriveShortNameFromId(String id) {
-    int separatorIndex = id.lastIndexOf(':');
-    if (separatorIndex < 0 || separatorIndex == id.length() - 1) {
-      return id;
-    }
-    return id.substring(separatorIndex + 1);
+    return name;
   }
 
   private static List<String> toStringList(JsonNode node, String fieldName) {

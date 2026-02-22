@@ -72,7 +72,7 @@ class QuarkusApiClientTest {
   }
 
   @Test
-  void fetchExtensionsUsesShortIdWhenShortNameIsBlank() {
+  void fetchExtensionsUsesNameWhenShortNameIsBlank() {
     stubFor(
         get(urlEqualTo("/api/extensions"))
             .willReturn(
@@ -92,13 +92,11 @@ class QuarkusApiClientTest {
 
     List<ExtensionDto> extensions = client.fetchExtensions().join();
 
-    assertThat(extensions)
-        .containsExactly(
-            new ExtensionDto("io.quarkus:quarkus-rest", "REST", "resteasy-reactive"));
+    assertThat(extensions).containsExactly(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "REST"));
   }
 
   @Test
-  void fetchExtensionsDerivesShortNameFromIdWhenShortNameAndShortIdAreMissing() {
+  void fetchExtensionsUsesNameWhenShortNameAndShortIdAreMissing() {
     stubFor(
         get(urlEqualTo("/api/extensions"))
             .willReturn(
@@ -116,8 +114,33 @@ class QuarkusApiClientTest {
 
     List<ExtensionDto> extensions = client.fetchExtensions().join();
 
+    assertThat(extensions).containsExactly(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "REST"));
+  }
+
+  @Test
+  void fetchExtensionsIgnoresShortIdWhenShortNameIsBlank() {
+    stubFor(
+        get(urlEqualTo("/api/extensions"))
+            .willReturn(
+                okJson(
+                    """
+                    [
+                      {
+                        "id":"io.quarkus:quarkus-agroal",
+                        "name":"Agroal - DB connection pool",
+                        "shortName":" ",
+                        "shortId":"ignored"
+                      }
+                    ]
+                    """)));
+
+    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+
+    List<ExtensionDto> extensions = client.fetchExtensions().join();
+
     assertThat(extensions)
-        .containsExactly(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "quarkus-rest"));
+        .containsExactly(
+            new ExtensionDto("io.quarkus:quarkus-agroal", "Agroal - DB connection pool", "Agroal - DB connection pool"));
   }
 
   @Test

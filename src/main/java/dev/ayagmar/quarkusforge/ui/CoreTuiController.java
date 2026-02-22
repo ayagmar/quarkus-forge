@@ -40,6 +40,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 public final class CoreTuiController {
+  private static final int LIST_SHORT_NAME_MAX_LENGTH = 36;
   private static final List<FocusTarget> FOCUS_ORDER =
       List.of(
           FocusTarget.GROUP_ID,
@@ -418,9 +419,9 @@ public final class CoreTuiController {
     for (ExtensionCatalogItem extension : filteredExtensions) {
       boolean selected = extensionCatalogState.isSelected(extension.id());
       String prefix = selected ? "[x] " : "[ ] ";
+      String displayLabel = extensionDisplayLabel(extension);
       items.add(
-          ListItem.from(prefix + extension.name() + " (" + extension.shortName() + ")")
-              .toSizedWidget());
+          ListItem.from(prefix + displayLabel).toSizedWidget());
     }
 
     Block listBlock =
@@ -763,6 +764,20 @@ public final class CoreTuiController {
       case EXTENSION_LIST -> "extensionList";
       case SUBMIT -> "submit";
     };
+  }
+
+  private static String extensionDisplayLabel(ExtensionCatalogItem extension) {
+    if (extension.shortName().equalsIgnoreCase(extension.name())) {
+      return extension.name();
+    }
+    return extension.name() + " (" + truncate(extension.shortName(), LIST_SHORT_NAME_MAX_LENGTH) + ")";
+  }
+
+  private static String truncate(String value, int maxLength) {
+    if (value.length() <= maxLength) {
+      return value;
+    }
+    return value.substring(0, maxLength - 3) + "...";
   }
 
   private static String firstValidationError(ValidationReport report) {
