@@ -31,9 +31,15 @@ Use these gates after each issue:
 - The core two-panel shell, focus routing model, and key bindings are documented in `docs/ui-shell.md`.
 
 ## Native Profile Notes
-- Native profile is wired with `org.graalvm.buildtools:native-maven-plugin`.
+- Native profile is wired with `org.graalvm.buildtools:native-maven-plugin` (`0.11.4`) and compiles the native image during `package` when `-Dnative.skip=false` is set.
 - In this environment, `native-image` is installed at `~/.sdkman/candidates/java/25-graal/bin/native-image`, but it is not on `PATH` under the default Temurin Java runtime.
-- To produce a native binary, run with `-Dnative.skip=false` and ensure GraalVM is active (or invoke Maven with `JAVA_HOME` set to GraalVM).
+- To produce a native binary, run with GraalVM active:
+  - `JAVA_HOME=$HOME/.sdkman/candidates/java/25-graal PATH=$JAVA_HOME/bin:$PATH mvn -q -Pnative -Dnative.skip=false package`
+- Produced binary path: `target/quarkus-forge`.
+- JVM TUI runtime backend policy:
+  - With `--enable-native-access=ALL-UNNAMED`, backend preference is `panama,jline3`.
+  - Without native-access flag, runtime prefers `jline` and prints guidance; some terminal-native warnings may still appear depending on environment.
+- Native image build includes `--enable-native-access=ALL-UNNAMED` during compilation so the produced binary does not require extra launcher flags for terminal FFM access.
 
 ## Maven Repository Notes
 - TamboUI dependencies are resolved from Sonatype snapshots:

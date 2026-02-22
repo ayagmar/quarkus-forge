@@ -29,6 +29,7 @@
     <maven.shade.plugin.version>3.6.1</maven.shade.plugin.version>
     <spotless.plugin.version>3.2.1</spotless.plugin.version>
     <checkstyle.plugin.version>3.6.0</checkstyle.plugin.version>
+    <graalvm.native.plugin.version>0.11.4</graalvm.native.plugin.version>
     <native.skip>true</native.skip>
   </properties>
 
@@ -159,6 +160,16 @@
         <version>${maven.compiler.plugin.version}</version>
         <configuration>
           <release>${maven.compiler.release}</release>
+          <annotationProcessorPaths>
+            <path>
+              <groupId>info.picocli</groupId>
+              <artifactId>picocli-codegen</artifactId>
+              <version>${picocli.version}</version>
+            </path>
+          </annotationProcessorPaths>
+          <compilerArgs>
+            <arg>-Aproject=${project.groupId}/${project.artifactId}</arg>
+          </compilerArgs>
         </configuration>
       </plugin>
 
@@ -258,6 +269,36 @@
         <native.access.flag>--enable-native-access=ALL-UNNAMED</native.access.flag>
         <native.profile.active>true</native.profile.active>
       </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.graalvm.buildtools</groupId>
+            <artifactId>native-maven-plugin</artifactId>
+            <version>${graalvm.native.plugin.version}</version>
+            <extensions>true</extensions>
+            <executions>
+              <execution>
+                <id>build-native-image</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>compile-no-fork</goal>
+                </goals>
+              </execution>
+            </executions>
+            <configuration>
+              <skip>${native.skip}</skip>
+              <imageName>quarkus-forge</imageName>
+              <mainClass>dev.ayagmar.quarkusforge.QuarkusForgeCli</mainClass>
+              <buildArgs>
+                <buildArg>--no-fallback</buildArg>
+                <buildArg>-H:+ReportExceptionStackTraces</buildArg>
+                <buildArg>--enable-url-protocols=http,https</buildArg>
+                <buildArg>${native.access.flag}</buildArg>
+              </buildArgs>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
   </profiles>
 </project>

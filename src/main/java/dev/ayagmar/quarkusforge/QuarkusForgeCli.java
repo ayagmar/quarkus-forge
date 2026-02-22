@@ -57,6 +57,12 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   static final int EXIT_CODE_NETWORK = 3;
   static final int EXIT_CODE_ARCHIVE = 4;
   static final int EXIT_CODE_CANCELLED = 130;
+  static final String NATIVE_ACCESS_FLAG = "--enable-native-access=ALL-UNNAMED";
+
+  private static final String BACKEND_PROPERTY_NAME = "tamboui.backend";
+  private static final String BACKEND_ENV_NAME = "TAMBOUI_BACKEND";
+  private static final String PANAMA_BACKEND = "panama";
+  private static final String JLINE_BACKEND = "jline3";
 
   private static final Map<String, List<String>> BUILTIN_PRESETS = builtInPresets();
   private static final String PRESET_FAVORITES = "favorites";
@@ -131,6 +137,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       int searchDebounceMs,
       RuntimeConfig runtimeConfig)
       throws Exception {
+    configureTerminalBackendPreference();
     try (var tui = TuiRunner.create()) {
       QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
       CatalogDataService catalogDataService =
@@ -183,6 +190,42 @@ public final class QuarkusForgeCli implements Callable<Integer> {
         catalogData.stale(),
         catalogData.detailMessage(),
         catalogData.metadata());
+  }
+
+  private static void configureTerminalBackendPreference() {
+    if (isBackendPreferenceExplicitlyConfigured()) {
+      return;
+    }
+    String backendPreference =
+        defaultBackendPreference(
+            isNativeImageRuntime(), QuarkusForgeCli.class.getModule().isNativeAccessEnabled());
+    System.setProperty(BACKEND_PROPERTY_NAME, backendPreference);
+    if (JLINE_BACKEND.equals(backendPreference)) {
+      System.err.println(
+          "JVM started without "
+              + NATIVE_ACCESS_FLAG
+              + "; preferring jline backend (terminal-native warnings may still appear).");
+    }
+  }
+
+  static String defaultBackendPreference(boolean nativeImageRuntime, boolean nativeAccessEnabled) {
+    if (nativeImageRuntime || nativeAccessEnabled) {
+      return PANAMA_BACKEND + "," + JLINE_BACKEND;
+    }
+    return JLINE_BACKEND;
+  }
+
+  private static boolean isBackendPreferenceExplicitlyConfigured() {
+    String propertyValue = System.getProperty(BACKEND_PROPERTY_NAME);
+    if (propertyValue != null && !propertyValue.isBlank()) {
+      return true;
+    }
+    String envValue = System.getenv(BACKEND_ENV_NAME);
+    return envValue != null && !envValue.isBlank();
+  }
+
+  private static boolean isNativeImageRuntime() {
+    return "runtime".equalsIgnoreCase(System.getProperty("org.graalvm.nativeimage.imagecode"));
   }
 
   private static ForgeUiState buildInitialState(

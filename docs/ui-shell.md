@@ -40,6 +40,10 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - `Ctrl+K`: toggle favorites-only filter mode.
 - `Enter`: attempt submit (blocked with validation feedback if invalid).
 - `Esc` or `Ctrl+C`: cancel active generation if running, otherwise exit the TUI.
+- Backend startup preference is deterministic:
+  - JVM with native access enabled: `panama,jline3`.
+  - JVM without native access: `jline` (with guidance to use `--enable-native-access=ALL-UNNAMED`; some terminal-native warnings can still appear).
+  - Native image runtime: `panama,jline3`.
 
 ## Validation and Status
 - Metadata + field validation are recalculated as project inputs change.

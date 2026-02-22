@@ -74,4 +74,22 @@ class QuarkusForgeCliTest {
 
     assertThat(exitCode).isEqualTo(2);
   }
+
+  @Test
+  void backendPreferenceFallsBackToJlineWhenJvmNativeAccessIsDisabled() {
+    String preference = QuarkusForgeCli.defaultBackendPreference(false, false);
+    assertThat(preference).isEqualTo("jline3");
+  }
+
+  @Test
+  void backendPreferenceKeepsPanamaFirstWhenNativeAccessIsEnabled() {
+    String preference = QuarkusForgeCli.defaultBackendPreference(false, true);
+    assertThat(preference).isEqualTo("panama,jline3");
+  }
+
+  @Test
+  void backendPreferenceKeepsPanamaFirstInNativeImageRuntime() {
+    String preference = QuarkusForgeCli.defaultBackendPreference(true, false);
+    assertThat(preference).isEqualTo("panama,jline3");
+  }
 }
