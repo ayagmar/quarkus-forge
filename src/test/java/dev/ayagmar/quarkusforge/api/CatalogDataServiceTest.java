@@ -129,6 +129,29 @@ class CatalogDataServiceTest {
   }
 
   @Test
+  void liveExtensionsStillLoadWhenMetadataEndpointIsUnavailable() {
+    stubExtensionsWithMetadataUnavailable();
+    Path cacheFile = tempDir.resolve("catalog-snapshot.json");
+
+    CatalogDataService service =
+        new CatalogDataService(
+            onlineClient(),
+            new CatalogSnapshotCache(
+                cacheFile,
+                ObjectMapperProvider.shared(),
+                Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
+                Duration.ofHours(6),
+                2L * 1024L * 1024L));
+
+    CatalogData liveData = service.load().join();
+
+    assertThat(liveData.source()).isEqualTo(CatalogSource.LIVE);
+    assertThat(liveData.extensions()).hasSize(2);
+    assertThat(liveData.detailMessage()).contains("Live metadata unavailable");
+    assertThat(new CatalogSnapshotCache(cacheFile).read()).isPresent();
+  }
+
+  @Test
   void invalidCacheSchemaFallsBackToNoCacheFailure() throws Exception {
     Path cacheFile = tempDir.resolve("catalog-snapshot.json");
     java.nio.file.Files.writeString(
@@ -213,6 +236,23 @@ class CatalogDataServiceTest {
                           }
                         }
                         """)));
+  }
+
+  private void stubExtensionsWithMetadataUnavailable() {
+    stubFor(
+        get(urlEqualTo("/api/extensions"))
+            .willReturn(
+                okJson(
+                    """
+                    [
+                      {"id":"io.quarkus:quarkus-rest","name":"REST","shortName":"rest"},
+                      {"id":"io.quarkus:quarkus-arc","name":"CDI","shortName":"cdi"}
+                    ]
+                    """)));
+
+    stubFor(
+        get(urlEqualTo("/api/metadata"))
+            .willReturn(aResponse().withStatus(404).withBody("not found")));
   }
 
   private QuarkusApiClient onlineClient() {
