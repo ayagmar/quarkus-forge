@@ -1,6 +1,9 @@
 package dev.ayagmar.quarkusforge;
 
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
+import dev.ayagmar.quarkusforge.archive.OverwritePolicy;
+import dev.ayagmar.quarkusforge.archive.ProjectArchiveService;
+import dev.ayagmar.quarkusforge.archive.SafeZipExtractor;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.CliPrefillMapper;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
@@ -116,11 +119,25 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       throws Exception {
     try (var tui = TuiRunner.create()) {
       QuarkusApiClient apiClient = new QuarkusApiClient(URI.create("https://code.quarkus.io"));
+      ProjectArchiveService projectArchiveService =
+          new ProjectArchiveService(apiClient, new SafeZipExtractor());
       CoreTuiController controller =
           CoreTuiController.from(
               initialState,
               UiScheduler.fromScheduledExecutor(tui.scheduler(), tui::runOnRenderThread),
-              Duration.ofMillis(Math.max(0, searchDebounceMs)));
+              Duration.ofMillis(Math.max(0, searchDebounceMs)),
+              (generationRequest, outputDirectory, cancelled, progressListener) ->
+                  projectArchiveService.downloadAndExtract(
+                      generationRequest,
+                      outputDirectory,
+                      OverwritePolicy.FAIL_IF_EXISTS,
+                      cancelled,
+                      progress ->
+                          progressListener.accept(
+                              switch (progress) {
+                                case DOWNLOADING_ARCHIVE -> "downloading project archive...";
+                                case EXTRACTING_ARCHIVE -> "extracting project archive...";
+                              })));
       controller.loadExtensionCatalogAsync(apiClient::fetchExtensions);
       if (smokeMode) {
         tui.scheduler().schedule(tui::quit, 350, TimeUnit.MILLISECONDS);

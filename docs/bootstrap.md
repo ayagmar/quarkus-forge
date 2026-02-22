@@ -23,6 +23,8 @@ Use these gates after each issue:
 ## Archive Generation Safety
 - Archive download/extraction hardening is documented in `docs/archive-safety.md`.
 - Generated ZIPs are downloaded as streams to temporary files and extracted with zip-slip/symlink/zip-bomb guards.
+- Submit flow uses `ProjectArchiveService` (`download -> extract -> cleanup`) with `OverwritePolicy.FAIL_IF_EXISTS`.
+- TUI cancellation (`Esc` during generation) requests safe abort and ensures temporary archive cleanup.
 
 ## Core TUI Shell
 - The core two-panel shell, focus routing model, and key bindings are documented in `docs/ui-shell.md`.

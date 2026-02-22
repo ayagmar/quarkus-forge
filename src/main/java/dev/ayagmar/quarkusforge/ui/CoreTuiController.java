@@ -1,6 +1,7 @@
 package dev.ayagmar.quarkusforge.ui;
 
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
+import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.CliPrefillMapper;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
@@ -27,6 +28,7 @@ import dev.tamboui.widgets.list.ListItem;
 import dev.tamboui.widgets.list.ListState;
 import dev.tamboui.widgets.list.ListWidget;
 import dev.tamboui.widgets.paragraph.Paragraph;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -34,7 +36,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 public final class CoreTuiController {
   private static final List<FocusTarget> FOCUS_ORDER =
@@ -64,6 +70,10 @@ public final class CoreTuiController {
           new ExtensionCatalogItem("io.quarkus:quarkus-junit5", "JUnit 5", "junit5"));
 
   private static final int NARROW_WIDTH_THRESHOLD = 100;
+  private static final ProjectGenerationRunner NOOP_PROJECT_GENERATION_RUNNER =
+      (generationRequest, outputDirectory, cancelled, progressListener) ->
+          CompletableFuture.failedFuture(
+              new IllegalStateException("Generation flow is not configured in this runtime"));
   private final EnumMap<FocusTarget, TextInputState> inputStates = new EnumMap<>(FocusTarget.class);
   private final ListState extensionListState = new ListState();
   private final Set<String> selectedExtensionIds = new LinkedHashSet<>();
@@ -72,6 +82,7 @@ public final class CoreTuiController {
   private final UiScheduler scheduler;
   private final Debouncer extensionSearchDebouncer;
   private final LatestResultGate extensionSearchResultGate = new LatestResultGate();
+  private final ProjectGenerationRunner projectGenerationRunner;
 
   private ProjectRequest request;
   private ValidationReport validation;
@@ -82,12 +93,21 @@ public final class CoreTuiController {
   private String errorMessage;
   private boolean submitRequested;
   private boolean submitBlockedByValidation;
+  private GenerationState generationState;
+  private CompletableFuture<Path> generationFuture;
+  private boolean generationCancelRequested;
+  private long generationToken;
+  private String successHint;
 
   private CoreTuiController(
-      ForgeUiState initialState, UiScheduler scheduler, Duration debounceDelay) {
+      ForgeUiState initialState,
+      UiScheduler scheduler,
+      Duration debounceDelay,
+      ProjectGenerationRunner projectGenerationRunner) {
     Objects.requireNonNull(initialState);
     Objects.requireNonNull(scheduler);
     Objects.requireNonNull(debounceDelay);
+    Objects.requireNonNull(projectGenerationRunner);
     request = initialState.request();
     validation = initialState.validation();
     focusTarget = FocusTarget.GROUP_ID;
@@ -98,6 +118,12 @@ public final class CoreTuiController {
     metadataCompatibility = initialState.metadataCompatibility();
     this.scheduler = scheduler;
     extensionSearchDebouncer = new Debouncer(scheduler, debounceDelay);
+    this.projectGenerationRunner = projectGenerationRunner;
+    generationState = GenerationState.IDLE;
+    generationFuture = null;
+    generationCancelRequested = false;
+    generationToken = 0L;
+    successHint = "";
 
     for (FocusTarget target : FocusTarget.values()) {
       inputStates.put(target, new TextInputState(""));
@@ -123,12 +149,21 @@ public final class CoreTuiController {
   }
 
   public static CoreTuiController from(ForgeUiState initialState) {
-    return from(initialState, UiScheduler.immediate(), Duration.ZERO);
+    return from(
+        initialState, UiScheduler.immediate(), Duration.ZERO, NOOP_PROJECT_GENERATION_RUNNER);
   }
 
   public static CoreTuiController from(
       ForgeUiState initialState, UiScheduler scheduler, Duration debounceDelay) {
-    return new CoreTuiController(initialState, scheduler, debounceDelay);
+    return from(initialState, scheduler, debounceDelay, NOOP_PROJECT_GENERATION_RUNNER);
+  }
+
+  public static CoreTuiController from(
+      ForgeUiState initialState,
+      UiScheduler scheduler,
+      Duration debounceDelay,
+      ProjectGenerationRunner projectGenerationRunner) {
+    return new CoreTuiController(initialState, scheduler, debounceDelay, projectGenerationRunner);
   }
 
   public void loadExtensionCatalogAsync(ExtensionCatalogLoader loader) {
@@ -176,7 +211,20 @@ public final class CoreTuiController {
     }
 
     if (keyEvent.isQuit() || keyEvent.isCancel()) {
+      if (isGenerationInProgress()) {
+        requestGenerationCancellation();
+        return UiAction.handled(false);
+      }
       cancelPendingAsyncOperations();
+      return UiAction.handled(true);
+    }
+
+    if (isGenerationInProgress()) {
+      if (keyEvent.isConfirm()) {
+        statusMessage = "Generation already in progress. Press Esc to cancel.";
+        return UiAction.handled(true);
+      }
+      statusMessage = "Generation in progress. Press Esc to cancel.";
       return UiAction.handled(true);
     }
     if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && keyEvent.hasShift()) {
@@ -205,10 +253,14 @@ public final class CoreTuiController {
       } else {
         submitBlockedByValidation = false;
         errorMessage = "";
-        statusMessage =
-            "Submit requested with "
-                + selectedExtensionIds.size()
-                + " extension(s). Generation flow lands in ISSUE-P1-02.";
+        if (projectGenerationRunner == NOOP_PROJECT_GENERATION_RUNNER) {
+          statusMessage =
+              "Submit requested with "
+                  + selectedExtensionIds.size()
+                  + " extension(s), but generation service is not configured.";
+        } else {
+          startGenerationFlow();
+        }
       }
       return UiAction.handled(false);
     }
@@ -235,6 +287,10 @@ public final class CoreTuiController {
   public void render(Frame frame) {
     Rect area = frame.area();
     int footerHeight = errorMessage.isBlank() ? 5 : 6;
+    footerHeight += 1;
+    if (!successHint.isBlank()) {
+      footerHeight += 1;
+    }
     List<Rect> rootLayout =
         Layout.vertical()
             .constraints(Constraint.length(3), Constraint.fill(), Constraint.length(footerHeight))
@@ -459,8 +515,12 @@ public final class CoreTuiController {
             + (validation.isValid() ? "OK" : firstValidationError(validation))
             + " | Focus: "
             + focusTargetName(focusTarget);
+    footerText += "\nGeneration: " + generationStateLabel();
     if (!errorMessage.isBlank()) {
       footerText += "\nError: " + errorMessage;
+    }
+    if (!successHint.isBlank()) {
+      footerText += "\nNext: " + successHint;
     }
 
     Paragraph footer =
@@ -599,6 +659,128 @@ public final class CoreTuiController {
     extensionSearchResultGate.cancel();
   }
 
+  private void startGenerationFlow() {
+    successHint = "";
+    generatedProjectCleanup();
+    generationCancelRequested = false;
+    long token = ++generationToken;
+    generationState = GenerationState.GENERATING;
+    statusMessage = "Generation in progress: preparing request...";
+
+    GenerationRequest generationRequest = toGenerationRequest();
+    Path outputDirectory = Path.of(request.outputDirectory());
+
+    generationFuture =
+        projectGenerationRunner.generate(
+            generationRequest,
+            outputDirectory,
+            () -> generationCancelRequested || token != generationToken,
+            progressMessage ->
+                scheduler.schedule(
+                    Duration.ZERO, () -> onGenerationProgress(token, progressMessage)));
+
+    generationFuture.whenComplete(
+        (generatedPath, throwable) ->
+            scheduler.schedule(
+                Duration.ZERO, () -> onGenerationCompleted(token, generatedPath, throwable)));
+  }
+
+  private void onGenerationProgress(long token, String progressMessage) {
+    if (token != generationToken || generationState != GenerationState.GENERATING) {
+      return;
+    }
+    statusMessage = "Generation in progress: " + progressMessage;
+  }
+
+  private void onGenerationCompleted(long token, Path generatedPath, Throwable throwable) {
+    if (token != generationToken) {
+      return;
+    }
+    generationFuture = null;
+
+    Throwable cause = unwrapCompletionCause(throwable);
+    if (cause == null) {
+      generationState = GenerationState.SUCCESS;
+      Path normalizedPath = generatedPath.toAbsolutePath().normalize();
+      statusMessage = "Generation succeeded: " + normalizedPath;
+      errorMessage = "";
+      successHint = "cd " + normalizedPath + " && mvn quarkus:dev";
+      return;
+    }
+
+    if (cause instanceof CancellationException || generationCancelRequested) {
+      generationState = GenerationState.CANCELLED;
+      statusMessage = "Generation cancelled. Update inputs and press Enter to retry.";
+      errorMessage = "";
+      successHint = "";
+      return;
+    }
+
+    generationState = GenerationState.ERROR;
+    statusMessage = "Generation failed.";
+    errorMessage = userFriendlyError(cause);
+    successHint = "";
+  }
+
+  private void requestGenerationCancellation() {
+    generationCancelRequested = true;
+    statusMessage = "Cancellation requested. Waiting for cleanup...";
+    errorMessage = "";
+    if (generationFuture != null) {
+      generationFuture.cancel(true);
+    }
+  }
+
+  private boolean isGenerationInProgress() {
+    return generationState == GenerationState.GENERATING;
+  }
+
+  private GenerationRequest toGenerationRequest() {
+    return new GenerationRequest(
+        request.groupId(),
+        request.artifactId(),
+        request.version(),
+        request.buildTool(),
+        request.javaVersion(),
+        List.copyOf(selectedExtensionIds));
+  }
+
+  private void generatedProjectCleanup() {
+    if (generationState == GenerationState.SUCCESS
+        || generationState == GenerationState.ERROR
+        || generationState == GenerationState.CANCELLED) {
+      generationState = GenerationState.IDLE;
+    }
+  }
+
+  private String generationStateLabel() {
+    return switch (generationState) {
+      case IDLE -> "idle";
+      case GENERATING -> "running (Esc to cancel)";
+      case SUCCESS -> "success";
+      case ERROR -> "failed";
+      case CANCELLED -> "cancelled";
+    };
+  }
+
+  private static Throwable unwrapCompletionCause(Throwable throwable) {
+    if (throwable == null) {
+      return null;
+    }
+    if (throwable instanceof CompletionException completionException
+        && completionException.getCause() != null) {
+      return completionException.getCause();
+    }
+    return throwable;
+  }
+
+  private static String userFriendlyError(Throwable throwable) {
+    if (throwable.getMessage() != null && !throwable.getMessage().isBlank()) {
+      return throwable.getMessage();
+    }
+    return throwable.getClass().getSimpleName();
+  }
+
   @FunctionalInterface
   public interface ExtensionCatalogLoader {
     CompletableFuture<List<ExtensionDto>> load();
@@ -631,6 +813,23 @@ public final class CoreTuiController {
     return report.errors().isEmpty()
         ? ""
         : report.errors().getFirst().field() + ": " + report.errors().getFirst().message();
+  }
+
+  @FunctionalInterface
+  public interface ProjectGenerationRunner {
+    CompletableFuture<Path> generate(
+        GenerationRequest generationRequest,
+        Path outputDirectory,
+        BooleanSupplier cancelled,
+        Consumer<String> progressListener);
+  }
+
+  private enum GenerationState {
+    IDLE,
+    GENERATING,
+    SUCCESS,
+    ERROR,
+    CANCELLED
   }
 
   private static boolean handleTextInputKey(TextInputState state, KeyEvent event) {

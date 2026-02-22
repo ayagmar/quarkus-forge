@@ -30,12 +30,22 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - `Up` / `Down`: navigate extension list when focused.
 - `Space`: toggle extension selection when list is focused.
 - `Enter`: attempt submit (blocked with validation feedback if invalid).
-- `Esc` (or quit key): exit the TUI.
+- `Esc` (or quit key): cancel active generation if running, otherwise exit the TUI.
 
 ## Validation and Status
 - Metadata + field validation are recalculated as project inputs change.
 - Footer status area is non-modal and always visible.
 - Errors are surfaced inline in footer as actionable messages.
+- Footer includes generation state (`idle`, `running`, `success`, `failed`, `cancelled`).
+
+## Generation Flow
+- On valid `Enter`, the UI starts async generation:
+  1. compose generation request from metadata + selected extension IDs
+  2. stream download project archive from Quarkus API
+  3. extract archive safely to requested output directory
+- While generation runs, interactive edits and focus moves are locked to prevent conflicting state changes.
+- Pressing `Esc` during generation requests cancellation and keeps the app open.
+- On success, footer shows next step hint: `cd <generated-path> && mvn quarkus:dev`.
 
 ## Deterministic Async Search
 - Extension catalog is loaded from Quarkus API and indexed in-memory by stable extension identifier.

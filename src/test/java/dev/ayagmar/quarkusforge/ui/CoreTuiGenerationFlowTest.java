@@ -1,0 +1,157 @@
+package dev.ayagmar.quarkusforge.ui;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import dev.ayagmar.quarkusforge.api.GenerationRequest;
+import dev.ayagmar.quarkusforge.domain.ForgeUiState;
+import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
+import dev.ayagmar.quarkusforge.domain.ProjectRequest;
+import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
+import dev.ayagmar.quarkusforge.domain.ValidationReport;
+import dev.tamboui.buffer.Buffer;
+import dev.tamboui.layout.Rect;
+import dev.tamboui.terminal.Frame;
+import dev.tamboui.tui.event.KeyCode;
+import dev.tamboui.tui.event.KeyEvent;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+import org.junit.jupiter.api.Test;
+
+class CoreTuiGenerationFlowTest {
+  @Test
+  void successfulGenerationShowsNextStepHintAndLocksInteractiveInputs() {
+    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    CoreTuiController controller =
+        CoreTuiController.from(
+            validInitialState(), UiScheduler.immediate(), Duration.ZERO, generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    assertThat(generationRunner.callCount()).isEqualTo(1);
+    assertThat(controller.statusMessage()).contains("Generation in progress");
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
+
+    generationRunner.complete(Path.of("build/generated-project"));
+
+    assertThat(controller.statusMessage()).contains("Generation succeeded");
+    assertThat(renderToString(controller)).contains("Next: cd");
+    assertThat(renderToString(controller)).contains("mvn quarkus:dev");
+  }
+
+  @Test
+  void duplicateSubmitIsIgnoredWhileGenerationIsRunning() {
+    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    CoreTuiController controller =
+        CoreTuiController.from(
+            validInitialState(), UiScheduler.immediate(), Duration.ZERO, generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    assertThat(generationRunner.callCount()).isEqualTo(1);
+    assertThat(controller.statusMessage()).contains("already in progress");
+  }
+
+  @Test
+  void escapeCancelsActiveGenerationWithoutImmediateQuit() {
+    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    CoreTuiController controller =
+        CoreTuiController.from(
+            validInitialState(), UiScheduler.immediate(), Duration.ZERO, generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    CoreTuiController.UiAction cancelAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+
+    assertThat(cancelAction.shouldQuit()).isFalse();
+    assertThat(controller.statusMessage())
+        .containsAnyOf("Cancellation requested", "Generation cancelled");
+
+    generationRunner.fail(new CancellationException("cancelled"));
+    assertThat(controller.statusMessage()).contains("Generation cancelled");
+
+    CoreTuiController.UiAction quitAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(quitAction.shouldQuit()).isTrue();
+  }
+
+  @Test
+  void generationFailureShowsErrorAndReleasesUiLock() {
+    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    CoreTuiController controller =
+        CoreTuiController.from(
+            validInitialState(), UiScheduler.immediate(), Duration.ZERO, generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    generationRunner.fail(new RuntimeException("download failed"));
+
+    assertThat(controller.statusMessage()).contains("Generation failed");
+    assertThat(renderToString(controller)).contains("Error: download failed");
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.ARTIFACT_ID);
+  }
+
+  private static String renderToString(CoreTuiController controller) {
+    Buffer buffer = Buffer.empty(new Rect(0, 0, 120, 34));
+    Frame frame = Frame.forTesting(buffer);
+    controller.render(frame);
+    return buffer.toAnsiStringTrimmed();
+  }
+
+  private static ForgeUiState validInitialState() {
+    MetadataCompatibilityContext metadataCompatibility = MetadataCompatibilityContext.loadDefault();
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example",
+            "forge-app",
+            "1.0.0-SNAPSHOT",
+            "com.example.forge.app",
+            "./generated",
+            "maven",
+            "25");
+    ValidationReport validation =
+        new ProjectRequestValidator()
+            .validate(request)
+            .merge(metadataCompatibility.validate(request));
+    return new ForgeUiState(request, validation, metadataCompatibility);
+  }
+
+  private static final class ControlledGenerationRunner
+      implements CoreTuiController.ProjectGenerationRunner {
+    private int callCount;
+    private CompletableFuture<Path> future;
+
+    ControlledGenerationRunner() {
+      callCount = 0;
+      future = new CompletableFuture<>();
+    }
+
+    @Override
+    public CompletableFuture<Path> generate(
+        GenerationRequest generationRequest,
+        Path outputDirectory,
+        BooleanSupplier cancelled,
+        Consumer<String> progressListener) {
+      callCount++;
+      progressListener.accept("downloading project archive...");
+      return future;
+    }
+
+    int callCount() {
+      return callCount;
+    }
+
+    void complete(Path outputPath) {
+      future.complete(outputPath);
+    }
+
+    void fail(Throwable throwable) {
+      future.completeExceptionally(throwable);
+    }
+  }
+}
