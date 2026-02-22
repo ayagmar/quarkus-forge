@@ -42,10 +42,12 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - On valid `Enter`, the UI starts async generation:
   1. compose generation request from metadata + selected extension IDs
   2. stream download project archive from Quarkus API
-  3. extract archive safely to requested output directory
+  3. extract archive safely to `<outputDir>/<artifactId>`
 - While generation runs, interactive edits and focus moves are locked to prevent conflicting state changes.
 - Pressing `Esc` during generation requests cancellation and keeps the app open.
-- On success, footer shows next step hint: `cd <generated-path> && mvn quarkus:dev`.
+- On success, footer shows build-tool-specific next step hint:
+  - Maven: `cd <generated-path> && mvn quarkus:dev`
+  - Gradle: `cd <generated-path> && ./gradlew quarkusDev`
 
 ## Deterministic Async Search
 - Extension catalog is loaded from Quarkus API and indexed in-memory by stable extension identifier.

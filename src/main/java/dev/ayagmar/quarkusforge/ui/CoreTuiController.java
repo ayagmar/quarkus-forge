@@ -222,10 +222,10 @@ public final class CoreTuiController {
     if (isGenerationInProgress()) {
       if (keyEvent.isConfirm()) {
         statusMessage = "Generation already in progress. Press Esc to cancel.";
-        return UiAction.handled(true);
+        return UiAction.handled(false);
       }
       statusMessage = "Generation in progress. Press Esc to cancel.";
-      return UiAction.handled(true);
+      return UiAction.handled(false);
     }
     if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && keyEvent.hasShift()) {
       moveFocus(-1);
@@ -507,7 +507,7 @@ public final class CoreTuiController {
 
   private void renderFooter(Frame frame, Rect area) {
     String footerText =
-        "Tab/Shift+Tab: focus | Up/Down: list nav | Space: toggle extension | Enter: submit | Esc: quit\n"
+        "Tab/Shift+Tab: focus | Up/Down: list nav | Space: toggle extension | Enter: submit | Esc: cancel/quit\n"
             + "Status: "
             + statusMessage
             + "\n"
@@ -668,7 +668,7 @@ public final class CoreTuiController {
     statusMessage = "Generation in progress: preparing request...";
 
     GenerationRequest generationRequest = toGenerationRequest();
-    Path outputDirectory = Path.of(request.outputDirectory());
+    Path outputDirectory = resolveGeneratedProjectDirectory();
 
     generationFuture =
         projectGenerationRunner.generate(
@@ -699,13 +699,17 @@ public final class CoreTuiController {
     generationFuture = null;
 
     Throwable cause = unwrapCompletionCause(throwable);
-    if (cause == null) {
+    if (cause == null && generatedPath != null) {
       generationState = GenerationState.SUCCESS;
       Path normalizedPath = generatedPath.toAbsolutePath().normalize();
       statusMessage = "Generation succeeded: " + normalizedPath;
       errorMessage = "";
-      successHint = "cd " + normalizedPath + " && mvn quarkus:dev";
+      successHint = "cd " + normalizedPath + " && " + nextStepCommand(request.buildTool());
       return;
+    }
+
+    if (cause == null) {
+      cause = new IllegalStateException("Generation finished without an output path");
     }
 
     if (cause instanceof CancellationException || generationCancelRequested) {
@@ -745,6 +749,11 @@ public final class CoreTuiController {
         List.copyOf(selectedExtensionIds));
   }
 
+  private Path resolveGeneratedProjectDirectory() {
+    Path outputRoot = Path.of(request.outputDirectory());
+    return outputRoot.resolve(request.artifactId());
+  }
+
   private void generatedProjectCleanup() {
     if (generationState == GenerationState.SUCCESS
         || generationState == GenerationState.ERROR
@@ -779,6 +788,10 @@ public final class CoreTuiController {
       return throwable.getMessage();
     }
     return throwable.getClass().getSimpleName();
+  }
+
+  private static String nextStepCommand(String buildTool) {
+    return "gradle".equalsIgnoreCase(buildTool) ? "./gradlew quarkusDev" : "mvn quarkus:dev";
   }
 
   @FunctionalInterface

@@ -15,6 +15,7 @@ import dev.ayagmar.quarkusforge.ui.CoreTuiController;
 import dev.ayagmar.quarkusforge.ui.UiScheduler;
 import dev.tamboui.tui.TuiRunner;
 import java.net.URI;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
@@ -54,7 +55,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   @Option(
       names = {"-o", "--output-dir"},
       defaultValue = ".",
-      description = "Output directory")
+      description = "Output parent directory (project path resolves to <output-dir>/<artifact-id>)")
   private String outputDirectory;
 
   @Option(
@@ -176,6 +177,8 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   }
 
   private static void printPrefillSummary(ProjectRequest request) {
+    Path generatedProjectDirectory =
+        Path.of(request.outputDirectory()).resolve(request.artifactId()).normalize();
     System.out.println("Prefill validated successfully:");
     System.out.println(" - groupId: " + request.groupId());
     System.out.println(" - artifactId: " + request.artifactId());
@@ -184,5 +187,6 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     System.out.println(" - outputDirectory: " + request.outputDirectory());
     System.out.println(" - buildTool: " + request.buildTool());
     System.out.println(" - javaVersion: " + request.javaVersion());
+    System.out.println(" - generatedProjectDirectory: " + generatedProjectDirectory);
   }
 }

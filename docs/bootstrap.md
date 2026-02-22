@@ -24,6 +24,7 @@ Use these gates after each issue:
 - Archive download/extraction hardening is documented in `docs/archive-safety.md`.
 - Generated ZIPs are downloaded as streams to temporary files and extracted with zip-slip/symlink/zip-bomb guards.
 - Submit flow uses `ProjectArchiveService` (`download -> extract -> cleanup`) with `OverwritePolicy.FAIL_IF_EXISTS`.
+- Generation target path resolves as `<output-dir>/<artifact-id>` to keep `--output-dir=.` usable by default.
 - TUI cancellation (`Esc` during generation) requests safe abort and ensures temporary archive cleanup.
 
 ## Core TUI Shell
@@ -42,6 +43,7 @@ Use these gates after each issue:
 
 ## CLI Prefill Flags
 - `--group-id`, `--artifact-id`, `--project-version`, `--package-name`, `--output-dir`
+- `--output-dir` is the parent directory for the generated project root (`<output-dir>/<artifact-id>`).
 - `--build-tool`, `--java-version` are validated against metadata compatibility rules before submit.
 - `--search-debounce-ms` configures extension-search debounce delay in the TUI shell.
 - `--dry-run` validates input and prints resolved initial state without starting the TUI.

@@ -32,6 +32,8 @@ class CoreTuiGenerationFlowTest {
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
     assertThat(generationRunner.callCount()).isEqualTo(1);
+    assertThat(generationRunner.lastOutputDirectory())
+        .isEqualTo(Path.of("./generated").resolve("forge-app"));
     assertThat(controller.statusMessage()).contains("Generation in progress");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
@@ -59,6 +61,24 @@ class CoreTuiGenerationFlowTest {
   }
 
   @Test
+  void generationLockConsumesKeysWithoutTriggeringQuit() {
+    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    CoreTuiController controller =
+        CoreTuiController.from(
+            validInitialState(), UiScheduler.immediate(), Duration.ZERO, generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    CoreTuiController.UiAction tabAction = controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
+    CoreTuiController.UiAction enterAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    assertThat(tabAction.handled()).isTrue();
+    assertThat(tabAction.shouldQuit()).isFalse();
+    assertThat(enterAction.handled()).isTrue();
+    assertThat(enterAction.shouldQuit()).isFalse();
+  }
+
+  @Test
   void escapeCancelsActiveGenerationWithoutImmediateQuit() {
     ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
     CoreTuiController controller =
@@ -77,6 +97,20 @@ class CoreTuiGenerationFlowTest {
 
     CoreTuiController.UiAction quitAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(quitAction.shouldQuit()).isTrue();
+  }
+
+  @Test
+  void successfulGradleGenerationShowsGradleNextStepHint() {
+    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    CoreTuiController controller =
+        CoreTuiController.from(
+            validInitialState("gradle"), UiScheduler.immediate(), Duration.ZERO, generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    generationRunner.complete(Path.of("build/generated-project"));
+
+    assertThat(renderToString(controller)).contains("./gradlew quarkusDev");
+    assertThat(renderToString(controller)).doesNotContain("mvn quarkus:dev");
   }
 
   @Test
@@ -104,6 +138,10 @@ class CoreTuiGenerationFlowTest {
   }
 
   private static ForgeUiState validInitialState() {
+    return validInitialState("maven");
+  }
+
+  private static ForgeUiState validInitialState(String buildTool) {
     MetadataCompatibilityContext metadataCompatibility = MetadataCompatibilityContext.loadDefault();
     ProjectRequest request =
         new ProjectRequest(
@@ -112,7 +150,7 @@ class CoreTuiGenerationFlowTest {
             "1.0.0-SNAPSHOT",
             "com.example.forge.app",
             "./generated",
-            "maven",
+            buildTool,
             "25");
     ValidationReport validation =
         new ProjectRequestValidator()
@@ -124,10 +162,12 @@ class CoreTuiGenerationFlowTest {
   private static final class ControlledGenerationRunner
       implements CoreTuiController.ProjectGenerationRunner {
     private int callCount;
+    private Path lastOutputDirectory;
     private CompletableFuture<Path> future;
 
     ControlledGenerationRunner() {
       callCount = 0;
+      lastOutputDirectory = null;
       future = new CompletableFuture<>();
     }
 
@@ -138,12 +178,17 @@ class CoreTuiGenerationFlowTest {
         BooleanSupplier cancelled,
         Consumer<String> progressListener) {
       callCount++;
+      lastOutputDirectory = outputDirectory;
       progressListener.accept("downloading project archive...");
       return future;
     }
 
     int callCount() {
       return callCount;
+    }
+
+    Path lastOutputDirectory() {
+      return lastOutputDirectory;
     }
 
     void complete(Path outputPath) {
