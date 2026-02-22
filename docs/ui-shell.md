@@ -53,5 +53,7 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - Extension catalog is loaded from Quarkus API and indexed in-memory by stable extension identifier.
 - Extension search filtering uses a debounced async scheduler (`120ms` default).
 - The scheduler/debouncer layer is injectable so tests can run with virtual time instead of wall-clock delays.
+- Extension catalog/filter/selection state is isolated in a dedicated UI component
+  (`ExtensionCatalogState`) and consumed by `CoreTuiController`.
 - Cancellation and stale-result protection ensure outdated async callbacks never overwrite newer search state.
 - Multi-selection is tracked by stable extension IDs, independent from list navigation cursor state.

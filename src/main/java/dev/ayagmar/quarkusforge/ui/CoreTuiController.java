@@ -25,17 +25,14 @@ import dev.tamboui.widgets.common.SizedWidget;
 import dev.tamboui.widgets.input.TextInput;
 import dev.tamboui.widgets.input.TextInputState;
 import dev.tamboui.widgets.list.ListItem;
-import dev.tamboui.widgets.list.ListState;
 import dev.tamboui.widgets.list.ListWidget;
 import dev.tamboui.widgets.paragraph.Paragraph;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.EnumMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -56,39 +53,21 @@ public final class CoreTuiController {
           FocusTarget.EXTENSION_LIST,
           FocusTarget.SUBMIT);
 
-  private static final List<ExtensionCatalogItem> DEFAULT_EXTENSIONS =
-      List.of(
-          new ExtensionCatalogItem("io.quarkus:quarkus-rest", "REST", "rest"),
-          new ExtensionCatalogItem(
-              "io.quarkus:quarkus-resteasy-jackson", "REST Jackson", "rest-jackson"),
-          new ExtensionCatalogItem(
-              "io.quarkus:quarkus-jdbc-postgresql", "JDBC PostgreSQL", "jdbc-postgresql"),
-          new ExtensionCatalogItem(
-              "io.quarkus:quarkus-hibernate-orm", "Hibernate ORM", "hibernate-orm"),
-          new ExtensionCatalogItem("io.quarkus:quarkus-smallrye-openapi", "OpenAPI", "openapi"),
-          new ExtensionCatalogItem("io.quarkus:quarkus-arc", "CDI", "cdi"),
-          new ExtensionCatalogItem("io.quarkus:quarkus-junit5", "JUnit 5", "junit5"));
-
   private static final int NARROW_WIDTH_THRESHOLD = 100;
   private static final ProjectGenerationRunner NOOP_PROJECT_GENERATION_RUNNER =
       (generationRequest, outputDirectory, cancelled, progressListener) ->
           CompletableFuture.failedFuture(
               new IllegalStateException("Generation flow is not configured in this runtime"));
   private final EnumMap<FocusTarget, TextInputState> inputStates = new EnumMap<>(FocusTarget.class);
-  private final ListState extensionListState = new ListState();
-  private final Set<String> selectedExtensionIds = new LinkedHashSet<>();
   private final ProjectRequestValidator requestValidator = new ProjectRequestValidator();
   private final MetadataCompatibilityContext metadataCompatibility;
   private final UiScheduler scheduler;
-  private final Debouncer extensionSearchDebouncer;
-  private final LatestResultGate extensionSearchResultGate = new LatestResultGate();
+  private final ExtensionCatalogState extensionCatalogState;
   private final ProjectGenerationRunner projectGenerationRunner;
 
   private ProjectRequest request;
   private ValidationReport validation;
   private FocusTarget focusTarget;
-  private ExtensionCatalogIndex extensionCatalogIndex;
-  private List<ExtensionCatalogItem> filteredExtensions;
   private String statusMessage;
   private String errorMessage;
   private boolean submitRequested;
@@ -117,7 +96,6 @@ public final class CoreTuiController {
     submitBlockedByValidation = false;
     metadataCompatibility = initialState.metadataCompatibility();
     this.scheduler = scheduler;
-    extensionSearchDebouncer = new Debouncer(scheduler, debounceDelay);
     this.projectGenerationRunner = projectGenerationRunner;
     generationState = GenerationState.IDLE;
     generationFuture = null;
@@ -140,11 +118,10 @@ public final class CoreTuiController {
         inputStates.get(target).moveCursorToEnd();
       }
     }
+    extensionCatalogState =
+        new ExtensionCatalogState(
+            scheduler, debounceDelay, inputStates.get(FocusTarget.EXTENSION_SEARCH).text());
 
-    extensionCatalogIndex = new ExtensionCatalogIndex(DEFAULT_EXTENSIONS);
-    applyFilteredExtensions(
-        inputStates.get(FocusTarget.EXTENSION_SEARCH).text(),
-        extensionSearchResultGate.nextToken());
     revalidate();
   }
 
@@ -196,8 +173,11 @@ public final class CoreTuiController {
                         return;
                       }
 
-                      extensionCatalogIndex = new ExtensionCatalogIndex(items);
-                      scheduleFilteredExtensionsRefresh();
+                      statusMessage = "Searching extensions...";
+                      extensionCatalogState.replaceCatalog(
+                          items,
+                          inputStates.get(FocusTarget.EXTENSION_SEARCH).text(),
+                          filteredCount -> statusMessage = "Extensions filtered: " + filteredCount);
                     }));
   }
 
@@ -256,7 +236,7 @@ public final class CoreTuiController {
         if (projectGenerationRunner == NOOP_PROJECT_GENERATION_RUNNER) {
           statusMessage =
               "Submit requested with "
-                  + selectedExtensionIds.size()
+                  + extensionCatalogState.selectedExtensionCount()
                   + " extension(s), but generation service is not configured.";
         } else {
           startGenerationFlow();
@@ -265,7 +245,10 @@ public final class CoreTuiController {
       return UiAction.handled(false);
     }
 
-    if (focusTarget == FocusTarget.EXTENSION_LIST && handleExtensionListKeys(keyEvent)) {
+    if (focusTarget == FocusTarget.EXTENSION_LIST
+        && extensionCatalogState.handleListKeys(
+            keyEvent,
+            toggledShortName -> statusMessage = "Toggled extension: " + toggledShortName)) {
       return UiAction.handled(false);
     }
 
@@ -314,7 +297,7 @@ public final class CoreTuiController {
   }
 
   List<String> selectedExtensionIds() {
-    return List.copyOf(selectedExtensionIds);
+    return extensionCatalogState.selectedExtensionIds();
   }
 
   String statusMessage() {
@@ -326,10 +309,11 @@ public final class CoreTuiController {
   }
 
   int filteredExtensionCount() {
-    return filteredExtensions.size();
+    return extensionCatalogState.filteredExtensions().size();
   }
 
   String firstFilteredExtensionId() {
+    List<ExtensionCatalogItem> filteredExtensions = extensionCatalogState.filteredExtensions();
     return filteredExtensions.isEmpty() ? "" : filteredExtensions.getFirst().id();
   }
 
@@ -419,9 +403,10 @@ public final class CoreTuiController {
   }
 
   private void renderExtensionList(Frame frame, Rect area) {
+    List<ExtensionCatalogItem> filteredExtensions = extensionCatalogState.filteredExtensions();
     List<SizedWidget> items = new ArrayList<>();
     for (ExtensionCatalogItem extension : filteredExtensions) {
-      boolean selected = selectedExtensionIds.contains(extension.id());
+      boolean selected = extensionCatalogState.isSelected(extension.id());
       String prefix = selected ? "[x] " : "[ ] ";
       items.add(
           ListItem.from(prefix + extension.name() + " (" + extension.shortName() + ")")
@@ -454,10 +439,11 @@ public final class CoreTuiController {
             .highlightStyle(Style.EMPTY.reversed())
             .block(listBlock)
             .build();
-    frame.renderStatefulWidget(listWidget, area, extensionListState);
+    frame.renderStatefulWidget(listWidget, area, extensionCatalogState.listState());
   }
 
   private void renderSelectedSummary(Frame frame, Rect area) {
+    List<String> selectedExtensionIds = extensionCatalogState.selectedExtensionIds();
     String summary;
     if (selectedExtensionIds.isEmpty()) {
       summary = "Selected: none";
@@ -537,42 +523,6 @@ public final class CoreTuiController {
     frame.renderWidget(footer, area);
   }
 
-  private boolean handleExtensionListKeys(KeyEvent keyEvent) {
-    int size = filteredExtensions.size();
-    if (size == 0) {
-      return false;
-    }
-    if (keyEvent.isUp()) {
-      extensionListState.selectPrevious();
-      return true;
-    }
-    if (keyEvent.isDown()) {
-      extensionListState.selectNext(size);
-      return true;
-    }
-    if (keyEvent.isHome()) {
-      extensionListState.selectFirst();
-      return true;
-    }
-    if (keyEvent.isEnd()) {
-      extensionListState.selectLast(size);
-      return true;
-    }
-    if (keyEvent.isSelect()) {
-      Integer selected = extensionListState.selected();
-      if (selected == null || selected < 0 || selected >= size) {
-        return false;
-      }
-      ExtensionCatalogItem extension = filteredExtensions.get(selected);
-      if (!selectedExtensionIds.add(extension.id())) {
-        selectedExtensionIds.remove(extension.id());
-      }
-      statusMessage = "Toggled extension: " + extension.shortName();
-      return true;
-    }
-    return false;
-  }
-
   private void moveFocus(int offset) {
     int index = FOCUS_ORDER.indexOf(focusTarget);
     int size = FOCUS_ORDER.size();
@@ -601,26 +551,9 @@ public final class CoreTuiController {
 
   private void scheduleFilteredExtensionsRefresh() {
     String query = inputStates.get(FocusTarget.EXTENSION_SEARCH).text();
-    long token = extensionSearchResultGate.nextToken();
     statusMessage = "Searching extensions...";
-    extensionSearchDebouncer.submit(() -> applyFilteredExtensions(query, token));
-  }
-
-  private void applyFilteredExtensions(String queryText, long token) {
-    if (!extensionSearchResultGate.shouldApply(token)) {
-      return;
-    }
-
-    filteredExtensions = extensionCatalogIndex.search(queryText);
-
-    if (filteredExtensions.isEmpty()) {
-      extensionListState.select(null);
-    } else if (extensionListState.selected() == null
-        || extensionListState.selected() >= filteredExtensions.size()) {
-      extensionListState.selectFirst();
-    }
-
-    statusMessage = "Extensions filtered: " + filteredExtensions.size();
+    extensionCatalogState.scheduleRefresh(
+        query, filteredCount -> statusMessage = "Extensions filtered: " + filteredCount);
   }
 
   private void rebuildRequestFromInputs() {
@@ -655,8 +588,7 @@ public final class CoreTuiController {
   }
 
   private void cancelPendingAsyncOperations() {
-    extensionSearchDebouncer.cancel();
-    extensionSearchResultGate.cancel();
+    extensionCatalogState.cancelPendingAsync();
   }
 
   private void startGenerationFlow() {
@@ -746,7 +678,7 @@ public final class CoreTuiController {
         request.version(),
         request.buildTool(),
         request.javaVersion(),
-        List.copyOf(selectedExtensionIds));
+        extensionCatalogState.selectedExtensionIds());
   }
 
   private Path resolveGeneratedProjectDirectory() {
