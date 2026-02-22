@@ -27,11 +27,13 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -69,7 +71,7 @@ class GeneratedProjectE2EIT {
             "1.0.0-SNAPSHOT",
             "maven",
             "25",
-            List.of("io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc"));
+            List.of("io.quarkus:quarkus-resteasy-reactive", "io.quarkus:quarkus-arc"));
 
     stubFor(
         get(urlPathEqualTo("/api/download"))
@@ -104,7 +106,8 @@ class GeneratedProjectE2EIT {
             .withQueryParam("v", equalTo("1.0.0-SNAPSHOT"))
             .withQueryParam("b", equalTo("maven"))
             .withQueryParam("j", equalTo("25"))
-            .withQueryParam("e", equalTo("io.quarkus:quarkus-rest,io.quarkus:quarkus-arc")));
+            .withQueryParam(
+                "e", equalTo("io.quarkus:quarkus-resteasy-reactive,io.quarkus:quarkus-arc")));
 
     assertThat(generatedProject.resolve("pom.xml")).exists();
     assertThat(generatedProject.resolve("README.md")).exists();
@@ -139,40 +142,59 @@ class GeneratedProjectE2EIT {
     processBuilder.redirectErrorStream(true);
 
     Process process = processBuilder.start();
-    List<String> outputLines = new ArrayList<>();
+    List<String> outputLines = Collections.synchronizedList(new ArrayList<>());
     long deadlineNanos = System.nanoTime() + DEV_MODE_START_TIMEOUT.toNanos();
-    boolean started = false;
-    try (BufferedReader reader =
-        new BufferedReader(
-            new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-      while (System.nanoTime() < deadlineNanos) {
-        while (reader.ready()) {
-          String line = reader.readLine();
-          if (line == null) {
-            break;
-          }
-          outputLines.add(line);
-          if (isDevModeReadyLine(line)) {
-            started = true;
-            break;
-          }
-        }
-        if (started) {
-          break;
-        }
-        if (!process.isAlive()) {
+    AtomicBoolean started = new AtomicBoolean(false);
+    AtomicBoolean outputClosed = new AtomicBoolean(false);
+    Thread outputReader =
+        Thread.ofPlatform()
+            .name("generated-project-e2e-output-reader")
+            .daemon()
+            .unstarted(
+                () -> {
+                  try (BufferedReader reader =
+                      new BufferedReader(
+                          new InputStreamReader(
+                              process.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                      outputLines.add(line);
+                      if (isDevModeReadyLine(line)) {
+                        started.set(true);
+                      }
+                    }
+                  } catch (IOException ignored) {
+                    // Stream may close as process exits.
+                  } finally {
+                    outputClosed.set(true);
+                  }
+                });
+    outputReader.start();
+
+    boolean exitedBeforeReady = false;
+    Integer earlyExitCode = null;
+    try {
+      while (System.nanoTime() < deadlineNanos && !started.get()) {
+        if (!process.isAlive() && outputClosed.get()) {
+          exitedBeforeReady = true;
+          earlyExitCode = process.exitValue();
           break;
         }
         TimeUnit.MILLISECONDS.sleep(100);
       }
     } finally {
       terminateProcess(process);
+      outputReader.join(5_000);
     }
 
-    assertThat(started)
+    String exitDetail =
+        exitedBeforeReady
+            ? " (process exited early with code " + earlyExitCode + ")"
+            : " (process did not report readiness in time)";
+    assertThat(started.get())
         .withFailMessage(
-            "Generated project did not start in dev mode within %s. Last output:%n%s",
-            DEV_MODE_START_TIMEOUT, tail(outputLines, 80))
+            "Generated project did not start in dev mode within %s%s. Last output:%n%s",
+            DEV_MODE_START_TIMEOUT, exitDetail, tail(outputLines, 80))
         .isTrue();
   }
 
@@ -267,6 +289,10 @@ class GeneratedProjectE2EIT {
             <dependency>
               <groupId>io.quarkus</groupId>
               <artifactId>quarkus-resteasy-reactive</artifactId>
+            </dependency>
+            <dependency>
+              <groupId>io.quarkus</groupId>
+              <artifactId>quarkus-arc</artifactId>
             </dependency>
           </dependencies>
           <build>
