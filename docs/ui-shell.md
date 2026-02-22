@@ -36,8 +36,10 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - Metadata + field validation are recalculated as project inputs change.
 - Footer status area is non-modal and always visible.
 - Errors are surfaced inline in footer as actionable messages.
+- Invalid metadata fields are highlighted with error-colored borders.
 - Footer includes generation state (`idle`, `validating`, `loading`, `success`, `failed`, `cancelled`).
 - Transition contract is documented in `docs/ui-state-machine.md`.
+- Theme/token policy is documented in `docs/ui-theme.md`.
 
 ## Generation Flow
 - On valid `Enter`, the UI starts async generation:
@@ -58,3 +60,4 @@ The shell keeps a stable widget tree and switches only the body split strategy b
   (`ExtensionCatalogState`) and consumed by `CoreTuiController`.
 - Cancellation and stale-result protection ensure outdated async callbacks never overwrite newer search state.
 - Multi-selection is tracked by stable extension IDs, independent from list navigation cursor state.
+- Catalog rendering has explicit loading and fallback/degraded visuals.

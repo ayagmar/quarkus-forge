@@ -12,7 +12,7 @@ import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.tamboui.layout.Constraint;
 import dev.tamboui.layout.Layout;
 import dev.tamboui.layout.Rect;
-import dev.tamboui.style.Color;
+import dev.tamboui.style.Overflow;
 import dev.tamboui.style.Style;
 import dev.tamboui.terminal.Frame;
 import dev.tamboui.tui.event.Event;
@@ -65,6 +65,7 @@ public final class CoreTuiController {
   private final UiScheduler scheduler;
   private final ExtensionCatalogState extensionCatalogState;
   private final ProjectGenerationRunner projectGenerationRunner;
+  private final UiTheme theme;
 
   private ProjectRequest request;
   private ValidationReport validation;
@@ -79,6 +80,9 @@ public final class CoreTuiController {
   private volatile long generationToken;
   private volatile long extensionCatalogLoadToken;
   private volatile boolean asyncOperationsCancelled;
+  private boolean extensionCatalogLoading;
+  private String extensionCatalogErrorMessage;
+  private String extensionCatalogSource;
   private String successHint;
 
   private CoreTuiController(
@@ -100,12 +104,16 @@ public final class CoreTuiController {
     metadataCompatibility = initialState.metadataCompatibility();
     this.scheduler = scheduler;
     this.projectGenerationRunner = projectGenerationRunner;
+    theme = UiTheme.loadDefault();
     generationState = GenerationState.IDLE;
     generationFuture = null;
     generationCancelRequested = false;
     generationToken = 0L;
     extensionCatalogLoadToken = 0L;
     asyncOperationsCancelled = false;
+    extensionCatalogLoading = false;
+    extensionCatalogErrorMessage = "";
+    extensionCatalogSource = "snapshot";
     successHint = "";
 
     for (FocusTarget target : FocusTarget.values()) {
@@ -152,6 +160,9 @@ public final class CoreTuiController {
     Objects.requireNonNull(loader);
     asyncOperationsCancelled = false;
     long loadToken = ++extensionCatalogLoadToken;
+    extensionCatalogLoading = true;
+    extensionCatalogErrorMessage = "";
+    extensionCatalogSource = "live (loading)";
     statusMessage = "Loading extension catalog...";
 
     loader
@@ -167,6 +178,10 @@ public final class CoreTuiController {
                       return;
                     }
                     if (throwable != null) {
+                      extensionCatalogLoading = false;
+                      extensionCatalogErrorMessage =
+                          "Catalog load failed: " + throwable.getMessage();
+                      extensionCatalogSource = "snapshot (fallback)";
                       errorMessage = "Catalog load failed: " + throwable.getMessage();
                       statusMessage = "Using fallback extension catalog";
                       return;
@@ -180,11 +195,17 @@ public final class CoreTuiController {
                                         extension.id(), extension.name(), extension.shortName()))
                             .toList();
                     if (items.isEmpty()) {
+                      extensionCatalogLoading = false;
+                      extensionCatalogErrorMessage = "Catalog load returned no extensions";
+                      extensionCatalogSource = "snapshot (fallback)";
                       errorMessage = "Catalog load returned no extensions";
                       statusMessage = "Using fallback extension catalog";
                       return;
                     }
 
+                    extensionCatalogLoading = false;
+                    extensionCatalogErrorMessage = "";
+                    extensionCatalogSource = "live";
                     statusMessage = "Searching extensions...";
                     extensionCatalogState.replaceCatalog(
                         items,
@@ -289,7 +310,10 @@ public final class CoreTuiController {
 
   public void render(Frame frame) {
     Rect area = frame.area();
-    int footerHeight = errorMessage.isBlank() ? 5 : 6;
+    int footerHeight = 6;
+    if (!errorMessage.isBlank()) {
+      footerHeight += 1;
+    }
     footerHeight += 1;
     if (!successHint.isBlank()) {
       footerHeight += 1;
@@ -347,10 +371,16 @@ public final class CoreTuiController {
             .title("Quarkus Forge")
             .borders(Borders.ALL)
             .borderType(BorderType.ROUNDED)
-            .borderStyle(Style.EMPTY.fg(Color.CYAN))
+            .borderStyle(accentBorderStyle())
             .build();
     String text = "Keyboard-first Quarkus project generator";
-    Paragraph header = Paragraph.builder().text(text).block(block).build();
+    Paragraph header =
+        Paragraph.builder()
+            .text(text)
+            .style(Style.EMPTY.fg(theme.color("text")))
+            .overflow(Overflow.ELLIPSIS)
+            .block(block)
+            .build();
     frame.renderWidget(header, area);
   }
 
@@ -371,12 +401,13 @@ public final class CoreTuiController {
   }
 
   private void renderMetadataPanel(Frame frame, Rect area) {
+    boolean metadataInvalid = !validation.isValid();
     Block panelBlock =
         Block.builder()
-            .title(panelTitle("Project Metadata", isMetadataFocused()))
+            .title(panelTitle(metadataPanelTitle(), isMetadataFocused()))
             .borders(Borders.ALL)
             .borderType(BorderType.ROUNDED)
-            .borderStyle(Style.EMPTY.fg(Color.CYAN))
+            .borderStyle(panelBorderStyle(isMetadataFocused(), metadataInvalid, false))
             .build();
     frame.renderWidget(panelBlock, area);
 
@@ -402,12 +433,15 @@ public final class CoreTuiController {
   }
 
   private void renderExtensionsPanel(Frame frame, Rect area) {
+    boolean extensionError = !extensionCatalogErrorMessage.isBlank();
     Block panelBlock =
         Block.builder()
-            .title(panelTitle("Extensions", isExtensionPanelFocused()))
+            .title(panelTitle(extensionsPanelTitle(), isExtensionPanelFocused()))
             .borders(Borders.ALL)
             .borderType(BorderType.ROUNDED)
-            .borderStyle(Style.EMPTY.fg(Color.CYAN))
+            .borderStyle(
+                panelBorderStyle(
+                    isExtensionPanelFocused(), extensionError, extensionCatalogLoading))
             .build();
     frame.renderWidget(panelBlock, area);
 
@@ -428,6 +462,31 @@ public final class CoreTuiController {
 
   private void renderExtensionList(Frame frame, Rect area) {
     List<ExtensionCatalogItem> filteredExtensions = extensionCatalogState.filteredExtensions();
+    boolean extensionError = !extensionCatalogErrorMessage.isBlank();
+    Block listBlock =
+        Block.builder()
+            .title(panelTitle("Catalog", focusTarget == FocusTarget.EXTENSION_LIST))
+            .borders(Borders.ALL)
+            .borderType(BorderType.ROUNDED)
+            .borderStyle(
+                panelBorderStyle(
+                    focusTarget == FocusTarget.EXTENSION_LIST,
+                    extensionError,
+                    extensionCatalogLoading))
+            .build();
+
+    if (extensionCatalogLoading) {
+      Paragraph loading =
+          Paragraph.builder()
+              .text("Loading extension catalog...")
+              .block(listBlock)
+              .style(Style.EMPTY.fg(theme.color("warning")).bold())
+              .overflow(Overflow.ELLIPSIS)
+              .build();
+      frame.renderWidget(loading, area);
+      return;
+    }
+
     List<SizedWidget> items = new ArrayList<>();
     for (ExtensionCatalogItem extension : filteredExtensions) {
       boolean selected = extensionCatalogState.isSelected(extension.id());
@@ -436,20 +495,17 @@ public final class CoreTuiController {
       items.add(ListItem.from(prefix + displayLabel).toSizedWidget());
     }
 
-    Block listBlock =
-        Block.builder()
-            .title(panelTitle("Catalog", focusTarget == FocusTarget.EXTENSION_LIST))
-            .borders(Borders.ALL)
-            .borderType(BorderType.ROUNDED)
-            .borderStyle(Style.EMPTY.fg(Color.DARK_GRAY))
-            .build();
-
     if (items.isEmpty()) {
+      String emptyMessage =
+          extensionError
+              ? "Catalog unavailable - using fallback snapshot"
+              : "No extension matches current filter";
       Paragraph empty =
           Paragraph.builder()
-              .text("No extension matches current filter")
+              .text(emptyMessage)
               .block(listBlock)
-              .style(Style.EMPTY.fg(Color.YELLOW))
+              .style(Style.EMPTY.fg(extensionError ? theme.color("error") : theme.color("warning")))
+              .overflow(Overflow.ELLIPSIS)
               .build();
       frame.renderWidget(empty, area);
       return;
@@ -459,7 +515,8 @@ public final class CoreTuiController {
         ListWidget.builder()
             .items(items)
             .highlightSymbol("> ")
-            .highlightStyle(Style.EMPTY.reversed())
+            .style(Style.EMPTY.fg(theme.color("text")))
+            .highlightStyle(Style.EMPTY.fg(theme.color("focus")).reversed().bold())
             .block(listBlock)
             .build();
     frame.renderStatefulWidget(listWidget, area, extensionCatalogState.listState());
@@ -467,29 +524,31 @@ public final class CoreTuiController {
 
   private void renderSelectedSummary(Frame frame, Rect area) {
     List<String> selectedExtensionIds = extensionCatalogState.selectedExtensionIds();
-    String summary;
-    if (selectedExtensionIds.isEmpty()) {
-      summary = "Selected: none";
-    } else {
-      summary =
-          "Selected: "
-              + selectedExtensionIds.size()
-              + " -> "
-              + String.join(", ", selectedExtensionIds);
+    String summary = selectedExtensionsSummary(selectedExtensionIds, area.width());
+    summary += "\nCatalog: " + extensionCatalogSource;
+    if (!extensionCatalogErrorMessage.isBlank()) {
+      summary += " | error: " + extensionCatalogErrorMessage;
     }
     if (focusTarget == FocusTarget.SUBMIT) {
       summary += "\nSubmit focus active - press Enter to submit";
     }
 
+    Style summaryStyle = Style.EMPTY.fg(theme.color("text"));
+    if (!extensionCatalogErrorMessage.isBlank()) {
+      summaryStyle = summaryStyle.fg(theme.color("warning"));
+    }
+
     Paragraph paragraph =
         Paragraph.builder()
             .text(summary)
+            .style(summaryStyle)
+            .overflow(Overflow.ELLIPSIS)
             .block(
                 Block.builder()
                     .title(panelTitle("Selection", focusTarget == FocusTarget.SUBMIT))
                     .borders(Borders.ALL)
                     .borderType(BorderType.ROUNDED)
-                    .borderStyle(Style.EMPTY.fg(Color.DARK_GRAY))
+                    .borderStyle(panelBorderStyle(focusTarget == FocusTarget.SUBMIT, false, false))
                     .build())
             .build();
     frame.renderWidget(paragraph, area);
@@ -502,26 +561,31 @@ public final class CoreTuiController {
             .title(panelTitle(label, focused))
             .borders(Borders.ALL)
             .borderType(BorderType.ROUNDED)
-            .borderStyle(Style.EMPTY.fg(focused ? Color.CYAN : Color.DARK_GRAY))
+            .borderStyle(inputBorderStyle(target, focused))
             .build();
 
     TextInput input =
         TextInput.builder()
             .placeholder(label)
+            .style(Style.EMPTY.fg(theme.color("text")))
             .block(inputBlock)
-            .placeholderStyle(Style.EMPTY.fg(Color.DARK_GRAY))
+            .placeholderStyle(Style.EMPTY.fg(theme.color("muted")))
             .build();
     frame.renderStatefulWidget(input, area, inputStates.get(target));
   }
 
   private void renderFooter(Frame frame, Rect area) {
     String footerText =
-        "Tab/Shift+Tab: focus | Up/Down: list nav | Space: toggle extension | Enter: submit | Esc: cancel/quit\n"
+        footerHintLine(area.width())
+            + "\n"
+            + "Mode: "
+            + footerModeLabel()
+            + "\n"
             + "Status: "
             + statusMessage
             + "\n"
             + "Validation: "
-            + (validation.isValid() ? "OK" : firstValidationError(validation))
+            + validationLabel()
             + " | Focus: "
             + focusTargetName(focusTarget);
     footerText += "\nGeneration: " + generationStateLabel();
@@ -529,18 +593,20 @@ public final class CoreTuiController {
       footerText += "\nError: " + errorMessage;
     }
     if (!successHint.isBlank()) {
-      footerText += "\nNext: " + successHint;
+      footerText += "\nNext: " + truncate(successHint, Math.max(24, area.width() - 16));
     }
 
     Paragraph footer =
         Paragraph.builder()
             .text(footerText)
+            .style(Style.EMPTY.fg(theme.color("text")))
+            .overflow(Overflow.ELLIPSIS)
             .block(
                 Block.builder()
                     .title("Status")
                     .borders(Borders.ALL)
                     .borderType(BorderType.ROUNDED)
-                    .borderStyle(Style.EMPTY.fg(Color.CYAN))
+                    .borderStyle(accentBorderStyle())
                     .build())
             .build();
     frame.renderWidget(footer, area);
@@ -570,6 +636,116 @@ public final class CoreTuiController {
     return focusTarget == FocusTarget.EXTENSION_SEARCH
         || focusTarget == FocusTarget.EXTENSION_LIST
         || focusTarget == FocusTarget.SUBMIT;
+  }
+
+  private String metadataPanelTitle() {
+    return validation.isValid() ? "Project Metadata" : "Project Metadata [invalid]";
+  }
+
+  private String extensionsPanelTitle() {
+    if (extensionCatalogLoading) {
+      return "Extensions [loading]";
+    }
+    if (!extensionCatalogErrorMessage.isBlank()) {
+      return "Extensions [fallback]";
+    }
+    return "Extensions";
+  }
+
+  private Style panelBorderStyle(boolean focused, boolean hasError, boolean isLoading) {
+    if (hasError) {
+      return Style.EMPTY.fg(theme.color("error")).bold();
+    }
+    if (isLoading) {
+      return Style.EMPTY.fg(theme.color("warning")).bold();
+    }
+    if (focused) {
+      return Style.EMPTY.fg(theme.color("focus")).bold();
+    }
+    return Style.EMPTY.fg(theme.color("accent"));
+  }
+
+  private Style accentBorderStyle() {
+    return Style.EMPTY.fg(theme.color("accent")).bold();
+  }
+
+  private Style inputBorderStyle(FocusTarget target, boolean focused) {
+    boolean invalidField = hasValidationErrorFor(target);
+    if (invalidField) {
+      return Style.EMPTY.fg(theme.color("error")).bold();
+    }
+    if (focused) {
+      return Style.EMPTY.fg(theme.color("focus")).bold();
+    }
+    return Style.EMPTY.fg(theme.color("muted"));
+  }
+
+  private boolean hasValidationErrorFor(FocusTarget target) {
+    if (!isTextInputFocus(target) || target == FocusTarget.EXTENSION_SEARCH) {
+      return false;
+    }
+    String fieldName = focusTargetName(target);
+    return validation.errors().stream()
+        .anyMatch(error -> error.field().equalsIgnoreCase(fieldName));
+  }
+
+  private static String selectedExtensionsSummary(List<String> selectedExtensionIds, int width) {
+    if (selectedExtensionIds.isEmpty()) {
+      return "Selected: none";
+    }
+    int maxVisible = width < NARROW_WIDTH_THRESHOLD ? 1 : 3;
+    int visibleCount = Math.min(maxVisible, selectedExtensionIds.size());
+    String visible = String.join(", ", selectedExtensionIds.subList(0, visibleCount));
+    if (selectedExtensionIds.size() > visibleCount) {
+      int remaining = selectedExtensionIds.size() - visibleCount;
+      return "Selected ("
+          + selectedExtensionIds.size()
+          + "): "
+          + visible
+          + " +"
+          + remaining
+          + " more";
+    }
+    return "Selected (" + selectedExtensionIds.size() + "): " + visible;
+  }
+
+  private String footerHintLine(int width) {
+    if (isGenerationInProgress()) {
+      return width < NARROW_WIDTH_THRESHOLD
+          ? "Esc: cancel generation | Enter disabled"
+          : "Esc: cancel generation | Enter disabled while generation is loading";
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST) {
+      return width < NARROW_WIDTH_THRESHOLD
+          ? "Up/Down: nav | Space: toggle | Enter: submit"
+          : "Up/Down: list nav | Space: toggle extension | Enter: submit | Tab/Shift+Tab: focus";
+    }
+    if (focusTarget == FocusTarget.EXTENSION_SEARCH) {
+      return width < NARROW_WIDTH_THRESHOLD
+          ? "Type: filter | Enter: submit | Esc: quit"
+          : "Type: filter extensions | Enter: submit | Tab/Shift+Tab: focus | Esc: cancel/quit";
+    }
+    return width < NARROW_WIDTH_THRESHOLD
+        ? "Tab: focus | Enter: submit | Esc: quit"
+        : "Tab/Shift+Tab: focus | Enter: submit | Esc: cancel/quit";
+  }
+
+  private String footerModeLabel() {
+    return switch (generationState) {
+      case IDLE -> "ready";
+      case VALIDATING -> "validating input";
+      case LOADING -> "generation loading";
+      case SUCCESS -> "last run succeeded";
+      case ERROR -> "last run failed";
+      case CANCELLED -> "last run cancelled";
+    };
+  }
+
+  private String validationLabel() {
+    if (validation.isValid()) {
+      return "OK";
+    }
+    return "INVALID - " + firstValidationError(validation);
   }
 
   private void scheduleFilteredExtensionsRefresh() {
@@ -611,6 +787,7 @@ public final class CoreTuiController {
 
   private void cancelPendingAsyncOperations() {
     asyncOperationsCancelled = true;
+    extensionCatalogLoading = false;
     extensionCatalogState.cancelPendingAsync();
   }
 
