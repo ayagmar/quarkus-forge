@@ -124,6 +124,23 @@ class CoreTuiGenerationFlowTest {
   }
 
   @Test
+  void successfulGradleKotlinDslGenerationShowsGradleNextStepHint() {
+    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState("gradle-kotlin-dsl"),
+            UiScheduler.immediate(),
+            Duration.ZERO,
+            generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    generationRunner.complete(Path.of("build/generated-project"));
+
+    assertThat(renderToString(controller)).contains("./gradlew quarkusDev");
+    assertThat(renderToString(controller)).doesNotContain("mvn quarkus:dev");
+  }
+
+  @Test
   void generationFailureShowsErrorAndReleasesUiLock() {
     ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
     CoreTuiController controller =

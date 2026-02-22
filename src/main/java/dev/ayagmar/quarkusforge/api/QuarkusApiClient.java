@@ -21,11 +21,14 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ThreadLocalRandom;
@@ -34,6 +37,9 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 public final class QuarkusApiClient {
+  private static final List<String> FALLBACK_BUILD_TOOLS =
+      List.of("maven", "gradle", "gradle-kotlin-dsl");
+
   private final HttpClient httpClient;
   private final ObjectMapper objectMapper;
   private final URI baseUri;
@@ -78,10 +84,134 @@ public final class QuarkusApiClient {
   }
 
   public CompletableFuture<MetadataDto> fetchMetadata() {
-    HttpRequest request = newGetRequest(baseUri.resolve("/api/metadata"), "application/json");
-    return sendWithRetry(request, BodyHandlers.ofString(StandardCharsets.UTF_8), 1)
-        .thenApply(this::assertSuccessful)
-        .thenApply(response -> parseMetadataPayload(response.body(), objectMapper));
+    HttpRequest streamsRequest = newGetRequest(baseUri.resolve("/api/streams"), "application/json");
+    HttpRequest openApiRequest = newGetRequest(baseUri.resolve("/q/openapi"), "application/json");
+
+    CompletableFuture<List<String>> javaVersionsFuture =
+        sendWithRetry(streamsRequest, BodyHandlers.ofString(StandardCharsets.UTF_8), 1)
+            .thenApply(this::assertSuccessful)
+            .thenApply(
+                response -> parseJavaVersionsFromStreamsPayload(response.body(), objectMapper));
+
+    CompletableFuture<List<String>> buildToolsFuture =
+        sendWithRetry(openApiRequest, BodyHandlers.ofString(StandardCharsets.UTF_8), 1)
+            .thenApply(this::assertSuccessful)
+            .thenApply(response -> parseBuildToolsFromOpenApiPayload(response.body(), objectMapper))
+            .exceptionally(ignored -> fallbackBuildTools());
+
+    return javaVersionsFuture.thenCombine(buildToolsFuture, QuarkusApiClient::toMetadata);
+  }
+
+  static MetadataDto parseMetadataPayload(String payload, ObjectMapper objectMapper) {
+    JsonNode root = readPayload(payload, objectMapper);
+    if (!root.isObject()) {
+      throw new ApiContractException("Metadata payload must be a JSON object");
+    }
+
+    JsonNode javaVersionsNode = root.get("javaVersions");
+    JsonNode buildToolsNode = root.get("buildTools");
+    if (javaVersionsNode == null || !javaVersionsNode.isArray()) {
+      throw new ApiContractException("Metadata payload is missing 'javaVersions' array");
+    }
+    if (buildToolsNode == null || !buildToolsNode.isArray()) {
+      throw new ApiContractException("Metadata payload is missing 'buildTools' array");
+    }
+
+    List<String> javaVersions = toStringList(javaVersionsNode, "javaVersions");
+    List<String> buildTools = toStringList(buildToolsNode, "buildTools");
+    Map<String, List<String>> compatibility =
+        parseCompatibility(root.get("compatibility"), buildTools);
+    return new MetadataDto(javaVersions, buildTools, compatibility);
+  }
+
+  static List<String> parseJavaVersionsFromStreamsPayload(
+      String payload, ObjectMapper objectMapper) {
+    JsonNode root = readPayload(payload, objectMapper);
+    if (!root.isArray()) {
+      throw new ApiContractException("Streams payload must be a JSON array");
+    }
+
+    Set<Integer> versions = new LinkedHashSet<>();
+    for (JsonNode stream : root) {
+      JsonNode javaCompatibilityNode = stream.get("javaCompatibility");
+      if (javaCompatibilityNode == null || !javaCompatibilityNode.isObject()) {
+        throw new ApiContractException("Stream payload is missing 'javaCompatibility' object");
+      }
+      JsonNode javaVersionsNode = javaCompatibilityNode.get("versions");
+      if (javaVersionsNode == null || !javaVersionsNode.isArray()) {
+        throw new ApiContractException("Stream payload is missing 'javaCompatibility.versions'");
+      }
+      for (JsonNode version : javaVersionsNode) {
+        if (!version.canConvertToInt()) {
+          throw new ApiContractException(
+              "Stream payload field 'javaCompatibility.versions' must contain integers");
+        }
+        int parsed = version.intValue();
+        if (parsed > 0) {
+          versions.add(parsed);
+        }
+      }
+    }
+
+    if (versions.isEmpty()) {
+      throw new ApiContractException("Streams payload did not provide any Java versions");
+    }
+    return versions.stream().sorted(Comparator.naturalOrder()).map(String::valueOf).toList();
+  }
+
+  static List<String> parseBuildToolsFromOpenApiPayload(String payload, ObjectMapper objectMapper) {
+    JsonNode root = readPayload(payload, objectMapper);
+    if (!root.isObject()) {
+      throw new ApiContractException("OpenAPI payload must be a JSON object");
+    }
+
+    // Use direct parameter iteration to avoid brittle fixed indexing in OpenAPI parameters.
+    JsonNode parametersNode =
+        root.path("paths").path("/api/download").path("get").path("parameters");
+    if (!parametersNode.isArray()) {
+      throw new ApiContractException(
+          "OpenAPI payload is missing '/api/download.get.parameters' array");
+    }
+
+    Set<String> buildTools = new LinkedHashSet<>();
+    for (JsonNode parameter : parametersNode) {
+      if (!"b".equals(parameter.path("name").asText())) {
+        continue;
+      }
+      JsonNode parameterEnum = parameter.path("schema").path("enum");
+      if (!parameterEnum.isArray()) {
+        throw new ApiContractException(
+            "OpenAPI payload is missing '/api/download' build tool enum");
+      }
+      for (JsonNode value : parameterEnum) {
+        if (!value.isTextual()) {
+          throw new ApiContractException("OpenAPI build tool enum must contain strings");
+        }
+        buildTools.add(BuildToolCodec.toUiValue(value.textValue()));
+      }
+      break;
+    }
+
+    if (buildTools.isEmpty()) {
+      throw new ApiContractException("OpenAPI payload did not provide any build tool enum values");
+    }
+    return List.copyOf(buildTools);
+  }
+
+  private static MetadataDto toMetadata(List<String> javaVersions, List<String> buildTools) {
+    Map<String, List<String>> compatibility = new LinkedHashMap<>();
+    for (String buildTool : buildTools) {
+      compatibility.put(buildTool, javaVersions);
+    }
+    return new MetadataDto(javaVersions, buildTools, compatibility);
+  }
+
+  private static List<String> fallbackBuildTools() {
+    try {
+      return MetadataSnapshotLoader.loadDefault().buildTools();
+    } catch (RuntimeException ignored) {
+      return FALLBACK_BUILD_TOOLS;
+    }
   }
 
   public CompletableFuture<byte[]> generateProjectZip(GenerationRequest generationRequest) {
@@ -124,28 +254,6 @@ public final class QuarkusApiClient {
       extensions.add(new ExtensionDto(id, name, shortName));
     }
     return List.copyOf(extensions);
-  }
-
-  static MetadataDto parseMetadataPayload(String payload, ObjectMapper objectMapper) {
-    JsonNode root = readPayload(payload, objectMapper);
-    if (!root.isObject()) {
-      throw new ApiContractException("Metadata payload must be a JSON object");
-    }
-
-    JsonNode javaVersionsNode = root.get("javaVersions");
-    JsonNode buildToolsNode = root.get("buildTools");
-    if (javaVersionsNode == null || !javaVersionsNode.isArray()) {
-      throw new ApiContractException("Metadata payload is missing 'javaVersions' array");
-    }
-    if (buildToolsNode == null || !buildToolsNode.isArray()) {
-      throw new ApiContractException("Metadata payload is missing 'buildTools' array");
-    }
-
-    List<String> javaVersions = toStringList(javaVersionsNode, "javaVersions");
-    List<String> buildTools = toStringList(buildToolsNode, "buildTools");
-    Map<String, List<String>> compatibility =
-        parseCompatibility(root.get("compatibility"), buildTools);
-    return new MetadataDto(javaVersions, buildTools, compatibility);
   }
 
   private <T> CompletableFuture<HttpResponse<T>> sendWithRetry(

@@ -145,7 +145,7 @@ public final class CatalogSnapshotCache {
 
   private boolean isStale(Instant fetchedAt) {
     Instant staleAt = fetchedAt.plus(ttl);
-    return staleAt.isBefore(clock.instant());
+    return !staleAt.isAfter(clock.instant());
   }
 
   private byte[] toPayload(MetadataDto metadata, List<ExtensionDto> extensions) throws IOException {

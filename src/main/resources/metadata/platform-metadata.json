@@ -1,8 +1,9 @@
 {
   "javaVersions": ["17", "21", "25"],
-  "buildTools": ["maven", "gradle"],
+  "buildTools": ["maven", "gradle", "gradle-kotlin-dsl"],
   "compatibility": {
     "maven": ["17", "21", "25"],
-    "gradle": ["21", "25"]
+    "gradle": ["17", "21", "25"],
+    "gradle-kotlin-dsl": ["17", "21", "25"]
   }
 }

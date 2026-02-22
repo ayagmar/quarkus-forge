@@ -291,8 +291,9 @@ class QuarkusApiClientTest {
   @Test
   void fetchMetadataFailsOnNon2xxStatus() {
     stubFor(
-        get(urlEqualTo("/api/metadata"))
+        get(urlEqualTo("/api/streams"))
             .willReturn(aResponse().withStatus(400).withBody("bad input")));
+    stubOpenApiBuildTools();
 
     QuarkusApiClient client =
         newClient(
@@ -306,21 +307,9 @@ class QuarkusApiClientTest {
   }
 
   @Test
-  void fetchMetadataReturnsParsedDto() {
-    stubFor(
-        get(urlEqualTo("/api/metadata"))
-            .willReturn(
-                okJson(
-                    """
-                    {
-                      "javaVersions": ["21", "25"],
-                      "buildTools": ["maven", "gradle"],
-                      "compatibility": {
-                        "maven": ["21", "25"],
-                        "gradle": ["25"]
-                      }
-                    }
-                    """)));
+  void fetchMetadataReturnsParsedDtoFromStreamsAndOpenApi() {
+    stubStreamsPayload(List.of(17, 21, 25));
+    stubOpenApiBuildTools();
 
     QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
 
@@ -329,9 +318,28 @@ class QuarkusApiClientTest {
     assertThat(metadata)
         .isEqualTo(
             new MetadataDto(
-                List.of("21", "25"),
-                List.of("maven", "gradle"),
-                Map.of("maven", List.of("21", "25"), "gradle", List.of("25"))));
+                List.of("17", "21", "25"),
+                List.of("maven", "gradle", "gradle-kotlin-dsl"),
+                Map.of(
+                    "maven",
+                    List.of("17", "21", "25"),
+                    "gradle",
+                    List.of("17", "21", "25"),
+                    "gradle-kotlin-dsl",
+                    List.of("17", "21", "25"))));
+  }
+
+  @Test
+  void fetchMetadataFallsBackToDefaultBuildToolsWhenOpenApiIsUnavailable() {
+    stubStreamsPayload(List.of(17, 21, 25));
+    stubFor(get(urlEqualTo("/q/openapi")).willReturn(aResponse().withStatus(404)));
+
+    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+
+    MetadataDto metadata = client.fetchMetadata().join();
+
+    assertThat(metadata.buildTools()).containsExactly("maven", "gradle", "gradle-kotlin-dsl");
+    assertThat(metadata.compatibility().get("gradle-kotlin-dsl")).containsExactly("17", "21", "25");
   }
 
   @Test
@@ -440,6 +448,52 @@ class QuarkusApiClientTest {
         sleeper,
         Clock.fixed(Instant.parse("2026-02-21T00:00:00Z"), ZoneOffset.UTC),
         () -> 0.5d);
+  }
+
+  private void stubStreamsPayload(List<Integer> javaVersions) {
+    String javaVersionsJson =
+        javaVersions.stream()
+            .map(String::valueOf)
+            .collect(java.util.stream.Collectors.joining(","));
+    stubFor(
+        get(urlEqualTo("/api/streams"))
+            .willReturn(
+                okJson(
+                    """
+                    [
+                      {
+                        "key": "io.quarkus.platform:3.31",
+                        "javaCompatibility": {
+                          "versions": [%s],
+                          "recommended": %s
+                        },
+                        "recommended": true,
+                        "status": "FINAL"
+                      }
+                    ]
+                    """
+                        .formatted(javaVersionsJson, javaVersions.get(javaVersions.size() - 1)))));
+  }
+
+  private void stubOpenApiBuildTools() {
+    stubFor(
+        get(urlEqualTo("/q/openapi"))
+            .willReturn(
+                okJson(
+                    """
+                    {
+                      "paths": {
+                        "/api/download": {
+                          "get": {
+                            "parameters": [
+                              {"name":"g","schema":{"type":"string"}},
+                              {"name":"b","schema":{"enum":["MAVEN","GRADLE","GRADLE_KOTLIN_DSL"]}}
+                            ]
+                          }
+                        }
+                      }
+                    }
+                    """)));
   }
 
   private static final class RecordingSleeper implements AsyncSleeper {

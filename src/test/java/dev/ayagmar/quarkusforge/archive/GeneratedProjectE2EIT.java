@@ -104,7 +104,7 @@ class GeneratedProjectE2EIT {
             .withQueryParam("g", equalTo("org.acme"))
             .withQueryParam("a", equalTo(artifactId))
             .withQueryParam("v", equalTo("1.0.0-SNAPSHOT"))
-            .withQueryParam("b", equalTo("maven"))
+            .withQueryParam("b", equalTo("MAVEN"))
             .withQueryParam("j", equalTo("25"))
             .withQueryParam(
                 "e", equalTo("io.quarkus:quarkus-resteasy-reactive,io.quarkus:quarkus-arc")));

@@ -15,7 +15,7 @@ final class ExtensionCatalogState {
       List.of(
           new ExtensionCatalogItem("io.quarkus:quarkus-rest", "REST", "rest"),
           new ExtensionCatalogItem(
-              "io.quarkus:quarkus-resteasy-jackson", "REST Jackson", "rest-jackson"),
+              "io.quarkus:quarkus-rest-jackson", "REST Jackson", "rest-jackson"),
           new ExtensionCatalogItem(
               "io.quarkus:quarkus-jdbc-postgresql", "JDBC PostgreSQL", "jdbc-postgresql"),
           new ExtensionCatalogItem(

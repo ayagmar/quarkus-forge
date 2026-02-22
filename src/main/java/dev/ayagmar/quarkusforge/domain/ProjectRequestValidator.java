@@ -10,9 +10,8 @@ import java.util.regex.Pattern;
 
 public final class ProjectRequestValidator {
   private static final Pattern GROUP_ID_PATTERN =
-      Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$");
-  private static final Pattern ARTIFACT_ID_PATTERN =
-      Pattern.compile("^[A-Za-z0-9_]+([._-][A-Za-z0-9_]+)*$");
+      Pattern.compile("^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)*$");
+  private static final Pattern ARTIFACT_ID_PATTERN = Pattern.compile("^[a-z][a-z0-9._-]*$");
   private static final Pattern VERSION_PATTERN = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._+-]*$");
   private static final Pattern PACKAGE_NAME_PATTERN =
       Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$");
@@ -38,7 +37,7 @@ public final class ProjectRequestValidator {
         request.artifactId(),
         ARTIFACT_ID_PATTERN,
         "artifactId",
-        "must contain only letters, digits, '.', '-' or '_'",
+        "must start with a lowercase letter and contain only lowercase letters, digits, '.', '-' or '_'",
         errors);
     validatePattern(
         request.version(),

@@ -96,4 +96,95 @@ class QuarkusApiContractDriftTest {
         .isInstanceOf(ApiContractException.class)
         .hasMessageContaining("differing only by case");
   }
+
+  @Test
+  void streamsPayloadParsesJavaVersionsFromJavaCompatibility() {
+    String streamsPayload =
+        """
+        [
+          {
+            "key":"io.quarkus.platform:3.31",
+            "javaCompatibility":{"versions":[17,21,25],"recommended":25}
+          },
+          {
+            "key":"io.quarkus.platform:3.20",
+            "javaCompatibility":{"versions":[17,21],"recommended":21}
+          }
+        ]
+        """;
+
+    List<String> javaVersions =
+        QuarkusApiClient.parseJavaVersionsFromStreamsPayload(streamsPayload, objectMapper);
+
+    assertThat(javaVersions).containsExactly("17", "21", "25");
+  }
+
+  @Test
+  void streamsPayloadWithoutJavaCompatibilityVersionsIsRejected() {
+    String driftedStreamsPayload =
+        """
+        [
+          {
+            "key":"io.quarkus.platform:3.31",
+            "javaCompatibility":{"recommended":25}
+          }
+        ]
+        """;
+
+    assertThatThrownBy(
+            () ->
+                QuarkusApiClient.parseJavaVersionsFromStreamsPayload(
+                    driftedStreamsPayload, objectMapper))
+        .isInstanceOf(ApiContractException.class)
+        .hasMessageContaining("javaCompatibility.versions");
+  }
+
+  @Test
+  void openApiPayloadParsesBuildToolEnumForDownloadEndpoint() {
+    String openApiPayload =
+        """
+        {
+          "paths": {
+            "/api/download": {
+              "get": {
+                "parameters": [
+                  {"name":"g","schema":{"type":"string"}},
+                  {"name":"b","schema":{"enum":["MAVEN","GRADLE","GRADLE_KOTLIN_DSL"]}}
+                ]
+              }
+            }
+          }
+        }
+        """;
+
+    List<String> buildTools =
+        QuarkusApiClient.parseBuildToolsFromOpenApiPayload(openApiPayload, objectMapper);
+
+    assertThat(buildTools).containsExactly("maven", "gradle", "gradle-kotlin-dsl");
+  }
+
+  @Test
+  void openApiPayloadWithoutBuildToolEnumIsRejected() {
+    String driftedOpenApiPayload =
+        """
+        {
+          "paths": {
+            "/api/download": {
+              "get": {
+                "parameters": [
+                  {"name":"g","schema":{"type":"string"}}
+                ]
+              }
+            }
+          }
+        }
+        """;
+
+    assertThatThrownBy(
+            () ->
+                QuarkusApiClient.parseBuildToolsFromOpenApiPayload(
+                    driftedOpenApiPayload, objectMapper))
+        .isInstanceOf(ApiContractException.class)
+        .hasMessageContaining("build tool enum");
+  }
 }

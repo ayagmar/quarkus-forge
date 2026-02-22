@@ -26,8 +26,19 @@ class GenerationQueryBuilderTest {
                 + "?g=com.example"
                 + "&a=demo+app"
                 + "&v=1.0.0-SNAPSHOT"
-                + "&b=maven"
+                + "&b=MAVEN"
                 + "&j=25"
                 + "&e=io.quarkus%3Aquarkus-rest%2Cio.quarkus%3Aquarkus-jdbc-postgresql");
+  }
+
+  @Test
+  void buildEncodesGradleKotlinDslWithApiContractValue() {
+    GenerationRequest request =
+        new GenerationRequest(
+            "com.example", "demo", "1.0.0-SNAPSHOT", "gradle-kotlin-dsl", "25", List.of());
+
+    URI uri = GenerationQueryBuilder.build(URI.create("https://code.quarkus.io"), request);
+
+    assertThat(uri.toString()).contains("&b=GRADLE_KOTLIN_DSL&");
   }
 }

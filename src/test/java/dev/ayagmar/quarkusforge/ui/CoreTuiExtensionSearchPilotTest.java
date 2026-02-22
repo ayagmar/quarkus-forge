@@ -212,6 +212,33 @@ class CoreTuiExtensionSearchPilotTest {
     assertThat(controller.statusMessage()).contains("Loaded extension catalog from cache");
   }
 
+  @Test
+  void extensionListAutoScrollKeepsDeepSelectionVisible() {
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+    List<ExtensionDto> manyExtensions = new ArrayList<>();
+    for (int i = 0; i < 120; i++) {
+      String suffix = "%03d".formatted(i);
+      manyExtensions.add(
+          new ExtensionDto(
+              "io.quarkus:quarkus-test-" + suffix, "Test Extension " + suffix, "test-" + suffix));
+    }
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(manyExtensions)));
+
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    for (int i = 0; i < 80; i++) {
+      controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    }
+
+    String rendered = renderToString(controller);
+    assertThat(rendered).contains("Test Extension 080");
+    assertThat(rendered).doesNotContain("Test Extension 000");
+  }
+
   private static void moveFocusTo(CoreTuiController controller, FocusTarget target) {
     for (int i = 0; i < 20 && controller.focusTarget() != target; i++) {
       controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));

@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge.ui;
 
+import dev.ayagmar.quarkusforge.api.BuildToolCodec;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
@@ -23,11 +24,13 @@ import dev.tamboui.tui.event.ResizeEvent;
 import dev.tamboui.widgets.block.Block;
 import dev.tamboui.widgets.block.BorderType;
 import dev.tamboui.widgets.block.Borders;
+import dev.tamboui.widgets.common.ScrollBarPolicy;
 import dev.tamboui.widgets.common.SizedWidget;
 import dev.tamboui.widgets.input.TextInput;
 import dev.tamboui.widgets.input.TextInputState;
 import dev.tamboui.widgets.list.ListItem;
 import dev.tamboui.widgets.list.ListWidget;
+import dev.tamboui.widgets.list.ScrollMode;
 import dev.tamboui.widgets.paragraph.Paragraph;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -556,6 +559,10 @@ public final class CoreTuiController {
             .highlightSymbol("> ")
             .style(Style.EMPTY.fg(theme.color("text")))
             .highlightStyle(Style.EMPTY.fg(theme.color("focus")).reversed().bold())
+            .scrollMode(ScrollMode.AUTO_SCROLL)
+            .scrollBarPolicy(ScrollBarPolicy.AS_NEEDED)
+            .scrollbarThumbStyle(Style.EMPTY.fg(theme.color("focus")).bold())
+            .scrollbarTrackStyle(Style.EMPTY.fg(theme.color("muted")))
             .block(listBlock)
             .build();
     frame.renderStatefulWidget(listWidget, area, extensionCatalogState.listState());
@@ -1008,7 +1015,11 @@ public final class CoreTuiController {
   }
 
   private static String nextStepCommand(String buildTool) {
-    return "gradle".equalsIgnoreCase(buildTool) ? "./gradlew quarkusDev" : "mvn quarkus:dev";
+    String normalizedBuildTool = BuildToolCodec.toUiValue(buildTool);
+    if ("gradle".equals(normalizedBuildTool) || "gradle-kotlin-dsl".equals(normalizedBuildTool)) {
+      return "./gradlew quarkusDev";
+    }
+    return "mvn quarkus:dev";
   }
 
   @FunctionalInterface

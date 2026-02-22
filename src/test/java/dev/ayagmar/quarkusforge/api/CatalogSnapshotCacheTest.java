@@ -64,6 +64,31 @@ class CatalogSnapshotCacheTest {
   }
 
   @Test
+  void readMarksSnapshotAsStaleExactlyAtTtlBoundary() {
+    Path cacheFile = tempDir.resolve("catalog-snapshot.json");
+    CatalogSnapshotCache writer =
+        new CatalogSnapshotCache(
+            cacheFile,
+            new ObjectMapper(),
+            Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
+            Duration.ofHours(6),
+            2L * 1024L * 1024L);
+
+    assertThat(writer.write(sampleMetadata(), sampleExtensions()).written()).isTrue();
+
+    CatalogSnapshotCache reader =
+        new CatalogSnapshotCache(
+            cacheFile,
+            new ObjectMapper(),
+            Clock.fixed(Instant.parse("2026-02-22T06:00:00Z"), ZoneOffset.UTC),
+            Duration.ofHours(6),
+            2L * 1024L * 1024L);
+
+    CatalogSnapshotCache.CachedCatalogSnapshot snapshot = reader.read().orElseThrow();
+    assertThat(snapshot.stale()).isTrue();
+  }
+
+  @Test
   void readRejectsSchemaVersionMismatch() throws Exception {
     Path cacheFile = tempDir.resolve("catalog-snapshot.json");
     Files.writeString(

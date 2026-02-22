@@ -129,7 +129,7 @@ class CatalogDataServiceTest {
   }
 
   @Test
-  void liveExtensionsStillLoadWhenMetadataEndpointIsUnavailable() {
+  void liveExtensionsStillLoadWhenStreamsEndpointIsUnavailable() {
     stubExtensionsWithMetadataUnavailable();
     Path cacheFile = tempDir.resolve("catalog-snapshot.json");
 
@@ -220,7 +220,28 @@ class CatalogDataServiceTest {
                     """)));
 
     stubFor(
-        get(urlEqualTo("/api/metadata"))
+        get(urlEqualTo("/api/streams"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        [
+                          {
+                            "key":"io.quarkus.platform:3.31",
+                            "javaCompatibility": {
+                              "versions":[17,21,25],
+                              "recommended":25
+                            },
+                            "recommended":true,
+                            "status":"FINAL"
+                          }
+                        ]
+                        """)));
+
+    stubFor(
+        get(urlEqualTo("/q/openapi"))
             .willReturn(
                 aResponse()
                     .withStatus(200)
@@ -228,11 +249,14 @@ class CatalogDataServiceTest {
                     .withBody(
                         """
                         {
-                          "javaVersions": ["21", "25"],
-                          "buildTools": ["maven", "gradle"],
-                          "compatibility": {
-                            "maven": ["21", "25"],
-                            "gradle": ["25"]
+                          "paths": {
+                            "/api/download": {
+                              "get": {
+                                "parameters": [
+                                  {"name":"b","schema":{"enum":["MAVEN","GRADLE","GRADLE_KOTLIN_DSL"]}}
+                                ]
+                              }
+                            }
                           }
                         }
                         """)));
@@ -251,8 +275,29 @@ class CatalogDataServiceTest {
                     """)));
 
     stubFor(
-        get(urlEqualTo("/api/metadata"))
+        get(urlEqualTo("/api/streams"))
             .willReturn(aResponse().withStatus(404).withBody("not found")));
+
+    stubFor(
+        get(urlEqualTo("/q/openapi"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        {
+                          "paths": {
+                            "/api/download": {
+                              "get": {
+                                "parameters": [
+                                  {"name":"b","schema":{"enum":["MAVEN","GRADLE"]}}
+                                ]
+                              }
+                            }
+                          }
+                        }
+                        """)));
   }
 
   private QuarkusApiClient onlineClient() {

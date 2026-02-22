@@ -134,7 +134,9 @@ class ProjectRequestValidatorTest {
     ProjectRequest request = CliPrefillMapper.map(prefill);
 
     assertThat(request.packageName()).isEqualTo("com.example.x123app");
-    assertThat(validator.validate(request).isValid()).isTrue();
+    assertThat(validator.validate(request).errors())
+        .extracting(ValidationError::field)
+        .contains("artifactId");
   }
 
   @Test

@@ -13,6 +13,7 @@
 
 ## Runtime Fallback Order
 1. `live`: load metadata + extension catalog from Quarkus API.
+Metadata source details: `/api/streams` + `/q/openapi`.
 2. `cache`: if live load fails and cache snapshot is valid.
 3. `snapshot`: if live load fails and no valid cache exists.
 

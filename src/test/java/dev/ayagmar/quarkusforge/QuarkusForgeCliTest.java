@@ -29,7 +29,7 @@ class QuarkusForgeCliTest {
   }
 
   @Test
-  void dryRunWithNumericArtifactStillBuildsValidDerivedPackage() {
+  void dryRunWithNumericArtifactReturnsUsageCode() {
     int exitCode =
         QuarkusForgeCli.runWithArgs(
             new String[] {
@@ -42,7 +42,7 @@ class QuarkusForgeCliTest {
               "./tmp/output"
             });
 
-    assertThat(exitCode).isZero();
+    assertThat(exitCode).isEqualTo(2);
   }
 
   @Test
@@ -69,7 +69,7 @@ class QuarkusForgeCliTest {
               "--build-tool",
               "gradle",
               "--java-version",
-              "17"
+              "11"
             });
 
     assertThat(exitCode).isEqualTo(2);

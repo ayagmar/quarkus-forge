@@ -18,7 +18,7 @@ public final class GenerationQueryBuilder {
     parameters.put("g", request.groupId());
     parameters.put("a", request.artifactId());
     parameters.put("v", request.version());
-    parameters.put("b", request.buildTool());
+    parameters.put("b", BuildToolCodec.toApiValue(request.buildTool()));
     parameters.put("j", request.javaVersion());
     parameters.put("e", String.join(",", request.extensions()));
 

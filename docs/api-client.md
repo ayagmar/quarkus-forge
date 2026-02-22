@@ -2,7 +2,8 @@
 
 ## Endpoints
 - `GET /api/extensions`: fetch extension catalog.
-- `GET /api/metadata`: fetch Java/build-tool metadata.
+- `GET /api/streams`: fetch live Java compatibility versions per stream.
+- `GET /q/openapi` (JSON): derive build-tool enum from contract (`/api/download` `b` parameter).
 - `GET /api/download`: generate project ZIP with encoded query parameters.
 - ZIP download supports both byte-array payload usage and streaming-to-file usage.
 
@@ -26,13 +27,20 @@
 - JSON payloads are parsed with strict required fields.
 - Extension parsing requires `id` and `name`; `shortName` is tolerant and falls back to `name`
   when missing/blank.
-- Metadata contract includes compatibility matrix entries per build tool.
-- Compatibility lookup is normalized once during parsing (case-insensitive key normalization), then
-  resolved by direct map lookup.
-- Case-colliding compatibility keys (for example `maven` and `MAVEN`) are rejected as contract
-  errors to avoid ambiguous behavior.
-- Missing/renamed required fields raise `ApiContractException`.
+- Metadata is synthesized from live contract sources:
+  - Java versions: union of `/api/streams[].javaCompatibility.versions`
+  - Build tools: `/q/openapi` enum at `/api/download` parameter `b`
+  - Compatibility map: generated for each build tool over the same Java version set
+- Missing/renamed required fields raise `ApiContractException`, then fallback policy applies.
 - Snapshot contract drift test is pinned at `src/test/resources/contracts/quarkus-api-snapshot.json`.
+
+## OpenAPI Snapshot Maintenance
+- `docs/openapi.json` is a local reference snapshot for `code.quarkus.io/q/openapi`.
+- Refresh the file when parser tests fail or when Quarkus API contract changes are suspected.
+- Suggested refresh command:
+  - `curl -sS -H 'Accept: application/json' https://code.quarkus.io/q/openapi > docs/openapi.json`
+- After refresh, run:
+  - `mvn -q -Dtest=QuarkusApiContractDriftTest,QuarkusApiClientTest test`
 
 ## Generation Query Mapping
 - Generation query parameters are encoded using the contract keys:
