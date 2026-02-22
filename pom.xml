@@ -28,7 +28,7 @@
     <maven.failsafe.plugin.version>3.5.4</maven.failsafe.plugin.version>
     <maven.shade.plugin.version>3.6.1</maven.shade.plugin.version>
     <spotless.plugin.version>3.2.1</spotless.plugin.version>
-    <checkstyle.plugin.version>99.0-offline</checkstyle.plugin.version>
+    <checkstyle.plugin.version>3.6.0</checkstyle.plugin.version>
     <native.skip>true</native.skip>
   </properties>
 
@@ -218,6 +218,11 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
         <version>${checkstyle.plugin.version}</version>
+        <configuration>
+          <configLocation>${project.basedir}/checkstyle.xml</configLocation>
+          <consoleOutput>true</consoleOutput>
+          <failsOnError>true</failsOnError>
+        </configuration>
       </plugin>
 
       <plugin>
