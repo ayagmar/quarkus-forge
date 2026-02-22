@@ -1,9 +1,13 @@
 package dev.ayagmar.quarkusforge;
 
+import dev.ayagmar.quarkusforge.api.ApiClientException;
 import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogDataService;
 import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
+import dev.ayagmar.quarkusforge.api.ExtensionDto;
+import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
+import dev.ayagmar.quarkusforge.archive.ArchiveException;
 import dev.ayagmar.quarkusforge.archive.OverwritePolicy;
 import dev.ayagmar.quarkusforge.archive.ProjectArchiveService;
 import dev.ayagmar.quarkusforge.archive.SafeZipExtractor;
@@ -13,6 +17,7 @@ import dev.ayagmar.quarkusforge.domain.ForgeUiState;
 import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
+import dev.ayagmar.quarkusforge.domain.ValidationError;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.ayagmar.quarkusforge.ui.CoreTuiController;
 import dev.ayagmar.quarkusforge.ui.ExtensionFavoritesStore;
@@ -21,58 +26,44 @@ import dev.tamboui.tui.TuiRunner;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.ParentCommand;
 
 @Command(
     name = "quarkus-forge",
     version = "0.1.0-SNAPSHOT",
     mixinStandardHelpOptions = true,
+    subcommands = {QuarkusForgeCli.GenerateCommand.class},
     description = "Quarkus forge terminal UI")
 public final class QuarkusForgeCli implements Callable<Integer> {
-  @Option(
-      names = {"-g", "--group-id"},
-      defaultValue = "org.acme",
-      description = "Maven group id")
-  private String groupId;
+  static final int EXIT_CODE_VALIDATION = 2;
+  static final int EXIT_CODE_NETWORK = 3;
+  static final int EXIT_CODE_ARCHIVE = 4;
+  static final int EXIT_CODE_CANCELLED = 130;
 
-  @Option(
-      names = {"-a", "--artifact-id"},
-      defaultValue = "quarkus-app",
-      description = "Maven artifact id")
-  private String artifactId;
+  private static final Map<String, List<String>> BUILTIN_PRESETS = builtInPresets();
+  private static final String PRESET_FAVORITES = "favorites";
 
-  @Option(
-      names = {"-v", "--project-version"},
-      defaultValue = "1.0.0-SNAPSHOT",
-      description = "Project version")
-  private String version;
+  @Mixin private RequestOptions requestOptions = new RequestOptions();
 
-  @Option(
-      names = {"-p", "--package-name"},
-      description = "Base package name (defaults from group/artifact)")
-  private String packageName;
-
-  @Option(
-      names = {"-o", "--output-dir"},
-      defaultValue = ".",
-      description = "Output parent directory (project path resolves to <output-dir>/<artifact-id>)")
-  private String outputDirectory;
-
-  @Option(
-      names = {"-b", "--build-tool"},
-      defaultValue = "maven",
-      description = "Build tool (metadata-driven)")
-  private String buildTool;
-
-  @Option(
-      names = {"-j", "--java-version"},
-      defaultValue = "25",
-      description = "Java version for generated project (metadata-driven)")
-  private String javaVersion;
+  private final RuntimeConfig runtimeConfig;
 
   @Option(
       names = "--dry-run",
@@ -92,9 +83,19 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       description = "Debounce delay for extension search updates")
   private int searchDebounceMs;
 
+  public QuarkusForgeCli() {
+    this(RuntimeConfig.defaults());
+  }
+
+  QuarkusForgeCli(RuntimeConfig runtimeConfig) {
+    this.runtimeConfig = Objects.requireNonNull(runtimeConfig);
+  }
+
   @Override
   public Integer call() throws Exception {
-    ForgeUiState initialState = buildInitialState();
+    ProjectRequest request = toProjectRequest(requestOptions);
+    ForgeUiState initialState =
+        buildInitialState(request, MetadataCompatibilityContext.loadDefault());
     if (!initialState.canSubmit()) {
       printValidationErrors(initialState.validation());
       return CommandLine.ExitCode.USAGE;
@@ -105,12 +106,16 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       return CommandLine.ExitCode.OK;
     }
 
-    runTui(smokeMode, initialState, searchDebounceMs);
+    runTui(smokeMode, initialState, searchDebounceMs, runtimeConfig);
     return CommandLine.ExitCode.OK;
   }
 
   public static int runWithArgs(String[] args) {
-    return new CommandLine(new QuarkusForgeCli()).execute(args);
+    return runWithArgs(args, RuntimeConfig.defaults());
+  }
+
+  static int runWithArgs(String[] args, RuntimeConfig runtimeConfig) {
+    return new CommandLine(new QuarkusForgeCli(runtimeConfig)).execute(args);
   }
 
   public static void main(String[] args) {
@@ -120,13 +125,17 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     }
   }
 
-  static void runTui(boolean smokeMode, ForgeUiState initialState, int searchDebounceMs)
+  static void runTui(
+      boolean smokeMode,
+      ForgeUiState initialState,
+      int searchDebounceMs,
+      RuntimeConfig runtimeConfig)
       throws Exception {
     try (var tui = TuiRunner.create()) {
-      QuarkusApiClient apiClient = new QuarkusApiClient(URI.create("https://code.quarkus.io"));
+      QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
       CatalogDataService catalogDataService =
           new CatalogDataService(
-              apiClient, new CatalogSnapshotCache(CatalogSnapshotCache.defaultCacheFile()));
+              apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
       ProjectArchiveService projectArchiveService =
           new ProjectArchiveService(apiClient, new SafeZipExtractor());
       CoreTuiController controller =
@@ -146,7 +155,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
                                 case DOWNLOADING_ARCHIVE -> "downloading project archive...";
                                 case EXTRACTING_ARCHIVE -> "extracting project archive...";
                               })),
-              ExtensionFavoritesStore.fileBacked(ExtensionFavoritesStore.defaultFile()),
+              ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile()),
               CoreTuiController.defaultFavoritesPersistenceExecutor());
       controller.loadExtensionCatalogAsync(
           () -> catalogDataService.load().thenApply(QuarkusForgeCli::toExtensionCatalogLoadResult));
@@ -176,17 +185,25 @@ public final class QuarkusForgeCli implements Callable<Integer> {
         catalogData.metadata());
   }
 
-  private ForgeUiState buildInitialState() {
-    CliPrefill prefill =
-        new CliPrefill(
-            groupId, artifactId, version, packageName, outputDirectory, buildTool, javaVersion);
-    ProjectRequest request = CliPrefillMapper.map(prefill);
-    MetadataCompatibilityContext metadataCompatibility = MetadataCompatibilityContext.loadDefault();
-
+  private static ForgeUiState buildInitialState(
+      ProjectRequest request, MetadataCompatibilityContext metadataCompatibility) {
     ValidationReport fieldValidation = new ProjectRequestValidator().validate(request);
     ValidationReport compatibilityValidation = metadataCompatibility.validate(request);
     return new ForgeUiState(
         request, fieldValidation.merge(compatibilityValidation), metadataCompatibility);
+  }
+
+  private static ProjectRequest toProjectRequest(RequestOptions options) {
+    CliPrefill prefill =
+        new CliPrefill(
+            options.groupId,
+            options.artifactId,
+            options.version,
+            options.packageName,
+            options.outputDirectory,
+            options.buildTool,
+            options.javaVersion);
+    return CliPrefillMapper.map(prefill);
   }
 
   private static void printValidationErrors(ValidationReport validation) {
@@ -208,5 +225,336 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     System.out.println(" - buildTool: " + request.buildTool());
     System.out.println(" - javaVersion: " + request.javaVersion());
     System.out.println(" - generatedProjectDirectory: " + generatedProjectDirectory);
+  }
+
+  private static void printDryRunSummary(
+      ProjectRequest request, List<String> extensionIds, String sourceLabel, boolean stale) {
+    Path generatedProjectDirectory =
+        Path.of(request.outputDirectory()).resolve(request.artifactId()).normalize();
+    System.out.println("Dry-run validated successfully:");
+    System.out.println(" - groupId: " + request.groupId());
+    System.out.println(" - artifactId: " + request.artifactId());
+    System.out.println(" - version: " + request.version());
+    System.out.println(" - packageName: " + request.packageName());
+    System.out.println(" - outputDirectory: " + request.outputDirectory());
+    System.out.println(" - buildTool: " + request.buildTool());
+    System.out.println(" - javaVersion: " + request.javaVersion());
+    System.out.println(" - extensions: " + extensionIds);
+    System.out.println(" - catalogSource: " + sourceLabel + (stale ? " [stale]" : ""));
+    System.out.println(" - generatedProjectDirectory: " + generatedProjectDirectory);
+  }
+
+  private static String userFriendlyError(Throwable throwable) {
+    if (throwable == null) {
+      return "unknown error";
+    }
+    String message = throwable.getMessage();
+    if (message == null || message.isBlank()) {
+      return throwable.getClass().getSimpleName();
+    }
+    return message;
+  }
+
+  private static Throwable unwrapCompletionFailure(Throwable throwable) {
+    Throwable current = throwable;
+    while (current instanceof ExecutionException || current instanceof CompletionException) {
+      Throwable cause = current.getCause();
+      if (cause == null) {
+        break;
+      }
+      current = cause;
+    }
+    return current;
+  }
+
+  private static int mapHeadlessFailureToExitCode(Throwable throwable) {
+    Throwable cause = unwrapCompletionFailure(throwable);
+    if (cause instanceof CancellationException) {
+      return EXIT_CODE_CANCELLED;
+    }
+    if (cause instanceof ArchiveException) {
+      return EXIT_CODE_ARCHIVE;
+    }
+    if (cause instanceof ApiClientException) {
+      return EXIT_CODE_NETWORK;
+    }
+    return EXIT_CODE_ARCHIVE;
+  }
+
+  private static Map<String, List<String>> builtInPresets() {
+    Map<String, List<String>> presets = new LinkedHashMap<>();
+    presets.put("web", List.of("io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc"));
+    presets.put(
+        "data",
+        List.of("io.quarkus:quarkus-hibernate-orm-panache", "io.quarkus:quarkus-jdbc-postgresql"));
+    presets.put(
+        "messaging", List.of("io.quarkus:quarkus-messaging", "io.quarkus:quarkus-smallrye-health"));
+    return Collections.unmodifiableMap(presets);
+  }
+
+  private static String normalizePresetName(String presetName) {
+    if (presetName == null) {
+      return "";
+    }
+    return presetName.trim().toLowerCase(Locale.ROOT);
+  }
+
+  private CatalogData loadCatalogData() throws ExecutionException, InterruptedException {
+    QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
+    CatalogDataService catalogDataService =
+        new CatalogDataService(
+            apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
+    return catalogDataService.load().get();
+  }
+
+  private List<String> resolveRequestedExtensions(
+      List<String> extensionInputs, List<String> presetInputs, Set<String> knownExtensionIds) {
+    List<ValidationError> errors = new ArrayList<>();
+    LinkedHashSet<String> resolved = new LinkedHashSet<>();
+
+    for (String presetInput : presetInputs) {
+      String preset = normalizePresetName(presetInput);
+      if (preset.isBlank()) {
+        continue;
+      }
+      if (PRESET_FAVORITES.equals(preset)) {
+        resolved.addAll(
+            ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile())
+                .loadFavoriteExtensionIds());
+        continue;
+      }
+      List<String> presetExtensions = BUILTIN_PRESETS.get(preset);
+      if (presetExtensions == null) {
+        errors.add(
+            new ValidationError(
+                "preset",
+                "unknown preset '"
+                    + presetInput
+                    + "'. Allowed: "
+                    + String.join(", ", BUILTIN_PRESETS.keySet())
+                    + ", "
+                    + PRESET_FAVORITES));
+        continue;
+      }
+      resolved.addAll(presetExtensions);
+    }
+
+    for (String extensionInput : extensionInputs) {
+      if (extensionInput == null || extensionInput.isBlank()) {
+        errors.add(new ValidationError("extension", "must not be blank"));
+        continue;
+      }
+      resolved.add(extensionInput.trim());
+    }
+
+    for (String extensionId : resolved) {
+      if (!knownExtensionIds.contains(extensionId)) {
+        errors.add(new ValidationError("extension", "unknown extension id '" + extensionId + "'"));
+      }
+    }
+
+    if (!errors.isEmpty()) {
+      throw new ValidationException(errors);
+    }
+    return List.copyOf(resolved);
+  }
+
+  private Integer runHeadlessGenerate(GenerateCommand command) {
+    CatalogData catalogData;
+    try {
+      catalogData = loadCatalogData();
+    } catch (CancellationException cancellationException) {
+      System.err.println("Generation cancelled before start.");
+      return EXIT_CODE_CANCELLED;
+    } catch (InterruptedException interruptedException) {
+      Thread.currentThread().interrupt();
+      System.err.println("Generation cancelled before start.");
+      return EXIT_CODE_CANCELLED;
+    } catch (ExecutionException executionException) {
+      Throwable cause = unwrapCompletionFailure(executionException);
+      System.err.println("Failed to load extension catalog: " + userFriendlyError(cause));
+      return mapHeadlessFailureToExitCode(cause);
+    }
+
+    ProjectRequest request = toProjectRequest(command.requestOptions);
+    ForgeUiState validatedState =
+        buildInitialState(request, MetadataCompatibilityContext.success(catalogData.metadata()));
+    if (!validatedState.canSubmit()) {
+      printValidationErrors(validatedState.validation());
+      return EXIT_CODE_VALIDATION;
+    }
+
+    Set<String> knownExtensionIds = new LinkedHashSet<>();
+    for (ExtensionDto extension : catalogData.extensions()) {
+      knownExtensionIds.add(extension.id());
+    }
+
+    List<String> extensionIds;
+    try {
+      extensionIds =
+          resolveRequestedExtensions(command.extensions, command.presets, knownExtensionIds);
+    } catch (ValidationException validationException) {
+      printValidationErrors(new ValidationReport(validationException.errors()));
+      return EXIT_CODE_VALIDATION;
+    }
+
+    boolean dryRunRequested = command.dryRun || dryRun;
+    if (dryRunRequested) {
+      printDryRunSummary(
+          validatedState.request(),
+          extensionIds,
+          catalogData.source().label(),
+          catalogData.stale());
+      return CommandLine.ExitCode.OK;
+    }
+
+    Path outputPath =
+        Path.of(validatedState.request().outputDirectory())
+            .resolve(validatedState.request().artifactId())
+            .normalize();
+    GenerationRequest generationRequest =
+        new GenerationRequest(
+            validatedState.request().groupId(),
+            validatedState.request().artifactId(),
+            validatedState.request().version(),
+            validatedState.request().buildTool(),
+            validatedState.request().javaVersion(),
+            extensionIds);
+
+    QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
+    ProjectArchiveService archiveService =
+        new ProjectArchiveService(apiClient, new SafeZipExtractor());
+    try {
+      Path generatedProjectRoot =
+          archiveService
+              .downloadAndExtract(
+                  generationRequest,
+                  outputPath,
+                  OverwritePolicy.FAIL_IF_EXISTS,
+                  () -> Thread.currentThread().isInterrupted(),
+                  progress ->
+                      System.out.println(
+                          switch (progress) {
+                            case DOWNLOADING_ARCHIVE -> "downloading project archive...";
+                            case EXTRACTING_ARCHIVE -> "extracting project archive...";
+                          }))
+              .get();
+      System.out.println(
+          "Generation succeeded: " + generatedProjectRoot.toAbsolutePath().normalize());
+      return CommandLine.ExitCode.OK;
+    } catch (CancellationException cancellationException) {
+      System.err.println("Generation cancelled.");
+      return EXIT_CODE_CANCELLED;
+    } catch (InterruptedException interruptedException) {
+      Thread.currentThread().interrupt();
+      System.err.println("Generation cancelled.");
+      return EXIT_CODE_CANCELLED;
+    } catch (ExecutionException executionException) {
+      Throwable cause = unwrapCompletionFailure(executionException);
+      int exitCode = mapHeadlessFailureToExitCode(cause);
+      System.err.println("Generation failed: " + userFriendlyError(cause));
+      return exitCode;
+    }
+  }
+
+  static final class RequestOptions {
+    @Option(
+        names = {"-g", "--group-id"},
+        defaultValue = "org.acme",
+        description = "Maven group id")
+    private String groupId;
+
+    @Option(
+        names = {"-a", "--artifact-id"},
+        defaultValue = "quarkus-app",
+        description = "Maven artifact id")
+    private String artifactId;
+
+    @Option(
+        names = {"-v", "--project-version"},
+        defaultValue = "1.0.0-SNAPSHOT",
+        description = "Project version")
+    private String version;
+
+    @Option(
+        names = {"-p", "--package-name"},
+        description = "Base package name (defaults from group/artifact)")
+    private String packageName;
+
+    @Option(
+        names = {"-o", "--output-dir"},
+        defaultValue = ".",
+        description =
+            "Output parent directory (project path resolves to <output-dir>/<artifact-id>)")
+    private String outputDirectory;
+
+    @Option(
+        names = {"-b", "--build-tool"},
+        defaultValue = "maven",
+        description = "Build tool (metadata-driven)")
+    private String buildTool;
+
+    @Option(
+        names = {"-j", "--java-version"},
+        defaultValue = "25",
+        description = "Java version for generated project (metadata-driven)")
+    private String javaVersion;
+  }
+
+  @Command(name = "generate", description = "Generate a Quarkus project without starting the TUI")
+  static final class GenerateCommand implements Callable<Integer> {
+    @ParentCommand private QuarkusForgeCli rootCommand;
+
+    @Mixin private RequestOptions requestOptions = new RequestOptions();
+
+    @Option(
+        names = {"-e", "--extension"},
+        split = ",",
+        description = "Extension id to include (repeatable and comma-separated)")
+    private List<String> extensions = new ArrayList<>();
+
+    @Option(
+        names = "--preset",
+        split = ",",
+        description = "Extension preset(s): web, data, messaging, favorites")
+    private List<String> presets = new ArrayList<>();
+
+    @Option(
+        names = "--dry-run",
+        defaultValue = "false",
+        description = "Validate full generation request without writing files")
+    private boolean dryRun;
+
+    @Override
+    public Integer call() {
+      return rootCommand.runHeadlessGenerate(this);
+    }
+  }
+
+  record RuntimeConfig(URI apiBaseUri, Path catalogCacheFile, Path favoritesFile) {
+    RuntimeConfig {
+      Objects.requireNonNull(apiBaseUri);
+      Objects.requireNonNull(catalogCacheFile);
+      Objects.requireNonNull(favoritesFile);
+    }
+
+    static RuntimeConfig defaults() {
+      return new RuntimeConfig(
+          URI.create("https://code.quarkus.io"),
+          CatalogSnapshotCache.defaultCacheFile(),
+          ExtensionFavoritesStore.defaultFile());
+    }
+  }
+
+  private static final class ValidationException extends RuntimeException {
+    private final List<ValidationError> errors;
+
+    private ValidationException(List<ValidationError> errors) {
+      this.errors = List.copyOf(errors);
+    }
+
+    private List<ValidationError> errors() {
+      return errors;
+    }
   }
 }

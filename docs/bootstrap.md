@@ -48,3 +48,4 @@ Use these gates after each issue:
 - `--search-debounce-ms` configures extension-search debounce delay in the TUI shell (`0` default for instant updates).
 - `--dry-run` validates input and prints resolved initial state without starting the TUI.
 - Validation rejects malformed Maven identifiers and Windows-invalid output paths (reserved names and invalid characters).
+- Headless non-interactive generation is documented in `docs/cli-generate.md` (`quarkus-forge generate`).

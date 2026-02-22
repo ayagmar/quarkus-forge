@@ -60,6 +60,7 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - On success, footer shows build-tool-specific next step hint:
   - Maven: `cd <generated-path> && mvn quarkus:dev`
   - Gradle: `cd <generated-path> && ./gradlew quarkusDev`
+- For non-interactive generation (CI/scripts), use `quarkus-forge generate` documented in `docs/cli-generate.md`.
 
 ## Deterministic Async Search
 - Extension catalog is loaded from Quarkus API and indexed in-memory by stable extension identifier.
