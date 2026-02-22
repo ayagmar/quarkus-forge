@@ -4,6 +4,7 @@
 - Java runtime baseline: Java 25.
 - Build tool: Maven.
 - TUI runtime dependencies: `dev.tamboui:tamboui-tui` + `dev.tamboui:tamboui-panama-backend`.
+- TamboUI dependency version: `0.2.0-SNAPSHOT`.
 - CLI parser baseline: `picocli`.
 - Domain bootstrap defaults:
   - `groupId=org.acme`
@@ -28,11 +29,13 @@ Use these gates after each issue:
 
 ## Native Profile Notes
 - Native profile is wired with `org.graalvm.buildtools:native-maven-plugin`.
-- In this environment, `native-image` is not installed, so `native.skip=true` is the default.
-- To produce a native binary when GraalVM is available, run with `-Dnative.skip=false`.
+- In this environment, `native-image` is installed at `~/.sdkman/candidates/java/25-graal/bin/native-image`, but it is not on `PATH` under the default Temurin Java runtime.
+- To produce a native binary, run with `-Dnative.skip=false` and ensure GraalVM is active (or invoke Maven with `JAVA_HOME` set to GraalVM).
 
-## Offline Maven Notes
-- `.mvn/settings.xml` mirrors repositories to the local Maven cache path.
+## Maven Repository Notes
+- TamboUI dependencies are resolved from Sonatype snapshots:
+  - `https://central.sonatype.com/repository/maven-snapshots/`
+- `pom.xml` enables snapshots for `ossrh-snapshots` and disables releases for that repository.
 - `.mvn/maven.config` sets the project-local Maven repository at `.m2/repository`.
 
 ## CLI Prefill Flags

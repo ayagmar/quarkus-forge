@@ -20,8 +20,8 @@ import java.net.http.HttpClient;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZonedDateTime;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -323,7 +323,8 @@ class QuarkusApiClientTest {
   }
 
   @Test
-  void downloadProjectZipToFileRetriesThenSurfacesHttpErrorWithFinalBodyPersisted() throws Exception {
+  void downloadProjectZipToFileRetriesThenSurfacesHttpErrorWithFinalBodyPersisted()
+      throws Exception {
     stubFor(
         get(urlPathEqualTo("/api/download"))
             .inScenario("download-retry-fail")

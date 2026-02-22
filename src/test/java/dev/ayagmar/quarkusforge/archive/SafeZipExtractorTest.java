@@ -180,7 +180,8 @@ class SafeZipExtractorTest {
     for (int i = 0; i < payload.length; i++) {
       payload[i] = 'A';
     }
-    Path zipPath = createZip(tempDir.resolve("zero-size-mismatch.zip"), Map.of("demo/big.txt", payload));
+    Path zipPath =
+        createZip(tempDir.resolve("zero-size-mismatch.zip"), Map.of("demo/big.txt", payload));
     patchUncompressedSize(zipPath, "demo/big.txt", 0L);
 
     SafeZipExtractor extractor =

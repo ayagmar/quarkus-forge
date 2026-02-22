@@ -14,7 +14,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>25</maven.compiler.release>
 
-    <tamboui.version>0.1.0</tamboui.version>
+    <tamboui.version>0.2.0-SNAPSHOT</tamboui.version>
     <picocli.version>4.7.7</picocli.version>
     <jackson.version>2.20.2</jackson.version>
     <junit.version>6.0.1</junit.version>
@@ -31,6 +31,19 @@
     <checkstyle.plugin.version>99.0-offline</checkstyle.plugin.version>
     <native.skip>true</native.skip>
   </properties>
+
+  <repositories>
+    <repository>
+      <id>ossrh-snapshots</id>
+      <url>https://central.sonatype.com/repository/maven-snapshots/</url>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
 
   <dependencies>
     <dependency>

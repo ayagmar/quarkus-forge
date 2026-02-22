@@ -23,8 +23,7 @@ class MetadataCompatibilityContextTest {
 
   @Test
   void constructorNormalizesBlankLoadErrorWhenSnapshotIsPresent() {
-    MetadataCompatibilityContext context =
-        new MetadataCompatibilityContext(validMetadata(), "   ");
+    MetadataCompatibilityContext context = new MetadataCompatibilityContext(validMetadata(), "   ");
 
     ValidationReport report = context.validate(validRequest());
 

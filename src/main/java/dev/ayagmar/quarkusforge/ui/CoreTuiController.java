@@ -20,6 +20,7 @@ import dev.tamboui.tui.event.ResizeEvent;
 import dev.tamboui.widgets.block.Block;
 import dev.tamboui.widgets.block.BorderType;
 import dev.tamboui.widgets.block.Borders;
+import dev.tamboui.widgets.common.SizedWidget;
 import dev.tamboui.widgets.input.TextInput;
 import dev.tamboui.widgets.input.TextInputState;
 import dev.tamboui.widgets.list.ListItem;
@@ -362,11 +363,13 @@ public final class CoreTuiController {
   }
 
   private void renderExtensionList(Frame frame, Rect area) {
-    List<ListItem> items = new ArrayList<>();
+    List<SizedWidget> items = new ArrayList<>();
     for (ExtensionCatalogItem extension : filteredExtensions) {
       boolean selected = selectedExtensionIds.contains(extension.id());
       String prefix = selected ? "[x] " : "[ ] ";
-      items.add(ListItem.from(prefix + extension.name() + " (" + extension.shortName() + ")"));
+      items.add(
+          ListItem.from(prefix + extension.name() + " (" + extension.shortName() + ")")
+              .toSizedWidget());
     }
 
     Block listBlock =

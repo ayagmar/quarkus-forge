@@ -111,7 +111,9 @@ class ProjectRequestValidatorTest {
 
     ValidationReport report = validator.validate(request);
 
-    assertThat(report.errors()).extracting(ValidationError::field).doesNotContain("outputDirectory");
+    assertThat(report.errors())
+        .extracting(ValidationError::field)
+        .doesNotContain("outputDirectory");
   }
 
   @Test

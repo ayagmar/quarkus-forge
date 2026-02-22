@@ -100,8 +100,7 @@ final class ZipCentralDirectoryReader {
       }
       entries.put(
           normalizedEntryName,
-          new ZipEntryMetadata(
-              normalizedEntryName, compressedSize, uncompressedSize, unixMode));
+          new ZipEntryMetadata(normalizedEntryName, compressedSize, uncompressedSize, unixMode));
 
       consumed += CEN_FIXED_LENGTH + fileNameLength + skip;
     }
