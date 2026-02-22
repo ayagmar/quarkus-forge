@@ -95,8 +95,8 @@ public final class CoreTuiController {
   private boolean submitBlockedByValidation;
   private GenerationState generationState;
   private CompletableFuture<Path> generationFuture;
-  private boolean generationCancelRequested;
-  private long generationToken;
+  private volatile boolean generationCancelRequested;
+  private volatile long generationToken;
   private String successHint;
 
   private CoreTuiController(
