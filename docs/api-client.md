@@ -6,6 +6,13 @@
 - `GET /api/download`: generate project ZIP with encoded query parameters.
 - ZIP download supports both byte-array payload usage and streaming-to-file usage.
 
+## Catalog Cache Fallback
+- Runtime catalog loading uses `live -> cache -> snapshot` fallback order.
+- Cache persists metadata + extension catalog only.
+- Cache snapshot schema/version is validated before use.
+- TTL is `6h`, and stale cache is explicitly surfaced in UI state.
+- Cache file size is capped at `2 MiB`; oversized snapshots are rejected.
+
 ## Retry Policy
 - Async HTTP client based on `java.net.http.HttpClient`.
 - Bounded retries with exponential backoff + jitter.

@@ -127,19 +127,24 @@ class CoreTuiStateMachineTest {
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
-    CompletableFuture<List<ExtensionDto>> firstLoad = new CompletableFuture<>();
-    CompletableFuture<List<ExtensionDto>> secondLoad = new CompletableFuture<>();
+    CompletableFuture<CoreTuiController.ExtensionCatalogLoadResult> firstLoad =
+        new CompletableFuture<>();
+    CompletableFuture<CoreTuiController.ExtensionCatalogLoadResult> secondLoad =
+        new CompletableFuture<>();
 
     controller.loadExtensionCatalogAsync(() -> firstLoad);
     controller.loadExtensionCatalogAsync(() -> secondLoad);
 
     secondLoad.complete(
-        List.of(
-            new ExtensionDto(
-                "io.quarkus:quarkus-jdbc-postgresql", "JDBC PostgreSQL", "jdbc-postgresql")));
+        CoreTuiController.ExtensionCatalogLoadResult.live(
+            List.of(
+                new ExtensionDto(
+                    "io.quarkus:quarkus-jdbc-postgresql", "JDBC PostgreSQL", "jdbc-postgresql"))));
     assertThat(controller.firstFilteredExtensionId()).contains("jdbc-postgresql");
 
-    firstLoad.complete(List.of(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest")));
+    firstLoad.complete(
+        CoreTuiController.ExtensionCatalogLoadResult.live(
+            List.of(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest"))));
     assertThat(controller.firstFilteredExtensionId()).contains("jdbc-postgresql");
   }
 

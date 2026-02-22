@@ -61,3 +61,9 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - Cancellation and stale-result protection ensure outdated async callbacks never overwrite newer search state.
 - Multi-selection is tracked by stable extension IDs, independent from list navigation cursor state.
 - Catalog rendering has explicit loading and fallback/degraded visuals.
+- Source labeling is explicit: `live`, `cache`, or `snapshot`; stale cache is marked `[stale]`.
+- `Ctrl+R` triggers catalog refresh/retry without restarting the TUI.
+
+## Local Cache
+- Catalog cache policy is documented in `docs/catalog-cache.md`.
+- Runtime fallback order is `live -> cache -> snapshot`.

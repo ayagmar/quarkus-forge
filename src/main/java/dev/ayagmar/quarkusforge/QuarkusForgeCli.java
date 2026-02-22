@@ -1,5 +1,8 @@
 package dev.ayagmar.quarkusforge;
 
+import dev.ayagmar.quarkusforge.api.CatalogData;
+import dev.ayagmar.quarkusforge.api.CatalogDataService;
+import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
 import dev.ayagmar.quarkusforge.archive.OverwritePolicy;
 import dev.ayagmar.quarkusforge.archive.ProjectArchiveService;
@@ -120,6 +123,9 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       throws Exception {
     try (var tui = TuiRunner.create()) {
       QuarkusApiClient apiClient = new QuarkusApiClient(URI.create("https://code.quarkus.io"));
+      CatalogDataService catalogDataService =
+          new CatalogDataService(
+              apiClient, new CatalogSnapshotCache(CatalogSnapshotCache.defaultCacheFile()));
       ProjectArchiveService projectArchiveService =
           new ProjectArchiveService(apiClient, new SafeZipExtractor());
       CoreTuiController controller =
@@ -139,7 +145,8 @@ public final class QuarkusForgeCli implements Callable<Integer> {
                                 case DOWNLOADING_ARCHIVE -> "downloading project archive...";
                                 case EXTRACTING_ARCHIVE -> "extracting project archive...";
                               })));
-      controller.loadExtensionCatalogAsync(apiClient::fetchExtensions);
+      controller.loadExtensionCatalogAsync(
+          () -> catalogDataService.load().thenApply(QuarkusForgeCli::toExtensionCatalogLoadResult));
       if (smokeMode) {
         tui.scheduler().schedule(tui::quit, 350, TimeUnit.MILLISECONDS);
       }
@@ -154,6 +161,16 @@ public final class QuarkusForgeCli implements Callable<Integer> {
           },
           controller::render);
     }
+  }
+
+  private static CoreTuiController.ExtensionCatalogLoadResult toExtensionCatalogLoadResult(
+      CatalogData catalogData) {
+    return new CoreTuiController.ExtensionCatalogLoadResult(
+        catalogData.extensions(),
+        catalogData.source(),
+        catalogData.stale(),
+        catalogData.detailMessage(),
+        catalogData.metadata());
   }
 
   private ForgeUiState buildInitialState() {

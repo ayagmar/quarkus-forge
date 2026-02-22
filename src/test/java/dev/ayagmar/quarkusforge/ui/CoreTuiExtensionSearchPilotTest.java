@@ -2,16 +2,21 @@ package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
+import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.tamboui.buffer.Buffer;
 import dev.tamboui.layout.Rect;
 import dev.tamboui.terminal.Frame;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
+import dev.tamboui.tui.event.KeyModifiers;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class CoreTuiExtensionSearchPilotTest {
@@ -23,13 +28,15 @@ class CoreTuiExtensionSearchPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                List.of(
-                    new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest"),
-                    new ExtensionDto("io.quarkus:quarkus-smallrye-openapi", "OpenAPI", "openapi"),
-                    new ExtensionDto(
-                        "io.quarkus:quarkus-jdbc-postgresql",
-                        "JDBC PostgreSQL",
-                        "jdbc-postgresql"))));
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest"),
+                        new ExtensionDto(
+                            "io.quarkus:quarkus-smallrye-openapi", "OpenAPI", "openapi"),
+                        new ExtensionDto(
+                            "io.quarkus:quarkus-jdbc-postgresql",
+                            "JDBC PostgreSQL",
+                            "jdbc-postgresql")))));
 
     moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
     controller.onEvent(KeyEvent.ofChar('j'));
@@ -48,14 +55,15 @@ class CoreTuiExtensionSearchPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                List.of(
-                    new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest"),
-                    new ExtensionDto(
-                        "io.quarkus:quarkus-rest-client", "REST Client", "rest-client"),
-                    new ExtensionDto(
-                        "io.quarkus:quarkus-jdbc-postgresql",
-                        "JDBC PostgreSQL",
-                        "jdbc-postgresql"))));
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest"),
+                        new ExtensionDto(
+                            "io.quarkus:quarkus-rest-client", "REST Client", "rest-client"),
+                        new ExtensionDto(
+                            "io.quarkus:quarkus-jdbc-postgresql",
+                            "JDBC PostgreSQL",
+                            "jdbc-postgresql")))));
 
     moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     controller.onEvent(KeyEvent.ofChar(' '));
@@ -93,7 +101,10 @@ class CoreTuiExtensionSearchPilotTest {
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
 
-    controller.loadExtensionCatalogAsync(() -> CompletableFuture.completedFuture(List.of()));
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(List.of())));
 
     assertThat(controller.statusMessage()).isEqualTo("Using fallback extension catalog");
     assertThat(controller.filteredExtensionCount()).isEqualTo(7);
@@ -112,11 +123,12 @@ class CoreTuiExtensionSearchPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                List.of(
-                    new ExtensionDto(
-                        "io.quarkus:quarkus-jdbc-postgresql",
-                        "JDBC PostgreSQL",
-                        "jdbc-postgresql"))));
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto(
+                            "io.quarkus:quarkus-jdbc-postgresql",
+                            "JDBC PostgreSQL",
+                            "jdbc-postgresql")))));
 
     assertThat(controller.selectedExtensionIds()).isEmpty();
   }
@@ -127,18 +139,77 @@ class CoreTuiExtensionSearchPilotTest {
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ZERO);
-    CompletableFuture<List<ExtensionDto>> loadFuture = new CompletableFuture<>();
+    CompletableFuture<CoreTuiController.ExtensionCatalogLoadResult> loadFuture =
+        new CompletableFuture<>();
     controller.loadExtensionCatalogAsync(() -> loadFuture);
     assertThat(controller.statusMessage()).isEqualTo("Loading extension catalog...");
 
     CoreTuiController.UiAction quitAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(quitAction.shouldQuit()).isTrue();
 
-    loadFuture.complete(List.of(new ExtensionDto("io.quarkus:quarkus-funqy", "Funqy", "funqy")));
+    loadFuture.complete(
+        CoreTuiController.ExtensionCatalogLoadResult.live(
+            List.of(new ExtensionDto("io.quarkus:quarkus-funqy", "Funqy", "funqy"))));
     scheduler.runAll();
 
     assertThat(controller.statusMessage()).isEqualTo("Loading extension catalog...");
     assertThat(controller.filteredExtensionCount()).isEqualTo(7);
+  }
+
+  @Test
+  void cachedCatalogResultShowsSourceAndStaleIndicator() {
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                new CoreTuiController.ExtensionCatalogLoadResult(
+                    List.of(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest")),
+                    CatalogSource.CACHE,
+                    true,
+                    "Live catalog unavailable (network down); using stale cached snapshot",
+                    sampleMetadata())));
+
+    String rendered = renderToString(controller);
+    assertThat(rendered).contains("Catalog: cache [stale]");
+    assertThat(rendered).contains("Catalog: cache [stale] | error:");
+    assertThat(controller.statusMessage()).contains("stale extension catalog");
+  }
+
+  @Test
+  void ctrlRReloadsCatalogWithoutRestart() {
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+    AtomicInteger callCount = new AtomicInteger();
+
+    controller.loadExtensionCatalogAsync(
+        () -> {
+          int call = callCount.incrementAndGet();
+          if (call == 1) {
+            return CompletableFuture.failedFuture(new IllegalStateException("network down"));
+          }
+          return CompletableFuture.completedFuture(
+              new CoreTuiController.ExtensionCatalogLoadResult(
+                  List.of(
+                      new ExtensionDto(
+                          "io.quarkus:quarkus-jdbc-postgresql",
+                          "JDBC PostgreSQL",
+                          "jdbc-postgresql")),
+                  CatalogSource.CACHE,
+                  false,
+                  "Live catalog unavailable (network down); using cached snapshot",
+                  sampleMetadata()));
+        });
+
+    assertThat(controller.statusMessage()).isEqualTo("Using fallback extension catalog");
+    controller.onEvent(KeyEvent.ofChar('r', KeyModifiers.CTRL));
+
+    assertThat(callCount.get()).isEqualTo(2);
+    assertThat(controller.firstFilteredExtensionId()).contains("jdbc-postgresql");
+    assertThat(controller.statusMessage()).contains("Loaded extension catalog from cache");
   }
 
   private static void moveFocusTo(CoreTuiController controller, FocusTarget target) {
@@ -153,6 +224,13 @@ class CoreTuiExtensionSearchPilotTest {
     Frame frame = Frame.forTesting(buffer);
     controller.render(frame);
     return buffer.toAnsiStringTrimmed();
+  }
+
+  private static MetadataDto sampleMetadata() {
+    return new MetadataDto(
+        List.of("21", "25"),
+        List.of("maven", "gradle"),
+        Map.of("maven", List.of("21", "25"), "gradle", List.of("25")));
   }
 
   private static final class QueueingScheduler implements UiScheduler {

@@ -1,7 +1,9 @@
 package dev.ayagmar.quarkusforge.ui;
 
+import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
+import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.CliPrefillMapper;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
@@ -61,7 +63,7 @@ public final class CoreTuiController {
               new IllegalStateException("Generation flow is not configured in this runtime"));
   private final EnumMap<FocusTarget, TextInputState> inputStates = new EnumMap<>(FocusTarget.class);
   private final ProjectRequestValidator requestValidator = new ProjectRequestValidator();
-  private final MetadataCompatibilityContext metadataCompatibility;
+  private MetadataCompatibilityContext metadataCompatibility;
   private final UiScheduler scheduler;
   private final ExtensionCatalogState extensionCatalogState;
   private final ProjectGenerationRunner projectGenerationRunner;
@@ -83,6 +85,8 @@ public final class CoreTuiController {
   private boolean extensionCatalogLoading;
   private String extensionCatalogErrorMessage;
   private String extensionCatalogSource;
+  private boolean extensionCatalogStale;
+  private ExtensionCatalogLoader extensionCatalogLoader;
   private String successHint;
 
   private CoreTuiController(
@@ -114,6 +118,8 @@ public final class CoreTuiController {
     extensionCatalogLoading = false;
     extensionCatalogErrorMessage = "";
     extensionCatalogSource = "snapshot";
+    extensionCatalogStale = false;
+    extensionCatalogLoader = null;
     successHint = "";
 
     for (FocusTarget target : FocusTarget.values()) {
@@ -158,17 +164,19 @@ public final class CoreTuiController {
 
   public void loadExtensionCatalogAsync(ExtensionCatalogLoader loader) {
     Objects.requireNonNull(loader);
+    extensionCatalogLoader = loader;
     asyncOperationsCancelled = false;
     long loadToken = ++extensionCatalogLoadToken;
     extensionCatalogLoading = true;
     extensionCatalogErrorMessage = "";
-    extensionCatalogSource = "live (loading)";
+    extensionCatalogSource = "live";
+    extensionCatalogStale = false;
     statusMessage = "Loading extension catalog...";
 
     loader
         .load()
         .whenComplete(
-            (extensions, throwable) -> {
+            (result, throwable) -> {
               if (asyncOperationsCancelled || loadToken != extensionCatalogLoadToken) {
                 return;
               }
@@ -178,17 +186,29 @@ public final class CoreTuiController {
                       return;
                     }
                     if (throwable != null) {
+                      Throwable cause = unwrapCompletionCause(throwable);
+                      String message = userFriendlyError(cause);
                       extensionCatalogLoading = false;
-                      extensionCatalogErrorMessage =
-                          "Catalog load failed: " + throwable.getMessage();
-                      extensionCatalogSource = "snapshot (fallback)";
-                      errorMessage = "Catalog load failed: " + throwable.getMessage();
+                      extensionCatalogErrorMessage = "Catalog load failed: " + message;
+                      extensionCatalogSource = "snapshot";
+                      extensionCatalogStale = false;
+                      errorMessage = "Catalog load failed: " + message;
+                      statusMessage = "Using fallback extension catalog";
+                      return;
+                    }
+
+                    if (result == null) {
+                      extensionCatalogLoading = false;
+                      extensionCatalogErrorMessage = "Catalog load failed: empty load result";
+                      extensionCatalogSource = "snapshot";
+                      extensionCatalogStale = false;
+                      errorMessage = "Catalog load failed: empty load result";
                       statusMessage = "Using fallback extension catalog";
                       return;
                     }
 
                     List<ExtensionCatalogItem> items =
-                        extensions.stream()
+                        result.extensions().stream()
                             .map(
                                 extension ->
                                     new ExtensionCatalogItem(
@@ -197,20 +217,27 @@ public final class CoreTuiController {
                     if (items.isEmpty()) {
                       extensionCatalogLoading = false;
                       extensionCatalogErrorMessage = "Catalog load returned no extensions";
-                      extensionCatalogSource = "snapshot (fallback)";
+                      extensionCatalogSource = "snapshot";
+                      extensionCatalogStale = false;
                       errorMessage = "Catalog load returned no extensions";
                       statusMessage = "Using fallback extension catalog";
                       return;
                     }
 
+                    if (result.metadata() != null) {
+                      metadataCompatibility =
+                          MetadataCompatibilityContext.success(result.metadata());
+                      revalidate();
+                    }
+
                     extensionCatalogLoading = false;
-                    extensionCatalogErrorMessage = "";
-                    extensionCatalogSource = "live";
-                    statusMessage = "Searching extensions...";
+                    extensionCatalogErrorMessage = result.detailMessage();
+                    extensionCatalogSource = result.source().label();
+                    extensionCatalogStale = result.stale();
+                    errorMessage = "";
+                    statusMessage = catalogLoadedStatusMessage(result.source(), result.stale());
                     extensionCatalogState.replaceCatalog(
-                        items,
-                        inputStates.get(FocusTarget.EXTENSION_SEARCH).text(),
-                        this::updateExtensionFilterStatus);
+                        items, inputStates.get(FocusTarget.EXTENSION_SEARCH).text(), ignored -> {});
                   });
             });
   }
@@ -239,6 +266,10 @@ public final class CoreTuiController {
         return UiAction.handled(false);
       }
       statusMessage = "Generation in progress. Press Esc to cancel.";
+      return UiAction.handled(false);
+    }
+    if (isCatalogReloadKey(keyEvent)) {
+      requestCatalogReload();
       return UiAction.handled(false);
     }
     if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && keyEvent.hasShift()) {
@@ -526,6 +557,9 @@ public final class CoreTuiController {
     List<String> selectedExtensionIds = extensionCatalogState.selectedExtensionIds();
     String summary = selectedExtensionsSummary(selectedExtensionIds, area.width());
     summary += "\nCatalog: " + extensionCatalogSource;
+    if (extensionCatalogStale) {
+      summary += " [stale]";
+    }
     if (!extensionCatalogErrorMessage.isBlank()) {
       summary += " | error: " + extensionCatalogErrorMessage;
     }
@@ -717,13 +751,13 @@ public final class CoreTuiController {
     }
     if (focusTarget == FocusTarget.EXTENSION_LIST) {
       return width < NARROW_WIDTH_THRESHOLD
-          ? "Up/Down: nav | Space: toggle | Enter: submit"
-          : "Up/Down: list nav | Space: toggle extension | Enter: submit | Tab/Shift+Tab: focus";
+          ? "Up/Down: nav | Space: toggle | Ctrl+R: reload"
+          : "Up/Down: list nav | Space: toggle extension | Ctrl+R: reload | Enter: submit";
     }
     if (focusTarget == FocusTarget.EXTENSION_SEARCH) {
       return width < NARROW_WIDTH_THRESHOLD
-          ? "Type: filter | Enter: submit | Esc: quit"
-          : "Type: filter extensions | Enter: submit | Tab/Shift+Tab: focus | Esc: cancel/quit";
+          ? "Type: filter | Ctrl+R: reload | Enter: submit"
+          : "Type: filter extensions | Ctrl+R: reload | Enter: submit | Esc: cancel/quit";
     }
     return width < NARROW_WIDTH_THRESHOLD
         ? "Tab: focus | Enter: submit | Esc: quit"
@@ -963,7 +997,28 @@ public final class CoreTuiController {
 
   @FunctionalInterface
   public interface ExtensionCatalogLoader {
-    CompletableFuture<List<ExtensionDto>> load();
+    CompletableFuture<ExtensionCatalogLoadResult> load();
+  }
+
+  public record ExtensionCatalogLoadResult(
+      List<ExtensionDto> extensions,
+      CatalogSource source,
+      boolean stale,
+      String detailMessage,
+      MetadataDto metadata) {
+    public ExtensionCatalogLoadResult {
+      extensions = List.copyOf(Objects.requireNonNull(extensions));
+      source = Objects.requireNonNull(source);
+      detailMessage = detailMessage == null ? "" : detailMessage.strip();
+
+      if (source != CatalogSource.CACHE && stale) {
+        throw new IllegalArgumentException("stale flag is allowed only for cache source");
+      }
+    }
+
+    public static ExtensionCatalogLoadResult live(List<ExtensionDto> extensions) {
+      return new ExtensionCatalogLoadResult(extensions, CatalogSource.LIVE, false, "", null);
+    }
   }
 
   private static boolean isTextInputFocus(FocusTarget focusTarget) {
@@ -1017,6 +1072,32 @@ public final class CoreTuiController {
       return;
     }
     statusMessage = "Extensions filtered: " + filteredCount;
+  }
+
+  private void requestCatalogReload() {
+    if (extensionCatalogLoader == null) {
+      statusMessage = "Catalog reload unavailable";
+      return;
+    }
+    statusMessage = "Reloading extension catalog...";
+    loadExtensionCatalogAsync(extensionCatalogLoader);
+  }
+
+  private static boolean isCatalogReloadKey(KeyEvent keyEvent) {
+    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
+        && keyEvent.hasCtrl()
+        && (keyEvent.character() == 'r' || keyEvent.character() == 'R');
+  }
+
+  private static String catalogLoadedStatusMessage(CatalogSource source, boolean stale) {
+    return switch (source) {
+      case LIVE -> "Loaded extension catalog from live API";
+      case CACHE ->
+          stale
+              ? "Loaded stale extension catalog from cache"
+              : "Loaded extension catalog from cache";
+      case SNAPSHOT -> "Loaded extension catalog from bundled snapshot";
+    };
   }
 
   @FunctionalInterface

@@ -28,10 +28,10 @@ class CoreTuiThemePolishTest {
 
     moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     String listFooterWide = renderToString(controller, 120, 32);
-    assertThat(listFooterWide).contains("Up/Down: list nav | Space: toggle extension");
+    assertThat(listFooterWide).contains("Up/Down: list nav | Space: toggle extension | Ctrl+R");
 
     String listFooterNarrow = renderToString(controller, 80, 32);
-    assertThat(listFooterNarrow).contains("Up/Down: nav | Space: toggle | Enter: submit");
+    assertThat(listFooterNarrow).contains("Up/Down: nav | Space: toggle | Ctrl+R: reload");
   }
 
   @Test
@@ -40,7 +40,7 @@ class CoreTuiThemePolishTest {
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ofMillis(50));
-    CompletableFuture<List<dev.ayagmar.quarkusforge.api.ExtensionDto>> loadFuture =
+    CompletableFuture<CoreTuiController.ExtensionCatalogLoadResult> loadFuture =
         new CompletableFuture<>();
 
     controller.loadExtensionCatalogAsync(() -> loadFuture);
@@ -52,7 +52,7 @@ class CoreTuiThemePolishTest {
 
     String rendered = renderToString(controller, 120, 32);
     assertThat(rendered).contains("Extensions [fallback]");
-    assertThat(rendered).contains("Catalog: snapshot (fallback)");
+    assertThat(rendered).contains("Catalog: snapshot");
     assertThat(rendered).contains("Error: Catalog load failed: network down");
   }
 

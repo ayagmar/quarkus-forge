@@ -144,6 +144,34 @@ class ProjectArchiveServiceTest {
   }
 
   @Test
+  void generatedZipPayloadIsNotPersistedAsCacheArtifact() throws Exception {
+    stubFor(
+        get(urlPathEqualTo("/api/download"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withBody(createZipPayload("demo/pom.xml", "<project/>"))));
+
+    Path tempArchiveDirectory = tempDir.resolve("archive-staging");
+    Files.createDirectories(tempArchiveDirectory);
+    Path tempArchive = tempArchiveDirectory.resolve("download.zip");
+    ProjectArchiveService service =
+        new ProjectArchiveService(newClient(), new SafeZipExtractor(), () -> tempArchive);
+
+    GenerationRequest request =
+        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+
+    Path output = tempDir.resolve("generated-project");
+    service.downloadAndExtract(request, output, OverwritePolicy.FAIL_IF_EXISTS).join();
+
+    assertThat(Files.exists(output.resolve("pom.xml"))).isTrue();
+    assertThat(Files.exists(tempArchive)).isFalse();
+    try (var stagedFiles = Files.list(tempArchiveDirectory)) {
+      assertThat(stagedFiles.findAny()).isEmpty();
+    }
+  }
+
+  @Test
   void extractionRunsOnConfiguredExecutor() throws Exception {
     stubFor(
         get(urlPathEqualTo("/api/download"))
