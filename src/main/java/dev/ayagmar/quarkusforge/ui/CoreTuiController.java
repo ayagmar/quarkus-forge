@@ -312,6 +312,7 @@ public final class CoreTuiController {
   }
 
   public UiAction onEvent(Event event) {
+    reconcileGenerationCompletionIfDone();
     if (event instanceof ResizeEvent resizeEvent) {
       statusMessage = "Terminal resized to " + resizeEvent.width() + "x" + resizeEvent.height();
       return UiAction.handled(false);
@@ -439,6 +440,7 @@ public final class CoreTuiController {
   }
 
   public void render(Frame frame) {
+    reconcileGenerationCompletionIfDone();
     Rect area = frame.area();
     int footerHeight = 6;
     if (!errorMessage.isBlank()) {
@@ -1046,6 +1048,24 @@ public final class CoreTuiController {
     statusMessage = "Generation failed.";
     errorMessage = userFriendlyError(cause);
     successHint = "";
+  }
+
+  private void reconcileGenerationCompletionIfDone() {
+    if (generationState != GenerationState.LOADING || generationFuture == null) {
+      return;
+    }
+    if (!generationFuture.isDone()) {
+      return;
+    }
+
+    Path generatedPath = null;
+    Throwable throwable = null;
+    try {
+      generatedPath = generationFuture.join();
+    } catch (RuntimeException completionFailure) {
+      throwable = completionFailure;
+    }
+    onGenerationCompleted(generationToken, generatedPath, throwable);
   }
 
   private void requestGenerationCancellation() {

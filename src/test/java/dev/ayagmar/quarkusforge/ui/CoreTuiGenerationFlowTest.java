@@ -195,6 +195,28 @@ class CoreTuiGenerationFlowTest {
         .contains("Error: Generation service returned null future");
   }
 
+  @Test
+  void completionStillAppliesWhenSchedulerDropsAsyncCallback() {
+    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    UiScheduler droppingScheduler = (delay, task) -> () -> false;
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(),
+            droppingScheduler,
+            Duration.ZERO,
+            generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    generationRunner.complete(Path.of("build/generated-project"));
+
+    assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.LOADING);
+
+    renderToString(controller);
+
+    assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.SUCCESS);
+    assertThat(controller.statusMessage()).contains("Generation succeeded");
+  }
+
   private static String renderToString(CoreTuiController controller) {
     Buffer buffer = Buffer.empty(new Rect(0, 0, 120, 34));
     Frame frame = Frame.forTesting(buffer);
