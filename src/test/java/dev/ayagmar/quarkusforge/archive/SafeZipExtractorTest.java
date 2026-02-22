@@ -251,6 +251,21 @@ class SafeZipExtractorTest {
   }
 
   @Test
+  void failIfExistsOnRootOutputPathDoesNotCrashOnNullFileName() throws IOException {
+    Path zipPath =
+        createZip(
+            tempDir.resolve("root-output.zip"),
+            Map.of("demo/new.txt", "new".getBytes(StandardCharsets.UTF_8)));
+    Path rootOutput = tempDir.getRoot();
+
+    SafeZipExtractor extractor = new SafeZipExtractor();
+
+    assertThatThrownBy(() -> extractor.extract(zipPath, rootOutput, OverwritePolicy.FAIL_IF_EXISTS))
+        .isInstanceOf(ArchiveException.class)
+        .hasRootCauseInstanceOf(java.nio.file.FileAlreadyExistsException.class);
+  }
+
+  @Test
   void replaceExistingPolicyReplacesTargetDirectory() throws IOException {
     Path zipPath =
         createZip(

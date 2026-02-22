@@ -80,6 +80,7 @@ public final class CoreTuiController {
   private String statusMessage;
   private String errorMessage;
   private boolean submitRequested;
+  private boolean submitBlockedByValidation;
 
   private CoreTuiController(
       ForgeUiState initialState, UiScheduler scheduler, Duration debounceDelay) {
@@ -92,6 +93,7 @@ public final class CoreTuiController {
     statusMessage = "Ready";
     errorMessage = "";
     submitRequested = false;
+    submitBlockedByValidation = false;
     metadataCompatibility = initialState.metadataCompatibility();
     this.scheduler = scheduler;
     extensionSearchDebouncer = new Debouncer(scheduler, debounceDelay);
@@ -196,9 +198,11 @@ public final class CoreTuiController {
     if (keyEvent.isConfirm()) {
       submitRequested = true;
       if (!validation.isValid()) {
+        submitBlockedByValidation = true;
         errorMessage = firstValidationError(validation);
         statusMessage = "Submit blocked: invalid input";
       } else {
+        submitBlockedByValidation = false;
         errorMessage = "";
         statusMessage =
             "Submit requested with "
@@ -513,6 +517,7 @@ public final class CoreTuiController {
     focusTarget = FOCUS_ORDER.get(nextIndex);
     statusMessage = "Focus moved to " + focusTargetName(focusTarget);
     errorMessage = "";
+    submitBlockedByValidation = false;
   }
 
   private boolean isMetadataFocused() {
@@ -574,10 +579,11 @@ public final class CoreTuiController {
   }
 
   private void refreshValidationFeedbackAfterEdit() {
-    if (!statusMessage.startsWith("Submit blocked")) {
+    if (!submitBlockedByValidation) {
       return;
     }
     if (validation.isValid()) {
+      submitBlockedByValidation = false;
       errorMessage = "";
       statusMessage = "Validation restored";
       return;

@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -49,7 +50,7 @@ public final class QuarkusApiClient {
         RetryPolicy.defaults(),
         AsyncSleeper.system(),
         Clock.systemUTC(),
-        Math::random);
+        () -> ThreadLocalRandom.current().nextDouble());
   }
 
   public QuarkusApiClient(

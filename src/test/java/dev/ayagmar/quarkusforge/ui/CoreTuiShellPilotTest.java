@@ -13,6 +13,7 @@ import dev.tamboui.terminal.Frame;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.KeyModifiers;
+import dev.tamboui.tui.event.ResizeEvent;
 import org.junit.jupiter.api.Test;
 
 class CoreTuiShellPilotTest {
@@ -83,6 +84,23 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     assertThat(renderToString(controller)).contains("Error:");
 
+    controller.onEvent(KeyEvent.ofKey(KeyCode.BACKSPACE));
+
+    assertThat(controller.validation().isValid()).isTrue();
+    assertThat(controller.statusMessage()).contains("Validation restored");
+    assertThat(renderToString(controller)).doesNotContain("Error:");
+  }
+
+  @Test
+  void blockedSubmitFeedbackRecoversEvenIfStatusMessageChangesBeforeFix() {
+    CoreTuiController controller = CoreTuiController.from(validInitialState());
+    moveFocusTo(controller, FocusTarget.JAVA_VERSION);
+
+    controller.onEvent(KeyEvent.ofChar('x'));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    assertThat(renderToString(controller)).contains("Error:");
+
+    controller.onEvent(ResizeEvent.of(90, 30));
     controller.onEvent(KeyEvent.ofKey(KeyCode.BACKSPACE));
 
     assertThat(controller.validation().isValid()).isTrue();

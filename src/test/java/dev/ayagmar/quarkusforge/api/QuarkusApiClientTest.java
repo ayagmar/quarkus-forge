@@ -25,6 +25,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -225,6 +226,35 @@ class QuarkusApiClientTest {
         .hasRootCauseInstanceOf(ApiHttpException.class)
         .rootCause()
         .hasMessageContaining("Unexpected HTTP status 400");
+  }
+
+  @Test
+  void fetchMetadataReturnsParsedDto() {
+    stubFor(
+        get(urlEqualTo("/api/metadata"))
+            .willReturn(
+                okJson(
+                    """
+                    {
+                      "javaVersions": ["21", "25"],
+                      "buildTools": ["maven", "gradle"],
+                      "compatibility": {
+                        "maven": ["21", "25"],
+                        "gradle": ["25"]
+                      }
+                    }
+                    """)));
+
+    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+
+    MetadataDto metadata = client.fetchMetadata().join();
+
+    assertThat(metadata)
+        .isEqualTo(
+            new MetadataDto(
+                List.of("21", "25"),
+                List.of("maven", "gradle"),
+                Map.of("maven", List.of("21", "25"), "gradle", List.of("25"))));
   }
 
   @Test

@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge.archive;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -55,7 +56,11 @@ public final class SafeZipExtractor {
           "Failed to create output parent directory: " + parent, ioException);
     }
 
-    Path stagingRoot = createTempDirectory(parent, absoluteTarget.getFileName() + "-extract-");
+    String targetName =
+        absoluteTarget.getFileName() == null
+            ? "quarkus-forge"
+            : absoluteTarget.getFileName().toString();
+    Path stagingRoot = createTempDirectory(parent, targetName + "-extract-");
     Path stagingContent = stagingRoot.resolve("content");
     try {
       Files.createDirectories(stagingContent);
@@ -214,20 +219,28 @@ public final class SafeZipExtractor {
       backup =
           outputDirectory.resolveSibling(
               outputDirectory.getFileName() + ".backup-" + UUID.randomUUID());
-      Files.move(outputDirectory, backup, StandardCopyOption.ATOMIC_MOVE);
+      moveWithAtomicFallback(outputDirectory, backup);
     }
 
     try {
-      Files.move(extractedRoot, outputDirectory, StandardCopyOption.ATOMIC_MOVE);
+      moveWithAtomicFallback(extractedRoot, outputDirectory);
       if (backup != null) {
         deleteRecursivelyQuietly(backup);
       }
     } catch (IOException ioException) {
       deleteRecursivelyQuietly(outputDirectory);
       if (backup != null && Files.exists(backup)) {
-        Files.move(backup, outputDirectory, StandardCopyOption.ATOMIC_MOVE);
+        moveWithAtomicFallback(backup, outputDirectory);
       }
       throw ioException;
+    }
+  }
+
+  private static void moveWithAtomicFallback(Path source, Path target) throws IOException {
+    try {
+      Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
+    } catch (AtomicMoveNotSupportedException ignored) {
+      Files.move(source, target);
     }
   }
 
