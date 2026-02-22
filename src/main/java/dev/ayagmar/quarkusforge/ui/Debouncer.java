@@ -15,6 +15,10 @@ final class Debouncer {
 
   synchronized void submit(Runnable task) {
     cancel();
+    if (delay.isZero()) {
+      task.run();
+      return;
+    }
     pendingTask = scheduler.schedule(delay, task);
   }
 

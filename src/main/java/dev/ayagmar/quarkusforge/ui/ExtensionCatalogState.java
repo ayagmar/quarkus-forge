@@ -82,6 +82,11 @@ final class ExtensionCatalogState {
     return selectedExtensionIds.size();
   }
 
+  boolean isSelectionAtTop() {
+    Integer selected = listState.selected();
+    return selected == null || selected <= 0;
+  }
+
   boolean isSelected(String extensionId) {
     return selectedExtensionIds.contains(extensionId);
   }

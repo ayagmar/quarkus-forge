@@ -25,6 +25,10 @@ The shell keeps a stable widget tree and switches only the body split strategy b
   10. submit action
 - `Tab` moves to next focus target.
 - `Shift+Tab` moves to previous focus target.
+- `/` or `Ctrl+F` jumps directly to extension search.
+- `Ctrl+L` jumps directly to extension list.
+- In extension search, `Down` moves focus to extension list.
+- In extension list, `Up` on the top row moves focus back to search.
 
 ## Key Bindings
 - `Up` / `Down`: navigate extension list when focused.
@@ -54,7 +58,7 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 
 ## Deterministic Async Search
 - Extension catalog is loaded from Quarkus API and indexed in-memory by stable extension identifier.
-- Extension search filtering uses a debounced async scheduler (`120ms` default).
+- Extension search filtering uses a configurable async debounce (`0ms` default for instant updates).
 - The scheduler/debouncer layer is injectable so tests can run with virtual time instead of wall-clock delays.
 - Extension catalog/filter/selection state is isolated in a dedicated UI component
   (`ExtensionCatalogState`) and consumed by `CoreTuiController`.

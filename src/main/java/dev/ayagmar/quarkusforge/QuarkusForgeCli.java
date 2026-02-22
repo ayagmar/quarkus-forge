@@ -87,7 +87,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
 
   @Option(
       names = "--search-debounce-ms",
-      defaultValue = "120",
+      defaultValue = "0",
       description = "Debounce delay for extension search updates")
   private int searchDebounceMs;
 

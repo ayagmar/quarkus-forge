@@ -262,7 +262,7 @@ public final class CoreTuiController {
       return UiAction.ignored();
     }
 
-    if (keyEvent.isQuit() || keyEvent.isCancel()) {
+    if (shouldQuitKeyEvent(keyEvent)) {
       if (isGenerationInProgress()) {
         requestGenerationCancellation();
         return UiAction.handled(false);
@@ -277,6 +277,14 @@ public final class CoreTuiController {
         return UiAction.handled(false);
       }
       statusMessage = "Generation in progress. Press Esc to cancel.";
+      return UiAction.handled(false);
+    }
+    if (shouldFocusExtensionSearch(keyEvent)) {
+      focusExtensionSearch();
+      return UiAction.handled(false);
+    }
+    if (shouldFocusExtensionList(keyEvent)) {
+      focusExtensionList();
       return UiAction.handled(false);
     }
     if (isCatalogReloadKey(keyEvent)) {
@@ -325,6 +333,17 @@ public final class CoreTuiController {
           startGenerationFlow();
         }
       }
+      return UiAction.handled(false);
+    }
+
+    if (focusTarget == FocusTarget.EXTENSION_SEARCH && keyEvent.isDown()) {
+      focusExtensionList();
+      return UiAction.handled(false);
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST
+        && keyEvent.isUp()
+        && extensionCatalogState.isSelectionAtTop()) {
+      focusExtensionSearch();
       return UiAction.handled(false);
     }
 
@@ -767,16 +786,16 @@ public final class CoreTuiController {
     if (focusTarget == FocusTarget.EXTENSION_LIST) {
       return width < NARROW_WIDTH_THRESHOLD
           ? "Up/Down: nav | Space: toggle | Ctrl+R: reload"
-          : "Up/Down: list nav | Space: toggle extension | Ctrl+R: reload | Enter: submit";
+          : "Up/Down: list nav | Space: toggle extension | Ctrl+R: reload | Enter: submit | /: search";
     }
     if (focusTarget == FocusTarget.EXTENSION_SEARCH) {
       return width < NARROW_WIDTH_THRESHOLD
-          ? "Type: filter | Ctrl+R: reload | Enter: submit"
-          : "Type: filter extensions | Ctrl+R: reload | Enter: submit | Esc: cancel/quit";
+          ? "Type: filter | Down: list | Enter: submit"
+          : "Type: filter extensions | Down: list | Ctrl+R: reload | Enter: submit | Esc: cancel/quit";
     }
     return width < NARROW_WIDTH_THRESHOLD
         ? "Tab: focus | Enter: submit | Esc: quit"
-        : "Tab/Shift+Tab: focus | Enter: submit | Esc: cancel/quit";
+        : "Tab/Shift+Tab: focus | Enter: submit | /: search | Esc: cancel/quit";
   }
 
   private String footerModeLabel() {
@@ -1114,6 +1133,41 @@ public final class CoreTuiController {
     return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
         && keyEvent.hasCtrl()
         && (keyEvent.character() == 'r' || keyEvent.character() == 'R');
+  }
+
+  private static boolean shouldQuitKeyEvent(KeyEvent keyEvent) {
+    return keyEvent.isCancel() || keyEvent.isCtrlC();
+  }
+
+  private static boolean shouldFocusExtensionSearch(KeyEvent keyEvent) {
+    if (keyEvent.code() != dev.tamboui.tui.event.KeyCode.CHAR) {
+      return false;
+    }
+    if (!keyEvent.hasCtrl() && !keyEvent.hasAlt() && keyEvent.character() == '/') {
+      return true;
+    }
+    return keyEvent.hasCtrl() && (keyEvent.character() == 'f' || keyEvent.character() == 'F');
+  }
+
+  private static boolean shouldFocusExtensionList(KeyEvent keyEvent) {
+    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
+        && keyEvent.hasCtrl()
+        && (keyEvent.character() == 'l' || keyEvent.character() == 'L');
+  }
+
+  private void focusExtensionSearch() {
+    focusTarget = FocusTarget.EXTENSION_SEARCH;
+    inputStates.get(FocusTarget.EXTENSION_SEARCH).moveCursorToEnd();
+    statusMessage = "Focus moved to extensionSearch";
+    errorMessage = "";
+    submitBlockedByValidation = false;
+  }
+
+  private void focusExtensionList() {
+    focusTarget = FocusTarget.EXTENSION_LIST;
+    statusMessage = "Focus moved to extensionList";
+    errorMessage = "";
+    submitBlockedByValidation = false;
   }
 
   private static String catalogLoadedStatusMessage(CatalogSource source, boolean stale) {

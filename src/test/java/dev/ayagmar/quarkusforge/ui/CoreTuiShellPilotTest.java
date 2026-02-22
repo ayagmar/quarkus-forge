@@ -109,6 +109,65 @@ class CoreTuiShellPilotTest {
     assertThat(renderToString(controller)).doesNotContain("Error:");
   }
 
+  @Test
+  void slashShortcutJumpsFocusToExtensionSearch() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+
+    controller.onEvent(KeyEvent.ofChar('/'));
+
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_SEARCH);
+    assertThat(controller.statusMessage()).contains("Focus moved to extensionSearch");
+  }
+
+  @Test
+  void ctrlFAndCtrlLShortcutsJumpBetweenSearchAndList() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+
+    controller.onEvent(KeyEvent.ofChar('f', KeyModifiers.CTRL));
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_SEARCH);
+
+    controller.onEvent(KeyEvent.ofChar('l', KeyModifiers.CTRL));
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
+  }
+
+  @Test
+  void searchAndListSupportDirectArrowHandoff() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.UP));
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_SEARCH);
+  }
+
+  @Test
+  void qNoLongerTriggersQuitByDefault() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+
+    CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofChar('q'));
+
+    assertThat(action.shouldQuit()).isFalse();
+    assertThat(action.handled()).isTrue();
+    assertThat(controller.request().groupId()).endsWith("q");
+  }
+
+  @Test
+  void ctrlCStillQuitsFromShell() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+
+    CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofChar('c', KeyModifiers.CTRL));
+
+    assertThat(action.shouldQuit()).isTrue();
+    assertThat(action.handled()).isTrue();
+  }
+
   private static void moveFocusTo(CoreTuiController controller, FocusTarget target) {
     for (int i = 0; i < 20 && controller.focusTarget() != target; i++) {
       controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
