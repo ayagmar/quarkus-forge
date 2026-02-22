@@ -86,4 +86,20 @@ class MetadataCompatibilityValidatorTest {
 
     assertThat(report.errors()).extracting(ValidationError::field).containsExactly("metadata");
   }
+
+  @Test
+  void acceptsSupportedCombinationWhenMetadataContainsTrimPadding() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example", "forge-app", "1.0.0", "com.example.forge", ".", "maven", "25");
+    MetadataDto metadata =
+        new MetadataDto(
+            List.of("21", "25"),
+            List.of(" Maven ", " Gradle "),
+            Map.of(" maven ", List.of("21", "25"), " gradle ", List.of("25")));
+
+    ValidationReport report = validator.validate(request, metadata);
+
+    assertThat(report.isValid()).isTrue();
+  }
 }

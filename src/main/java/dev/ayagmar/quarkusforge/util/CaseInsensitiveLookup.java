@@ -31,6 +31,6 @@ public final class CaseInsensitiveLookup {
   }
 
   private static String normalize(String value) {
-    return Objects.requireNonNull(value).toLowerCase(Locale.ROOT);
+    return Objects.requireNonNull(value).trim().toLowerCase(Locale.ROOT);
   }
 }

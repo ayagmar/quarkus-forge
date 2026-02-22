@@ -31,4 +31,14 @@ class CaseInsensitiveLookupTest {
 
     assertThat(match).isNull();
   }
+
+  @Test
+  void lookupTrimsBuildToolNames() {
+    Map<String, List<String>> compatibility = Map.of(" maven ", List.of("21", "25"));
+
+    List<String> javaVersions = CaseInsensitiveLookup.find(compatibility, "maven");
+
+    assertThat(javaVersions).containsExactly("21", "25");
+    assertThat(CaseInsensitiveLookup.contains(List.of(" Maven "), "maven")).isTrue();
+  }
 }
