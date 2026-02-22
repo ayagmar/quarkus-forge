@@ -2,11 +2,6 @@ package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.ayagmar.quarkusforge.domain.ForgeUiState;
-import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
-import dev.ayagmar.quarkusforge.domain.ProjectRequest;
-import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
-import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import java.time.Duration;
@@ -20,7 +15,8 @@ class CoreTuiAsyncDeterministicTest {
   void debounceAppliesOnlyAfterVirtualTimeAdvance() {
     ManualUiScheduler scheduler = new ManualUiScheduler(false);
     CoreTuiController controller =
-        CoreTuiController.from(validInitialState(), scheduler, Duration.ofMillis(200));
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ofMillis(200));
     moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
 
     controller.onEvent(KeyEvent.ofChar('j'));
@@ -41,7 +37,8 @@ class CoreTuiAsyncDeterministicTest {
   void staleResultsNeverOverwriteLatestQueryWhenCancelIsIneffective() {
     ManualUiScheduler scheduler = new ManualUiScheduler(true);
     CoreTuiController controller =
-        CoreTuiController.from(validInitialState(), scheduler, Duration.ofMillis(150));
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ofMillis(150));
     moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
 
     for (char character : "rest".toCharArray()) {
@@ -63,7 +60,8 @@ class CoreTuiAsyncDeterministicTest {
   void cancellationPreventsPendingDebounceTaskFromApplying() {
     ManualUiScheduler scheduler = new ManualUiScheduler(false);
     CoreTuiController controller =
-        CoreTuiController.from(validInitialState(), scheduler, Duration.ofMillis(120));
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ofMillis(120));
     moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
 
     for (char character : "jdbc".toCharArray()) {
@@ -81,24 +79,6 @@ class CoreTuiAsyncDeterministicTest {
       controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
     }
     assertThat(controller.focusTarget()).isEqualTo(target);
-  }
-
-  private static ForgeUiState validInitialState() {
-    MetadataCompatibilityContext metadataCompatibility = MetadataCompatibilityContext.loadDefault();
-    ProjectRequest request =
-        new ProjectRequest(
-            "com.example",
-            "forge-app",
-            "1.0.0-SNAPSHOT",
-            "com.example.forge.app",
-            "./generated",
-            "maven",
-            "25");
-    ValidationReport validation =
-        new ProjectRequestValidator()
-            .validate(request)
-            .merge(metadataCompatibility.validate(request));
-    return new ForgeUiState(request, validation, metadataCompatibility);
   }
 
   private static final class ManualUiScheduler implements UiScheduler {

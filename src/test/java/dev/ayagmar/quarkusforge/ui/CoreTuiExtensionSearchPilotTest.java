@@ -3,11 +3,6 @@ package dev.ayagmar.quarkusforge.ui;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
-import dev.ayagmar.quarkusforge.domain.ForgeUiState;
-import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
-import dev.ayagmar.quarkusforge.domain.ProjectRequest;
-import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
-import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.tamboui.buffer.Buffer;
 import dev.tamboui.layout.Rect;
 import dev.tamboui.terminal.Frame;
@@ -22,7 +17,8 @@ class CoreTuiExtensionSearchPilotTest {
   @Test
   void apiLoadedCatalogIsIndexedAndSearchable() {
     CoreTuiController controller =
-        CoreTuiController.from(validInitialState(), UiScheduler.immediate(), Duration.ZERO);
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
@@ -46,7 +42,8 @@ class CoreTuiExtensionSearchPilotTest {
   @Test
   void selectionByStableIdPersistsAcrossFiltering() {
     CoreTuiController controller =
-        CoreTuiController.from(validInitialState(), UiScheduler.immediate(), Duration.ZERO);
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
@@ -78,7 +75,8 @@ class CoreTuiExtensionSearchPilotTest {
   @Test
   void failedCatalogLoadKeepsFallbackCatalogAndShowsError() {
     CoreTuiController controller =
-        CoreTuiController.from(validInitialState(), UiScheduler.immediate(), Duration.ZERO);
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
 
     controller.loadExtensionCatalogAsync(
         () -> CompletableFuture.failedFuture(new IllegalStateException("network down")));
@@ -91,7 +89,8 @@ class CoreTuiExtensionSearchPilotTest {
   @Test
   void emptyCatalogLoadKeepsFallbackCatalogAndShowsError() {
     CoreTuiController controller =
-        CoreTuiController.from(validInitialState(), UiScheduler.immediate(), Duration.ZERO);
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
 
     controller.loadExtensionCatalogAsync(() -> CompletableFuture.completedFuture(List.of()));
 
@@ -112,23 +111,5 @@ class CoreTuiExtensionSearchPilotTest {
     Frame frame = Frame.forTesting(buffer);
     controller.render(frame);
     return buffer.toAnsiStringTrimmed();
-  }
-
-  private static ForgeUiState validInitialState() {
-    MetadataCompatibilityContext metadataCompatibility = MetadataCompatibilityContext.loadDefault();
-    ProjectRequest request =
-        new ProjectRequest(
-            "com.example",
-            "forge-app",
-            "1.0.0-SNAPSHOT",
-            "com.example.forge.app",
-            "./generated",
-            "maven",
-            "25");
-    ValidationReport validation =
-        new ProjectRequestValidator()
-            .validate(request)
-            .merge(metadataCompatibility.validate(request));
-    return new ForgeUiState(request, validation, metadataCompatibility);
   }
 }

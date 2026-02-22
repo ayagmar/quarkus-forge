@@ -2,11 +2,6 @@ package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.ayagmar.quarkusforge.domain.ForgeUiState;
-import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
-import dev.ayagmar.quarkusforge.domain.ProjectRequest;
-import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
-import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.tamboui.buffer.Buffer;
 import dev.tamboui.layout.Rect;
 import dev.tamboui.terminal.Frame;
@@ -19,7 +14,8 @@ import org.junit.jupiter.api.Test;
 class CoreTuiShellPilotTest {
   @Test
   void focusTraversalCyclesWithTabAndShiftTab() {
-    CoreTuiController controller = CoreTuiController.from(validInitialState());
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
 
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
 
@@ -32,7 +28,8 @@ class CoreTuiShellPilotTest {
 
   @Test
   void listNavigationAndSpaceToggleAreRoutedWhenListIsFocused() {
-    CoreTuiController controller = CoreTuiController.from(validInitialState());
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
     moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     CoreTuiController.UiAction downAction = controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
@@ -45,7 +42,8 @@ class CoreTuiShellPilotTest {
 
   @Test
   void enterSubmitsWhenValidAndBlocksWhenValidationFails() {
-    CoreTuiController controller = CoreTuiController.from(validInitialState());
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     assertThat(controller.submitRequested()).isTrue();
@@ -63,7 +61,8 @@ class CoreTuiShellPilotTest {
 
   @Test
   void enterSubmitsInsteadOfTogglingWhenExtensionListIsFocused() {
-    CoreTuiController controller = CoreTuiController.from(validInitialState());
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
     moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
@@ -75,7 +74,8 @@ class CoreTuiShellPilotTest {
 
   @Test
   void fixingInputWithoutChangingFocusClearsBlockedSubmitErrorFromFooter() {
-    CoreTuiController controller = CoreTuiController.from(validInitialState());
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
     moveFocusTo(controller, FocusTarget.JAVA_VERSION);
 
     controller.onEvent(KeyEvent.ofChar('x'));
@@ -93,7 +93,8 @@ class CoreTuiShellPilotTest {
 
   @Test
   void blockedSubmitFeedbackRecoversEvenIfStatusMessageChangesBeforeFix() {
-    CoreTuiController controller = CoreTuiController.from(validInitialState());
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
     moveFocusTo(controller, FocusTarget.JAVA_VERSION);
 
     controller.onEvent(KeyEvent.ofChar('x'));
@@ -120,23 +121,5 @@ class CoreTuiShellPilotTest {
     Frame frame = Frame.forTesting(buffer);
     controller.render(frame);
     return buffer.toAnsiStringTrimmed();
-  }
-
-  private static ForgeUiState validInitialState() {
-    MetadataCompatibilityContext metadataCompatibility = MetadataCompatibilityContext.loadDefault();
-    ProjectRequest request =
-        new ProjectRequest(
-            "com.example",
-            "forge-app",
-            "1.0.0-SNAPSHOT",
-            "com.example.forge.app",
-            "./generated",
-            "maven",
-            "25");
-    ValidationReport validation =
-        new ProjectRequestValidator()
-            .validate(request)
-            .merge(metadataCompatibility.validate(request));
-    return new ForgeUiState(request, validation, metadataCompatibility);
   }
 }

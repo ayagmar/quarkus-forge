@@ -3,11 +3,6 @@ package dev.ayagmar.quarkusforge.ui;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
-import dev.ayagmar.quarkusforge.domain.ForgeUiState;
-import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
-import dev.ayagmar.quarkusforge.domain.ProjectRequest;
-import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
-import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.tamboui.buffer.Buffer;
 import dev.tamboui.layout.Rect;
 import dev.tamboui.terminal.Frame;
@@ -27,7 +22,10 @@ class CoreTuiGenerationFlowTest {
     ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
     CoreTuiController controller =
         CoreTuiController.from(
-            validInitialState(), UiScheduler.immediate(), Duration.ZERO, generationRunner);
+            UiTestFixtureFactory.defaultForgeUiState(),
+            UiScheduler.immediate(),
+            Duration.ZERO,
+            generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
@@ -51,7 +49,10 @@ class CoreTuiGenerationFlowTest {
     ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
     CoreTuiController controller =
         CoreTuiController.from(
-            validInitialState(), UiScheduler.immediate(), Duration.ZERO, generationRunner);
+            UiTestFixtureFactory.defaultForgeUiState(),
+            UiScheduler.immediate(),
+            Duration.ZERO,
+            generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
@@ -65,7 +66,10 @@ class CoreTuiGenerationFlowTest {
     ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
     CoreTuiController controller =
         CoreTuiController.from(
-            validInitialState(), UiScheduler.immediate(), Duration.ZERO, generationRunner);
+            UiTestFixtureFactory.defaultForgeUiState(),
+            UiScheduler.immediate(),
+            Duration.ZERO,
+            generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
@@ -83,7 +87,10 @@ class CoreTuiGenerationFlowTest {
     ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
     CoreTuiController controller =
         CoreTuiController.from(
-            validInitialState(), UiScheduler.immediate(), Duration.ZERO, generationRunner);
+            UiTestFixtureFactory.defaultForgeUiState(),
+            UiScheduler.immediate(),
+            Duration.ZERO,
+            generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     CoreTuiController.UiAction cancelAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
@@ -104,7 +111,10 @@ class CoreTuiGenerationFlowTest {
     ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
     CoreTuiController controller =
         CoreTuiController.from(
-            validInitialState("gradle"), UiScheduler.immediate(), Duration.ZERO, generationRunner);
+            UiTestFixtureFactory.defaultForgeUiState("gradle"),
+            UiScheduler.immediate(),
+            Duration.ZERO,
+            generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     generationRunner.complete(Path.of("build/generated-project"));
@@ -118,7 +128,10 @@ class CoreTuiGenerationFlowTest {
     ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
     CoreTuiController controller =
         CoreTuiController.from(
-            validInitialState(), UiScheduler.immediate(), Duration.ZERO, generationRunner);
+            UiTestFixtureFactory.defaultForgeUiState(),
+            UiScheduler.immediate(),
+            Duration.ZERO,
+            generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     generationRunner.fail(new RuntimeException("download failed"));
@@ -135,28 +148,6 @@ class CoreTuiGenerationFlowTest {
     Frame frame = Frame.forTesting(buffer);
     controller.render(frame);
     return buffer.toAnsiStringTrimmed();
-  }
-
-  private static ForgeUiState validInitialState() {
-    return validInitialState("maven");
-  }
-
-  private static ForgeUiState validInitialState(String buildTool) {
-    MetadataCompatibilityContext metadataCompatibility = MetadataCompatibilityContext.loadDefault();
-    ProjectRequest request =
-        new ProjectRequest(
-            "com.example",
-            "forge-app",
-            "1.0.0-SNAPSHOT",
-            "com.example.forge.app",
-            "./generated",
-            buildTool,
-            "25");
-    ValidationReport validation =
-        new ProjectRequestValidator()
-            .validate(request)
-            .merge(metadataCompatibility.validate(request));
-    return new ForgeUiState(request, validation, metadataCompatibility);
   }
 
   private static final class ControlledGenerationRunner
