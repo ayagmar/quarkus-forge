@@ -120,7 +120,7 @@ public final class QuarkusApiClient {
     for (JsonNode node : root) {
       String id = requiredText(node, "id");
       String name = requiredText(node, "name");
-      String shortName = requiredText(node, "shortName");
+      String shortName = resolvedShortName(node, id);
       extensions.add(new ExtensionDto(id, name, shortName));
     }
     return List.copyOf(extensions);
@@ -281,7 +281,37 @@ public final class QuarkusApiClient {
     if (child == null || !child.isTextual() || child.textValue().isBlank()) {
       throw new ApiContractException("Missing required contract field '" + fieldName + "'");
     }
-    return child.textValue();
+    return child.textValue().trim();
+  }
+
+  private static String optionalText(JsonNode node, String fieldName) {
+    JsonNode child = node.get(fieldName);
+    if (child == null || !child.isTextual()) {
+      return "";
+    }
+    return child.textValue().trim();
+  }
+
+  private static String resolvedShortName(JsonNode node, String id) {
+    String shortName = optionalText(node, "shortName");
+    if (!shortName.isBlank()) {
+      return shortName;
+    }
+
+    String shortId = optionalText(node, "shortId");
+    if (!shortId.isBlank()) {
+      return shortId;
+    }
+
+    return deriveShortNameFromId(id);
+  }
+
+  private static String deriveShortNameFromId(String id) {
+    int separatorIndex = id.lastIndexOf(':');
+    if (separatorIndex < 0 || separatorIndex == id.length() - 1) {
+      return id;
+    }
+    return id.substring(separatorIndex + 1);
   }
 
   private static List<String> toStringList(JsonNode node, String fieldName) {

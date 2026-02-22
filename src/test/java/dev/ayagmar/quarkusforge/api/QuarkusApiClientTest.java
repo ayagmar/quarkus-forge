@@ -72,6 +72,55 @@ class QuarkusApiClientTest {
   }
 
   @Test
+  void fetchExtensionsUsesShortIdWhenShortNameIsBlank() {
+    stubFor(
+        get(urlEqualTo("/api/extensions"))
+            .willReturn(
+                okJson(
+                    """
+                    [
+                      {
+                        "id":"io.quarkus:quarkus-rest",
+                        "name":"REST",
+                        "shortName":" ",
+                        "shortId":"resteasy-reactive"
+                      }
+                    ]
+                    """)));
+
+    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+
+    List<ExtensionDto> extensions = client.fetchExtensions().join();
+
+    assertThat(extensions)
+        .containsExactly(
+            new ExtensionDto("io.quarkus:quarkus-rest", "REST", "resteasy-reactive"));
+  }
+
+  @Test
+  void fetchExtensionsDerivesShortNameFromIdWhenShortNameAndShortIdAreMissing() {
+    stubFor(
+        get(urlEqualTo("/api/extensions"))
+            .willReturn(
+                okJson(
+                    """
+                    [
+                      {
+                        "id":"io.quarkus:quarkus-rest",
+                        "name":"REST"
+                      }
+                    ]
+                    """)));
+
+    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+
+    List<ExtensionDto> extensions = client.fetchExtensions().join();
+
+    assertThat(extensions)
+        .containsExactly(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "quarkus-rest"));
+  }
+
+  @Test
   void fetchExtensionsRetries500ThenSucceeds() {
     stubFor(
         get(urlEqualTo("/api/extensions"))
