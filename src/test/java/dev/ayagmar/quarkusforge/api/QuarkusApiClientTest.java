@@ -262,6 +262,67 @@ class QuarkusApiClientTest {
     assertThat(java.nio.file.Files.readString(destination)).isEqualTo("zip-data");
   }
 
+  @Test
+  void downloadProjectZipToFileRetries500ThenSucceedsAndOverwritesDestination() throws Exception {
+    stubFor(
+        get(urlPathEqualTo("/api/download"))
+            .inScenario("download-retry-500")
+            .whenScenarioStateIs(Scenario.STARTED)
+            .willSetStateTo("second")
+            .willReturn(aResponse().withStatus(500).withBody("temporary-error")));
+
+    stubFor(
+        get(urlPathEqualTo("/api/download"))
+            .inScenario("download-retry-500")
+            .whenScenarioStateIs("second")
+            .willReturn(aResponse().withStatus(200).withBody("zip-data")));
+
+    RecordingSleeper sleeper = new RecordingSleeper();
+    RetryPolicy retryPolicy = new RetryPolicy(3, Duration.ofMillis(300), Duration.ofMillis(20), 0d);
+    QuarkusApiClient client = newClient(retryPolicy, sleeper);
+    GenerationRequest request =
+        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+    java.nio.file.Path destination = tempDir.resolve("download-retry.zip");
+
+    java.nio.file.Path downloaded = client.downloadProjectZipToFile(request, destination).join();
+
+    assertThat(downloaded).isEqualTo(destination);
+    assertThat(java.nio.file.Files.readString(destination)).isEqualTo("zip-data");
+    verify(2, getRequestedFor(urlPathEqualTo("/api/download")));
+    assertThat(sleeper.delays).containsExactly(Duration.ofMillis(20));
+  }
+
+  @Test
+  void downloadProjectZipToFileRetriesThenSurfacesHttpErrorWithFinalBodyPersisted() throws Exception {
+    stubFor(
+        get(urlPathEqualTo("/api/download"))
+            .inScenario("download-retry-fail")
+            .whenScenarioStateIs(Scenario.STARTED)
+            .willSetStateTo("second")
+            .willReturn(aResponse().withStatus(503).withBody("first-failure")));
+
+    stubFor(
+        get(urlPathEqualTo("/api/download"))
+            .inScenario("download-retry-fail")
+            .whenScenarioStateIs("second")
+            .willReturn(aResponse().withStatus(503).withBody("second-failure")));
+
+    RecordingSleeper sleeper = new RecordingSleeper();
+    RetryPolicy retryPolicy = new RetryPolicy(2, Duration.ofMillis(300), Duration.ofMillis(20), 0d);
+    QuarkusApiClient client = newClient(retryPolicy, sleeper);
+    GenerationRequest request =
+        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+    java.nio.file.Path destination = tempDir.resolve("download-retry-fail.zip");
+
+    assertThatThrownBy(() -> client.downloadProjectZipToFile(request, destination).join())
+        .hasRootCauseInstanceOf(ApiHttpException.class)
+        .rootCause()
+        .hasMessageContaining("Unexpected HTTP status 503");
+    assertThat(java.nio.file.Files.readString(destination)).isEqualTo("second-failure");
+    verify(2, getRequestedFor(urlPathEqualTo("/api/download")));
+    assertThat(sleeper.delays).containsExactly(Duration.ofMillis(20));
+  }
+
   private QuarkusApiClient newClient(RetryPolicy retryPolicy, RecordingSleeper sleeper) {
     return new QuarkusApiClient(
         HttpClient.newHttpClient(),

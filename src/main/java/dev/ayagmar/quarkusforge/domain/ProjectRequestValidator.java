@@ -110,6 +110,8 @@ public final class ProjectRequestValidator {
 
       String segment = rawSegment;
       if (".".equals(segment) || "..".equals(segment)) {
+        // Intentional: this is a user-selected local destination path. Relative navigation
+        // segments are allowed; archive extraction still enforces ZIP entry containment.
         continue;
       }
 

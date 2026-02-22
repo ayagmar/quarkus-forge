@@ -98,6 +98,23 @@ class ProjectRequestValidatorTest {
   }
 
   @Test
+  void allowsRelativeParentSegmentsInOutputDirectoryByPolicy() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example",
+            "forge-app",
+            "1.0.0",
+            "com.example.forge",
+            "../tmp/./forge-out",
+            "maven",
+            "25");
+
+    ValidationReport report = validator.validate(request);
+
+    assertThat(report.errors()).extracting(ValidationError::field).doesNotContain("outputDirectory");
+  }
+
+  @Test
   void derivesPackageNameWhenNotProvided() {
     CliPrefill prefill =
         new CliPrefill("Com.Example", "my-app", "1.0.0", "", "./tmp", "maven", "25");
