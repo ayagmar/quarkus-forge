@@ -121,6 +121,20 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void slashIsInsertedInOutputDirectoryWithoutStealingFocus() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    moveFocusTo(controller, FocusTarget.OUTPUT_DIR);
+
+    CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofChar('/'));
+
+    assertThat(action.handled()).isTrue();
+    assertThat(action.shouldQuit()).isFalse();
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.OUTPUT_DIR);
+    assertThat(controller.request().outputDirectory()).endsWith("/");
+  }
+
+  @Test
   void ctrlFAndCtrlLShortcutsJumpBetweenSearchAndList() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());

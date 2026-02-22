@@ -96,6 +96,36 @@ class CoreTuiExtensionSearchPilotTest {
   }
 
   @Test
+  void synchronousCatalogLoaderFailureKeepsFallbackCatalogAndShowsError() {
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+
+    controller.loadExtensionCatalogAsync(
+        () -> {
+          throw new IllegalStateException("loader crashed");
+        });
+
+    assertThat(controller.statusMessage()).isEqualTo("Using fallback extension catalog");
+    assertThat(controller.filteredExtensionCount()).isEqualTo(7);
+    assertThat(renderToString(controller)).contains("Error: Catalog load failed: loader crashed");
+  }
+
+  @Test
+  void nullCatalogLoaderFutureKeepsFallbackCatalogAndShowsError() {
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+
+    controller.loadExtensionCatalogAsync(() -> null);
+
+    assertThat(controller.statusMessage()).isEqualTo("Using fallback extension catalog");
+    assertThat(controller.filteredExtensionCount()).isEqualTo(7);
+    assertThat(renderToString(controller))
+        .contains("Error: Catalog load failed: loader returned null future");
+  }
+
+  @Test
   void emptyCatalogLoadKeepsFallbackCatalogAndShowsError() {
     CoreTuiController controller =
         CoreTuiController.from(

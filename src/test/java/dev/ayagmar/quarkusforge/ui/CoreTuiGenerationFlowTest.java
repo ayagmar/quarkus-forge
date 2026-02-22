@@ -160,6 +160,41 @@ class CoreTuiGenerationFlowTest {
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.ARTIFACT_ID);
   }
 
+  @Test
+  void synchronousGenerationRunnerFailureIsSurfacedAsUiError() {
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(),
+            UiScheduler.immediate(),
+            Duration.ZERO,
+            (generationRequest, outputDirectory, cancelled, progressListener) -> {
+              throw new IllegalStateException("runner crashed");
+            });
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.ERROR);
+    assertThat(controller.statusMessage()).contains("Generation failed");
+    assertThat(renderToString(controller)).contains("Error: runner crashed");
+  }
+
+  @Test
+  void nullGenerationFutureIsSurfacedAsUiError() {
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(),
+            UiScheduler.immediate(),
+            Duration.ZERO,
+            (generationRequest, outputDirectory, cancelled, progressListener) -> null);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.ERROR);
+    assertThat(controller.statusMessage()).contains("Generation failed");
+    assertThat(renderToString(controller))
+        .contains("Error: Generation service returned null future");
+  }
+
   private static String renderToString(CoreTuiController controller) {
     Buffer buffer = Buffer.empty(new Rect(0, 0, 120, 34));
     Frame frame = Frame.forTesting(buffer);

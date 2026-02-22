@@ -176,81 +176,89 @@ public final class CoreTuiController {
     extensionCatalogStale = false;
     statusMessage = "Loading extension catalog...";
 
-    loader
-        .load()
-        .whenComplete(
-            (result, throwable) -> {
-              if (asyncOperationsCancelled || loadToken != extensionCatalogLoadToken) {
-                return;
-              }
-              scheduleOnRenderThread(
-                  () -> {
-                    if (asyncOperationsCancelled || loadToken != extensionCatalogLoadToken) {
-                      return;
-                    }
-                    if (throwable != null) {
-                      Throwable cause = unwrapCompletionCause(throwable);
-                      String message = catalogLoadFailureMessage(cause);
-                      extensionCatalogLoading = false;
-                      extensionCatalogErrorMessage = message;
-                      extensionCatalogSource = "snapshot";
-                      extensionCatalogStale = false;
-                      errorMessage = message;
-                      statusMessage = "Using fallback extension catalog";
-                      return;
-                    }
+    CompletableFuture<ExtensionCatalogLoadResult> loadFuture;
+    try {
+      loadFuture = loader.load();
+    } catch (RuntimeException runtimeException) {
+      loadFuture = CompletableFuture.failedFuture(runtimeException);
+    }
+    if (loadFuture == null) {
+      loadFuture =
+          CompletableFuture.failedFuture(new IllegalStateException("loader returned null future"));
+    }
 
-                    if (result == null) {
-                      extensionCatalogLoading = false;
-                      extensionCatalogErrorMessage = "Catalog load failed: empty load result";
-                      extensionCatalogSource = "snapshot";
-                      extensionCatalogStale = false;
-                      errorMessage = "Catalog load failed: empty load result";
-                      statusMessage = "Using fallback extension catalog";
-                      return;
-                    }
+    loadFuture.whenComplete(
+        (result, throwable) -> {
+          if (asyncOperationsCancelled || loadToken != extensionCatalogLoadToken) {
+            return;
+          }
+          scheduleOnRenderThread(
+              () -> {
+                if (asyncOperationsCancelled || loadToken != extensionCatalogLoadToken) {
+                  return;
+                }
+                if (throwable != null) {
+                  Throwable cause = unwrapCompletionCause(throwable);
+                  String message = catalogLoadFailureMessage(cause);
+                  extensionCatalogLoading = false;
+                  extensionCatalogErrorMessage = message;
+                  extensionCatalogSource = "snapshot";
+                  extensionCatalogStale = false;
+                  errorMessage = message;
+                  statusMessage = "Using fallback extension catalog";
+                  return;
+                }
 
-                    List<ExtensionCatalogItem> items =
-                        result.extensions().stream()
-                            .map(
-                                extension ->
-                                    new ExtensionCatalogItem(
-                                        extension.id(), extension.name(), extension.shortName()))
-                            .toList();
-                    if (items.isEmpty()) {
-                      extensionCatalogLoading = false;
-                      extensionCatalogErrorMessage = "Catalog load returned no extensions";
-                      extensionCatalogSource = "snapshot";
-                      extensionCatalogStale = false;
-                      errorMessage = "Catalog load returned no extensions";
-                      statusMessage = "Using fallback extension catalog";
-                      return;
-                    }
+                if (result == null) {
+                  extensionCatalogLoading = false;
+                  extensionCatalogErrorMessage = "Catalog load failed: empty load result";
+                  extensionCatalogSource = "snapshot";
+                  extensionCatalogStale = false;
+                  errorMessage = "Catalog load failed: empty load result";
+                  statusMessage = "Using fallback extension catalog";
+                  return;
+                }
 
-                    if (result.metadata() != null) {
-                      metadataCompatibility =
-                          MetadataCompatibilityContext.success(result.metadata());
-                      revalidate();
-                    }
+                List<ExtensionCatalogItem> items =
+                    result.extensions().stream()
+                        .map(
+                            extension ->
+                                new ExtensionCatalogItem(
+                                    extension.id(), extension.name(), extension.shortName()))
+                        .toList();
+                if (items.isEmpty()) {
+                  extensionCatalogLoading = false;
+                  extensionCatalogErrorMessage = "Catalog load returned no extensions";
+                  extensionCatalogSource = "snapshot";
+                  extensionCatalogStale = false;
+                  errorMessage = "Catalog load returned no extensions";
+                  statusMessage = "Using fallback extension catalog";
+                  return;
+                }
 
-                    extensionCatalogLoading = false;
-                    extensionCatalogSource = result.source().label();
-                    extensionCatalogStale = result.stale();
-                    errorMessage = "";
-                    if (result.source() == CatalogSource.LIVE) {
-                      extensionCatalogErrorMessage = "";
-                      statusMessage =
-                          result.detailMessage().isBlank()
-                              ? catalogLoadedStatusMessage(result.source(), result.stale())
-                              : result.detailMessage();
-                    } else {
-                      extensionCatalogErrorMessage = result.detailMessage();
-                      statusMessage = catalogLoadedStatusMessage(result.source(), result.stale());
-                    }
-                    extensionCatalogState.replaceCatalog(
-                        items, inputStates.get(FocusTarget.EXTENSION_SEARCH).text(), ignored -> {});
-                  });
-            });
+                if (result.metadata() != null) {
+                  metadataCompatibility = MetadataCompatibilityContext.success(result.metadata());
+                  revalidate();
+                }
+
+                extensionCatalogLoading = false;
+                extensionCatalogSource = result.source().label();
+                extensionCatalogStale = result.stale();
+                errorMessage = "";
+                if (result.source() == CatalogSource.LIVE) {
+                  extensionCatalogErrorMessage = "";
+                  statusMessage =
+                      result.detailMessage().isBlank()
+                          ? catalogLoadedStatusMessage(result.source(), result.stale())
+                          : result.detailMessage();
+                } else {
+                  extensionCatalogErrorMessage = result.detailMessage();
+                  statusMessage = catalogLoadedStatusMessage(result.source(), result.stale());
+                }
+                extensionCatalogState.replaceCatalog(
+                    items, inputStates.get(FocusTarget.EXTENSION_SEARCH).text(), ignored -> {});
+              });
+        });
   }
 
   public UiAction onEvent(Event event) {
@@ -279,7 +287,7 @@ public final class CoreTuiController {
       statusMessage = "Generation in progress. Press Esc to cancel.";
       return UiAction.handled(false);
     }
-    if (shouldFocusExtensionSearch(keyEvent)) {
+    if (shouldFocusExtensionSearch(keyEvent, focusTarget)) {
       focusExtensionSearch();
       return UiAction.handled(false);
     }
@@ -873,15 +881,27 @@ public final class CoreTuiController {
     GenerationRequest generationRequest = toGenerationRequest();
     Path outputDirectory = resolveGeneratedProjectDirectory();
 
-    generationFuture =
-        projectGenerationRunner.generate(
-            generationRequest,
-            outputDirectory,
-            () -> generationCancelRequested || token != generationToken,
-            progressMessage ->
-                scheduleOnRenderThread(() -> onGenerationProgress(token, progressMessage)));
+    CompletableFuture<Path> startedFuture;
+    try {
+      startedFuture =
+          projectGenerationRunner.generate(
+              generationRequest,
+              outputDirectory,
+              () -> generationCancelRequested || token != generationToken,
+              progressMessage ->
+                  scheduleOnRenderThread(() -> onGenerationProgress(token, progressMessage)));
+    } catch (RuntimeException runtimeException) {
+      onGenerationCompleted(token, null, runtimeException);
+      return;
+    }
+    if (startedFuture == null) {
+      onGenerationCompleted(
+          token, null, new IllegalStateException("Generation service returned null future"));
+      return;
+    }
 
-    generationFuture.whenComplete(
+    generationFuture = startedFuture;
+    startedFuture.whenComplete(
         (generatedPath, throwable) ->
             scheduleOnRenderThread(() -> onGenerationCompleted(token, generatedPath, throwable)));
   }
@@ -1139,12 +1159,12 @@ public final class CoreTuiController {
     return keyEvent.isCancel() || keyEvent.isCtrlC();
   }
 
-  private static boolean shouldFocusExtensionSearch(KeyEvent keyEvent) {
+  private static boolean shouldFocusExtensionSearch(KeyEvent keyEvent, FocusTarget currentFocus) {
     if (keyEvent.code() != dev.tamboui.tui.event.KeyCode.CHAR) {
       return false;
     }
     if (!keyEvent.hasCtrl() && !keyEvent.hasAlt() && keyEvent.character() == '/') {
-      return true;
+      return currentFocus != FocusTarget.OUTPUT_DIR && currentFocus != FocusTarget.EXTENSION_SEARCH;
     }
     return keyEvent.hasCtrl() && (keyEvent.character() == 'f' || keyEvent.character() == 'F');
   }

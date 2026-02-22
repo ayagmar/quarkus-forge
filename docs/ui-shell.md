@@ -25,7 +25,8 @@ The shell keeps a stable widget tree and switches only the body split strategy b
   10. submit action
 - `Tab` moves to next focus target.
 - `Shift+Tab` moves to previous focus target.
-- `/` or `Ctrl+F` jumps directly to extension search.
+- `/` jumps directly to extension search when focus is not editing `outputDir` or extension search input.
+- `Ctrl+F` jumps directly to extension search from any focus target.
 - `Ctrl+L` jumps directly to extension list.
 - In extension search, `Down` moves focus to extension list.
 - In extension list, `Up` on the top row moves focus back to search.
@@ -34,7 +35,7 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - `Up` / `Down`: navigate extension list when focused.
 - `Space`: toggle extension selection when list is focused.
 - `Enter`: attempt submit (blocked with validation feedback if invalid).
-- `Esc` (or quit key): cancel active generation if running, otherwise exit the TUI.
+- `Esc` or `Ctrl+C`: cancel active generation if running, otherwise exit the TUI.
 
 ## Validation and Status
 - Metadata + field validation are recalculated as project inputs change.
