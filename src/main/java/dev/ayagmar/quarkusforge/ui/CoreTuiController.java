@@ -86,6 +86,7 @@ public final class CoreTuiController {
   private boolean submitRequested;
   private boolean submitBlockedByValidation;
   private final GenerationStateTracker generationStateTracker;
+  private final FooterLinesComposer footerLinesComposer;
   private CompletableFuture<Path> generationFuture;
   private volatile boolean generationCancelRequested;
   private volatile long generationToken;
@@ -124,6 +125,7 @@ public final class CoreTuiController {
     this.projectGenerationRunner = projectGenerationRunner;
     theme = UiTheme.loadDefault();
     generationStateTracker = new GenerationStateTracker();
+    footerLinesComposer = new FooterLinesComposer();
     generationFuture = null;
     generationCancelRequested = false;
     generationToken = 0L;
@@ -472,7 +474,7 @@ public final class CoreTuiController {
   public void render(Frame frame) {
     reconcileGenerationCompletionIfDone();
     Rect area = frame.area();
-    List<String> footerLines = footerLinesForWidth(area.width());
+    List<String> footerLines = footerLinesComposer.compose(area.width(), footerSnapshot());
     int footerHeight = Math.max(3, footerLines.size() + 2);
     List<Rect> rootLayout =
         Layout.vertical()
@@ -797,28 +799,19 @@ public final class CoreTuiController {
     frame.renderWidget(footer, area);
   }
 
-  private List<String> footerLinesForWidth(int width) {
-    List<String> lines = new ArrayList<>();
-    lines.add(footerHintLine(width));
-    lines.add("Mode: " + footerModeLabel() + " | Generation: " + generationStateLabel());
-    lines.add("Status: " + statusMessage);
-    lines.add("Validation: " + validationLabel() + " | Focus: " + focusTargetName(focusTarget));
-
-    String activeError = activeErrorDetails();
-    if (!activeError.isBlank()) {
-      lines.add("Error: " + activeError);
-    }
-
-    int expandedErrorLines = expandedErrorDetailLines(activeError, width);
-    if (expandedErrorLines > 0) {
-      lines.add("Error details:");
-      lines.addAll(wrapToWidth(activeError, Math.max(24, width - 6), expandedErrorLines));
-    }
-
-    if (!successHint.isBlank()) {
-      lines.add("Next: " + truncate(successHint, Math.max(24, width - 16)));
-    }
-    return lines;
+  private FooterLinesComposer.FooterSnapshot footerSnapshot() {
+    return new FooterLinesComposer.FooterSnapshot(
+        isGenerationInProgress(),
+        focusTarget,
+        isMetadataSelectorFocus(focusTarget),
+        generationStateTracker.modeLabel(),
+        generationStateLabel(),
+        statusMessage,
+        validationLabel(),
+        focusTargetName(focusTarget),
+        activeErrorDetails(),
+        showErrorDetails,
+        successHint);
   }
 
   private void moveFocus(int offset) {
@@ -920,41 +913,6 @@ public final class CoreTuiController {
     return "Selected (" + selectedExtensionIds.size() + "): " + visible;
   }
 
-  private String footerHintLine(int width) {
-    if (isGenerationInProgress()) {
-      return width < NARROW_WIDTH_THRESHOLD
-          ? "Esc: cancel generation | Enter disabled"
-          : "Esc: cancel generation | Enter disabled while generation is loading";
-    }
-    if (focusTarget == FocusTarget.EXTENSION_LIST) {
-      return width < NARROW_WIDTH_THRESHOLD
-          ? "Up/Down or j/k: nav | Space: select | F: favorite | c: category"
-          : "Up/Down/Home/End or j/k: list nav | Space: select | F: favorite | c: close/open category | C: open all | Ctrl+J: jump favorite | Ctrl+K: favorite filter | Ctrl+R: reload | Ctrl+E: error details";
-    }
-    if (focusTarget == FocusTarget.EXTENSION_SEARCH) {
-      return width < NARROW_WIDTH_THRESHOLD
-          ? "Type: filter | Down: list | Ctrl+K: fav filter"
-          : "Type: filter extensions | Down: list | Ctrl+R: reload | Ctrl+J: jump favorite | Ctrl+K: favorite filter | Ctrl+E: error details";
-    }
-    if (focusTarget == FocusTarget.SUBMIT) {
-      return width < NARROW_WIDTH_THRESHOLD
-          ? "Enter: submit | j/k: focus | Ctrl+E: error details"
-          : "Enter: submit | Tab/Shift+Tab or j/k: focus | Ctrl+E: error details | Esc: cancel/quit";
-    }
-    if (isMetadataSelectorFocus(focusTarget)) {
-      return width < NARROW_WIDTH_THRESHOLD
-          ? "Left/Right or h/l: pick | Up/Down or j/k: cycle"
-          : "Left/Right/Home/End or h/l/j/k: pick value | Tab/Shift+Tab: focus | Enter: submit | Ctrl+E: error details";
-    }
-    return width < NARROW_WIDTH_THRESHOLD
-        ? "Tab: focus | Enter: submit | Ctrl+E: error details"
-        : "Tab/Shift+Tab: focus | Enter: submit | /: search | Ctrl+K: favorite filter | Ctrl+E: error details | Esc: cancel/quit";
-  }
-
-  private String footerModeLabel() {
-    return generationStateTracker.modeLabel();
-  }
-
   private String validationLabel() {
     if (validation.isValid()) {
       return "OK";
@@ -970,41 +928,6 @@ public final class CoreTuiController {
       return extensionCatalogErrorMessage;
     }
     return "";
-  }
-
-  private int expandedErrorDetailLines(String activeError, int width) {
-    if (!showErrorDetails || activeError.isBlank()) {
-      return 0;
-    }
-    return wrapToWidth(activeError, Math.max(24, width - 6), 6).size();
-  }
-
-  private static List<String> wrapToWidth(String text, int width, int maxLines) {
-    List<String> lines = new ArrayList<>();
-    if (text == null || text.isBlank() || width <= 0 || maxLines <= 0) {
-      return lines;
-    }
-
-    String remaining = text.strip();
-    while (!remaining.isBlank() && lines.size() < maxLines) {
-      if (remaining.length() <= width) {
-        lines.add(remaining);
-        break;
-      }
-
-      int breakIndex = remaining.lastIndexOf(' ', width);
-      if (breakIndex <= 0) {
-        breakIndex = width;
-      }
-      lines.add(remaining.substring(0, breakIndex).stripTrailing());
-      remaining = remaining.substring(Math.min(remaining.length(), breakIndex + 1)).stripLeading();
-    }
-
-    if (!remaining.isBlank() && lines.size() == maxLines) {
-      int lastIndex = lines.size() - 1;
-      lines.set(lastIndex, truncate(lines.get(lastIndex), Math.max(4, width)));
-    }
-    return lines;
   }
 
   private void scheduleFilteredExtensionsRefresh() {
@@ -1566,13 +1489,6 @@ public final class CoreTuiController {
     String prefix = row.collapsed() ? "[+]" : "[-]";
     String suffix = row.collapsed() ? " (" + row.hiddenCount() + " hidden)" : "";
     return "-- " + prefix + " " + row.label() + suffix + " --";
-  }
-
-  private static String truncate(String value, int maxLength) {
-    if (value.length() <= maxLength) {
-      return value;
-    }
-    return value.substring(0, maxLength - 3) + "...";
   }
 
   private static String firstValidationError(ValidationReport report) {
