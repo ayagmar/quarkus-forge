@@ -85,7 +85,7 @@ public final class CoreTuiController {
   private String errorMessage;
   private boolean submitRequested;
   private boolean submitBlockedByValidation;
-  private GenerationState generationState;
+  private final GenerationStateTracker generationStateTracker;
   private CompletableFuture<Path> generationFuture;
   private volatile boolean generationCancelRequested;
   private volatile long generationToken;
@@ -123,7 +123,7 @@ public final class CoreTuiController {
     this.scheduler = scheduler;
     this.projectGenerationRunner = projectGenerationRunner;
     theme = UiTheme.loadDefault();
-    generationState = GenerationState.IDLE;
+    generationStateTracker = new GenerationStateTracker();
     generationFuture = null;
     generationCancelRequested = false;
     generationToken = 0L;
@@ -509,7 +509,7 @@ public final class CoreTuiController {
   }
 
   GenerationState generationState() {
-    return generationState;
+    return generationStateTracker.currentState();
   }
 
   int filteredExtensionCount() {
@@ -952,14 +952,7 @@ public final class CoreTuiController {
   }
 
   private String footerModeLabel() {
-    return switch (generationState) {
-      case IDLE -> "ready";
-      case VALIDATING -> "validating input";
-      case LOADING -> "generation loading";
-      case SUCCESS -> "last run succeeded";
-      case ERROR -> "last run failed";
-      case CANCELLED -> "last run cancelled";
-    };
+    return generationStateTracker.modeLabel();
   }
 
   private String validationLabel() {
@@ -1353,14 +1346,16 @@ public final class CoreTuiController {
   }
 
   private void onGenerationProgress(long token, String progressMessage) {
-    if (token != generationToken || generationState != GenerationState.LOADING) {
+    if (token != generationToken
+        || generationStateTracker.currentState() != GenerationState.LOADING) {
       return;
     }
     statusMessage = "Generation in progress: " + progressMessage;
   }
 
   private void onGenerationCompleted(long token, Path generatedPath, Throwable throwable) {
-    if (token != generationToken || generationState != GenerationState.LOADING) {
+    if (token != generationToken
+        || generationStateTracker.currentState() != GenerationState.LOADING) {
       return;
     }
     generationFuture = null;
@@ -1394,7 +1389,8 @@ public final class CoreTuiController {
   }
 
   private void reconcileGenerationCompletionIfDone() {
-    if (generationState != GenerationState.LOADING || generationFuture == null) {
+    if (generationStateTracker.currentState() != GenerationState.LOADING
+        || generationFuture == null) {
       return;
     }
     if (!generationFuture.isDone()) {
@@ -1412,7 +1408,7 @@ public final class CoreTuiController {
   }
 
   private void requestGenerationCancellation() {
-    if (generationState != GenerationState.LOADING) {
+    if (generationStateTracker.currentState() != GenerationState.LOADING) {
       return;
     }
     generationCancelRequested = true;
@@ -1424,7 +1420,7 @@ public final class CoreTuiController {
   }
 
   private boolean isGenerationInProgress() {
-    return generationState == GenerationState.LOADING;
+    return generationStateTracker.isInProgress();
   }
 
   private GenerationRequest toGenerationRequest() {
@@ -1444,22 +1440,11 @@ public final class CoreTuiController {
   }
 
   private void resetGenerationStateAfterTerminalOutcome() {
-    if (generationState == GenerationState.SUCCESS
-        || generationState == GenerationState.ERROR
-        || generationState == GenerationState.CANCELLED) {
-      transitionGenerationState(GenerationState.IDLE);
-    }
+    generationStateTracker.resetAfterTerminalOutcome();
   }
 
   private String generationStateLabel() {
-    return switch (generationState) {
-      case IDLE -> "idle";
-      case VALIDATING -> "validating";
-      case LOADING -> "loading (Esc to cancel)";
-      case SUCCESS -> "success";
-      case ERROR -> "failed";
-      case CANCELLED -> "cancelled";
-    };
+    return generationStateTracker.stateLabel();
   }
 
   private void scheduleOnRenderThread(Runnable task) {
@@ -1467,29 +1452,11 @@ public final class CoreTuiController {
   }
 
   private boolean transitionGenerationState(GenerationState targetState) {
-    if (!isValidTransition(generationState, targetState)) {
-      return false;
-    }
-    generationState = targetState;
-    return true;
+    return generationStateTracker.transitionTo(targetState);
   }
 
   static boolean isValidTransition(GenerationState currentState, GenerationState targetState) {
-    if (currentState == targetState) {
-      return false;
-    }
-    return switch (currentState) {
-      case IDLE -> targetState == GenerationState.VALIDATING;
-      case VALIDATING ->
-          targetState == GenerationState.LOADING
-              || targetState == GenerationState.ERROR
-              || targetState == GenerationState.IDLE;
-      case LOADING ->
-          targetState == GenerationState.SUCCESS
-              || targetState == GenerationState.ERROR
-              || targetState == GenerationState.CANCELLED;
-      case SUCCESS, ERROR, CANCELLED -> targetState == GenerationState.IDLE;
-    };
+    return GenerationStateTracker.isValidTransition(currentState, targetState);
   }
 
   private static Throwable unwrapCompletionCause(Throwable throwable) {
