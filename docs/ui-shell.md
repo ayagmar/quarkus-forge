@@ -36,6 +36,8 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - `Home` / `End`: jump to first/last selectable extension row.
 - `Space`: toggle extension selection when list is focused.
 - `f`: toggle favorite for the focused extension when list is focused.
+- `c`: close/open the focused extension category.
+- `C`: open all closed categories.
 - `Ctrl+J`: jump to next visible favorite extension.
 - `Ctrl+K`: toggle favorites-only filter mode.
 - `Enter`: attempt submit (blocked with validation feedback if invalid).
@@ -81,6 +83,7 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - Favorites are persisted under `~/.quarkus-forge/favorites.json` and restored on startup.
 - Catalog rows are grouped with stable category section headers, and keyboard navigation skips
   section-header rows deterministically.
+- Section headers show open/closed state (`[-]` / `[+]`) and hidden-item counts for closed categories.
 - Favorites keep ranked position (API order precedence is preserved) and are marked/toggled via `*` indicator and favorite key actions.
 - Extension list labels use one rule: display extension `name` only (no alias/short-name suffix noise).
 - Catalog rendering has explicit loading and fallback/degraded visuals.

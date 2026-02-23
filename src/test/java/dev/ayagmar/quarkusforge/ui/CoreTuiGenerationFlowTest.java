@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.ayagmar.quarkusforge.api.ApiHttpException;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.tamboui.buffer.Buffer;
 import dev.tamboui.layout.Rect;
@@ -158,6 +159,24 @@ class CoreTuiGenerationFlowTest {
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.ARTIFACT_ID);
+  }
+
+  @Test
+  void http400GenerationFailureShowsActionableErrorMessage() {
+    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(),
+            UiScheduler.immediate(),
+            Duration.ZERO,
+            generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    generationRunner.fail(new ApiHttpException(400, "<binary>"));
+
+    assertThat(controller.statusMessage()).contains("Generation failed");
+    assertThat(renderToString(controller))
+        .contains("Error: Quarkus API rejected generation request (HTTP 400).");
   }
 
   @Test

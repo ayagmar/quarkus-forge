@@ -43,6 +43,7 @@ final class ExtensionCatalogState {
   private final LatestResultGate searchResultGate;
   private final ExtensionFavoritesStore favoritesStore;
   private final Executor favoritesPersistenceExecutor;
+  private final Set<String> collapsedCategoryTitles;
   private ExtensionCatalogIndex catalogIndex;
   private List<ExtensionCatalogItem> filteredExtensions;
   private List<ExtensionCatalogRow> filteredRows;
@@ -71,6 +72,7 @@ final class ExtensionCatalogState {
     favoriteExtensionIds = new LinkedHashSet<>(favoritesStore.loadFavoriteExtensionIds());
     searchDebouncer = new Debouncer(scheduler, debounceDelay);
     searchResultGate = new LatestResultGate();
+    collapsedCategoryTitles = new LinkedHashSet<>();
     catalogIndex = new ExtensionCatalogIndex(DEFAULT_EXTENSIONS);
     filteredExtensions = List.of();
     filteredRows = List.of();
@@ -123,6 +125,31 @@ final class ExtensionCatalogState {
     persistFavoritesAsync();
     applyFiltered(currentQuery, searchResultGate.nextToken(), onFiltered);
     return new FavoriteToggleResult(true, selected.name(), isNowFavorite);
+  }
+
+  CategoryCollapseResult toggleCategoryCollapseAtSelection() {
+    ExtensionCatalogItem selected = selectedListItem();
+    if (selected == null) {
+      return CategoryCollapseResult.none();
+    }
+    String categoryTitle = resolveCategoryTitle(selected.categoryKey(), selected.category());
+    boolean collapsed = collapsedCategoryTitles.add(categoryTitle);
+    if (!collapsed) {
+      collapsedCategoryTitles.remove(categoryTitle);
+    }
+    refreshRows(selected.id());
+    return new CategoryCollapseResult(true, categoryTitle, collapsed);
+  }
+
+  int expandAllCategories() {
+    int collapsedCount = collapsedCategoryTitles.size();
+    if (collapsedCount == 0) {
+      return 0;
+    }
+    String previousFocusedId = selectedListItemId();
+    collapsedCategoryTitles.clear();
+    refreshRows(previousFocusedId);
+    return collapsedCount;
   }
 
   JumpToFavoriteResult jumpToFavorite() {
@@ -257,11 +284,24 @@ final class ExtensionCatalogState {
     }
 
     filteredExtensions = rankedResults;
-    filteredRows = buildRows(rankedResults);
+    collapsedCategoryTitles.retainAll(availableCategoryTitles(rankedResults));
+    refreshRows(previousFocusedId);
+    onFiltered.accept(filteredExtensions.size());
+  }
+
+  private void refreshRows(String previousFocusedExtensionId) {
+    filteredRows = buildRows(filteredExtensions);
     selectableRowIndexes = buildSelectableIndexes(filteredRows);
     rowIndexByExtensionId = buildRowIndexByExtensionId(filteredRows);
-    restoreSelection(previousFocusedId);
-    onFiltered.accept(filteredExtensions.size());
+    restoreSelection(previousFocusedExtensionId);
+  }
+
+  private static Set<String> availableCategoryTitles(List<ExtensionCatalogItem> rankedItems) {
+    Set<String> categoryTitles = new LinkedHashSet<>();
+    for (ExtensionCatalogItem item : rankedItems) {
+      categoryTitles.add(resolveCategoryTitle(item.categoryKey(), item.category()));
+    }
+    return categoryTitles;
   }
 
   private List<ExtensionCatalogRow> buildRows(List<ExtensionCatalogItem> rankedItems) {
@@ -269,13 +309,24 @@ final class ExtensionCatalogState {
       return List.of();
     }
 
+    Map<String, Integer> categoryItemCount = new LinkedHashMap<>();
+    for (ExtensionCatalogItem item : rankedItems) {
+      String categoryTitle = resolveCategoryTitle(item.categoryKey(), item.category());
+      categoryItemCount.merge(categoryTitle, 1, Integer::sum);
+    }
+
     List<ExtensionCatalogRow> rows = new ArrayList<>();
     String previousCategoryTitle = null;
     for (ExtensionCatalogItem item : rankedItems) {
       String categoryTitle = resolveCategoryTitle(item.categoryKey(), item.category());
       if (!categoryTitle.equals(previousCategoryTitle)) {
-        rows.add(ExtensionCatalogRow.section(categoryTitle));
+        boolean collapsed = collapsedCategoryTitles.contains(categoryTitle);
+        int hiddenCount = collapsed ? categoryItemCount.getOrDefault(categoryTitle, 0) : 0;
+        rows.add(ExtensionCatalogRow.section(categoryTitle, collapsed, hiddenCount));
         previousCategoryTitle = categoryTitle;
+      }
+      if (collapsedCategoryTitles.contains(categoryTitle)) {
+        continue;
       }
       rows.add(ExtensionCatalogRow.item(item));
     }
@@ -425,6 +476,12 @@ final class ExtensionCatalogState {
   record JumpToFavoriteResult(boolean jumped, String extensionName) {
     static JumpToFavoriteResult none() {
       return new JumpToFavoriteResult(false, "");
+    }
+  }
+
+  record CategoryCollapseResult(boolean changed, String categoryTitle, boolean collapsed) {
+    static CategoryCollapseResult none() {
+      return new CategoryCollapseResult(false, "", false);
     }
   }
 }

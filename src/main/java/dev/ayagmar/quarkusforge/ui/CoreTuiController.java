@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge.ui;
 
+import dev.ayagmar.quarkusforge.api.ApiErrorMessages;
 import dev.ayagmar.quarkusforge.api.BuildToolCodec;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
@@ -409,6 +410,14 @@ public final class CoreTuiController {
       toggleFavoriteAtSelection();
       return UiAction.handled(false);
     }
+    if (focusTarget == FocusTarget.EXTENSION_LIST && isCategoryCollapseToggleKey(keyEvent)) {
+      toggleCategoryCollapseAtSelection();
+      return UiAction.handled(false);
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST && isExpandAllCategoriesKey(keyEvent)) {
+      expandAllCategories();
+      return UiAction.handled(false);
+    }
 
     if (focusTarget == FocusTarget.EXTENSION_LIST
         && extensionCatalogState.handleListKeys(
@@ -639,7 +648,7 @@ public final class CoreTuiController {
     List<SizedWidget> items = new ArrayList<>();
     for (ExtensionCatalogRow row : filteredRows) {
       if (row.isSectionHeader()) {
-        items.add(ListItem.from(sectionHeaderLabel(row.label())).toSizedWidget());
+        items.add(ListItem.from(sectionHeaderLabel(row)).toSizedWidget());
         continue;
       }
       ExtensionCatalogItem extension = row.extension();
@@ -888,8 +897,8 @@ public final class CoreTuiController {
     }
     if (focusTarget == FocusTarget.EXTENSION_LIST) {
       return width < NARROW_WIDTH_THRESHOLD
-          ? "Up/Down: nav | Space: select | F: favorite | Ctrl+R: reload"
-          : "Up/Down/Home/End: list nav | Space: select | F: favorite | Ctrl+J: jump favorite | Ctrl+K: favorite filter | Ctrl+R: reload";
+          ? "Up/Down: nav | Space: select | F: favorite | c: close/open category"
+          : "Up/Down/Home/End: list nav | Space: select | F: favorite | c: close/open category | C: open all | Ctrl+J: jump favorite | Ctrl+K: favorite filter | Ctrl+R: reload";
     }
     if (focusTarget == FocusTarget.EXTENSION_SEARCH) {
       return width < NARROW_WIDTH_THRESHOLD
@@ -1152,10 +1161,7 @@ public final class CoreTuiController {
   }
 
   private static String userFriendlyError(Throwable throwable) {
-    if (throwable.getMessage() != null && !throwable.getMessage().isBlank()) {
-      return throwable.getMessage();
-    }
-    return throwable.getClass().getSimpleName();
+    return ApiErrorMessages.userFriendlyMessage(throwable);
   }
 
   private static String catalogLoadFailureMessage(Throwable throwable) {
@@ -1234,8 +1240,10 @@ public final class CoreTuiController {
     return extension.name();
   }
 
-  private static String sectionHeaderLabel(String sectionTitle) {
-    return "-- " + sectionTitle + " --";
+  private static String sectionHeaderLabel(ExtensionCatalogRow row) {
+    String prefix = row.collapsed() ? "[+]" : "[-]";
+    String suffix = row.collapsed() ? " (" + row.hiddenCount() + " hidden)" : "";
+    return "-- " + prefix + " " + row.label() + suffix + " --";
   }
 
   private static String truncate(String value, int maxLength) {
@@ -1268,6 +1276,28 @@ public final class CoreTuiController {
     statusMessage =
         (toggleResult.favoriteNow() ? "Favorited extension: " : "Unfavorited extension: ")
             + toggleResult.extensionName();
+  }
+
+  private void toggleCategoryCollapseAtSelection() {
+    ExtensionCatalogState.CategoryCollapseResult collapseResult =
+        extensionCatalogState.toggleCategoryCollapseAtSelection();
+    if (!collapseResult.changed()) {
+      statusMessage = "No category selected to close";
+      return;
+    }
+    statusMessage =
+        (collapseResult.collapsed() ? "Closed category: " : "Opened category: ")
+            + collapseResult.categoryTitle();
+  }
+
+  private void expandAllCategories() {
+    int reopenedCount = extensionCatalogState.expandAllCategories();
+    if (reopenedCount == 0) {
+      statusMessage = "All categories are already open";
+      return;
+    }
+    statusMessage =
+        "Opened " + reopenedCount + " " + (reopenedCount == 1 ? "category" : "categories");
   }
 
   private void jumpToFavorite() {
@@ -1320,6 +1350,20 @@ public final class CoreTuiController {
     return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
         && keyEvent.hasCtrl()
         && (keyEvent.character() == 'k' || keyEvent.character() == 'K');
+  }
+
+  private static boolean isCategoryCollapseToggleKey(KeyEvent keyEvent) {
+    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
+        && !keyEvent.hasCtrl()
+        && !keyEvent.hasAlt()
+        && keyEvent.character() == 'c';
+  }
+
+  private static boolean isExpandAllCategoriesKey(KeyEvent keyEvent) {
+    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
+        && !keyEvent.hasCtrl()
+        && !keyEvent.hasAlt()
+        && keyEvent.character() == 'C';
   }
 
   private static boolean shouldQuitKeyEvent(KeyEvent keyEvent) {

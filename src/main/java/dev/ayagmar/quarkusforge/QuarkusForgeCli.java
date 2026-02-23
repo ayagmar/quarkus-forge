@@ -1,6 +1,7 @@
 package dev.ayagmar.quarkusforge;
 
 import dev.ayagmar.quarkusforge.api.ApiClientException;
+import dev.ayagmar.quarkusforge.api.ApiErrorMessages;
 import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogDataService;
 import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
@@ -288,14 +289,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   }
 
   private static String userFriendlyError(Throwable throwable) {
-    if (throwable == null) {
-      return "unknown error";
-    }
-    String message = throwable.getMessage();
-    if (message == null || message.isBlank()) {
-      return throwable.getClass().getSimpleName();
-    }
-    return message;
+    return ApiErrorMessages.userFriendlyMessage(throwable);
   }
 
   private static Throwable unwrapCompletionFailure(Throwable throwable) {
