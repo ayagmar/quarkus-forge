@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -210,5 +211,20 @@ class QuarkusApiContractDriftTest {
                     driftedOpenApiPayload, objectMapper))
         .isInstanceOf(ApiContractException.class)
         .hasMessageContaining("build tool enum");
+  }
+
+  @Test
+  void docsOpenApiSnapshotStillProvidesDownloadBuildToolEnum() throws IOException {
+    String openApiPayload;
+    try (InputStream inputStream =
+        getClass().getClassLoader().getResourceAsStream("contracts/openapi.json")) {
+      assertThat(inputStream).isNotNull();
+      openApiPayload = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+    }
+
+    List<String> buildTools =
+        QuarkusApiClient.parseBuildToolsFromOpenApiPayload(openApiPayload, objectMapper);
+
+    assertThat(buildTools).containsExactly("maven", "gradle", "gradle-kotlin-dsl");
   }
 }

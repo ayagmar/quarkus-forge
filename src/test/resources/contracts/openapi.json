@@ -1,0 +1,775 @@
+{
+  "openapi" : "3.1.0",
+  "tags" : [ {
+    "name" : "Download",
+    "description" : "Download endpoints"
+  }, {
+    "name" : "Extensions",
+    "description" : "Extension related endpoints"
+  }, {
+    "name" : "Platform",
+    "description" : "Platform related endpoints"
+  }, {
+    "name" : "Presets",
+    "description" : "Preset related endpoints"
+  }, {
+    "name" : "Project",
+    "description" : "Project creation endpoints"
+  } ],
+  "components" : {
+    "schemas" : {
+      "ArtifactCoords" : {
+        "type" : "object",
+        "properties" : {
+          "groupId" : {
+            "type" : "string"
+          },
+          "artifactId" : {
+            "type" : "string"
+          },
+          "classifier" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "string"
+          },
+          "key" : {
+            "$ref" : "#/components/schemas/ArtifactKey"
+          },
+          "jar" : {
+            "type" : "boolean"
+          },
+          "snapshot" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "ArtifactKey" : {
+        "type" : "object",
+        "properties" : {
+          "groupId" : {
+            "type" : "string"
+          },
+          "artifactId" : {
+            "type" : "string"
+          },
+          "classifier" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        }
+      },
+      "CodeQuarkusExtension" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "shortId" : {
+            "type" : "string",
+            "deprecated" : true
+          },
+          "version" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "shortName" : {
+            "type" : "string"
+          },
+          "category" : {
+            "type" : "string"
+          },
+          "transitiveExtensions" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "tags" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "keywords" : {
+            "type" : "array",
+            "uniqueItems" : true,
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "providesExampleCode" : {
+            "type" : "boolean",
+            "deprecated" : true
+          },
+          "providesCode" : {
+            "type" : "boolean"
+          },
+          "guide" : {
+            "type" : "string"
+          },
+          "order" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "platform" : {
+            "type" : "boolean"
+          },
+          "bom" : {
+            "type" : "string"
+          }
+        }
+      },
+      "CreatedProject" : {
+        "type" : "object",
+        "properties" : {
+          "path" : {
+            "type" : "string"
+          }
+        }
+      },
+      "GitHubCreatedRepository" : {
+        "type" : "object",
+        "properties" : {
+          "ownerName" : {
+            "type" : "string"
+          },
+          "url" : {
+            "type" : "string"
+          },
+          "defaultBranch" : {
+            "type" : "string"
+          }
+        }
+      },
+      "JavaCompatibility" : {
+        "type" : "object",
+        "properties" : {
+          "versions" : {
+            "type" : "array",
+            "uniqueItems" : true,
+            "items" : {
+              "type" : "integer",
+              "format" : "int32"
+            }
+          },
+          "recommended" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "Platform" : {
+        "type" : "object",
+        "properties" : {
+          "platformKey" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "streams" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PlatformStream"
+            }
+          },
+          "metadata" : {
+            "type" : "object",
+            "additionalProperties" : { }
+          }
+        }
+      },
+      "PlatformCatalog" : {
+        "type" : "object",
+        "properties" : {
+          "platforms" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Platform"
+            }
+          },
+          "metadata" : {
+            "type" : "object",
+            "additionalProperties" : { }
+          }
+        }
+      },
+      "PlatformRelease" : {
+        "type" : "object",
+        "properties" : {
+          "version" : {
+            "$ref" : "#/components/schemas/PlatformReleaseVersion"
+          },
+          "memberBoms" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ArtifactCoords"
+            }
+          },
+          "quarkusCoreVersion" : {
+            "type" : "string"
+          },
+          "upstreamQuarkusCoreVersion" : {
+            "type" : "string"
+          },
+          "metadata" : {
+            "type" : "object",
+            "additionalProperties" : { }
+          }
+        }
+      },
+      "PlatformReleaseVersion" : {
+        "type" : "object"
+      },
+      "PlatformStream" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "releases" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PlatformRelease"
+            }
+          },
+          "metadata" : {
+            "type" : "object",
+            "additionalProperties" : { }
+          }
+        }
+      },
+      "Preset" : {
+        "type" : "object",
+        "properties" : {
+          "key" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "icon" : {
+            "type" : "string"
+          },
+          "extensions" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "ProjectDefinition" : {
+        "type" : "object",
+        "required" : [ "groupId", "artifactId", "version", "buildTool" ],
+        "properties" : {
+          "streamKey" : {
+            "type" : "string",
+            "enum" : [ "io.quarkus.platform:3.31", "io.quarkus.platform:3.20", "io.quarkus.platform:3.15", "io.quarkus.platform:3.27" ]
+          },
+          "groupId" : {
+            "type" : "string",
+            "minLength" : 1,
+            "pattern" : "^([a-zA-Z_$][a-zA-Z\\d_$]*\\.)*[a-zA-Z_$][a-zA-Z\\d_$]*$"
+          },
+          "artifactId" : {
+            "type" : "string",
+            "minLength" : 1,
+            "pattern" : "^[a-z][a-z0-9-._]*$"
+          },
+          "version" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "className" : {
+            "type" : "string",
+            "pattern" : "^([a-zA-Z_$][a-zA-Z\\d_$]*\\.)*[a-zA-Z_$][a-zA-Z\\d_$]*$"
+          },
+          "path" : {
+            "type" : "string",
+            "pattern" : "^\\/([a-z0-9\\-._~%!$&'()*+,;=:@]+\\/?)*$"
+          },
+          "buildTool" : {
+            "type" : "string",
+            "minLength" : 1,
+            "pattern" : "^(MAVEN)|(GRADLE)|(GRADLE_KOTLIN_DSL)$"
+          },
+          "javaVersion" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "noCode" : {
+            "type" : "boolean"
+          },
+          "noExamples" : {
+            "type" : "boolean"
+          },
+          "extensions" : {
+            "type" : "array",
+            "uniqueItems" : true,
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "Stream" : {
+        "type" : "object",
+        "properties" : {
+          "key" : {
+            "type" : "string"
+          },
+          "quarkusCoreVersion" : {
+            "type" : "string"
+          },
+          "javaCompatibility" : {
+            "$ref" : "#/components/schemas/JavaCompatibility"
+          },
+          "platformVersion" : {
+            "type" : "string"
+          },
+          "recommended" : {
+            "type" : "boolean"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "lts" : {
+            "type" : "boolean"
+          }
+        }
+      }
+    }
+  },
+  "paths" : {
+    "/api/download" : {
+      "get" : {
+        "summary" : "Download a custom Quarkus application with the provided settings",
+        "operationId" : "downloadForStream",
+        "tags" : [ "Download" ],
+        "parameters" : [ {
+          "description" : "The platform stream to use to create this project ('platformKey:streamId' or 'streamId')",
+          "name" : "S",
+          "required" : false,
+          "in" : "query",
+          "schema" : {
+            "type" : "string",
+            "description" : "The platform stream to use to create this project ('platformKey:streamId' or 'streamId')",
+            "enum" : [ "io.quarkus.platform:3.31", "io.quarkus.platform:3.20", "io.quarkus.platform:3.15", "io.quarkus.platform:3.27" ]
+          }
+        }, {
+          "description" : "GAV: artifactId",
+          "name" : "a",
+          "required" : false,
+          "in" : "query",
+          "schema" : {
+            "type" : "string",
+            "pattern" : "^[a-z][a-z0-9-._]*$",
+            "description" : "GAV: artifactId",
+            "default" : "code-with-quarkus"
+          }
+        }, {
+          "description" : "The build tool to use (MAVEN, GRADLE or GRADLE_KOTLIN_DSL)",
+          "name" : "b",
+          "required" : false,
+          "schema" : {
+            "enum" : [ "MAVEN", "GRADLE", "GRADLE_KOTLIN_DSL" ],
+            "default" : "MAVEN"
+          },
+          "in" : "query"
+        }, {
+          "description" : "The class name to use in the generated application",
+          "name" : "c",
+          "required" : false,
+          "in" : "query",
+          "schema" : {
+            "type" : "string",
+            "pattern" : "^([a-zA-Z_$][a-zA-Z\\d_$]*\\.)*[a-zA-Z_$][a-zA-Z\\d_$]*$",
+            "description" : "The class name to use in the generated application"
+          }
+        }, {
+          "description" : "The set of extension ids that will be included in the generated application",
+          "name" : "e",
+          "required" : false,
+          "in" : "query",
+          "schema" : {
+            "type" : "object",
+            "description" : "The set of extension ids that will be included in the generated application"
+          }
+        }, {
+          "description" : "GAV: groupId",
+          "name" : "g",
+          "required" : false,
+          "in" : "query",
+          "schema" : {
+            "type" : "string",
+            "pattern" : "^([a-zA-Z_$][a-zA-Z\\d_$]*\\.)*[a-zA-Z_$][a-zA-Z\\d_$]*$",
+            "description" : "GAV: groupId",
+            "default" : "org.acme"
+          }
+        }, {
+          "description" : "The Java version for the generation application",
+          "name" : "j",
+          "required" : false,
+          "in" : "query",
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "The Java version for the generation application"
+          }
+        }, {
+          "description" : "No code",
+          "name" : "nc",
+          "required" : false,
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean",
+            "description" : "No code",
+            "default" : false
+          }
+        }, {
+          "description" : "No code examples (Deprecated: use noCode (nc) instead)",
+          "name" : "ne",
+          "required" : false,
+          "schema" : {
+            "deprecated" : true,
+            "default" : false
+          },
+          "in" : "query",
+          "deprecated" : true
+        }, {
+          "description" : "The path of the REST endpoint created in the generated application",
+          "name" : "p",
+          "required" : false,
+          "in" : "query",
+          "schema" : {
+            "type" : "string",
+            "pattern" : "^\\/([a-z0-9\\-._~%!$&'()*+,;=:@]+\\/?)*$",
+            "description" : "The path of the REST endpoint created in the generated application"
+          }
+        }, {
+          "description" : "GAV: version",
+          "name" : "v",
+          "required" : false,
+          "in" : "query",
+          "schema" : {
+            "type" : "string",
+            "description" : "GAV: version",
+            "default" : "1.0.0-SNAPSHOT"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/zip" : { }
+            }
+          }
+        }
+      },
+      "post" : {
+        "summary" : "Download a custom Quarkus application with the provided settings",
+        "tags" : [ "Download" ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ProjectDefinition"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/zip" : { }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        }
+      }
+    },
+    "/api/extensions" : {
+      "get" : {
+        "summary" : "Get the Quarkus Launcher list of Quarkus extensions",
+        "operationId" : "extensions",
+        "tags" : [ "Extensions" ],
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "platformOnly",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean",
+            "default" : true
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "List of Quarkus extensions",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/CodeQuarkusExtension"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/extensions/stream/{streamKey}" : {
+      "get" : {
+        "summary" : "Get the Quarkus Launcher list of Quarkus extensions",
+        "operationId" : "extensionsForStream",
+        "tags" : [ "Extensions" ],
+        "parameters" : [ {
+          "name" : "streamKey",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "io.quarkus.platform:3.31", "io.quarkus.platform:3.20", "io.quarkus.platform:3.15", "io.quarkus.platform:3.27" ]
+          }
+        }, {
+          "name" : "id",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "platformOnly",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean",
+            "default" : true
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "List of Quarkus extensions for a certain stream",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/CodeQuarkusExtension"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/github/project" : {
+      "post" : {
+        "summary" : "Create project and push generated code to GitHub",
+        "tags" : [ "Project" ],
+        "parameters" : [ {
+          "name" : "GitHub-Code",
+          "in" : "header",
+          "schema" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "required" : true
+        }, {
+          "name" : "GitHub-State",
+          "in" : "header",
+          "schema" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "required" : true
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ProjectDefinition"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/GitHubCreatedRepository"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        }
+      }
+    },
+    "/api/platforms" : {
+      "get" : {
+        "summary" : "Get all available platforms",
+        "tags" : [ "Platform" ],
+        "responses" : {
+          "200" : {
+            "description" : "All available platforms",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PlatformCatalog"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/presets" : {
+      "get" : {
+        "summary" : "Get the Quarkus Launcher list of Presets",
+        "operationId" : "presets",
+        "tags" : [ "Presets" ],
+        "responses" : {
+          "200" : {
+            "description" : "List of Presets",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Preset"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/presets/stream/{streamKey}" : {
+      "get" : {
+        "summary" : "Get the Quarkus Launcher list of Presets",
+        "operationId" : "presetsForStream",
+        "tags" : [ "Presets" ],
+        "parameters" : [ {
+          "name" : "streamKey",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "List of Presets for a certain stream",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Preset"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/project" : {
+      "post" : {
+        "summary" : "Prepare a Quarkus application project to be downloaded",
+        "tags" : [ "Project" ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ProjectDefinition"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CreatedProject"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        }
+      }
+    },
+    "/api/streams" : {
+      "get" : {
+        "summary" : "Get all available streams",
+        "tags" : [ "Platform" ],
+        "responses" : {
+          "200" : {
+            "description" : "All available streams",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Stream"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "info" : {
+    "title" : "Quarkus bootstrap API",
+    "version" : "1.0.0",
+    "description" : "API that helps bootstrap a Quarkus application",
+    "contact" : {
+      "name" : "Quarkus Developers",
+      "email" : "quarkus-dev@googlegroups.com",
+      "url" : "https://code.quarkus.io/"
+    },
+    "license" : {
+      "name" : "Apache 2.0",
+      "url" : "https://github.com/quarkusio/code.quarkus.io/blob/main/LICENSE.txt"
+    }
+  }
+}

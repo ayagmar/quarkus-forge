@@ -35,13 +35,15 @@
   - Build tools: `/q/openapi` enum at `/api/download` parameter `b`
   - Compatibility map: generated for each build tool over the same Java version set
 - Missing/renamed required fields raise `ApiContractException`, then fallback policy applies.
-- Snapshot contract drift test is pinned at `src/test/resources/contracts/quarkus-api-snapshot.json`.
+- Snapshot contract drift tests are pinned at:
+  - `src/test/resources/contracts/quarkus-api-snapshot.json` (extensions + metadata assumptions)
+  - `src/test/resources/contracts/openapi.json` (`/api/download` build-tool enum assumptions)
 
 ## OpenAPI Snapshot Maintenance
-- `docs/openapi.json` is a local reference snapshot for `code.quarkus.io/q/openapi`.
+- `src/test/resources/contracts/openapi.json` is the pinned OpenAPI snapshot used by tests.
 - Refresh the file when parser tests fail or when Quarkus API contract changes are suspected.
 - Suggested refresh command:
-  - `curl -sS -H 'Accept: application/json' https://code.quarkus.io/q/openapi > docs/openapi.json`
+  - `curl -sS -H 'Accept: application/json' https://code.quarkus.io/q/openapi > src/test/resources/contracts/openapi.json`
 - After refresh, run:
   - `mvn -q -Dtest=QuarkusApiContractDriftTest,QuarkusApiClientTest test`
 

@@ -105,6 +105,54 @@ class QuarkusForgeGenerateCommandTest {
   }
 
   @Test
+  void headlessGenerateUsesRecommendedPlatformStreamWhenOptionIsOmitted() throws Exception {
+    stubCatalogEndpoints();
+    stubDownloadEndpoint("headless-app");
+    QuarkusForgeCli.RuntimeConfig runtimeConfig =
+        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    Path outputDir = tempDir.resolve("output-default-stream");
+
+    CommandResult result =
+        runCommand(
+            runtimeConfig,
+            "generate",
+            "--group-id",
+            "com.example",
+            "--artifact-id",
+            "headless-app",
+            "--output-dir",
+            outputDir.toString());
+
+    assertThat(result.exitCode()).isZero();
+    wireMockServer.verify(
+        getRequestedFor(urlPathEqualTo("/api/download"))
+            .withQueryParam("S", equalTo("io.quarkus.platform:3.31")));
+  }
+
+  @Test
+  void invalidPlatformStreamBlocksBeforeDownloadRequest() {
+    stubCatalogEndpoints();
+    QuarkusForgeCli.RuntimeConfig runtimeConfig =
+        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+
+    CommandResult result =
+        runCommand(
+            runtimeConfig,
+            "generate",
+            "--group-id",
+            "com.example",
+            "--artifact-id",
+            "headless-app",
+            "--platform-stream",
+            "io.quarkus.platform:does-not-exist");
+
+    assertThat(result.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_VALIDATION);
+    assertThat(result.standardError()).contains("unsupported platform stream");
+    assertThatCode(() -> wireMockServer.verify(0, getRequestedFor(urlPathEqualTo("/api/download"))))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
   void invalidExtensionIdReturnsValidationExitCode() {
     stubCatalogEndpoints();
     QuarkusForgeCli.RuntimeConfig runtimeConfig =

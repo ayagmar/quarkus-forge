@@ -7,6 +7,7 @@ import dev.ayagmar.quarkusforge.api.CatalogDataService;
 import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
+import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
 import dev.ayagmar.quarkusforge.archive.ArchiveException;
 import dev.ayagmar.quarkusforge.archive.OverwritePolicy;
@@ -41,6 +42,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
@@ -67,6 +69,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
 
   private static final Map<String, List<String>> BUILTIN_PRESETS = builtInPresets();
   private static final String PRESET_FAVORITES = "favorites";
+  private static final Duration STARTUP_METADATA_REFRESH_TIMEOUT = Duration.ofSeconds(2);
 
   @Mixin private RequestOptions requestOptions = new RequestOptions();
 
@@ -101,15 +104,25 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   @Override
   public Integer call() throws Exception {
     ProjectRequest request = toProjectRequest(requestOptions);
+    StartupMetadataSelection startupMetadataSelection = loadStartupMetadataSelection();
+    ProjectRequest requestWithResolvedStream =
+        applyRecommendedPlatformStream(request, startupMetadataSelection.metadataCompatibility());
     ForgeUiState initialState =
-        buildInitialState(request, MetadataCompatibilityContext.loadDefault());
+        buildInitialState(
+            requestWithResolvedStream, startupMetadataSelection.metadataCompatibility());
     if (!initialState.canSubmit()) {
-      printValidationErrors(initialState.validation());
+      printValidationErrors(
+          initialState.validation(),
+          startupMetadataSelection.sourceLabel(),
+          startupMetadataSelection.detailMessage());
       return CommandLine.ExitCode.USAGE;
     }
 
     if (dryRun) {
-      printPrefillSummary(initialState.request());
+      printPrefillSummary(
+          initialState.request(),
+          startupMetadataSelection.sourceLabel(),
+          startupMetadataSelection.detailMessage());
       return CommandLine.ExitCode.OK;
     }
 
@@ -251,14 +264,53 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     return CliPrefillMapper.map(prefill);
   }
 
+  private static ProjectRequest applyRecommendedPlatformStream(
+      ProjectRequest request, MetadataCompatibilityContext metadataCompatibilityContext) {
+    if (!request.platformStream().isBlank()) {
+      return request;
+    }
+    if (metadataCompatibilityContext.loadError() != null) {
+      return request;
+    }
+    MetadataDto metadata = metadataCompatibilityContext.metadataSnapshot();
+    if (metadata == null) {
+      return request;
+    }
+    String recommendedStream = metadata.recommendedPlatformStreamKey();
+    if (recommendedStream.isBlank()) {
+      return request;
+    }
+    return new ProjectRequest(
+        request.groupId(),
+        request.artifactId(),
+        request.version(),
+        request.packageName(),
+        request.outputDirectory(),
+        recommendedStream,
+        request.buildTool(),
+        request.javaVersion());
+  }
+
   private static void printValidationErrors(ValidationReport validation) {
+    printValidationErrors(validation, "", "");
+  }
+
+  private static void printValidationErrors(
+      ValidationReport validation, String sourceLabel, String sourceDetail) {
     System.err.println("Input validation failed:");
+    if (sourceLabel != null && !sourceLabel.isBlank()) {
+      System.err.println(" - metadataSource: " + sourceLabel);
+    }
+    if (sourceDetail != null && !sourceDetail.isBlank()) {
+      System.err.println(" - metadataDetail: " + sourceDetail);
+    }
     for (var error : validation.errors()) {
       System.err.println(" - " + error.field() + ": " + error.message());
     }
   }
 
-  private static void printPrefillSummary(ProjectRequest request) {
+  private static void printPrefillSummary(
+      ProjectRequest request, String sourceLabel, String sourceDetail) {
     Path generatedProjectDirectory =
         Path.of(request.outputDirectory()).resolve(request.artifactId()).normalize();
     System.out.println("Prefill validated successfully:");
@@ -270,6 +322,10 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     System.out.println(" - platformStream: " + request.platformStream());
     System.out.println(" - buildTool: " + request.buildTool());
     System.out.println(" - javaVersion: " + request.javaVersion());
+    System.out.println(" - metadataSource: " + sourceLabel);
+    if (sourceDetail != null && !sourceDetail.isBlank()) {
+      System.out.println(" - metadataDetail: " + sourceDetail);
+    }
     System.out.println(" - generatedProjectDirectory: " + generatedProjectDirectory);
   }
 
@@ -399,6 +455,40 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     return List.copyOf(resolved);
   }
 
+  private StartupMetadataSelection loadStartupMetadataSelection() {
+    QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
+    try {
+      MetadataDto metadata =
+          apiClient
+              .fetchMetadata()
+              .get(STARTUP_METADATA_REFRESH_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+      return new StartupMetadataSelection(
+          MetadataCompatibilityContext.success(metadata), "live", "");
+    } catch (InterruptedException interruptedException) {
+      Thread.currentThread().interrupt();
+      return snapshotFallbackSelection("Live metadata refresh interrupted");
+    } catch (TimeoutException timeoutException) {
+      return snapshotFallbackSelection(
+          "Live metadata refresh timed out after "
+              + STARTUP_METADATA_REFRESH_TIMEOUT.toMillis()
+              + "ms");
+    } catch (ExecutionException executionException) {
+      Throwable cause = unwrapCompletionFailure(executionException);
+      return snapshotFallbackSelection(
+          "Live metadata unavailable (%s)".formatted(userFriendlyError(cause)));
+    }
+  }
+
+  private static StartupMetadataSelection snapshotFallbackSelection(String fallbackReason) {
+    MetadataCompatibilityContext snapshotCompatibility = MetadataCompatibilityContext.loadDefault();
+    String detailMessage =
+        fallbackReason
+            + (snapshotCompatibility.loadError() == null
+                ? "; using bundled metadata snapshot"
+                : "; bundled metadata snapshot unavailable");
+    return new StartupMetadataSelection(snapshotCompatibility, "snapshot fallback", detailMessage);
+  }
+
   private Integer runHeadlessGenerate(GenerateCommand command) {
     CatalogData catalogData;
     try {
@@ -417,10 +507,17 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     }
 
     ProjectRequest request = toProjectRequest(command.requestOptions);
+    MetadataCompatibilityContext metadataCompatibility =
+        MetadataCompatibilityContext.success(catalogData.metadata());
+    ProjectRequest requestWithResolvedStream =
+        applyRecommendedPlatformStream(request, metadataCompatibility);
     ForgeUiState validatedState =
-        buildInitialState(request, MetadataCompatibilityContext.success(catalogData.metadata()));
+        buildInitialState(requestWithResolvedStream, metadataCompatibility);
     if (!validatedState.canSubmit()) {
-      printValidationErrors(validatedState.validation());
+      printValidationErrors(
+          validatedState.validation(),
+          catalogData.source().label() + (catalogData.stale() ? " [stale]" : ""),
+          catalogData.detailMessage());
       return EXIT_CODE_VALIDATION;
     }
 
@@ -434,7 +531,10 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       extensionIds =
           resolveRequestedExtensions(command.extensions, command.presets, knownExtensionIds);
     } catch (ValidationException validationException) {
-      printValidationErrors(new ValidationReport(validationException.errors()));
+      printValidationErrors(
+          new ValidationReport(validationException.errors()),
+          catalogData.source().label() + (catalogData.stale() ? " [stale]" : ""),
+          catalogData.detailMessage());
       return EXIT_CODE_VALIDATION;
     }
 
@@ -602,6 +702,17 @@ public final class QuarkusForgeCli implements Callable<Integer> {
 
     private List<ValidationError> errors() {
       return errors;
+    }
+  }
+
+  private record StartupMetadataSelection(
+      MetadataCompatibilityContext metadataCompatibility,
+      String sourceLabel,
+      String detailMessage) {
+    private StartupMetadataSelection {
+      Objects.requireNonNull(metadataCompatibility);
+      sourceLabel = sourceLabel == null ? "" : sourceLabel.strip();
+      detailMessage = detailMessage == null ? "" : detailMessage.strip();
     }
   }
 }
