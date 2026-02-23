@@ -25,13 +25,8 @@ import dev.tamboui.tui.event.ResizeEvent;
 import dev.tamboui.widgets.block.Block;
 import dev.tamboui.widgets.block.BorderType;
 import dev.tamboui.widgets.block.Borders;
-import dev.tamboui.widgets.common.ScrollBarPolicy;
-import dev.tamboui.widgets.common.SizedWidget;
 import dev.tamboui.widgets.input.TextInput;
 import dev.tamboui.widgets.input.TextInputState;
-import dev.tamboui.widgets.list.ListItem;
-import dev.tamboui.widgets.list.ListWidget;
-import dev.tamboui.widgets.list.ScrollMode;
 import dev.tamboui.widgets.paragraph.Paragraph;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -74,6 +69,7 @@ public final class CoreTuiController {
   private final ExtensionCatalogState extensionCatalogState;
   private final ProjectGenerationRunner projectGenerationRunner;
   private final UiTheme theme;
+  private final BodyPanelRenderer bodyPanelRenderer;
   private List<String> availableBuildTools;
   private List<String> availableJavaVersions;
   private List<String> availablePlatformStreams;
@@ -124,6 +120,7 @@ public final class CoreTuiController {
     this.scheduler = scheduler;
     this.projectGenerationRunner = projectGenerationRunner;
     theme = UiTheme.loadDefault();
+    bodyPanelRenderer = new BodyPanelRenderer(theme);
     generationStateTracker = new GenerationStateTracker();
     footerLinesComposer = new FooterLinesComposer();
     generationFuture = null;
@@ -579,185 +576,44 @@ public final class CoreTuiController {
               .split(area);
     }
 
-    renderMetadataPanel(frame, bodyLayout.get(0));
-    renderExtensionsPanel(frame, bodyLayout.get(1));
+    bodyPanelRenderer.renderMetadataPanel(
+        frame,
+        bodyLayout.get(0),
+        metadataPanelSnapshot(),
+        this::renderInput,
+        CoreTuiController::panelTitle,
+        this::panelBorderStyle);
+    bodyPanelRenderer.renderExtensionsPanel(
+        frame,
+        bodyLayout.get(1),
+        extensionsPanelSnapshot(),
+        extensionCatalogState.listState(),
+        this::renderInput,
+        CoreTuiController::panelTitle,
+        this::panelBorderStyle,
+        extensionCatalogState::isSelected,
+        extensionCatalogState::isFavorite);
   }
 
-  private void renderMetadataPanel(Frame frame, Rect area) {
-    boolean metadataInvalid = !validation.isValid();
-    Block panelBlock =
-        Block.builder()
-            .title(panelTitle(metadataPanelTitle(), isMetadataFocused()))
-            .borders(Borders.ALL)
-            .borderType(BorderType.ROUNDED)
-            .borderStyle(panelBorderStyle(isMetadataFocused(), metadataInvalid, false))
-            .build();
-    frame.renderWidget(panelBlock, area);
-
-    Rect inner = panelBlock.inner(area);
-    if (inner.isEmpty()) {
-      return;
-    }
-
-    List<Constraint> constraints = new ArrayList<>();
-    for (int i = 0; i < 8; i++) {
-      constraints.add(Constraint.length(3));
-    }
-    constraints.add(Constraint.fill());
-    List<Rect> rows = Layout.vertical().constraints(constraints).split(inner);
-
-    renderInput(frame, rows.get(0), "Group Id", FocusTarget.GROUP_ID);
-    renderInput(frame, rows.get(1), "Artifact Id", FocusTarget.ARTIFACT_ID);
-    renderInput(frame, rows.get(2), "Version", FocusTarget.VERSION);
-    renderInput(frame, rows.get(3), "Quarkus Platform", FocusTarget.PLATFORM_STREAM);
-    renderInput(frame, rows.get(4), "Build Tool", FocusTarget.BUILD_TOOL);
-    renderInput(frame, rows.get(5), "Java Version", FocusTarget.JAVA_VERSION);
-    renderInput(frame, rows.get(6), "Package Name", FocusTarget.PACKAGE_NAME);
-    renderInput(frame, rows.get(7), "Output Dir", FocusTarget.OUTPUT_DIR);
+  private BodyPanelRenderer.MetadataPanelSnapshot metadataPanelSnapshot() {
+    return new BodyPanelRenderer.MetadataPanelSnapshot(
+        metadataPanelTitle(), isMetadataFocused(), !validation.isValid());
   }
 
-  private void renderExtensionsPanel(Frame frame, Rect area) {
-    boolean extensionError = !extensionCatalogErrorMessage.isBlank();
-    Block panelBlock =
-        Block.builder()
-            .title(panelTitle(extensionsPanelTitle(), isExtensionPanelFocused()))
-            .borders(Borders.ALL)
-            .borderType(BorderType.ROUNDED)
-            .borderStyle(
-                panelBorderStyle(
-                    isExtensionPanelFocused(), extensionError, extensionCatalogLoading))
-            .build();
-    frame.renderWidget(panelBlock, area);
-
-    Rect inner = panelBlock.inner(area);
-    if (inner.isEmpty()) {
-      return;
-    }
-
-    List<Rect> sections =
-        Layout.vertical()
-            .constraints(Constraint.length(3), Constraint.fill(), Constraint.length(4))
-            .split(inner);
-
-    renderInput(frame, sections.get(0), "Search Extensions", FocusTarget.EXTENSION_SEARCH);
-    renderExtensionList(frame, sections.get(1));
-    renderSelectedSummary(frame, sections.get(2));
-  }
-
-  private void renderExtensionList(Frame frame, Rect area) {
-    List<ExtensionCatalogRow> filteredRows = extensionCatalogState.filteredRows();
-    boolean extensionError = !extensionCatalogErrorMessage.isBlank();
-    Block listBlock =
-        Block.builder()
-            .title(panelTitle("Catalog", focusTarget == FocusTarget.EXTENSION_LIST))
-            .borders(Borders.ALL)
-            .borderType(BorderType.ROUNDED)
-            .borderStyle(
-                panelBorderStyle(
-                    focusTarget == FocusTarget.EXTENSION_LIST,
-                    extensionError,
-                    extensionCatalogLoading))
-            .build();
-
-    if (extensionCatalogLoading) {
-      Paragraph loading =
-          Paragraph.builder()
-              .text("Loading extension catalog...")
-              .block(listBlock)
-              .style(Style.EMPTY.fg(theme.color("warning")).bold())
-              .overflow(Overflow.ELLIPSIS)
-              .build();
-      frame.renderWidget(loading, area);
-      return;
-    }
-
-    List<SizedWidget> items = new ArrayList<>();
-    for (ExtensionCatalogRow row : filteredRows) {
-      if (row.isSectionHeader()) {
-        items.add(ListItem.from(sectionHeaderLabel(row)).toSizedWidget());
-        continue;
-      }
-      ExtensionCatalogItem extension = row.extension();
-      boolean selected = extensionCatalogState.isSelected(extension.id());
-      boolean favorite = extensionCatalogState.isFavorite(extension.id());
-      String checkedPrefix = selected ? "[x] " : "[ ] ";
-      String favoritePrefix = favorite ? "* " : "  ";
-      String displayLabel = extensionDisplayLabel(extension);
-      items.add(ListItem.from(checkedPrefix + favoritePrefix + displayLabel).toSizedWidget());
-    }
-
-    if (items.isEmpty()) {
-      String emptyMessage;
-      if (extensionError) {
-        emptyMessage = "Catalog unavailable - using fallback snapshot";
-      } else if (extensionCatalogState.favoritesOnlyFilterEnabled()) {
-        emptyMessage = "No favorite extension matches current filter";
-      } else {
-        emptyMessage = "No extension matches current filter";
-      }
-      Paragraph empty =
-          Paragraph.builder()
-              .text(emptyMessage)
-              .block(listBlock)
-              .style(Style.EMPTY.fg(extensionError ? theme.color("error") : theme.color("warning")))
-              .overflow(Overflow.ELLIPSIS)
-              .build();
-      frame.renderWidget(empty, area);
-      return;
-    }
-
-    ListWidget listWidget =
-        ListWidget.builder()
-            .items(items)
-            .highlightSymbol("> ")
-            .style(Style.EMPTY.fg(theme.color("text")))
-            .highlightStyle(Style.EMPTY.fg(theme.color("focus")).reversed().bold())
-            .scrollMode(ScrollMode.AUTO_SCROLL)
-            .scrollBarPolicy(ScrollBarPolicy.AS_NEEDED)
-            .scrollbarThumbStyle(Style.EMPTY.fg(theme.color("focus")).bold())
-            .scrollbarTrackStyle(Style.EMPTY.fg(theme.color("muted")))
-            .block(listBlock)
-            .build();
-    frame.renderStatefulWidget(listWidget, area, extensionCatalogState.listState());
-  }
-
-  private void renderSelectedSummary(Frame frame, Rect area) {
-    List<String> selectedExtensionIds = extensionCatalogState.selectedExtensionIds();
-    String summary = selectedExtensionsSummary(selectedExtensionIds, area.width());
-    summary += "\nCatalog: " + extensionCatalogSource;
-    if (extensionCatalogStale) {
-      summary += " [stale]";
-    }
-    if (!extensionCatalogErrorMessage.isBlank()) {
-      summary += " | error: " + extensionCatalogErrorMessage;
-    }
-    summary += "\nFavorites: " + extensionCatalogState.favoriteExtensionCount();
-    if (extensionCatalogState.favoritesOnlyFilterEnabled()) {
-      summary += " [filter:on]";
-    }
-    if (focusTarget == FocusTarget.SUBMIT) {
-      summary += "\nSubmit focus active - press Enter to submit";
-    }
-
-    Style summaryStyle = Style.EMPTY.fg(theme.color("text"));
-    if (!extensionCatalogErrorMessage.isBlank()) {
-      summaryStyle = summaryStyle.fg(theme.color("warning"));
-    }
-
-    Paragraph paragraph =
-        Paragraph.builder()
-            .text(summary)
-            .style(summaryStyle)
-            .overflow(Overflow.ELLIPSIS)
-            .block(
-                Block.builder()
-                    .title(panelTitle("Selection", focusTarget == FocusTarget.SUBMIT))
-                    .borders(Borders.ALL)
-                    .borderType(BorderType.ROUNDED)
-                    .borderStyle(panelBorderStyle(focusTarget == FocusTarget.SUBMIT, false, false))
-                    .build())
-            .build();
-    frame.renderWidget(paragraph, area);
+  private BodyPanelRenderer.ExtensionsPanelSnapshot extensionsPanelSnapshot() {
+    return new BodyPanelRenderer.ExtensionsPanelSnapshot(
+        extensionsPanelTitle(),
+        isExtensionPanelFocused(),
+        focusTarget == FocusTarget.EXTENSION_LIST,
+        focusTarget == FocusTarget.SUBMIT,
+        extensionCatalogLoading,
+        extensionCatalogErrorMessage,
+        extensionCatalogSource,
+        extensionCatalogStale,
+        extensionCatalogState.favoritesOnlyFilterEnabled(),
+        extensionCatalogState.favoriteExtensionCount(),
+        extensionCatalogState.filteredRows(),
+        extensionCatalogState.selectedExtensionIds());
   }
 
   private void renderInput(Frame frame, Rect area, String label, FocusTarget target) {
@@ -891,26 +747,6 @@ public final class CoreTuiController {
     String fieldName = focusTargetName(target);
     return validation.errors().stream()
         .anyMatch(error -> error.field().equalsIgnoreCase(fieldName));
-  }
-
-  private static String selectedExtensionsSummary(List<String> selectedExtensionIds, int width) {
-    if (selectedExtensionIds.isEmpty()) {
-      return "Selected: none";
-    }
-    int maxVisible = width < NARROW_WIDTH_THRESHOLD ? 1 : 3;
-    int visibleCount = Math.min(maxVisible, selectedExtensionIds.size());
-    String visible = String.join(", ", selectedExtensionIds.subList(0, visibleCount));
-    if (selectedExtensionIds.size() > visibleCount) {
-      int remaining = selectedExtensionIds.size() - visibleCount;
-      return "Selected ("
-          + selectedExtensionIds.size()
-          + "): "
-          + visible
-          + " +"
-          + remaining
-          + " more";
-    }
-    return "Selected (" + selectedExtensionIds.size() + "): " + visible;
   }
 
   private String validationLabel() {
@@ -1479,16 +1315,6 @@ public final class CoreTuiController {
       case EXTENSION_LIST -> "extensionList";
       case SUBMIT -> "submit";
     };
-  }
-
-  private static String extensionDisplayLabel(ExtensionCatalogItem extension) {
-    return extension.name();
-  }
-
-  private static String sectionHeaderLabel(ExtensionCatalogRow row) {
-    String prefix = row.collapsed() ? "[+]" : "[-]";
-    String suffix = row.collapsed() ? " (" + row.hiddenCount() + " hidden)" : "";
-    return "-- " + prefix + " " + row.label() + suffix + " --";
   }
 
   private static String firstValidationError(ValidationReport report) {
