@@ -145,7 +145,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     }
 
     diagnostics.info("cli.tui.launch", Map.of("searchDebounceMs", searchDebounceMs));
-    runTui(smokeMode, initialState, searchDebounceMs, runtimeConfig);
+    runTui(smokeMode, initialState, searchDebounceMs, runtimeConfig, diagnostics);
     return CommandLine.ExitCode.OK;
   }
 
@@ -168,8 +168,12 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       boolean smokeMode,
       ForgeUiState initialState,
       int searchDebounceMs,
-      RuntimeConfig runtimeConfig)
+      RuntimeConfig runtimeConfig,
+      DiagnosticLogger diagnostics)
       throws Exception {
+    diagnostics.info(
+        "tui.session.start",
+        Map.of("smokeMode", smokeMode, "searchDebounceMs", Math.max(0, searchDebounceMs)));
     configureTerminalBackendPreference();
     try (var tui = TuiRunner.create()) {
       QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
@@ -198,7 +202,12 @@ public final class QuarkusForgeCli implements Callable<Integer> {
               ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile()),
               CoreTuiController.defaultFavoritesPersistenceExecutor());
       controller.loadExtensionCatalogAsync(
-          () -> catalogDataService.load().thenApply(QuarkusForgeCli::toExtensionCatalogLoadResult));
+          () -> {
+            diagnostics.info("catalog.load.start", Map.of("mode", "tui"));
+            return catalogDataService
+                .load()
+                .handle(QuarkusForgeCli.catalogLoadDiagnostics(diagnostics));
+          });
       if (smokeMode) {
         tui.scheduler().schedule(tui::quit, 350, TimeUnit.MILLISECONDS);
       }
@@ -207,12 +216,50 @@ public final class QuarkusForgeCli implements Callable<Integer> {
           (event, runner) -> {
             CoreTuiController.UiAction action = controller.onEvent(event);
             if (action.shouldQuit()) {
+              diagnostics.info("tui.session.quit.requested", Map.of("reason", "user"));
               runner.quit();
             }
             return action.handled();
           },
           controller::render);
+      diagnostics.info("tui.session.exit", Map.of("outcome", "completed"));
+    } catch (Exception exception) {
+      diagnostics.error(
+          "tui.session.failure",
+          Map.of(
+              "causeType", exception.getClass().getSimpleName(),
+              "message", userFriendlyError(exception)));
+      throw exception;
     }
+  }
+
+  private static java.util.function.BiFunction<
+          CatalogData, Throwable, CoreTuiController.ExtensionCatalogLoadResult>
+      catalogLoadDiagnostics(DiagnosticLogger diagnostics) {
+    return (catalogData, throwable) -> {
+      if (throwable == null) {
+        diagnostics.info(
+            "catalog.load.success",
+            Map.of(
+                "mode", "tui",
+                "source", catalogData.source().label(),
+                "stale", catalogData.stale(),
+                "detail", catalogData.detailMessage()));
+        return toExtensionCatalogLoadResult(catalogData);
+      }
+      Throwable cause = unwrapCompletionFailure(throwable);
+      if (cause instanceof CancellationException) {
+        diagnostics.error("catalog.load.cancelled", Map.of("mode", "tui"));
+      } else {
+        diagnostics.error(
+            "catalog.load.failure",
+            Map.of(
+                "mode", "tui",
+                "causeType", cause.getClass().getSimpleName(),
+                "message", userFriendlyError(cause)));
+      }
+      throw new CompletionException(cause);
+    };
   }
 
   private static CoreTuiController.ExtensionCatalogLoadResult toExtensionCatalogLoadResult(

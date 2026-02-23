@@ -33,4 +33,14 @@
 - Catalog source labeling is surfaced in dry-run output (`live`, `cache`, optional `[stale]` marker).
 - Output path resolves to `<output-dir>/<artifact-id>` and uses fail-if-exists behavior.
 - `--verbose` emits structured JSON-line diagnostics to `stderr` (events include metadata load,
-  catalog load, dry-run validation, generation start/success/failure).
+  catalog load, dry-run validation, generation start/success/failure, and TUI session events).
+
+## Troubleshooting Matrix (`--verbose`)
+| Symptom | Diagnostic Events | Interpretation | Action |
+| --- | --- | --- | --- |
+| Startup falls back to bundled metadata | `metadata.load.fallback` | Live metadata refresh failed (timeout, network, or API shape) and startup switched to snapshot. | Check connectivity/API availability; retry. If persistent, run with values compatible with snapshot metadata. |
+| TUI opens but catalog does not refresh from live source | `catalog.load.start` then `catalog.load.success` with `"mode":"tui"` and `"source":"cache"`/`"snapshot"` | TUI catalog load succeeded through fallback source, not live API. | Continue working; if live data is required, verify API reachability and reload with `Ctrl+R`. |
+| TUI catalog load fails | `catalog.load.failure` with `"mode":"tui"` | Initial or reload catalog request failed without a usable fallback. | Validate endpoint/network and rerun; inspect `causeType` and `message`. |
+| TUI exits unexpectedly | `tui.session.failure` | Session terminated due to runtime failure before normal completion. | Inspect failure `causeType/message`; rerun with `--smoke --verbose` for quick reproduction. |
+| Headless generate fails before submit | `catalog.load.failure` (no `"mode":"tui"`) or `generate.validation.failed` | Request could not be validated or catalog could not be loaded. | Fix validation fields/extension IDs or restore API access. |
+| Headless generate fails during archive step | `generate.execute.failure` | Download/extract failed after request validation. | Check output path conflicts, filesystem permissions, and API response health. |

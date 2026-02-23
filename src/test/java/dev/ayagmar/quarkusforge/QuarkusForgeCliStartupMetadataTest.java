@@ -81,6 +81,32 @@ class QuarkusForgeCliStartupMetadataTest {
   }
 
   @Test
+  void verboseSmokeModeEmitsTuiCatalogDiagnostics() {
+    stubLiveMetadataWithMavenOnly();
+    stubExtensionCatalog();
+    QuarkusForgeCli.RuntimeConfig runtimeConfig =
+        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+
+    CommandResult result =
+        runCommand(
+            runtimeConfig,
+            "--verbose",
+            "--smoke",
+            "--group-id",
+            "com.example",
+            "--artifact-id",
+            "forge-app");
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(result.standardError()).contains("\"event\":\"tui.session.start\"");
+    assertThat(result.standardError()).contains("\"event\":\"catalog.load.start\"");
+    assertThat(result.standardError())
+        .contains("\"event\":\"catalog.load.success\"")
+        .contains("\"mode\":\"tui\"");
+    assertThat(result.standardError()).contains("\"event\":\"tui.session.exit\"");
+  }
+
+  @Test
   void dryRunUsesRecommendedPlatformStreamWhenOptionIsOmitted() {
     stubLiveMetadataWithMavenOnly();
     QuarkusForgeCli.RuntimeConfig runtimeConfig =
@@ -218,6 +244,27 @@ class QuarkusForgeCliStartupMetadataTest {
     stubFor(get(urlPathEqualTo("/api/streams")).willReturn(aResponse().withStatus(404)));
     stubFor(
         get(urlPathEqualTo("/q/openapi")).willReturn(aResponse().withStatus(200).withBody("{}")));
+  }
+
+  private void stubExtensionCatalog() {
+    stubFor(
+        get(urlPathEqualTo("/api/extensions"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        [
+                          {
+                            "id":"io.quarkus:quarkus-rest",
+                            "name":"REST",
+                            "shortName":"rest",
+                            "category":"Web",
+                            "order":10
+                          }
+                        ]
+                        """)));
   }
 
   private record CommandResult(int exitCode, String standardOut, String standardError) {}
