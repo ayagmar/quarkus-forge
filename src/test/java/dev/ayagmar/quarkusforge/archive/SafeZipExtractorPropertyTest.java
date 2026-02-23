@@ -36,15 +36,121 @@ class SafeZipExtractorPropertyTest {
         extractor.extract(zipPath, destination, OverwritePolicy.FAIL_IF_EXISTS);
 
     assertThat(result.extractedRoot()).isEqualTo(destination);
-    for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
-      String normalizedEntryName = SafeZipExtractor.normalizeEntryName(entry.getKey());
-      String pathInOutput = normalizedEntryName.substring(normalizedEntryName.indexOf('/') + 1);
-      assertThat(Files.readAllBytes(destination.resolve(pathInOutput)))
-          .as(
-              "seed=%s, entry=%s",
-              BASE_SEED + repetitionInfo.getCurrentRepetition(), entry.getKey())
-          .isEqualTo(entry.getValue());
-    }
+    assertExtractedEntries(destination, entries, repetitionInfo, 1);
+  }
+
+  @RepeatedTest(16)
+  void randomizedReorderedCentralDirectoryEntriesStillExtract(RepetitionInfo repetitionInfo)
+      throws IOException {
+    SplittableRandom random = seededRandom(repetitionInfo, 11);
+    Map<String, byte[]> entries = randomizedDemoEntries(random);
+    Path zipPath =
+        ArchiveTestUtils.createZip(
+            tempDir.resolve("reordered-central-" + repetitionInfo.getCurrentRepetition() + ".zip"),
+            entries);
+    ArchiveTestUtils.reverseCentralDirectoryEntries(zipPath);
+
+    SafeZipExtractor extractor = new SafeZipExtractor();
+    Path destination = tempDir.resolve("output-reordered-" + repetitionInfo.getCurrentRepetition());
+
+    SafeZipExtractor.ExtractionResult result =
+        extractor.extract(zipPath, destination, OverwritePolicy.FAIL_IF_EXISTS);
+
+    assertThat(result.extractedRoot()).isEqualTo(destination);
+    assertExtractedEntries(destination, entries, repetitionInfo, 11);
+  }
+
+  @RepeatedTest(12)
+  void randomizedDuplicateCentralDirectoryEntriesAreRejected(RepetitionInfo repetitionInfo)
+      throws IOException {
+    String entryName = "demo/file-" + repetitionInfo.getCurrentRepetition() + ".txt";
+    Path zipPath =
+        ArchiveTestUtils.createZip(
+            tempDir.resolve("duplicate-central-" + repetitionInfo.getCurrentRepetition() + ".zip"),
+            Map.of(entryName, "payload".getBytes()));
+    ArchiveTestUtils.duplicateCentralDirectoryEntry(zipPath, entryName);
+
+    SafeZipExtractor extractor = new SafeZipExtractor();
+    assertThatThrownBy(
+            () ->
+                extractor.extract(
+                    zipPath,
+                    tempDir.resolve(
+                        "output-duplicate-central-" + repetitionInfo.getCurrentRepetition()),
+                    OverwritePolicy.FAIL_IF_EXISTS))
+        .isInstanceOf(ArchiveException.class)
+        .hasMessageContaining("Duplicate ZIP entry found after normalization");
+  }
+
+  @RepeatedTest(12)
+  void randomizedCentralPayloadNameMismatchesAreRejected(RepetitionInfo repetitionInfo)
+      throws IOException {
+    String entryName = "demo/file-" + repetitionInfo.getCurrentRepetition() + ".txt";
+    Path zipPath =
+        ArchiveTestUtils.createZip(
+            tempDir.resolve(
+                "central-payload-mismatch-" + repetitionInfo.getCurrentRepetition() + ".zip"),
+            Map.of(entryName, "payload".getBytes()));
+    ArchiveTestUtils.patchCentralDirectoryEntryNameByte(zipPath, entryName, 0, (byte) 'x');
+
+    SafeZipExtractor extractor = new SafeZipExtractor();
+    assertThatThrownBy(
+            () ->
+                extractor.extract(
+                    zipPath,
+                    tempDir.resolve(
+                        "output-central-payload-mismatch-" + repetitionInfo.getCurrentRepetition()),
+                    OverwritePolicy.FAIL_IF_EXISTS))
+        .isInstanceOf(ArchiveException.class)
+        .hasMessageContaining("missing in central directory");
+  }
+
+  @RepeatedTest(12)
+  void randomizedPayloadCentralNameMismatchesAreRejected(RepetitionInfo repetitionInfo)
+      throws IOException {
+    String entryName = "demo/file-" + repetitionInfo.getCurrentRepetition() + ".txt";
+    Path zipPath =
+        ArchiveTestUtils.createZip(
+            tempDir.resolve(
+                "payload-central-mismatch-" + repetitionInfo.getCurrentRepetition() + ".zip"),
+            Map.of(entryName, "payload".getBytes()));
+    ArchiveTestUtils.patchFirstLocalFileHeaderNameByte(zipPath, 0, (byte) 'x');
+
+    SafeZipExtractor extractor = new SafeZipExtractor();
+    assertThatThrownBy(
+            () ->
+                extractor.extract(
+                    zipPath,
+                    tempDir.resolve(
+                        "output-payload-central-mismatch-" + repetitionInfo.getCurrentRepetition()),
+                    OverwritePolicy.FAIL_IF_EXISTS))
+        .isInstanceOf(ArchiveException.class)
+        .hasMessageContaining("missing in central directory");
+  }
+
+  @RepeatedTest(16)
+  void randomizedMalformedCentralHeadersAreRejected(RepetitionInfo repetitionInfo)
+      throws IOException {
+    SplittableRandom random = seededRandom(repetitionInfo, 14);
+    Map<String, byte[]> entries = randomizedDemoEntries(random);
+    Path zipPath =
+        ArchiveTestUtils.createZip(
+            tempDir.resolve(
+                "malformed-central-header-" + repetitionInfo.getCurrentRepetition() + ".zip"),
+            entries);
+    ArchiveTestUtils.corruptRandomCentralDirectoryHeader(
+        zipPath, BASE_SEED + repetitionInfo.getCurrentRepetition() * 31L + 14L);
+
+    SafeZipExtractor extractor = new SafeZipExtractor();
+    assertThatThrownBy(
+            () ->
+                extractor.extract(
+                    zipPath,
+                    tempDir.resolve(
+                        "output-malformed-central-header-" + repetitionInfo.getCurrentRepetition()),
+                    OverwritePolicy.FAIL_IF_EXISTS))
+        .isInstanceOf(ArchiveException.class)
+        .hasMessageContaining("malformed central directory header");
   }
 
   @RepeatedTest(20)
@@ -132,5 +238,19 @@ class SafeZipExtractorPropertyTest {
       bytes[0] = 1;
     }
     return bytes;
+  }
+
+  private static void assertExtractedEntries(
+      Path destination, Map<String, byte[]> entries, RepetitionInfo repetitionInfo, long salt)
+      throws IOException {
+    for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
+      String normalizedEntryName = SafeZipExtractor.normalizeEntryName(entry.getKey());
+      String pathInOutput = normalizedEntryName.substring(normalizedEntryName.indexOf('/') + 1);
+      assertThat(Files.readAllBytes(destination.resolve(pathInOutput)))
+          .as(
+              "seed=%s, entry=%s",
+              BASE_SEED + (long) repetitionInfo.getCurrentRepetition() * 31L + salt, entry.getKey())
+          .isEqualTo(entry.getValue());
+    }
   }
 }
