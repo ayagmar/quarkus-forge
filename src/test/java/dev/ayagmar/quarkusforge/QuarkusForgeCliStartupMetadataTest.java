@@ -60,6 +60,27 @@ class QuarkusForgeCliStartupMetadataTest {
   }
 
   @Test
+  void verboseDryRunEmitsMetadataLoadDiagnostics() {
+    stubLiveMetadataWithMavenOnly();
+    QuarkusForgeCli.RuntimeConfig runtimeConfig =
+        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+
+    CommandResult result =
+        runCommand(
+            runtimeConfig,
+            "--verbose",
+            "--dry-run",
+            "--group-id",
+            "com.example",
+            "--artifact-id",
+            "forge-app");
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(result.standardError()).contains("\"event\":\"metadata.load.success\"");
+    assertThat(result.standardError()).contains("\"traceId\":\"");
+  }
+
+  @Test
   void dryRunUsesRecommendedPlatformStreamWhenOptionIsOmitted() {
     stubLiveMetadataWithMavenOnly();
     QuarkusForgeCli.RuntimeConfig runtimeConfig =

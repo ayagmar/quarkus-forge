@@ -32,3 +32,5 @@
 - Extension IDs are validated strictly against the loaded catalog before generation.
 - Catalog source labeling is surfaced in dry-run output (`live`, `cache`, optional `[stale]` marker).
 - Output path resolves to `<output-dir>/<artifact-id>` and uses fail-if-exists behavior.
+- `--verbose` emits structured JSON-line diagnostics to `stderr` (events include metadata load,
+  catalog load, dry-run validation, generation start/success/failure).

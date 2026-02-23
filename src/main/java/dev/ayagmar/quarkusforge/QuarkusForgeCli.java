@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import dev.ayagmar.quarkusforge.api.ApiClientException;
 import dev.ayagmar.quarkusforge.api.ApiErrorMessages;
 import dev.ayagmar.quarkusforge.api.CatalogData;
@@ -8,6 +9,7 @@ import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
+import dev.ayagmar.quarkusforge.api.ObjectMapperProvider;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
 import dev.ayagmar.quarkusforge.archive.ArchiveException;
 import dev.ayagmar.quarkusforge.archive.OverwritePolicy;
@@ -28,6 +30,7 @@ import dev.tamboui.tui.TuiRunner;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -37,6 +40,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionException;
@@ -93,6 +97,12 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       description = "Debounce delay for extension search updates")
   private int searchDebounceMs;
 
+  @Option(
+      names = "--verbose",
+      defaultValue = "false",
+      description = "Emit structured JSON-line diagnostics to stderr")
+  private boolean verbose;
+
   public QuarkusForgeCli() {
     this(RuntimeConfig.defaults());
   }
@@ -103,14 +113,19 @@ public final class QuarkusForgeCli implements Callable<Integer> {
 
   @Override
   public Integer call() throws Exception {
+    DiagnosticLogger diagnostics = DiagnosticLogger.create(verbose);
+    diagnostics.info("cli.start", Map.of("mode", dryRun ? "dry-run" : "tui"));
+
     ProjectRequest request = toProjectRequest(requestOptions);
-    StartupMetadataSelection startupMetadataSelection = loadStartupMetadataSelection();
+    StartupMetadataSelection startupMetadataSelection = loadStartupMetadataSelection(diagnostics);
     ProjectRequest requestWithResolvedStream =
         applyRecommendedPlatformStream(request, startupMetadataSelection.metadataCompatibility());
     ForgeUiState initialState =
         buildInitialState(
             requestWithResolvedStream, startupMetadataSelection.metadataCompatibility());
     if (!initialState.canSubmit()) {
+      diagnostics.error(
+          "cli.validation.failed", Map.of("errorCount", initialState.validation().errors().size()));
       printValidationErrors(
           initialState.validation(),
           startupMetadataSelection.sourceLabel(),
@@ -119,6 +134,9 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     }
 
     if (dryRun) {
+      diagnostics.info(
+          "cli.dry-run.validated",
+          Map.of("metadataSource", startupMetadataSelection.sourceLabel()));
       printPrefillSummary(
           initialState.request(),
           startupMetadataSelection.sourceLabel(),
@@ -126,6 +144,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       return CommandLine.ExitCode.OK;
     }
 
+    diagnostics.info("cli.tui.launch", Map.of("searchDebounceMs", searchDebounceMs));
     runTui(smokeMode, initialState, searchDebounceMs, runtimeConfig);
     return CommandLine.ExitCode.OK;
   }
@@ -455,27 +474,46 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     return List.copyOf(resolved);
   }
 
-  private StartupMetadataSelection loadStartupMetadataSelection() {
+  private StartupMetadataSelection loadStartupMetadataSelection(DiagnosticLogger diagnostics) {
     QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
     try {
       MetadataDto metadata =
           apiClient
               .fetchMetadata()
               .get(STARTUP_METADATA_REFRESH_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+      diagnostics.info("metadata.load.success", Map.of("source", "live"));
       return new StartupMetadataSelection(
           MetadataCompatibilityContext.success(metadata), "live", "");
     } catch (InterruptedException interruptedException) {
       Thread.currentThread().interrupt();
-      return snapshotFallbackSelection("Live metadata refresh interrupted");
+      StartupMetadataSelection selection =
+          snapshotFallbackSelection("Live metadata refresh interrupted");
+      diagnostics.error(
+          "metadata.load.fallback",
+          Map.of("source", selection.sourceLabel(), "detail", selection.detailMessage()));
+      return selection;
     } catch (TimeoutException timeoutException) {
-      return snapshotFallbackSelection(
-          "Live metadata refresh timed out after "
-              + STARTUP_METADATA_REFRESH_TIMEOUT.toMillis()
-              + "ms");
+      StartupMetadataSelection selection =
+          snapshotFallbackSelection(
+              "Live metadata refresh timed out after "
+                  + STARTUP_METADATA_REFRESH_TIMEOUT.toMillis()
+                  + "ms");
+      diagnostics.error(
+          "metadata.load.fallback",
+          Map.of("source", selection.sourceLabel(), "detail", selection.detailMessage()));
+      return selection;
     } catch (ExecutionException executionException) {
       Throwable cause = unwrapCompletionFailure(executionException);
-      return snapshotFallbackSelection(
-          "Live metadata unavailable (%s)".formatted(userFriendlyError(cause)));
+      StartupMetadataSelection selection =
+          snapshotFallbackSelection(
+              "Live metadata unavailable (%s)".formatted(userFriendlyError(cause)));
+      diagnostics.error(
+          "metadata.load.fallback",
+          Map.of(
+              "source", selection.sourceLabel(),
+              "detail", selection.detailMessage(),
+              "causeType", cause.getClass().getSimpleName()));
+      return selection;
     }
   }
 
@@ -490,18 +528,34 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   }
 
   private Integer runHeadlessGenerate(GenerateCommand command) {
+    DiagnosticLogger diagnostics = DiagnosticLogger.create(verbose);
+    diagnostics.info(
+        "generate.start", Map.of("mode", command.dryRun || dryRun ? "dry-run" : "apply"));
+
     CatalogData catalogData;
     try {
       catalogData = loadCatalogData();
+      diagnostics.info(
+          "catalog.load.success",
+          Map.of(
+              "source", catalogData.source().label(),
+              "stale", catalogData.stale(),
+              "detail", catalogData.detailMessage()));
     } catch (CancellationException cancellationException) {
+      diagnostics.error("catalog.load.cancelled", Map.of("phase", "before-start"));
       System.err.println("Generation cancelled before start.");
       return EXIT_CODE_CANCELLED;
     } catch (InterruptedException interruptedException) {
       Thread.currentThread().interrupt();
+      diagnostics.error("catalog.load.cancelled", Map.of("phase", "interrupted"));
       System.err.println("Generation cancelled before start.");
       return EXIT_CODE_CANCELLED;
     } catch (ExecutionException executionException) {
       Throwable cause = unwrapCompletionFailure(executionException);
+      diagnostics.error(
+          "catalog.load.failure",
+          Map.of(
+              "causeType", cause.getClass().getSimpleName(), "message", userFriendlyError(cause)));
       System.err.println("Failed to load extension catalog: " + userFriendlyError(cause));
       return mapHeadlessFailureToExitCode(cause);
     }
@@ -514,6 +568,11 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     ForgeUiState validatedState =
         buildInitialState(requestWithResolvedStream, metadataCompatibility);
     if (!validatedState.canSubmit()) {
+      diagnostics.error(
+          "generate.validation.failed",
+          Map.of(
+              "errorCount", validatedState.validation().errors().size(),
+              "catalogSource", catalogData.source().label()));
       printValidationErrors(
           validatedState.validation(),
           catalogData.source().label() + (catalogData.stale() ? " [stale]" : ""),
@@ -531,6 +590,9 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       extensionIds =
           resolveRequestedExtensions(command.extensions, command.presets, knownExtensionIds);
     } catch (ValidationException validationException) {
+      diagnostics.error(
+          "generate.extension-validation.failed",
+          Map.of("errorCount", validationException.errors().size()));
       printValidationErrors(
           new ValidationReport(validationException.errors()),
           catalogData.source().label() + (catalogData.stale() ? " [stale]" : ""),
@@ -540,6 +602,12 @@ public final class QuarkusForgeCli implements Callable<Integer> {
 
     boolean dryRunRequested = command.dryRun || dryRun;
     if (dryRunRequested) {
+      diagnostics.info(
+          "generate.dry-run.validated",
+          Map.of(
+              "extensionCount", extensionIds.size(),
+              "catalogSource", catalogData.source().label(),
+              "stale", catalogData.stale()));
       printDryRunSummary(
           validatedState.request(),
           extensionIds,
@@ -566,6 +634,9 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     ProjectArchiveService archiveService =
         new ProjectArchiveService(apiClient, new SafeZipExtractor());
     try {
+      diagnostics.info(
+          "generate.execute.start",
+          Map.of("outputPath", outputPath.toString(), "extensionCount", extensionIds.size()));
       Path generatedProjectRoot =
           archiveService
               .downloadAndExtract(
@@ -580,19 +651,29 @@ public final class QuarkusForgeCli implements Callable<Integer> {
                             case EXTRACTING_ARCHIVE -> "extracting project archive...";
                           }))
               .get();
+      diagnostics.info(
+          "generate.execute.success", Map.of("projectRoot", generatedProjectRoot.toString()));
       System.out.println(
           "Generation succeeded: " + generatedProjectRoot.toAbsolutePath().normalize());
       return CommandLine.ExitCode.OK;
     } catch (CancellationException cancellationException) {
+      diagnostics.error("generate.execute.cancelled", Map.of("phase", "execution"));
       System.err.println("Generation cancelled.");
       return EXIT_CODE_CANCELLED;
     } catch (InterruptedException interruptedException) {
       Thread.currentThread().interrupt();
+      diagnostics.error("generate.execute.cancelled", Map.of("phase", "interrupted"));
       System.err.println("Generation cancelled.");
       return EXIT_CODE_CANCELLED;
     } catch (ExecutionException executionException) {
       Throwable cause = unwrapCompletionFailure(executionException);
       int exitCode = mapHeadlessFailureToExitCode(cause);
+      diagnostics.error(
+          "generate.execute.failure",
+          Map.of(
+              "causeType", cause.getClass().getSimpleName(),
+              "message", userFriendlyError(cause),
+              "exitCode", exitCode));
       System.err.println("Generation failed: " + userFriendlyError(cause));
       return exitCode;
     }
@@ -713,6 +794,53 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       Objects.requireNonNull(metadataCompatibility);
       sourceLabel = sourceLabel == null ? "" : sourceLabel.strip();
       detailMessage = detailMessage == null ? "" : detailMessage.strip();
+    }
+  }
+
+  private static final class DiagnosticLogger {
+    private final boolean enabled;
+    private final String traceId;
+
+    private DiagnosticLogger(boolean enabled, String traceId) {
+      this.enabled = enabled;
+      this.traceId = traceId;
+    }
+
+    static DiagnosticLogger create(boolean enabled) {
+      if (!enabled) {
+        return new DiagnosticLogger(false, "");
+      }
+      return new DiagnosticLogger(true, UUID.randomUUID().toString());
+    }
+
+    private void info(String event, Map<String, Object> fields) {
+      log("INFO", event, fields);
+    }
+
+    private void error(String event, Map<String, Object> fields) {
+      log("ERROR", event, fields);
+    }
+
+    private void log(String level, String event, Map<String, Object> fields) {
+      if (!enabled) {
+        return;
+      }
+      Map<String, Object> payload = new LinkedHashMap<>();
+      payload.put("ts", Instant.now().toString());
+      payload.put("level", level);
+      payload.put("event", event);
+      payload.put("traceId", traceId);
+      payload.putAll(fields);
+      try {
+        System.err.println(ObjectMapperProvider.shared().writeValueAsString(payload));
+      } catch (JsonProcessingException jsonProcessingException) {
+        System.err.println(
+            "{\"event\":\"diagnostic.encoding.failure\",\"traceId\":\""
+                + traceId
+                + "\",\"message\":\""
+                + jsonProcessingException.getMessage().replace("\"", "'")
+                + "\"}");
+      }
     }
   }
 }

@@ -195,6 +195,49 @@ class QuarkusForgeGenerateCommandTest {
   }
 
   @Test
+  void verboseDryRunEmitsGenerateLifecycleDiagnostics() {
+    stubCatalogEndpoints();
+    QuarkusForgeCli.RuntimeConfig runtimeConfig =
+        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+
+    CommandResult result =
+        runCommand(
+            runtimeConfig,
+            "--verbose",
+            "generate",
+            "--dry-run",
+            "--group-id",
+            "com.example",
+            "--artifact-id",
+            "headless-app");
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(result.standardError()).contains("\"event\":\"generate.start\"");
+    assertThat(result.standardError()).contains("\"event\":\"catalog.load.success\"");
+    assertThat(result.standardError()).contains("\"event\":\"generate.dry-run.validated\"");
+  }
+
+  @Test
+  void verboseNetworkFailureEmitsCatalogLoadFailureDiagnostics() {
+    QuarkusForgeCli.RuntimeConfig runtimeConfig = runtimeConfig(URI.create("http://127.0.0.1:1"));
+
+    CommandResult result =
+        runCommand(
+            runtimeConfig,
+            "--verbose",
+            "generate",
+            "--dry-run",
+            "--group-id",
+            "com.example",
+            "--artifact-id",
+            "headless-app");
+
+    assertThat(result.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_NETWORK);
+    assertThat(result.standardError()).contains("\"event\":\"catalog.load.failure\"");
+    assertThat(result.standardError()).contains("\"causeType\":\"ApiClientException\"");
+  }
+
+  @Test
   void outputConflictReturnsArchiveExitCode() throws Exception {
     stubCatalogEndpoints();
     stubDownloadEndpoint("headless-app");
