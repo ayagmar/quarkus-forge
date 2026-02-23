@@ -31,6 +31,7 @@
   missing `category` defaults to `Other`.
 - Metadata is synthesized from live contract sources:
   - Java versions: union of `/api/streams[].javaCompatibility.versions`
+  - Platform streams: `/api/streams[]` (`key`, `platformVersion`, `recommended`, per-stream Java compatibility)
   - Build tools: `/q/openapi` enum at `/api/download` parameter `b`
   - Compatibility map: generated for each build tool over the same Java version set
 - Missing/renamed required fields raise `ApiContractException`, then fallback policy applies.
@@ -46,6 +47,7 @@
 
 ## Generation Query Mapping
 - Generation query parameters are encoded using the contract keys:
+  - `S` = platform stream key (optional; omitted when blank)
   - `g` = groupId
   - `a` = artifactId
   - `v` = version

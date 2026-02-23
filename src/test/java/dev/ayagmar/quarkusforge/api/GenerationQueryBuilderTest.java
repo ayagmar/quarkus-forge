@@ -41,4 +41,21 @@ class GenerationQueryBuilderTest {
 
     assertThat(uri.toString()).contains("&b=GRADLE_KOTLIN_DSL&");
   }
+
+  @Test
+  void buildEncodesPlatformStreamWhenProvided() {
+    GenerationRequest request =
+        new GenerationRequest(
+            "com.example",
+            "demo",
+            "1.0.0-SNAPSHOT",
+            "io.quarkus.platform:3.31",
+            "maven",
+            "25",
+            List.of());
+
+    URI uri = GenerationQueryBuilder.build(URI.create("https://code.quarkus.io"), request);
+
+    assertThat(uri.toString()).contains("S=io.quarkus.platform%3A3.31");
+  }
 }

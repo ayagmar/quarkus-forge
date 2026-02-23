@@ -16,6 +16,7 @@ public final class ProjectRequestValidator {
   private static final Pattern PACKAGE_NAME_PATTERN =
       Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$");
   private static final Pattern WINDOWS_INVALID_CHARS = Pattern.compile("[<>:\"|?*\\u0000-\\u001F]");
+  private static final Pattern PLATFORM_STREAM_PATTERN = Pattern.compile("^[A-Za-z0-9._:-]+$");
   private static final Pattern BUILD_TOOL_PATTERN = Pattern.compile("^[A-Za-z][A-Za-z0-9_-]*$");
   private static final Pattern JAVA_VERSION_PATTERN = Pattern.compile("^[0-9]+$");
 
@@ -52,6 +53,13 @@ public final class ProjectRequestValidator {
         "must be a valid Java package name",
         errors);
     validatePattern(
+        request.platformStream(),
+        PLATFORM_STREAM_PATTERN,
+        "platformStream",
+        "must contain only letters, digits, '.', '-', '_' or ':'",
+        errors,
+        true);
+    validatePattern(
         request.buildTool(),
         BUILD_TOOL_PATTERN,
         "buildTool",
@@ -75,8 +83,20 @@ public final class ProjectRequestValidator {
       String field,
       String errorMessage,
       List<ValidationError> errors) {
+    validatePattern(value, pattern, field, errorMessage, errors, false);
+  }
+
+  private static void validatePattern(
+      String value,
+      Pattern pattern,
+      String field,
+      String errorMessage,
+      List<ValidationError> errors,
+      boolean optional) {
     if (value == null || value.isBlank()) {
-      errors.add(new ValidationError(field, "must not be blank"));
+      if (!optional) {
+        errors.add(new ValidationError(field, "must not be blank"));
+      }
       return;
     }
 

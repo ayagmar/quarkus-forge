@@ -149,4 +149,33 @@ class ProjectRequestValidatorTest {
 
     assertThat(report.errors()).extracting(ValidationError::field).doesNotContain("javaVersion");
   }
+
+  @Test
+  void acceptsBlankPlatformStreamBecauseApiCanChooseDefault() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example", "forge-app", "1.0.0", "com.example.forge", "./out", "", "maven", "25");
+
+    ValidationReport report = validator.validate(request);
+
+    assertThat(report.errors()).extracting(ValidationError::field).doesNotContain("platformStream");
+  }
+
+  @Test
+  void rejectsPlatformStreamWithUnsupportedCharacters() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example",
+            "forge-app",
+            "1.0.0",
+            "com.example.forge",
+            "./out",
+            "io.quarkus.platform:3.31?",
+            "maven",
+            "25");
+
+    ValidationReport report = validator.validate(request);
+
+    assertThat(report.errors()).extracting(ValidationError::field).contains("platformStream");
+  }
 }

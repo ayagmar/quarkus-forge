@@ -7,7 +7,7 @@
 ## Request Flags
 - Metadata flags:
   - `--group-id`, `--artifact-id`, `--project-version`, `--package-name`, `--output-dir`
-  - `--build-tool`, `--java-version`
+  - `--platform-stream`, `--build-tool`, `--java-version`
 - Extension selection flags:
   - `--extension` (repeatable; also accepts comma-separated values)
   - `--preset` (repeatable; built-in presets: `web`, `data`, `messaging`, `favorites`)

@@ -245,6 +245,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
             options.version,
             options.packageName,
             options.outputDirectory,
+            options.platformStream,
             options.buildTool,
             options.javaVersion);
     return CliPrefillMapper.map(prefill);
@@ -266,6 +267,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     System.out.println(" - version: " + request.version());
     System.out.println(" - packageName: " + request.packageName());
     System.out.println(" - outputDirectory: " + request.outputDirectory());
+    System.out.println(" - platformStream: " + request.platformStream());
     System.out.println(" - buildTool: " + request.buildTool());
     System.out.println(" - javaVersion: " + request.javaVersion());
     System.out.println(" - generatedProjectDirectory: " + generatedProjectDirectory);
@@ -281,6 +283,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     System.out.println(" - version: " + request.version());
     System.out.println(" - packageName: " + request.packageName());
     System.out.println(" - outputDirectory: " + request.outputDirectory());
+    System.out.println(" - platformStream: " + request.platformStream());
     System.out.println(" - buildTool: " + request.buildTool());
     System.out.println(" - javaVersion: " + request.javaVersion());
     System.out.println(" - extensions: " + extensionIds);
@@ -454,6 +457,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
             validatedState.request().groupId(),
             validatedState.request().artifactId(),
             validatedState.request().version(),
+            validatedState.request().platformStream(),
             validatedState.request().buildTool(),
             validatedState.request().javaVersion(),
             extensionIds);
@@ -524,6 +528,12 @@ public final class QuarkusForgeCli implements Callable<Integer> {
         description =
             "Output parent directory (project path resolves to <output-dir>/<artifact-id>)")
     private String outputDirectory;
+
+    @Option(
+        names = {"-S", "--platform-stream"},
+        defaultValue = "",
+        description = "Quarkus platform stream key (metadata-driven, optional)")
+    private String platformStream;
 
     @Option(
         names = {"-b", "--build-tool"},

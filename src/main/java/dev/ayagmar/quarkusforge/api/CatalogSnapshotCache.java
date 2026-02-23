@@ -67,7 +67,7 @@ public final class CatalogSnapshotCache {
     byte[] payload;
     try {
       payload = toPayload(metadata, extensions);
-    } catch (IOException ioException) {
+    } catch (IOException | RuntimeException serializationException) {
       return CacheWriteOutcome.writeFailed("failed to serialize cache snapshot");
     }
 

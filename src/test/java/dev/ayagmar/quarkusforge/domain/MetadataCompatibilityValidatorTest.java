@@ -102,4 +102,59 @@ class MetadataCompatibilityValidatorTest {
 
     assertThat(report.isValid()).isTrue();
   }
+
+  @Test
+  void rejectsUnknownPlatformStreamWhenMetadataProvidesPlatformOptions() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example",
+            "forge-app",
+            "1.0.0",
+            "com.example.forge",
+            ".",
+            "io.quarkus.platform:9.99",
+            "maven",
+            "25");
+    MetadataDto metadata =
+        new MetadataDto(
+            List.of("21", "25"),
+            List.of("maven"),
+            Map.of("maven", List.of("21", "25")),
+            List.of(
+                new MetadataDto.PlatformStream(
+                    "io.quarkus.platform:3.31", "3.31", true, List.of("21", "25"))));
+
+    ValidationReport report = validator.validate(request, metadata);
+
+    assertThat(report.errors()).extracting(ValidationError::field).contains("platformStream");
+  }
+
+  @Test
+  void rejectsPlatformAndJavaCombinationWhenStreamDoesNotSupportJavaVersion() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example",
+            "forge-app",
+            "1.0.0",
+            "com.example.forge",
+            ".",
+            "io.quarkus.platform:3.20",
+            "maven",
+            "25");
+    MetadataDto metadata =
+        new MetadataDto(
+            List.of("17", "21", "25"),
+            List.of("maven"),
+            Map.of("maven", List.of("17", "21", "25")),
+            List.of(
+                new MetadataDto.PlatformStream(
+                    "io.quarkus.platform:3.31", "3.31", true, List.of("17", "21", "25")),
+                new MetadataDto.PlatformStream(
+                    "io.quarkus.platform:3.20", "3.20", false, List.of("17", "21"))));
+
+    ValidationReport report = validator.validate(request, metadata);
+
+    assertThat(report.errors()).extracting(ValidationError::field).contains("compatibility");
+    assertThat(report.errors().getFirst().message()).contains("platform stream");
+  }
 }

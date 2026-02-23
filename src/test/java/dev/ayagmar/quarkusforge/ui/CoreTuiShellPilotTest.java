@@ -2,7 +2,9 @@ package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
+import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.tamboui.buffer.Buffer;
 import dev.tamboui.layout.Rect;
 import dev.tamboui.terminal.Frame;
@@ -11,6 +13,7 @@ import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.KeyModifiers;
 import dev.tamboui.tui.event.ResizeEvent;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
@@ -41,6 +44,21 @@ class CoreTuiShellPilotTest {
     assertThat(downAction.handled()).isTrue();
     assertThat(toggleAction.handled()).isTrue();
     assertThat(controller.selectedExtensionIds()).hasSize(1);
+  }
+
+  @Test
+  void vimListMotionsJAndKNavigateCatalogRows() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    String firstId = controller.focusedListExtensionId();
+
+    controller.onEvent(KeyEvent.ofChar('j'));
+    String secondId = controller.focusedListExtensionId();
+    controller.onEvent(KeyEvent.ofChar('k'));
+
+    assertThat(secondId).isNotEqualTo(firstId);
+    assertThat(controller.focusedListExtensionId()).isEqualTo(firstId);
   }
 
   @Test
@@ -79,9 +97,9 @@ class CoreTuiShellPilotTest {
   void fixingInputWithoutChangingFocusClearsBlockedSubmitErrorFromFooter() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.JAVA_VERSION);
+    moveFocusTo(controller, FocusTarget.ARTIFACT_ID);
 
-    controller.onEvent(KeyEvent.ofChar('x'));
+    controller.onEvent(KeyEvent.ofChar('X'));
     assertThat(controller.validation().isValid()).isFalse();
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
@@ -98,9 +116,9 @@ class CoreTuiShellPilotTest {
   void blockedSubmitFeedbackRecoversEvenIfStatusMessageChangesBeforeFix() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.JAVA_VERSION);
+    moveFocusTo(controller, FocusTarget.ARTIFACT_ID);
 
-    controller.onEvent(KeyEvent.ofChar('x'));
+    controller.onEvent(KeyEvent.ofChar('X'));
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     assertThat(renderToString(controller)).contains("Error:");
 
@@ -147,6 +165,20 @@ class CoreTuiShellPilotTest {
 
     controller.onEvent(KeyEvent.ofChar('l', KeyModifiers.CTRL));
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
+  }
+
+  @Test
+  void submitFocusSupportsVimJkTraversal() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    moveFocusTo(controller, FocusTarget.SUBMIT);
+
+    controller.onEvent(KeyEvent.ofChar('k'));
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
+
+    moveFocusTo(controller, FocusTarget.SUBMIT);
+    controller.onEvent(KeyEvent.ofChar('j'));
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
   }
 
   @Test
@@ -288,6 +320,43 @@ class CoreTuiShellPilotTest {
     assertThat(renderToString(controller)).contains("CDI");
   }
 
+  @Test
+  void metadataSelectorsCycleFromLoadedOptionsAndBlockFreeTextEdits() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                new CoreTuiController.ExtensionCatalogLoadResult(
+                    List.of(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest")),
+                    CatalogSource.LIVE,
+                    false,
+                    "",
+                    selectorMetadata())));
+
+    moveFocusTo(controller, FocusTarget.PLATFORM_STREAM);
+    assertThat(controller.request().platformStream()).isEqualTo("io.quarkus.platform:3.31");
+    assertThat(renderToString(controller)).contains("(*)");
+
+    controller.onEvent(KeyEvent.ofChar('l'));
+    assertThat(controller.request().platformStream()).isEqualTo("io.quarkus.platform:3.20");
+    assertThat(controller.validation().isValid()).isFalse();
+    assertThat(controller.validation().errors().getFirst().field()).isEqualTo("compatibility");
+
+    moveFocusTo(controller, FocusTarget.JAVA_VERSION);
+    controller.onEvent(KeyEvent.ofChar('h'));
+    assertThat(controller.request().javaVersion()).isEqualTo("21");
+    assertThat(controller.validation().isValid()).isTrue();
+
+    moveFocusTo(controller, FocusTarget.BUILD_TOOL);
+    String originalBuildTool = controller.request().buildTool();
+    controller.onEvent(KeyEvent.ofChar('x'));
+    assertThat(controller.request().buildTool()).isEqualTo(originalBuildTool);
+
+    controller.onEvent(KeyEvent.ofChar('l'));
+    assertThat(controller.request().buildTool()).isEqualTo("gradle");
+  }
+
   private static void moveFocusTo(CoreTuiController controller, FocusTarget target) {
     for (int i = 0; i < 20 && controller.focusTarget() != target; i++) {
       controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
@@ -300,5 +369,17 @@ class CoreTuiShellPilotTest {
     Frame frame = Frame.forTesting(buffer);
     controller.render(frame);
     return buffer.toAnsiStringTrimmed();
+  }
+
+  private static MetadataDto selectorMetadata() {
+    return new MetadataDto(
+        List.of("17", "21", "25"),
+        List.of("maven", "gradle"),
+        Map.of("maven", List.of("17", "21", "25"), "gradle", List.of("21", "25")),
+        List.of(
+            new MetadataDto.PlatformStream(
+                "io.quarkus.platform:3.31", "3.31", true, List.of("17", "21", "25")),
+            new MetadataDto.PlatformStream(
+                "io.quarkus.platform:3.20", "3.20", false, List.of("17", "21"))));
   }
 }

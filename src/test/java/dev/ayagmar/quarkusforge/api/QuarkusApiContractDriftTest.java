@@ -32,6 +32,7 @@ class QuarkusApiContractDriftTest {
     assertThat(metadata.javaVersions()).contains("25");
     assertThat(metadata.buildTools()).contains("maven");
     assertThat(metadata.compatibility()).containsKey("gradle");
+    assertThat(metadata.recommendedPlatformStreamKey()).isEqualTo("io.quarkus.platform:3.31");
   }
 
   @Test
@@ -117,6 +118,29 @@ class QuarkusApiContractDriftTest {
         QuarkusApiClient.parseJavaVersionsFromStreamsPayload(streamsPayload, objectMapper);
 
     assertThat(javaVersions).containsExactly("17", "21", "25");
+  }
+
+  @Test
+  void streamsPayloadParsesPlatformStreamMetadata() {
+    String streamsPayload =
+        """
+        [
+          {
+            "key":"io.quarkus.platform:3.31",
+            "platformVersion":"3.31",
+            "recommended":true,
+            "javaCompatibility":{"versions":[17,21,25],"recommended":25}
+          }
+        ]
+        """;
+
+    List<MetadataDto.PlatformStream> platformStreams =
+        QuarkusApiClient.parsePlatformStreamsFromStreamsPayload(streamsPayload, objectMapper);
+
+    assertThat(platformStreams)
+        .containsExactly(
+            new MetadataDto.PlatformStream(
+                "io.quarkus.platform:3.31", "3.31", true, List.of("17", "21", "25")));
   }
 
   @Test

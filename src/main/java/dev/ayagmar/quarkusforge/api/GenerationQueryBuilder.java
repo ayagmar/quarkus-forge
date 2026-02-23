@@ -15,6 +15,7 @@ public final class GenerationQueryBuilder {
     URI endpoint = baseUri.resolve("/api/download");
 
     Map<String, String> parameters = new LinkedHashMap<>();
+    parameters.put("S", request.platformStream());
     parameters.put("g", request.groupId());
     parameters.put("a", request.artifactId());
     parameters.put("v", request.version());

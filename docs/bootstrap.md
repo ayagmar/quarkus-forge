@@ -50,7 +50,8 @@ Use these gates after each issue:
 ## CLI Prefill Flags
 - `--group-id`, `--artifact-id`, `--project-version`, `--package-name`, `--output-dir`
 - `--output-dir` is the parent directory for the generated project root (`<output-dir>/<artifact-id>`).
-- `--build-tool`, `--java-version` are validated against metadata compatibility rules before submit.
+- `--platform-stream`, `--build-tool`, `--java-version` are validated against metadata compatibility rules before submit.
+- In the TUI, `platformStream`, `buildTool`, and `javaVersion` are selector fields driven by metadata options.
 - `--search-debounce-ms` configures extension-search debounce delay in the TUI shell (`0` default for instant updates).
 - `--dry-run` validates input and prints resolved initial state without starting the TUI.
 - Validation rejects malformed Maven identifiers and Windows-invalid output paths (reserved names and invalid characters).

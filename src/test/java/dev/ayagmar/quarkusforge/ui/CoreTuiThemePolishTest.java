@@ -24,17 +24,17 @@ class CoreTuiThemePolishTest {
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
 
     String defaultFooter = renderToString(controller, 120, 32);
-    assertThat(defaultFooter).contains("Tab/Shift+Tab: focus | Enter: submit");
+    assertThat(defaultFooter).contains("Tab/Shift+Tab: focus | Enter: submit | /: search");
 
     moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     String listFooterWide = renderToString(controller, 120, 32);
     assertThat(listFooterWide)
         .contains(
-            "Up/Down/Home/End: list nav | Space: select | F: favorite | c: close/open category");
+            "Up/Down/Home/End or j/k: list nav | Space: select | F: favorite | c: close/open category");
 
     String listFooterNarrow = renderToString(controller, 80, 32);
     assertThat(listFooterNarrow)
-        .contains("Up/Down: nav | Space: select | F: favorite | c: close/open category");
+        .contains("Up/Down or j/k: nav | Space: select | F: favorite | c: category");
   }
 
   @Test
@@ -75,6 +75,29 @@ class CoreTuiThemePolishTest {
     String rendered = renderToString(controller, 70, 32);
     assertThat(rendered).contains("Next:");
     assertThat(rendered).contains("...");
+  }
+
+  @Test
+  void ctrlETogglesExpandedErrorDetailsInFooter() {
+    QueueingScheduler scheduler = new QueueingScheduler();
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ofMillis(50));
+    CompletableFuture<CoreTuiController.ExtensionCatalogLoadResult> loadFuture =
+        new CompletableFuture<>();
+    controller.loadExtensionCatalogAsync(() -> loadFuture);
+    loadFuture.completeExceptionally(
+        new IllegalStateException(
+            "live metadata failed because catalog endpoint did not return expected JSON payload"));
+    scheduler.runAll();
+
+    String collapsed = renderToString(controller, 90, 36);
+    assertThat(collapsed).doesNotContain("Error details:");
+
+    controller.onEvent(KeyEvent.ofChar('e', dev.tamboui.tui.event.KeyModifiers.CTRL));
+    String expanded = renderToString(controller, 90, 36);
+    assertThat(expanded).contains("Error details:");
+    assertThat(expanded).contains("expected JSON payload");
   }
 
   private static void moveFocusTo(CoreTuiController controller, FocusTarget target) {

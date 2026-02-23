@@ -17,6 +17,14 @@
     "compatibility": {
       "maven": ["17", "21", "25"],
       "gradle": ["21", "25"]
-    }
+    },
+    "platformStreams": [
+      {
+        "key": "io.quarkus.platform:3.31",
+        "platformVersion": "3.31",
+        "recommended": true,
+        "javaVersions": ["17", "21", "25"]
+      }
+    ]
   }
 }

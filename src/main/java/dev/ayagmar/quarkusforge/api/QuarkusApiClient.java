@@ -87,11 +87,10 @@ public final class QuarkusApiClient {
     HttpRequest streamsRequest = newGetRequest(baseUri.resolve("/api/streams"), "application/json");
     HttpRequest openApiRequest = newGetRequest(baseUri.resolve("/q/openapi"), "application/json");
 
-    CompletableFuture<List<String>> javaVersionsFuture =
+    CompletableFuture<StreamsMetadata> streamsMetadataFuture =
         sendWithRetry(streamsRequest, BodyHandlers.ofString(StandardCharsets.UTF_8), 1)
             .thenApply(this::assertSuccessful)
-            .thenApply(
-                response -> parseJavaVersionsFromStreamsPayload(response.body(), objectMapper));
+            .thenApply(response -> parseStreamsMetadataPayload(response.body(), objectMapper));
 
     CompletableFuture<List<String>> buildToolsFuture =
         sendWithRetry(openApiRequest, BodyHandlers.ofString(StandardCharsets.UTF_8), 1)
@@ -99,7 +98,7 @@ public final class QuarkusApiClient {
             .thenApply(response -> parseBuildToolsFromOpenApiPayload(response.body(), objectMapper))
             .exceptionally(ignored -> fallbackBuildTools());
 
-    return javaVersionsFuture.thenCombine(buildToolsFuture, QuarkusApiClient::toMetadata);
+    return streamsMetadataFuture.thenCombine(buildToolsFuture, QuarkusApiClient::toMetadata);
   }
 
   static MetadataDto parseMetadataPayload(String payload, ObjectMapper objectMapper) {
@@ -121,18 +120,31 @@ public final class QuarkusApiClient {
     List<String> buildTools = toStringList(buildToolsNode, "buildTools");
     Map<String, List<String>> compatibility =
         parseCompatibility(root.get("compatibility"), buildTools);
-    return new MetadataDto(javaVersions, buildTools, compatibility);
+    List<MetadataDto.PlatformStream> platformStreams =
+        parsePlatformStreams(root.get("platformStreams"));
+    return new MetadataDto(javaVersions, buildTools, compatibility, platformStreams);
   }
 
   static List<String> parseJavaVersionsFromStreamsPayload(
       String payload, ObjectMapper objectMapper) {
+    return parseStreamsMetadataPayload(payload, objectMapper).javaVersions();
+  }
+
+  static List<MetadataDto.PlatformStream> parsePlatformStreamsFromStreamsPayload(
+      String payload, ObjectMapper objectMapper) {
+    return parseStreamsMetadataPayload(payload, objectMapper).platformStreams();
+  }
+
+  static StreamsMetadata parseStreamsMetadataPayload(String payload, ObjectMapper objectMapper) {
     JsonNode root = readPayload(payload, objectMapper);
     if (!root.isArray()) {
       throw new ApiContractException("Streams payload must be a JSON array");
     }
 
     Set<Integer> versions = new LinkedHashSet<>();
+    List<MetadataDto.PlatformStream> platformStreams = new ArrayList<>();
     for (JsonNode stream : root) {
+      String key = requiredText(stream, "key");
       JsonNode javaCompatibilityNode = stream.get("javaCompatibility");
       if (javaCompatibilityNode == null || !javaCompatibilityNode.isObject()) {
         throw new ApiContractException("Stream payload is missing 'javaCompatibility' object");
@@ -141,6 +153,7 @@ public final class QuarkusApiClient {
       if (javaVersionsNode == null || !javaVersionsNode.isArray()) {
         throw new ApiContractException("Stream payload is missing 'javaCompatibility.versions'");
       }
+      List<String> streamJavaVersions = new ArrayList<>();
       for (JsonNode version : javaVersionsNode) {
         if (!version.canConvertToInt()) {
           throw new ApiContractException(
@@ -149,14 +162,25 @@ public final class QuarkusApiClient {
         int parsed = version.intValue();
         if (parsed > 0) {
           versions.add(parsed);
+          streamJavaVersions.add(String.valueOf(parsed));
         }
       }
+      if (streamJavaVersions.isEmpty()) {
+        throw new ApiContractException(
+            "Stream payload 'javaCompatibility.versions' must contain at least one positive value");
+      }
+      String platformVersion = optionalText(stream, "platformVersion");
+      boolean recommended = stream.path("recommended").asBoolean(false);
+      platformStreams.add(
+          new MetadataDto.PlatformStream(key, platformVersion, recommended, streamJavaVersions));
     }
 
     if (versions.isEmpty()) {
       throw new ApiContractException("Streams payload did not provide any Java versions");
     }
-    return versions.stream().sorted(Comparator.naturalOrder()).map(String::valueOf).toList();
+    List<String> javaVersions =
+        versions.stream().sorted(Comparator.naturalOrder()).map(String::valueOf).toList();
+    return new StreamsMetadata(javaVersions, List.copyOf(platformStreams));
   }
 
   static List<String> parseBuildToolsFromOpenApiPayload(String payload, ObjectMapper objectMapper) {
@@ -198,12 +222,14 @@ public final class QuarkusApiClient {
     return List.copyOf(buildTools);
   }
 
-  private static MetadataDto toMetadata(List<String> javaVersions, List<String> buildTools) {
+  private static MetadataDto toMetadata(StreamsMetadata streamsMetadata, List<String> buildTools) {
     Map<String, List<String>> compatibility = new LinkedHashMap<>();
+    List<String> javaVersions = streamsMetadata.javaVersions();
     for (String buildTool : buildTools) {
       compatibility.put(buildTool, javaVersions);
     }
-    return new MetadataDto(javaVersions, buildTools, compatibility);
+    return new MetadataDto(
+        javaVersions, buildTools, compatibility, streamsMetadata.platformStreams());
   }
 
   private static List<String> fallbackBuildTools() {
@@ -485,6 +511,34 @@ public final class QuarkusApiClient {
     return compatibility;
   }
 
+  private static List<MetadataDto.PlatformStream> parsePlatformStreams(JsonNode node) {
+    if (node == null || node.isNull()) {
+      return List.of();
+    }
+    if (!node.isArray()) {
+      throw new ApiContractException("Metadata payload field 'platformStreams' must be an array");
+    }
+
+    List<MetadataDto.PlatformStream> platformStreams = new ArrayList<>();
+    for (JsonNode platformStreamNode : node) {
+      if (!platformStreamNode.isObject()) {
+        throw new ApiContractException("Metadata platform stream entry must be an object");
+      }
+      String key = requiredText(platformStreamNode, "key");
+      String platformVersion = optionalText(platformStreamNode, "platformVersion");
+      JsonNode javaVersionsNode = platformStreamNode.get("javaVersions");
+      if (javaVersionsNode == null || !javaVersionsNode.isArray()) {
+        throw new ApiContractException(
+            "Metadata platform stream entry is missing 'javaVersions' array");
+      }
+      List<String> javaVersions = toStringList(javaVersionsNode, "platformStreams.javaVersions");
+      boolean recommended = platformStreamNode.path("recommended").asBoolean(false);
+      platformStreams.add(
+          new MetadataDto.PlatformStream(key, platformVersion, recommended, javaVersions));
+    }
+    return List.copyOf(platformStreams);
+  }
+
   private static Throwable unwrapThrowable(Throwable throwable) {
     if (throwable == null) {
       return null;
@@ -498,6 +552,14 @@ public final class QuarkusApiClient {
 
   private static String normalizeKey(String key) {
     return key == null ? "" : key.trim().toLowerCase(Locale.ROOT);
+  }
+
+  record StreamsMetadata(
+      List<String> javaVersions, List<MetadataDto.PlatformStream> platformStreams) {
+    StreamsMetadata {
+      javaVersions = List.copyOf(javaVersions);
+      platformStreams = List.copyOf(platformStreams);
+    }
   }
 
   private record CompatibilityEntry(String originalBuildTool, JsonNode value) {}

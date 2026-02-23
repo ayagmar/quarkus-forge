@@ -20,6 +20,7 @@ public final class CliPrefillMapper {
         trim(prefill.version()),
         trim(effectivePackage),
         trim(prefill.outputDirectory()),
+        trim(prefill.platformStream()),
         trim(prefill.buildTool()),
         trim(prefill.javaVersion()));
   }

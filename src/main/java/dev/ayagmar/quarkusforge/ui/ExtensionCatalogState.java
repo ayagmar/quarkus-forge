@@ -239,19 +239,19 @@ final class ExtensionCatalogState {
     if (selectableRowIndexes.isEmpty()) {
       return false;
     }
-    if (keyEvent.isUp()) {
+    if (keyEvent.isUp() || isVimUpKey(keyEvent)) {
       selectPrevious();
       return true;
     }
-    if (keyEvent.isDown()) {
+    if (keyEvent.isDown() || isVimDownKey(keyEvent)) {
       selectNext();
       return true;
     }
-    if (keyEvent.isHome()) {
+    if (keyEvent.isHome() || isVimHomeKey(keyEvent)) {
       selectFirst();
       return true;
     }
-    if (keyEvent.isEnd()) {
+    if (keyEvent.isEnd() || isVimEndKey(keyEvent)) {
       selectLast();
       return true;
     }
@@ -267,6 +267,29 @@ final class ExtensionCatalogState {
       return true;
     }
     return false;
+  }
+
+  private static boolean isVimUpKey(KeyEvent keyEvent) {
+    return isPlainChar(keyEvent, 'k', 'K');
+  }
+
+  private static boolean isVimDownKey(KeyEvent keyEvent) {
+    return isPlainChar(keyEvent, 'j', 'J');
+  }
+
+  private static boolean isVimHomeKey(KeyEvent keyEvent) {
+    return isPlainChar(keyEvent, 'g', 'g');
+  }
+
+  private static boolean isVimEndKey(KeyEvent keyEvent) {
+    return isPlainChar(keyEvent, 'G', 'G');
+  }
+
+  private static boolean isPlainChar(KeyEvent keyEvent, char lower, char upper) {
+    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
+        && !keyEvent.hasCtrl()
+        && !keyEvent.hasAlt()
+        && (keyEvent.character() == lower || keyEvent.character() == upper);
   }
 
   private void applyFiltered(String queryText, long token, IntConsumer onFiltered) {

@@ -13,6 +13,7 @@ public final class MetadataCompatibilityValidator {
 
     String buildTool = request.buildTool();
     String javaVersion = request.javaVersion();
+    String platformStream = request.platformStream();
 
     List<String> availableBuildTools = metadata.buildTools();
     List<String> availableJavaVersions = metadata.javaVersions();
@@ -56,6 +57,40 @@ public final class MetadataCompatibilityValidator {
                 "compatibility",
                 "unsupported combination: build tool '"
                     + buildTool
+                    + "' does not support Java "
+                    + javaVersion
+                    + ". Allowed Java versions: "
+                    + allowed));
+      }
+    }
+
+    if (!metadata.platformStreams().isEmpty()) {
+      MetadataDto.PlatformStream selectedStream = null;
+      if (platformStream != null && !platformStream.isBlank()) {
+        selectedStream = metadata.findPlatformStream(platformStream);
+        if (selectedStream == null) {
+          errors.add(
+              new ValidationError(
+                  "platformStream",
+                  "unsupported platform stream '"
+                      + platformStream
+                      + "'. Allowed: "
+                      + metadata.platformStreams().stream()
+                          .map(MetadataDto.PlatformStream::key)
+                          .collect(Collectors.joining(", "))));
+        }
+      } else {
+        selectedStream = metadata.findPlatformStream(metadata.recommendedPlatformStreamKey());
+      }
+
+      if (selectedStream != null && !selectedStream.javaVersions().contains(javaVersion)) {
+        String allowed =
+            selectedStream.javaVersions().stream().sorted().collect(Collectors.joining(", "));
+        errors.add(
+            new ValidationError(
+                "compatibility",
+                "unsupported combination: platform stream '"
+                    + selectedStream.key()
                     + "' does not support Java "
                     + javaVersion
                     + ". Allowed Java versions: "

@@ -53,10 +53,11 @@ public final class CoreTuiController {
           FocusTarget.GROUP_ID,
           FocusTarget.ARTIFACT_ID,
           FocusTarget.VERSION,
-          FocusTarget.PACKAGE_NAME,
-          FocusTarget.OUTPUT_DIR,
+          FocusTarget.PLATFORM_STREAM,
           FocusTarget.BUILD_TOOL,
           FocusTarget.JAVA_VERSION,
+          FocusTarget.PACKAGE_NAME,
+          FocusTarget.OUTPUT_DIR,
           FocusTarget.EXTENSION_SEARCH,
           FocusTarget.EXTENSION_LIST,
           FocusTarget.SUBMIT);
@@ -73,6 +74,9 @@ public final class CoreTuiController {
   private final ExtensionCatalogState extensionCatalogState;
   private final ProjectGenerationRunner projectGenerationRunner;
   private final UiTheme theme;
+  private List<String> availableBuildTools;
+  private List<String> availableJavaVersions;
+  private List<String> availablePlatformStreams;
 
   private ProjectRequest request;
   private ValidationReport validation;
@@ -93,6 +97,7 @@ public final class CoreTuiController {
   private boolean extensionCatalogStale;
   private ExtensionCatalogLoader extensionCatalogLoader;
   private String successHint;
+  private boolean showErrorDetails;
 
   private CoreTuiController(
       ForgeUiState initialState,
@@ -130,6 +135,10 @@ public final class CoreTuiController {
     extensionCatalogStale = false;
     extensionCatalogLoader = null;
     successHint = "";
+    showErrorDetails = false;
+    availableBuildTools = List.of();
+    availableJavaVersions = List.of();
+    availablePlatformStreams = List.of();
 
     for (FocusTarget target : FocusTarget.values()) {
       inputStates.put(target, new TextInputState(""));
@@ -139,8 +148,7 @@ public final class CoreTuiController {
     inputStates.get(FocusTarget.VERSION).setText(request.version());
     inputStates.get(FocusTarget.PACKAGE_NAME).setText(request.packageName());
     inputStates.get(FocusTarget.OUTPUT_DIR).setText(request.outputDirectory());
-    inputStates.get(FocusTarget.BUILD_TOOL).setText(request.buildTool());
-    inputStates.get(FocusTarget.JAVA_VERSION).setText(request.javaVersion());
+    syncMetadataSelectors();
     for (FocusTarget target : FOCUS_ORDER) {
       if (isTextInputFocus(target)) {
         inputStates.get(target).moveCursorToEnd();
@@ -281,6 +289,7 @@ public final class CoreTuiController {
 
                 if (result.metadata() != null) {
                   metadataCompatibility = MetadataCompatibilityContext.success(result.metadata());
+                  syncMetadataSelectors();
                   revalidate();
                 }
 
@@ -351,6 +360,10 @@ public final class CoreTuiController {
       jumpToFavorite();
       return UiAction.handled(false);
     }
+    if (isErrorDetailsToggleKey(keyEvent)) {
+      toggleErrorDetails();
+      return UiAction.handled(false);
+    }
     if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && keyEvent.hasShift()) {
       moveFocus(-1);
       return UiAction.handled(false);
@@ -366,6 +379,16 @@ public final class CoreTuiController {
     if (keyEvent.isFocusPrevious()) {
       moveFocus(-1);
       return UiAction.handled(false);
+    }
+    if (focusTarget == FocusTarget.SUBMIT) {
+      if (isVimDownKey(keyEvent)) {
+        moveFocus(1);
+        return UiAction.handled(false);
+      }
+      if (isVimUpKey(keyEvent)) {
+        moveFocus(-1);
+        return UiAction.handled(false);
+      }
     }
 
     if (keyEvent.isConfirm()) {
@@ -401,7 +424,7 @@ public final class CoreTuiController {
       return UiAction.handled(false);
     }
     if (focusTarget == FocusTarget.EXTENSION_LIST
-        && keyEvent.isUp()
+        && isUpNavigation(keyEvent)
         && extensionCatalogState.isSelectionAtTop()) {
       focusExtensionSearch();
       return UiAction.handled(false);
@@ -425,6 +448,12 @@ public final class CoreTuiController {
       return UiAction.handled(false);
     }
 
+    if (isMetadataSelectorFocus(focusTarget) && handleMetadataSelectorKey(focusTarget, keyEvent)) {
+      revalidate();
+      refreshValidationFeedbackAfterEdit();
+      return UiAction.handled(false);
+    }
+
     if (isTextInputFocus(focusTarget)
         && handleTextInputKey(inputStates.get(focusTarget), keyEvent)) {
       if (focusTarget == FocusTarget.EXTENSION_SEARCH) {
@@ -443,14 +472,8 @@ public final class CoreTuiController {
   public void render(Frame frame) {
     reconcileGenerationCompletionIfDone();
     Rect area = frame.area();
-    int footerHeight = 6;
-    if (!errorMessage.isBlank()) {
-      footerHeight += 1;
-    }
-    footerHeight += 1;
-    if (!successHint.isBlank()) {
-      footerHeight += 1;
-    }
+    List<String> footerLines = footerLinesForWidth(area.width());
+    int footerHeight = Math.max(3, footerLines.size() + 2);
     List<Rect> rootLayout =
         Layout.vertical()
             .constraints(Constraint.length(3), Constraint.fill(), Constraint.length(footerHeight))
@@ -458,7 +481,7 @@ public final class CoreTuiController {
 
     renderHeader(frame, rootLayout.get(0));
     renderBody(frame, rootLayout.get(1));
-    renderFooter(frame, rootLayout.get(2));
+    renderFooter(frame, rootLayout.get(2), footerLines);
   }
 
   FocusTarget focusTarget() {
@@ -575,7 +598,7 @@ public final class CoreTuiController {
     }
 
     List<Constraint> constraints = new ArrayList<>();
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < 8; i++) {
       constraints.add(Constraint.length(3));
     }
     constraints.add(Constraint.fill());
@@ -584,10 +607,11 @@ public final class CoreTuiController {
     renderInput(frame, rows.get(0), "Group Id", FocusTarget.GROUP_ID);
     renderInput(frame, rows.get(1), "Artifact Id", FocusTarget.ARTIFACT_ID);
     renderInput(frame, rows.get(2), "Version", FocusTarget.VERSION);
-    renderInput(frame, rows.get(3), "Package Name", FocusTarget.PACKAGE_NAME);
-    renderInput(frame, rows.get(4), "Output Dir", FocusTarget.OUTPUT_DIR);
-    renderInput(frame, rows.get(5), "Build Tool", FocusTarget.BUILD_TOOL);
-    renderInput(frame, rows.get(6), "Java Version", FocusTarget.JAVA_VERSION);
+    renderInput(frame, rows.get(3), "Quarkus Platform", FocusTarget.PLATFORM_STREAM);
+    renderInput(frame, rows.get(4), "Build Tool", FocusTarget.BUILD_TOOL);
+    renderInput(frame, rows.get(5), "Java Version", FocusTarget.JAVA_VERSION);
+    renderInput(frame, rows.get(6), "Package Name", FocusTarget.PACKAGE_NAME);
+    renderInput(frame, rows.get(7), "Output Dir", FocusTarget.OUTPUT_DIR);
   }
 
   private void renderExtensionsPanel(Frame frame, Rect area) {
@@ -754,27 +778,8 @@ public final class CoreTuiController {
     frame.renderStatefulWidget(input, area, inputStates.get(target));
   }
 
-  private void renderFooter(Frame frame, Rect area) {
-    String footerText =
-        footerHintLine(area.width())
-            + "\n"
-            + "Mode: "
-            + footerModeLabel()
-            + "\n"
-            + "Status: "
-            + statusMessage
-            + "\n"
-            + "Validation: "
-            + validationLabel()
-            + " | Focus: "
-            + focusTargetName(focusTarget);
-    footerText += "\nGeneration: " + generationStateLabel();
-    if (!errorMessage.isBlank()) {
-      footerText += "\nError: " + errorMessage;
-    }
-    if (!successHint.isBlank()) {
-      footerText += "\nNext: " + truncate(successHint, Math.max(24, area.width() - 16));
-    }
+  private void renderFooter(Frame frame, Rect area, List<String> footerLines) {
+    String footerText = String.join("\n", footerLines);
 
     Paragraph footer =
         Paragraph.builder()
@@ -790,6 +795,30 @@ public final class CoreTuiController {
                     .build())
             .build();
     frame.renderWidget(footer, area);
+  }
+
+  private List<String> footerLinesForWidth(int width) {
+    List<String> lines = new ArrayList<>();
+    lines.add(footerHintLine(width));
+    lines.add("Mode: " + footerModeLabel() + " | Generation: " + generationStateLabel());
+    lines.add("Status: " + statusMessage);
+    lines.add("Validation: " + validationLabel() + " | Focus: " + focusTargetName(focusTarget));
+
+    String activeError = activeErrorDetails();
+    if (!activeError.isBlank()) {
+      lines.add("Error: " + activeError);
+    }
+
+    int expandedErrorLines = expandedErrorDetailLines(activeError, width);
+    if (expandedErrorLines > 0) {
+      lines.add("Error details:");
+      lines.addAll(wrapToWidth(activeError, Math.max(24, width - 6), expandedErrorLines));
+    }
+
+    if (!successHint.isBlank()) {
+      lines.add("Next: " + truncate(successHint, Math.max(24, width - 16)));
+    }
+    return lines;
   }
 
   private void moveFocus(int offset) {
@@ -808,6 +837,7 @@ public final class CoreTuiController {
         || focusTarget == FocusTarget.VERSION
         || focusTarget == FocusTarget.PACKAGE_NAME
         || focusTarget == FocusTarget.OUTPUT_DIR
+        || focusTarget == FocusTarget.PLATFORM_STREAM
         || focusTarget == FocusTarget.BUILD_TOOL
         || focusTarget == FocusTarget.JAVA_VERSION;
   }
@@ -861,7 +891,8 @@ public final class CoreTuiController {
   }
 
   private boolean hasValidationErrorFor(FocusTarget target) {
-    if (!isTextInputFocus(target) || target == FocusTarget.EXTENSION_SEARCH) {
+    if ((!isTextInputFocus(target) && !isMetadataSelectorFocus(target))
+        || target == FocusTarget.EXTENSION_SEARCH) {
       return false;
     }
     String fieldName = focusTargetName(target);
@@ -897,17 +928,27 @@ public final class CoreTuiController {
     }
     if (focusTarget == FocusTarget.EXTENSION_LIST) {
       return width < NARROW_WIDTH_THRESHOLD
-          ? "Up/Down: nav | Space: select | F: favorite | c: close/open category"
-          : "Up/Down/Home/End: list nav | Space: select | F: favorite | c: close/open category | C: open all | Ctrl+J: jump favorite | Ctrl+K: favorite filter | Ctrl+R: reload";
+          ? "Up/Down or j/k: nav | Space: select | F: favorite | c: category"
+          : "Up/Down/Home/End or j/k: list nav | Space: select | F: favorite | c: close/open category | C: open all | Ctrl+J: jump favorite | Ctrl+K: favorite filter | Ctrl+R: reload | Ctrl+E: error details";
     }
     if (focusTarget == FocusTarget.EXTENSION_SEARCH) {
       return width < NARROW_WIDTH_THRESHOLD
           ? "Type: filter | Down: list | Ctrl+K: fav filter"
-          : "Type: filter extensions | Down: list | Ctrl+R: reload | Ctrl+J: jump favorite | Ctrl+K: favorite filter";
+          : "Type: filter extensions | Down: list | Ctrl+R: reload | Ctrl+J: jump favorite | Ctrl+K: favorite filter | Ctrl+E: error details";
+    }
+    if (focusTarget == FocusTarget.SUBMIT) {
+      return width < NARROW_WIDTH_THRESHOLD
+          ? "Enter: submit | j/k: focus | Ctrl+E: error details"
+          : "Enter: submit | Tab/Shift+Tab or j/k: focus | Ctrl+E: error details | Esc: cancel/quit";
+    }
+    if (isMetadataSelectorFocus(focusTarget)) {
+      return width < NARROW_WIDTH_THRESHOLD
+          ? "Left/Right or h/l: pick | Up/Down or j/k: cycle"
+          : "Left/Right/Home/End or h/l/j/k: pick value | Tab/Shift+Tab: focus | Enter: submit | Ctrl+E: error details";
     }
     return width < NARROW_WIDTH_THRESHOLD
-        ? "Tab: focus | Enter: submit | Esc: quit"
-        : "Tab/Shift+Tab: focus | Enter: submit | /: search | Ctrl+K: favorite filter | Esc: cancel/quit";
+        ? "Tab: focus | Enter: submit | Ctrl+E: error details"
+        : "Tab/Shift+Tab: focus | Enter: submit | /: search | Ctrl+K: favorite filter | Ctrl+E: error details | Esc: cancel/quit";
   }
 
   private String footerModeLabel() {
@@ -928,10 +969,310 @@ public final class CoreTuiController {
     return "INVALID - " + firstValidationError(validation);
   }
 
+  private String activeErrorDetails() {
+    if (!errorMessage.isBlank()) {
+      return errorMessage;
+    }
+    if (!extensionCatalogErrorMessage.isBlank()) {
+      return extensionCatalogErrorMessage;
+    }
+    return "";
+  }
+
+  private int expandedErrorDetailLines(String activeError, int width) {
+    if (!showErrorDetails || activeError.isBlank()) {
+      return 0;
+    }
+    return wrapToWidth(activeError, Math.max(24, width - 6), 6).size();
+  }
+
+  private static List<String> wrapToWidth(String text, int width, int maxLines) {
+    List<String> lines = new ArrayList<>();
+    if (text == null || text.isBlank() || width <= 0 || maxLines <= 0) {
+      return lines;
+    }
+
+    String remaining = text.strip();
+    while (!remaining.isBlank() && lines.size() < maxLines) {
+      if (remaining.length() <= width) {
+        lines.add(remaining);
+        break;
+      }
+
+      int breakIndex = remaining.lastIndexOf(' ', width);
+      if (breakIndex <= 0) {
+        breakIndex = width;
+      }
+      lines.add(remaining.substring(0, breakIndex).stripTrailing());
+      remaining = remaining.substring(Math.min(remaining.length(), breakIndex + 1)).stripLeading();
+    }
+
+    if (!remaining.isBlank() && lines.size() == maxLines) {
+      int lastIndex = lines.size() - 1;
+      lines.set(lastIndex, truncate(lines.get(lastIndex), Math.max(4, width)));
+    }
+    return lines;
+  }
+
   private void scheduleFilteredExtensionsRefresh() {
     String query = inputStates.get(FocusTarget.EXTENSION_SEARCH).text();
     statusMessage = "Searching extensions...";
     extensionCatalogState.scheduleRefresh(query, this::updateExtensionFilterStatus);
+  }
+
+  private void syncMetadataSelectors() {
+    MetadataDto metadataSnapshot = metadataCompatibility.metadataSnapshot();
+    availableBuildTools =
+        resolveSelectorOptions(
+            metadataSnapshot == null ? List.of() : metadataSnapshot.buildTools(),
+            request.buildTool());
+    availableJavaVersions =
+        resolveSelectorOptions(
+            metadataSnapshot == null ? List.of() : metadataSnapshot.javaVersions(),
+            request.javaVersion());
+    availablePlatformStreams =
+        resolvePlatformStreamOptions(metadataSnapshot, request.platformStream());
+
+    String selectedPlatformStream =
+        normalizeSelectedPlatformStream(
+            request.platformStream(), metadataSnapshot, availablePlatformStreams);
+    String selectedBuildTool = normalizeSelectedOption(request.buildTool(), availableBuildTools);
+    String selectedJavaVersion =
+        normalizeSelectedOption(request.javaVersion(), availableJavaVersions);
+
+    request =
+        CliPrefillMapper.map(
+            new CliPrefill(
+                inputStates.get(FocusTarget.GROUP_ID).text(),
+                inputStates.get(FocusTarget.ARTIFACT_ID).text(),
+                inputStates.get(FocusTarget.VERSION).text(),
+                inputStates.get(FocusTarget.PACKAGE_NAME).text(),
+                inputStates.get(FocusTarget.OUTPUT_DIR).text(),
+                selectedPlatformStream,
+                selectedBuildTool,
+                selectedJavaVersion));
+
+    inputStates
+        .get(FocusTarget.PLATFORM_STREAM)
+        .setText(selectorInlineLabel(FocusTarget.PLATFORM_STREAM));
+    inputStates.get(FocusTarget.BUILD_TOOL).setText(selectorInlineLabel(FocusTarget.BUILD_TOOL));
+    inputStates
+        .get(FocusTarget.JAVA_VERSION)
+        .setText(selectorInlineLabel(FocusTarget.JAVA_VERSION));
+    inputStates.get(FocusTarget.PLATFORM_STREAM).moveCursorToStart();
+    inputStates.get(FocusTarget.BUILD_TOOL).moveCursorToStart();
+    inputStates.get(FocusTarget.JAVA_VERSION).moveCursorToStart();
+  }
+
+  private boolean handleMetadataSelectorKey(FocusTarget target, KeyEvent keyEvent) {
+    if (keyEvent.isLeft() || isVimLeftKey(keyEvent) || keyEvent.isUp() || isVimUpKey(keyEvent)) {
+      return cycleSelector(target, -1);
+    }
+    if (keyEvent.isRight()
+        || isVimRightKey(keyEvent)
+        || keyEvent.isDown()
+        || isVimDownKey(keyEvent)) {
+      return cycleSelector(target, 1);
+    }
+    if (keyEvent.isHome()) {
+      return selectSelectorEdge(target, true);
+    }
+    if (keyEvent.isEnd()) {
+      return selectSelectorEdge(target, false);
+    }
+    return false;
+  }
+
+  private String selectorInlineLabel(FocusTarget target) {
+    List<String> options = selectorOptionsFor(target);
+    if (options.isEmpty()) {
+      return "( ) no options available";
+    }
+
+    String selected = selectorValue(target);
+    List<String> labels = new ArrayList<>();
+    for (String option : options) {
+      boolean selectedOption = option.equalsIgnoreCase(selected);
+      labels.add((selectedOption ? "(*) " : "( ) ") + selectorOptionLabel(target, option));
+    }
+    return String.join("  ", labels);
+  }
+
+  private String selectorOptionLabel(FocusTarget target, String option) {
+    if (target != FocusTarget.PLATFORM_STREAM) {
+      return option.isBlank() ? "default" : option;
+    }
+    if (option.isBlank()) {
+      return "default";
+    }
+
+    MetadataDto metadataSnapshot = metadataCompatibility.metadataSnapshot();
+    if (metadataSnapshot == null) {
+      return option;
+    }
+    MetadataDto.PlatformStream platformStream = metadataSnapshot.findPlatformStream(option);
+    if (platformStream == null) {
+      return option;
+    }
+    return platformStream.recommended()
+        ? platformStream.platformVersion() + "*"
+        : platformStream.platformVersion();
+  }
+
+  private boolean cycleSelector(FocusTarget target, int delta) {
+    List<String> options = selectorOptionsFor(target);
+    if (options.isEmpty()) {
+      return false;
+    }
+    int currentIndex = indexOfOption(options, selectorValue(target));
+    if (currentIndex < 0) {
+      currentIndex = 0;
+    }
+    int selectedIndex = Math.floorMod(currentIndex + delta, options.size());
+    applySelector(target, options.get(selectedIndex));
+    return true;
+  }
+
+  private boolean selectSelectorEdge(FocusTarget target, boolean first) {
+    List<String> options = selectorOptionsFor(target);
+    if (options.isEmpty()) {
+      return false;
+    }
+    applySelector(target, first ? options.getFirst() : options.getLast());
+    return true;
+  }
+
+  private void applySelector(FocusTarget target, String selectedValue) {
+    String platformStream = request.platformStream();
+    String buildTool = request.buildTool();
+    String javaVersion = request.javaVersion();
+
+    if (target == FocusTarget.PLATFORM_STREAM) {
+      platformStream = selectedValue;
+    } else if (target == FocusTarget.BUILD_TOOL) {
+      buildTool = selectedValue;
+    } else if (target == FocusTarget.JAVA_VERSION) {
+      javaVersion = selectedValue;
+    }
+
+    request =
+        CliPrefillMapper.map(
+            new CliPrefill(
+                inputStates.get(FocusTarget.GROUP_ID).text(),
+                inputStates.get(FocusTarget.ARTIFACT_ID).text(),
+                inputStates.get(FocusTarget.VERSION).text(),
+                inputStates.get(FocusTarget.PACKAGE_NAME).text(),
+                inputStates.get(FocusTarget.OUTPUT_DIR).text(),
+                platformStream,
+                buildTool,
+                javaVersion));
+    syncMetadataSelectors();
+    statusMessage = selectorStatusMessage(target);
+  }
+
+  private String selectorStatusMessage(FocusTarget target) {
+    return switch (target) {
+      case PLATFORM_STREAM ->
+          "Platform stream selected: "
+              + (request.platformStream().isBlank() ? "default" : request.platformStream());
+      case BUILD_TOOL -> "Build tool selected: " + request.buildTool();
+      case JAVA_VERSION -> "Java version selected: " + request.javaVersion();
+      default -> "Selection updated";
+    };
+  }
+
+  private List<String> selectorOptionsFor(FocusTarget target) {
+    return switch (target) {
+      case PLATFORM_STREAM -> availablePlatformStreams;
+      case BUILD_TOOL -> availableBuildTools;
+      case JAVA_VERSION -> availableJavaVersions;
+      default -> List.of();
+    };
+  }
+
+  private String selectorValue(FocusTarget target) {
+    return switch (target) {
+      case PLATFORM_STREAM -> request.platformStream();
+      case BUILD_TOOL -> request.buildTool();
+      case JAVA_VERSION -> request.javaVersion();
+      default -> "";
+    };
+  }
+
+  private static List<String> resolveSelectorOptions(
+      List<String> metadataValues, String fallbackValue) {
+    List<String> options = new ArrayList<>();
+    for (String metadataValue : metadataValues) {
+      if (metadataValue == null || metadataValue.isBlank()) {
+        continue;
+      }
+      if (indexOfOption(options, metadataValue) < 0) {
+        options.add(metadataValue);
+      }
+    }
+    if (options.isEmpty() && fallbackValue != null && !fallbackValue.isBlank()) {
+      options.add(fallbackValue);
+    }
+    return List.copyOf(options);
+  }
+
+  private static List<String> resolvePlatformStreamOptions(
+      MetadataDto metadataSnapshot, String fallbackValue) {
+    List<String> options = new ArrayList<>();
+    if (metadataSnapshot != null) {
+      for (MetadataDto.PlatformStream platformStream : metadataSnapshot.platformStreams()) {
+        if (platformStream.key().isBlank()) {
+          continue;
+        }
+        if (indexOfOption(options, platformStream.key()) < 0) {
+          options.add(platformStream.key());
+        }
+      }
+    }
+    if (options.isEmpty()) {
+      if (fallbackValue != null && !fallbackValue.isBlank()) {
+        options.add(fallbackValue);
+      } else {
+        options.add("");
+      }
+    }
+    return List.copyOf(options);
+  }
+
+  private static String normalizeSelectedOption(String currentValue, List<String> options) {
+    if (options.isEmpty()) {
+      return currentValue == null ? "" : currentValue.trim();
+    }
+    int index = indexOfOption(options, currentValue);
+    return index >= 0 ? options.get(index) : options.getFirst();
+  }
+
+  private static String normalizeSelectedPlatformStream(
+      String currentValue, MetadataDto metadataSnapshot, List<String> options) {
+    int explicitIndex = indexOfOption(options, currentValue);
+    if (explicitIndex >= 0) {
+      return options.get(explicitIndex);
+    }
+    if (metadataSnapshot != null && !metadataSnapshot.platformStreams().isEmpty()) {
+      int recommendedIndex =
+          indexOfOption(options, metadataSnapshot.recommendedPlatformStreamKey());
+      if (recommendedIndex >= 0) {
+        return options.get(recommendedIndex);
+      }
+    }
+    return options.isEmpty() ? "" : options.getFirst();
+  }
+
+  private static int indexOfOption(List<String> options, String candidate) {
+    if (candidate == null || candidate.isBlank()) {
+      return options.indexOf("");
+    }
+    for (int i = 0; i < options.size(); i++) {
+      if (options.get(i).equalsIgnoreCase(candidate.trim())) {
+        return i;
+      }
+    }
+    return -1;
   }
 
   private void rebuildRequestFromInputs() {
@@ -942,8 +1283,9 @@ public final class CoreTuiController {
             inputStates.get(FocusTarget.VERSION).text(),
             inputStates.get(FocusTarget.PACKAGE_NAME).text(),
             inputStates.get(FocusTarget.OUTPUT_DIR).text(),
-            inputStates.get(FocusTarget.BUILD_TOOL).text(),
-            inputStates.get(FocusTarget.JAVA_VERSION).text());
+            request.platformStream(),
+            request.buildTool(),
+            request.javaVersion());
     request = CliPrefillMapper.map(prefill);
   }
 
@@ -1090,6 +1432,7 @@ public final class CoreTuiController {
         request.groupId(),
         request.artifactId(),
         request.version(),
+        request.platformStream(),
         request.buildTool(),
         request.javaVersion(),
         extensionCatalogState.selectedExtensionIds());
@@ -1214,7 +1557,18 @@ public final class CoreTuiController {
   }
 
   private static boolean isTextInputFocus(FocusTarget focusTarget) {
-    return focusTarget != FocusTarget.EXTENSION_LIST && focusTarget != FocusTarget.SUBMIT;
+    return focusTarget == FocusTarget.GROUP_ID
+        || focusTarget == FocusTarget.ARTIFACT_ID
+        || focusTarget == FocusTarget.VERSION
+        || focusTarget == FocusTarget.PACKAGE_NAME
+        || focusTarget == FocusTarget.OUTPUT_DIR
+        || focusTarget == FocusTarget.EXTENSION_SEARCH;
+  }
+
+  private static boolean isMetadataSelectorFocus(FocusTarget focusTarget) {
+    return focusTarget == FocusTarget.PLATFORM_STREAM
+        || focusTarget == FocusTarget.BUILD_TOOL
+        || focusTarget == FocusTarget.JAVA_VERSION;
   }
 
   private static String panelTitle(String baseTitle, boolean focused) {
@@ -1228,6 +1582,7 @@ public final class CoreTuiController {
       case VERSION -> "version";
       case PACKAGE_NAME -> "packageName";
       case OUTPUT_DIR -> "outputDir";
+      case PLATFORM_STREAM -> "platformStream";
       case BUILD_TOOL -> "buildTool";
       case JAVA_VERSION -> "javaVersion";
       case EXTENSION_SEARCH -> "extensionSearch";
@@ -1318,6 +1673,17 @@ public final class CoreTuiController {
     statusMessage = enabled ? "Favorites filter enabled" : "Favorites filter disabled";
   }
 
+  private void toggleErrorDetails() {
+    String activeError = activeErrorDetails();
+    if (activeError.isBlank()) {
+      showErrorDetails = false;
+      statusMessage = "No error details available";
+      return;
+    }
+    showErrorDetails = !showErrorDetails;
+    statusMessage = showErrorDetails ? "Expanded error details" : "Collapsed error details";
+  }
+
   private void requestCatalogReload() {
     if (extensionCatalogLoader == null) {
       statusMessage = "Catalog reload unavailable";
@@ -1368,6 +1734,39 @@ public final class CoreTuiController {
 
   private static boolean shouldQuitKeyEvent(KeyEvent keyEvent) {
     return keyEvent.isCancel() || keyEvent.isCtrlC();
+  }
+
+  private static boolean isErrorDetailsToggleKey(KeyEvent keyEvent) {
+    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
+        && keyEvent.hasCtrl()
+        && (keyEvent.character() == 'e' || keyEvent.character() == 'E');
+  }
+
+  private static boolean isUpNavigation(KeyEvent keyEvent) {
+    return keyEvent.isUp() || isVimUpKey(keyEvent);
+  }
+
+  private static boolean isVimUpKey(KeyEvent keyEvent) {
+    return isPlainChar(keyEvent, 'k', 'K');
+  }
+
+  private static boolean isVimDownKey(KeyEvent keyEvent) {
+    return isPlainChar(keyEvent, 'j', 'J');
+  }
+
+  private static boolean isVimLeftKey(KeyEvent keyEvent) {
+    return isPlainChar(keyEvent, 'h', 'H');
+  }
+
+  private static boolean isVimRightKey(KeyEvent keyEvent) {
+    return isPlainChar(keyEvent, 'l', 'L');
+  }
+
+  private static boolean isPlainChar(KeyEvent keyEvent, char lower, char upper) {
+    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
+        && !keyEvent.hasCtrl()
+        && !keyEvent.hasAlt()
+        && (keyEvent.character() == lower || keyEvent.character() == upper);
   }
 
   private static boolean shouldFocusExtensionSearch(KeyEvent keyEvent, FocusTarget currentFocus) {

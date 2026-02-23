@@ -78,6 +78,33 @@ class QuarkusForgeGenerateCommandTest {
   }
 
   @Test
+  void headlessGeneratePassesPlatformStreamWhenProvided() throws Exception {
+    stubCatalogEndpoints();
+    stubDownloadEndpoint("headless-app");
+    QuarkusForgeCli.RuntimeConfig runtimeConfig =
+        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    Path outputDir = tempDir.resolve("output-platform");
+
+    CommandResult result =
+        runCommand(
+            runtimeConfig,
+            "generate",
+            "--group-id",
+            "com.example",
+            "--artifact-id",
+            "headless-app",
+            "--output-dir",
+            outputDir.toString(),
+            "--platform-stream",
+            "io.quarkus.platform:3.31");
+
+    assertThat(result.exitCode()).isZero();
+    wireMockServer.verify(
+        getRequestedFor(urlPathEqualTo("/api/download"))
+            .withQueryParam("S", equalTo("io.quarkus.platform:3.31")));
+  }
+
+  @Test
   void invalidExtensionIdReturnsValidationExitCode() {
     stubCatalogEndpoints();
     QuarkusForgeCli.RuntimeConfig runtimeConfig =

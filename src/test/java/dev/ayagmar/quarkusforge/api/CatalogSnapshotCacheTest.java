@@ -3,6 +3,7 @@ package dev.ayagmar.quarkusforge.api;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -136,6 +137,39 @@ class CatalogSnapshotCacheTest {
     assertThat(outcome.detail()).contains("exceeds max size");
     assertThat(Files.exists(cacheFile)).isFalse();
     assertThat(cache.read()).isEmpty();
+  }
+
+  @Test
+  void writeConvertsSerializationRuntimeFailureToWriteFailedOutcome() {
+    Path cacheFile = tempDir.resolve("catalog-snapshot.json");
+    ObjectMapper failingMapper =
+        new ObjectMapper() {
+          @Override
+          public <T extends com.fasterxml.jackson.databind.JsonNode> T valueToTree(
+              Object fromValue) {
+            throw new IllegalArgumentException("serializer failed");
+          }
+
+          @Override
+          public com.fasterxml.jackson.databind.node.ObjectNode createObjectNode() {
+            return JsonNodeFactory.instance.objectNode();
+          }
+        };
+    CatalogSnapshotCache cache =
+        new CatalogSnapshotCache(
+            cacheFile,
+            failingMapper,
+            Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
+            Duration.ofHours(6),
+            2L * 1024L * 1024L);
+
+    CatalogSnapshotCache.CacheWriteOutcome outcome =
+        cache.write(sampleMetadata(), sampleExtensions());
+
+    assertThat(outcome.written()).isFalse();
+    assertThat(outcome.rejected()).isFalse();
+    assertThat(outcome.detail()).contains("failed to serialize cache snapshot");
+    assertThat(Files.exists(cacheFile)).isFalse();
   }
 
   private static MetadataDto sampleMetadata() {

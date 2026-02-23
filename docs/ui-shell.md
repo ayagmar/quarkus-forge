@@ -3,7 +3,7 @@
 ## Layout Structure
 - Header: app title and context.
 - Body: two panels.
-  - Left panel: project metadata input fields (`groupId`, `artifactId`, `version`, `packageName`, `outputDir`, `buildTool`, `javaVersion`).
+  - Left panel: project metadata input fields (`groupId`, `artifactId`, `version`, `platformStream`, `buildTool`, `javaVersion`, `packageName`, `outputDir`).
   - Right panel: extension search, extension catalog list, selected summary.
 - Footer: structured key hints + live status + validation feedback.
 
@@ -16,13 +16,14 @@ The shell keeps a stable widget tree and switches only the body split strategy b
   1. `groupId`
   2. `artifactId`
   3. `version`
-  4. `packageName`
-  5. `outputDir`
-  6. `buildTool`
-  7. `javaVersion`
-  8. extension search
-  9. extension list
-  10. submit action
+  4. `platformStream`
+  5. `buildTool`
+  6. `javaVersion`
+  7. `packageName`
+  8. `outputDir`
+  9. extension search
+  10. extension list
+  11. submit action
 - `Tab` moves to next focus target.
 - `Shift+Tab` moves to previous focus target.
 - `/` jumps directly to extension search when focus is not editing `outputDir` or extension search input.
@@ -33,13 +34,17 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 
 ## Key Bindings
 - `Up` / `Down`: navigate extension list when focused.
+- `j` / `k`: vim-style list navigation aliases for `Down` / `Up`.
 - `Home` / `End`: jump to first/last selectable extension row.
+- `Left` / `Right` / `Home` / `End`: cycle metadata selectors (`platformStream`, `buildTool`, `javaVersion`).
+- `h` / `l`: vim-style selector aliases for `Left` / `Right`.
 - `Space`: toggle extension selection when list is focused.
 - `f`: toggle favorite for the focused extension when list is focused.
 - `c`: close/open the focused extension category.
 - `C`: open all closed categories.
 - `Ctrl+J`: jump to next visible favorite extension.
 - `Ctrl+K`: toggle favorites-only filter mode.
+- `Ctrl+E`: toggle expanded full error details in footer.
 - `Enter`: attempt submit (blocked with validation feedback if invalid).
 - `Esc` or `Ctrl+C`: cancel active generation if running, otherwise exit the TUI.
 - Backend startup preference is deterministic:
@@ -49,6 +54,8 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 
 ## Validation and Status
 - Metadata + field validation are recalculated as project inputs change.
+- `platformStream`, `buildTool`, and `javaVersion` are metadata-driven selectors (not free-text fields).
+- Selector fields are rendered with inline radio markers (`(*)` selected / `( )` unselected) to expose discoverability.
 - Footer status area is non-modal and always visible.
 - Errors are surfaced inline in footer as actionable messages.
 - Invalid metadata fields are highlighted with error-colored borders.
