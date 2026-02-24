@@ -3,7 +3,11 @@
 ## Theme Source
 - Semantic theme tokens live in `src/main/resources/ui/quarkus-forge.tcss`.
 - Runtime theme loading is handled by `UiTheme` (`src/main/java/dev/ayagmar/quarkusforge/ui/UiTheme.java`).
-- If the theme file is missing or a token is invalid, defaults are used to keep the UI deterministic.
+- Theme resolution order:
+  1. built-in defaults (Quarkus-branded fallback palette),
+  2. bundled resource theme (`quarkus-forge.tcss`),
+  3. optional user override file from `-Dquarkus.forge.theme=<path>` or `QUARKUS_FORGE_THEME=<path>`.
+- If the resource/override file is missing or a token is invalid, deterministic defaults are preserved.
 
 ## Token Set
 - `base`: neutral panel baseline.
