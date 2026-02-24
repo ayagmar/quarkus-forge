@@ -422,6 +422,36 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void categoryFilterStacksWithSearchQuery() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20)))));
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+
+    controller.onEvent(KeyEvent.ofChar('v'));
+    assertThat(controller.catalogSectionHeaders()).containsExactly("Core");
+    assertThat(renderToString(controller)).contains("Category filter: Core");
+
+    controller.onEvent(KeyEvent.ofChar('f', KeyModifiers.CTRL));
+    controller.onEvent(KeyEvent.ofChar('r'));
+    controller.onEvent(KeyEvent.ofChar('e'));
+    controller.onEvent(KeyEvent.ofChar('s'));
+    controller.onEvent(KeyEvent.ofChar('t'));
+    assertThat(controller.filteredExtensionCount()).isZero();
+    assertThat(renderToString(controller)).contains("Category filter: Core");
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(controller.filteredExtensionCount()).isEqualTo(1);
+    assertThat(controller.catalogSectionHeaders()).containsExactly("Core");
+  }
+
+  @Test
   void qNoLongerTriggersQuitByDefault() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());

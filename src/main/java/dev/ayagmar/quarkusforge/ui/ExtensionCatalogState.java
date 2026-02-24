@@ -460,10 +460,7 @@ final class ExtensionCatalogState {
           rankedResults.stream().filter(item -> favoriteExtensionIds.contains(item.id())).toList();
     }
 
-    if (!currentQuery.isBlank()) {
-      activeCategoryFilterTitle = "";
-    }
-    Set<String> availableCategoryTitles = availableCategoryTitles(rankedResults);
+    Set<String> availableCategoryTitles = new LinkedHashSet<>(filterableCategoryTitles());
     if (!activeCategoryFilterTitle.isBlank()
         && !availableCategoryTitles.contains(activeCategoryFilterTitle)) {
       activeCategoryFilterTitle = "";
@@ -486,8 +483,7 @@ final class ExtensionCatalogState {
   }
 
   private List<String> filterableCategoryTitles() {
-    List<ExtensionCatalogItem> rankedResults =
-        catalogIndex.search(currentQuery, favoriteExtensionIds);
+    List<ExtensionCatalogItem> rankedResults = catalogIndex.search("", favoriteExtensionIds);
     if (favoritesOnlyFilterEnabled) {
       rankedResults =
           rankedResults.stream().filter(item -> favoriteExtensionIds.contains(item.id())).toList();

@@ -217,6 +217,9 @@ final class BodyPanelRenderer {
       PanelTitleFormatter panelTitleFormatter,
       PanelBorderStyleResolver panelBorderStyleResolver) {
     String summary = selectedExtensionsSummary(snapshot.selectedExtensionIds(), area.width());
+    if (!snapshot.activeCategoryFilterTitle().isBlank()) {
+      summary += "\nCategory filter: " + snapshot.activeCategoryFilterTitle();
+    }
     summary += "\nCatalog: " + snapshot.catalogSource();
     if (snapshot.catalogStale()) {
       summary += " [stale]";
@@ -227,9 +230,6 @@ final class BodyPanelRenderer {
     summary += "\nFavorites: " + snapshot.favoriteCount();
     if (snapshot.favoritesOnlyFilterEnabled()) {
       summary += " [filter:on]";
-    }
-    if (!snapshot.activeCategoryFilterTitle().isBlank()) {
-      summary += "\nCategory filter: " + snapshot.activeCategoryFilterTitle();
     }
     if (snapshot.submitFocused()) {
       summary += "\nSubmit focus active - press Enter to submit";
