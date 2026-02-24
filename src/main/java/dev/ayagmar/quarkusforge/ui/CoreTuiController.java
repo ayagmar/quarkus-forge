@@ -401,6 +401,10 @@ public final class CoreTuiController {
       toggleFavoritesOnlyFilter();
       return UiAction.handled(false);
     }
+    if (shouldDisableCategoryFilterOnCancel(keyEvent)) {
+      clearCategoryFilter();
+      return UiAction.handled(false);
+    }
     if (shouldExitExtensionSearchOnCancel(keyEvent)) {
       focusExtensionList();
       return UiAction.handled(false);
@@ -1711,6 +1715,14 @@ public final class CoreTuiController {
         "Category filter: " + result.categoryTitle() + " (" + result.matchCount() + " matches)";
   }
 
+  private void clearCategoryFilter() {
+    boolean cleared = extensionCatalogState.clearCategoryFilter(this::updateExtensionFilterStatus);
+    if (!cleared) {
+      return;
+    }
+    statusMessage = "Category filter cleared";
+  }
+
   private void clearSelectedExtensions() {
     int clearedCount = extensionCatalogState.clearSelectedExtensions();
     if (clearedCount == 0) {
@@ -1908,7 +1920,13 @@ public final class CoreTuiController {
   }
 
   private static boolean shouldToggleHelpOverlay(KeyEvent keyEvent, FocusTarget currentFocus) {
-    return isHelpOverlayToggleKey(keyEvent) && !isTextInputFocus(currentFocus);
+    if (!isHelpOverlayToggleKey(keyEvent)) {
+      return false;
+    }
+    if (currentFocus == FocusTarget.EXTENSION_SEARCH) {
+      return true;
+    }
+    return !isTextInputFocus(currentFocus);
   }
 
   private static boolean shouldQuitKeyEvent(KeyEvent keyEvent) {
@@ -1946,6 +1964,22 @@ public final class CoreTuiController {
       return false;
     }
     return extensionCatalogState.favoritesOnlyFilterEnabled();
+  }
+
+  private boolean shouldDisableCategoryFilterOnCancel(KeyEvent keyEvent) {
+    if (!keyEvent.isCancel() || isGenerationInProgress()) {
+      return false;
+    }
+    if (focusTarget != FocusTarget.EXTENSION_SEARCH && focusTarget != FocusTarget.EXTENSION_LIST) {
+      return false;
+    }
+    if (!inputStates.get(FocusTarget.EXTENSION_SEARCH).text().isBlank()) {
+      return false;
+    }
+    if (extensionCatalogState.favoritesOnlyFilterEnabled()) {
+      return false;
+    }
+    return !extensionCatalogState.activeCategoryFilterTitle().isBlank();
   }
 
   private static boolean isErrorDetailsToggleKey(KeyEvent keyEvent) {

@@ -178,6 +178,18 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void questionMarkOpensHelpWhenExtensionSearchIsFocused() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
+
+    controller.onEvent(KeyEvent.ofChar('?'));
+
+    assertThat(controller.helpOverlayVisible()).isTrue();
+    assertThat(controller.filteredExtensionCount()).isEqualTo(7);
+  }
+
+  @Test
   void ctrlPTogglesCommandPaletteOverlay() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
@@ -362,6 +374,39 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void escapeClearsCategoryFilterBeforeQuitWhenListIsFocused() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
+                        new ExtensionDto(
+                            "io.quarkus:quarkus-jdbc-postgresql",
+                            "JDBC PostgreSQL",
+                            "jdbc-postgresql",
+                            "Data",
+                            30)))));
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+
+    controller.onEvent(KeyEvent.ofChar('v'));
+    assertThat(controller.catalogSectionHeaders()).containsExactly("Core");
+
+    CoreTuiController.UiAction firstEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(firstEscape.handled()).isTrue();
+    assertThat(firstEscape.shouldQuit()).isFalse();
+    assertThat(controller.catalogSectionHeaders()).containsExactly("Core", "Web", "Data");
+    assertThat(controller.statusMessage()).contains("Category filter cleared");
+
+    CoreTuiController.UiAction secondEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(secondEscape.handled()).isTrue();
+    assertThat(secondEscape.shouldQuit()).isTrue();
+  }
+
+  @Test
   void xClearsSelectedExtensionsWhenListIsFocused() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
@@ -449,6 +494,38 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(controller.filteredExtensionCount()).isEqualTo(1);
     assertThat(controller.catalogSectionHeaders()).containsExactly("Core");
+  }
+
+  @Test
+  void collapsedCategoryStateSurvivesCategoryFilterCycle() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
+                        new ExtensionDto(
+                            "io.quarkus:quarkus-jdbc-postgresql",
+                            "JDBC PostgreSQL",
+                            "jdbc-postgresql",
+                            "Data",
+                            30)))));
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.PAGE_DOWN));
+    controller.onEvent(KeyEvent.ofChar('c'));
+    assertThat(renderToString(controller)).contains("[+] Web (1 hidden)");
+
+    controller.onEvent(KeyEvent.ofChar('v'));
+    controller.onEvent(KeyEvent.ofChar('v'));
+    controller.onEvent(KeyEvent.ofChar('v'));
+    controller.onEvent(KeyEvent.ofChar('v'));
+
+    assertThat(controller.catalogSectionHeaders()).containsExactly("Core", "Web", "Data");
+    assertThat(renderToString(controller)).contains("[+] Web (1 hidden)");
   }
 
   @Test
@@ -753,6 +830,38 @@ class CoreTuiShellPilotTest {
 
     assertThat(controller.statusMessage()).contains("Opened category: Web");
     assertThat(renderToString(controller)).contains("REST");
+  }
+
+  @Test
+  void categoryCloseFromRecentlySelectedItemDoesNotCollapseUnderlyingCategory() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+
+    controller.onEvent(KeyEvent.ofChar(' '));
+    assertThat(renderToString(controller)).contains("Recently Selected");
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.HOME));
+    controller.onEvent(KeyEvent.ofChar('c'));
+
+    assertThat(controller.statusMessage()).contains("No category selected to close");
+    assertThat(renderToString(controller)).doesNotContain("[+] Core");
+  }
+
+  @Test
+  void pageUpSkipsRecentlySelectedPseudoSection() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+
+    controller.onEvent(KeyEvent.ofChar(' '));
+    assertThat(renderToString(controller)).contains("Recently Selected");
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.LEFT));
+    assertThat(controller.statusMessage()).contains("Moved to section: Core");
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.PAGE_UP));
+    assertThat(controller.statusMessage()).contains("No previous category section");
   }
 
   @Test

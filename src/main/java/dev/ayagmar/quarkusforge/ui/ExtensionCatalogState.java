@@ -126,6 +126,16 @@ final class ExtensionCatalogState {
     return favoritesOnlyFilterEnabled;
   }
 
+  boolean clearCategoryFilter(IntConsumer onFiltered) {
+    Objects.requireNonNull(onFiltered);
+    if (activeCategoryFilterTitle.isBlank()) {
+      return false;
+    }
+    activeCategoryFilterTitle = "";
+    applyFiltered(currentQuery, searchResultGate.nextToken(), onFiltered);
+    return true;
+  }
+
   CategoryFilterResult cycleCategoryFilter(IntConsumer onFiltered) {
     Objects.requireNonNull(onFiltered);
     List<String> categoryTitles = filterableCategoryTitles();
@@ -237,6 +247,9 @@ final class ExtensionCatalogState {
     for (int i = start + step; i >= 0 && i < filteredRows.size(); i += step) {
       ExtensionCatalogRow row = filteredRows.get(i);
       if (!row.isSectionHeader()) {
+        continue;
+      }
+      if (RECENT_SECTION_TITLE.equals(row.label())) {
         continue;
       }
       listState.select(i);
@@ -477,7 +490,7 @@ final class ExtensionCatalogState {
     }
 
     filteredExtensions = rankedResults;
-    collapsedCategoryTitles.retainAll(availableCategoryTitles(rankedResults));
+    collapsedCategoryTitles.retainAll(availableCategoryTitles);
     refreshRows(previousFocusedId);
     onFiltered.accept(filteredExtensions.size());
   }
@@ -746,7 +759,21 @@ final class ExtensionCatalogState {
     if (extension == null) {
       return null;
     }
+    if (isUnderRecentSection(rowIndex)) {
+      return null;
+    }
     return resolveCategoryTitle(extension.categoryKey(), extension.category());
+  }
+
+  private boolean isUnderRecentSection(int rowIndex) {
+    for (int i = rowIndex - 1; i >= 0; i--) {
+      ExtensionCatalogRow candidate = filteredRows.get(i);
+      if (!candidate.isSectionHeader()) {
+        continue;
+      }
+      return RECENT_SECTION_TITLE.equals(candidate.label());
+    }
+    return false;
   }
 
   private Integer sectionHeaderRowIndex(String categoryTitle) {
