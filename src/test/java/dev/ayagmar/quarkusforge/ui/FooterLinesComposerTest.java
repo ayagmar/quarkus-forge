@@ -54,6 +54,7 @@ class FooterLinesComposerTest {
     List<String> lines = composer.compose(120, snapshot);
 
     assertThat(lines.getFirst()).contains("PgUp/PgDn: category jump");
+    assertThat(lines.getFirst()).contains("Left/Right or h/l: section hierarchy");
   }
 
   @Test

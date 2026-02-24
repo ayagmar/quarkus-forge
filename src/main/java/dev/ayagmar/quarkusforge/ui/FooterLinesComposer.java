@@ -53,8 +53,8 @@ final class FooterLinesComposer {
     }
     if (snapshot.focusTarget() == FocusTarget.EXTENSION_LIST) {
       return width < NARROW_WIDTH_THRESHOLD
-          ? "Up/Down or j/k: nav | PgUp/PgDn: category | Space: select | F: favorite | ?: help"
-          : "Up/Down/Home/End or j/k: list nav | PgUp/PgDn: category jump | Space: select | F: favorite | c: close/open category | C: open all | Ctrl+J: jump favorite | Ctrl+K: favorite filter | Ctrl+R: reload | Ctrl+E: error details | ?: help | Ctrl+P: commands";
+          ? "Up/Down or j/k: nav | Left/Right: section | PgUp/PgDn: category | Space: select | F: favorite | ?: help"
+          : "Up/Down/Home/End or j/k: list nav | Left/Right or h/l: section hierarchy | PgUp/PgDn: category jump | Space: select | F: favorite | c: close/open category | C: open all | Ctrl+J: jump favorite | Ctrl+K: favorite filter | Ctrl+R: reload | Ctrl+E: error details | ?: help | Ctrl+P: commands";
     }
     if (snapshot.focusTarget() == FocusTarget.EXTENSION_SEARCH) {
       return width < NARROW_WIDTH_THRESHOLD

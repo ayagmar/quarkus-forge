@@ -35,6 +35,7 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 ## Key Bindings
 - `Up` / `Down`: navigate extension list when focused.
 - `j` / `k`: vim-style list navigation aliases for `Down` / `Up`.
+- `Left` / `Right` (or `h` / `l`): section hierarchy navigation in extension list (`Left`: item -> section / section -> close, `Right`: section -> open/first item).
 - `Home` / `End`: jump to first/last selectable extension row.
 - `PgUp` / `PgDn`: jump to previous/next category section header.
 - `Left` / `Right` / `Home` / `End`: cycle metadata selectors (`platformStream`, `buildTool`, `javaVersion`).

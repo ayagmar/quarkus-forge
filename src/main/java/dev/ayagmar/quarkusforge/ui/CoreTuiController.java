@@ -493,6 +493,14 @@ public final class CoreTuiController {
       focusExtensionSearch();
       return UiAction.handled(false);
     }
+    if (focusTarget == FocusTarget.EXTENSION_LIST && isSectionHierarchyLeftKey(keyEvent)) {
+      handleExtensionListHierarchyLeft();
+      return UiAction.handled(false);
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST && isSectionHierarchyRightKey(keyEvent)) {
+      handleExtensionListHierarchyRight();
+      return UiAction.handled(false);
+    }
     if (focusTarget == FocusTarget.EXTENSION_LIST && isSectionJumpDownKey(keyEvent)) {
       jumpToAdjacentCategorySection(true);
       return UiAction.handled(false);
@@ -1695,6 +1703,32 @@ public final class CoreTuiController {
     statusMessage = "Jumped to category: " + jumpResult.categoryTitle();
   }
 
+  private void handleExtensionListHierarchyLeft() {
+    ExtensionCatalogState.SectionFocusResult parentSectionResult =
+        extensionCatalogState.focusParentSectionHeader();
+    if (parentSectionResult.moved()) {
+      statusMessage = "Moved to section: " + parentSectionResult.sectionTitle();
+      return;
+    }
+    if (extensionCatalogState.isCategorySectionHeaderSelected()
+        && !extensionCatalogState.isSelectedCategorySectionCollapsed()) {
+      toggleCategoryCollapseAtSelection();
+    }
+  }
+
+  private void handleExtensionListHierarchyRight() {
+    ExtensionCatalogState.SectionFocusResult childResult =
+        extensionCatalogState.focusFirstVisibleItemInSelectedSection();
+    if (childResult.moved()) {
+      statusMessage = "Moved to first item in section: " + childResult.sectionTitle();
+      return;
+    }
+    if (extensionCatalogState.isCategorySectionHeaderSelected()
+        && extensionCatalogState.isSelectedCategorySectionCollapsed()) {
+      toggleCategoryCollapseAtSelection();
+    }
+  }
+
   private void toggleFavoritesOnlyFilter() {
     boolean enabled =
         extensionCatalogState.toggleFavoritesOnlyFilter(this::updateExtensionFilterStatus);
@@ -1766,6 +1800,14 @@ public final class CoreTuiController {
 
   private static boolean isSectionJumpDownKey(KeyEvent keyEvent) {
     return keyEvent.isPageDown();
+  }
+
+  private static boolean isSectionHierarchyLeftKey(KeyEvent keyEvent) {
+    return keyEvent.isLeft() || isVimLeftKey(keyEvent);
+  }
+
+  private static boolean isSectionHierarchyRightKey(KeyEvent keyEvent) {
+    return keyEvent.isRight() || isVimRightKey(keyEvent);
   }
 
   private static boolean isCommandPaletteToggleKey(KeyEvent keyEvent) {

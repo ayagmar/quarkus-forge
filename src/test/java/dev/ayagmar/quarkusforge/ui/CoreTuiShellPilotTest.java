@@ -385,6 +385,45 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void leftAndRightSupportSectionHierarchyNavigation() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
+                        new ExtensionDto(
+                            "io.quarkus:quarkus-jdbc-postgresql",
+                            "JDBC PostgreSQL",
+                            "jdbc-postgresql",
+                            "Data",
+                            30)))));
+
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.LEFT));
+    assertThat(controller.focusedListExtensionId()).isEmpty();
+    assertThat(controller.statusMessage()).contains("Moved to section: Core");
+
+    controller.onEvent(KeyEvent.ofChar('l'));
+    assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
+    assertThat(controller.statusMessage()).contains("Moved to first item in section: Core");
+
+    controller.onEvent(KeyEvent.ofChar('h'));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.LEFT));
+    assertThat(controller.statusMessage()).contains("Closed category: Core");
+    assertThat(renderToString(controller)).contains("[+] Core (1 hidden)");
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.RIGHT));
+    assertThat(controller.statusMessage()).contains("Opened category: Core");
+    assertThat(renderToString(controller)).contains("CDI");
+  }
+
+  @Test
   void spaceOnCategoryHeaderReopensClosedCategory() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());

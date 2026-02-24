@@ -276,6 +276,62 @@ final class ExtensionCatalogState {
     return row.isSectionHeader() && !RECENT_SECTION_TITLE.equals(row.label());
   }
 
+  boolean isSelectedCategorySectionCollapsed() {
+    if (!isCategorySectionHeaderSelected()) {
+      return false;
+    }
+    Integer selectedRow = listState.selected();
+    return selectedRow != null && filteredRows.get(selectedRow).collapsed();
+  }
+
+  String selectedSectionHeaderTitle() {
+    Integer selectedRow = listState.selected();
+    if (selectedRow == null || selectedRow < 0 || selectedRow >= filteredRows.size()) {
+      return "";
+    }
+    ExtensionCatalogRow row = filteredRows.get(selectedRow);
+    return row.isSectionHeader() ? row.label() : "";
+  }
+
+  SectionFocusResult focusParentSectionHeader() {
+    Integer selectedRow = listState.selected();
+    if (selectedRow == null || selectedRow <= 0 || selectedRow >= filteredRows.size()) {
+      return SectionFocusResult.none();
+    }
+    if (filteredRows.get(selectedRow).isSectionHeader()) {
+      return SectionFocusResult.none();
+    }
+    for (int i = selectedRow - 1; i >= 0; i--) {
+      ExtensionCatalogRow row = filteredRows.get(i);
+      if (!row.isSectionHeader()) {
+        continue;
+      }
+      listState.select(i);
+      return new SectionFocusResult(true, row.label());
+    }
+    return SectionFocusResult.none();
+  }
+
+  SectionFocusResult focusFirstVisibleItemInSelectedSection() {
+    Integer selectedRow = listState.selected();
+    if (selectedRow == null
+        || selectedRow < 0
+        || selectedRow >= filteredRows.size()
+        || !filteredRows.get(selectedRow).isSectionHeader()) {
+      return SectionFocusResult.none();
+    }
+    int childIndex = selectedRow + 1;
+    if (childIndex >= filteredRows.size()) {
+      return SectionFocusResult.none();
+    }
+    ExtensionCatalogRow childRow = filteredRows.get(childIndex);
+    if (childRow.isSectionHeader()) {
+      return SectionFocusResult.none();
+    }
+    listState.select(childIndex);
+    return new SectionFocusResult(true, filteredRows.get(selectedRow).label());
+  }
+
   boolean handleListKeys(KeyEvent keyEvent, Consumer<String> onToggled) {
     Objects.requireNonNull(keyEvent);
     Objects.requireNonNull(onToggled);
@@ -673,6 +729,12 @@ final class ExtensionCatalogState {
   record CategoryCollapseResult(boolean changed, String categoryTitle, boolean collapsed) {
     static CategoryCollapseResult none() {
       return new CategoryCollapseResult(false, "", false);
+    }
+  }
+
+  record SectionFocusResult(boolean moved, String sectionTitle) {
+    static SectionFocusResult none() {
+      return new SectionFocusResult(false, "");
     }
   }
 }
