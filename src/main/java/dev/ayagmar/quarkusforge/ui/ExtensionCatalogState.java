@@ -267,6 +267,15 @@ final class ExtensionCatalogState {
     return favoriteExtensionIds.contains(extensionId);
   }
 
+  boolean isCategorySectionHeaderSelected() {
+    Integer selectedRow = listState.selected();
+    if (selectedRow == null || selectedRow < 0 || selectedRow >= filteredRows.size()) {
+      return false;
+    }
+    ExtensionCatalogRow row = filteredRows.get(selectedRow);
+    return row.isSectionHeader() && !RECENT_SECTION_TITLE.equals(row.label());
+  }
+
   boolean handleListKeys(KeyEvent keyEvent, Consumer<String> onToggled) {
     Objects.requireNonNull(keyEvent);
     Objects.requireNonNull(onToggled);

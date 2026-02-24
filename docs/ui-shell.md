@@ -40,6 +40,7 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - `Left` / `Right` / `Home` / `End`: cycle metadata selectors (`platformStream`, `buildTool`, `javaVersion`).
 - `h` / `l`: vim-style selector aliases for `Left` / `Right`.
 - `Space`: toggle extension selection when list is focused.
+- `Space` on a category header: close/open that category.
 - `f`: toggle favorite for the focused extension when list is focused.
 - `c`: close/open the focused extension category.
 - `C`: open all closed categories.

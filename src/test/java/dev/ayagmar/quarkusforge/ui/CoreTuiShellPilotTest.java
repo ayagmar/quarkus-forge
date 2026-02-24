@@ -385,6 +385,34 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void spaceOnCategoryHeaderReopensClosedCategory() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
+                        new ExtensionDto(
+                            "io.quarkus:quarkus-jdbc-postgresql",
+                            "JDBC PostgreSQL",
+                            "jdbc-postgresql",
+                            "Data",
+                            30)))));
+
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    controller.onEvent(KeyEvent.ofChar('c'));
+    assertThat(renderToString(controller)).contains("[+] Core (1 hidden)");
+
+    controller.onEvent(KeyEvent.ofChar(' '));
+
+    assertThat(controller.statusMessage()).contains("Opened category: Core");
+    assertThat(renderToString(controller)).contains("CDI");
+  }
+
+  @Test
   void pageUpAndPageDownJumpBetweenCategorySections() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());

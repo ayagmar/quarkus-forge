@@ -501,6 +501,12 @@ public final class CoreTuiController {
       jumpToAdjacentCategorySection(false);
       return UiAction.handled(false);
     }
+    if (focusTarget == FocusTarget.EXTENSION_LIST
+        && keyEvent.isSelect()
+        && extensionCatalogState.isCategorySectionHeaderSelected()) {
+      toggleCategoryCollapseAtSelection();
+      return UiAction.handled(false);
+    }
     if (focusTarget == FocusTarget.EXTENSION_LIST && isFavoriteToggleKey(keyEvent)) {
       toggleFavoriteAtSelection();
       return UiAction.handled(false);
