@@ -211,7 +211,11 @@ public final class QuarkusApiClient {
         if (!value.isTextual()) {
           throw new ApiContractException("OpenAPI build tool enum must contain strings");
         }
-        buildTools.add(BuildToolCodec.toUiValue(value.textValue()));
+        String buildTool = BuildToolCodec.toUiValue(value.textValue());
+        if (buildTool.isBlank()) {
+          throw new ApiContractException("OpenAPI build tool enum must not contain blank values");
+        }
+        buildTools.add(buildTool);
       }
       break;
     }

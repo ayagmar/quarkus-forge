@@ -178,4 +178,21 @@ class ProjectRequestValidatorTest {
 
     assertThat(report.errors()).extracting(ValidationError::field).contains("platformStream");
   }
+
+  @Test
+  void rejectsOutputDirectorySegmentsEndingWithColonWhenNotDriveLetter() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example",
+            "forge-app",
+            "1.0.0",
+            "com.example.forge",
+            "./tmp/cache:",
+            "maven",
+            "25");
+
+    ValidationReport report = validator.validate(request);
+
+    assertThat(report.errors()).extracting(ValidationError::field).contains("outputDirectory");
+  }
 }

@@ -372,6 +372,37 @@ class QuarkusApiClientTest {
   }
 
   @Test
+  void fetchMetadataFallsBackToDefaultBuildToolsWhenOpenApiEnumContainsBlankValue() {
+    stubStreamsPayload(List.of(17, 21, 25));
+    stubFor(
+        get(urlEqualTo("/q/openapi"))
+            .willReturn(
+                okJson(
+                    """
+                    {
+                      "paths": {
+                        "/api/download": {
+                          "get": {
+                            "parameters": [
+                              {"name":"b","schema":{"enum":["MAVEN"," "]}}
+                            ]
+                          }
+                        }
+                      }
+                    }
+                    """)));
+
+    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+
+    MetadataDto metadata = client.fetchMetadata().join();
+
+    assertThat(metadata.buildTools())
+        .containsExactlyInAnyOrder("maven", "gradle", "gradle-kotlin-dsl");
+    assertThat(metadata.compatibility().keySet())
+        .containsExactlyInAnyOrder("maven", "gradle", "gradle-kotlin-dsl");
+  }
+
+  @Test
   void generateProjectZipRequestsZipContentType() {
     stubFor(
         get(urlPathEqualTo("/api/download"))

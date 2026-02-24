@@ -123,7 +123,10 @@ public final class ProjectRequestValidator {
 
     String[] segments = outputDirectory.replace('\\', '/').split("/");
     for (String rawSegment : segments) {
-      if (rawSegment.isBlank() || rawSegment.endsWith(":")) {
+      if (rawSegment.isBlank()) {
+        continue;
+      }
+      if (isWindowsDriveLetterSegment(rawSegment)) {
         continue;
       }
 
@@ -157,6 +160,12 @@ public final class ProjectRequestValidator {
         return;
       }
     }
+  }
+
+  private static boolean isWindowsDriveLetterSegment(String segment) {
+    return segment.length() == 2
+        && Character.isLetter(segment.charAt(0))
+        && segment.charAt(1) == ':';
   }
 
   private static boolean isWindowsReservedName(String segment) {

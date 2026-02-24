@@ -1,6 +1,7 @@
 package dev.ayagmar.quarkusforge.util;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import java.util.List;
 import java.util.Map;
@@ -40,5 +41,19 @@ class CaseInsensitiveLookupTest {
 
     assertThat(javaVersions).containsExactly("21", "25");
     assertThat(CaseInsensitiveLookup.contains(List.of(" Maven "), "maven")).isTrue();
+  }
+
+  @Test
+  void containsReturnsFalseWhenExpectedValueIsNull() {
+    assertThatCode(() -> CaseInsensitiveLookup.contains(List.of("maven"), null))
+        .doesNotThrowAnyException();
+    assertThat(CaseInsensitiveLookup.contains(List.of("maven"), null)).isFalse();
+  }
+
+  @Test
+  void findReturnsNullWhenExpectedKeyIsNull() {
+    assertThatCode(() -> CaseInsensitiveLookup.find(Map.of("maven", "ok"), null))
+        .doesNotThrowAnyException();
+    assertThat(CaseInsensitiveLookup.find(Map.of("maven", "ok"), null)).isNull();
   }
 }

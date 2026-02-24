@@ -10,6 +10,9 @@ public final class CaseInsensitiveLookup {
 
   public static boolean contains(List<String> values, String expected) {
     Objects.requireNonNull(values);
+    if (expected == null) {
+      return false;
+    }
     String normalizedExpected = normalize(expected);
     for (String value : values) {
       if (normalize(value).equals(normalizedExpected)) {
@@ -21,6 +24,9 @@ public final class CaseInsensitiveLookup {
 
   public static <V> V find(Map<String, V> values, String expectedKey) {
     Objects.requireNonNull(values);
+    if (expectedKey == null) {
+      return null;
+    }
     String normalizedExpected = normalize(expectedKey);
     for (var entry : values.entrySet()) {
       if (normalize(entry.getKey()).equals(normalizedExpected)) {
@@ -31,6 +37,6 @@ public final class CaseInsensitiveLookup {
   }
 
   private static String normalize(String value) {
-    return Objects.requireNonNull(value).trim().toLowerCase(Locale.ROOT);
+    return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
   }
 }
