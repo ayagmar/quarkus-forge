@@ -17,6 +17,8 @@ import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
 final class ExtensionCatalogState {
+  private static final String RECENT_SECTION_TITLE = "Recently Selected";
+  private static final int MAX_RECENT_SELECTIONS = 10;
   private static final List<ExtensionCatalogItem> DEFAULT_EXTENSIONS =
       List.of(
           new ExtensionCatalogItem("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
@@ -39,6 +41,7 @@ final class ExtensionCatalogState {
   private final ListState listState;
   private final Set<String> selectedExtensionIds;
   private final Set<String> favoriteExtensionIds;
+  private final List<String> recentExtensionIds;
   private final Debouncer searchDebouncer;
   private final LatestResultGate searchResultGate;
   private final ExtensionFavoritesStore favoritesStore;
@@ -52,7 +55,7 @@ final class ExtensionCatalogState {
   private Map<String, Integer> rowIndexByExtensionId;
   private String currentQuery;
   private boolean favoritesOnlyFilterEnabled;
-  private CompletableFuture<Void> favoritePersistenceChain;
+  private CompletableFuture<Void> preferencePersistenceChain;
 
   ExtensionCatalogState(UiScheduler scheduler, Duration debounceDelay, String initialQuery) {
     this(scheduler, debounceDelay, initialQuery, ExtensionFavoritesStore.inMemory(), Runnable::run);
@@ -71,6 +74,7 @@ final class ExtensionCatalogState {
     listState = new ListState();
     selectedExtensionIds = new LinkedHashSet<>();
     favoriteExtensionIds = new LinkedHashSet<>(favoritesStore.loadFavoriteExtensionIds());
+    recentExtensionIds = new ArrayList<>(favoritesStore.loadRecentExtensionIds());
     searchDebouncer = new Debouncer(scheduler, debounceDelay);
     searchResultGate = new LatestResultGate();
     collapsedCategoryTitles = new LinkedHashSet<>();
@@ -82,7 +86,7 @@ final class ExtensionCatalogState {
     rowIndexByExtensionId = Map.of();
     currentQuery = initialQuery == null ? "" : initialQuery;
     favoritesOnlyFilterEnabled = false;
-    favoritePersistenceChain = CompletableFuture.completedFuture(null);
+    preferencePersistenceChain = CompletableFuture.completedFuture(null);
     applyFiltered(currentQuery, searchResultGate.nextToken(), ignored -> {});
   }
 
@@ -96,7 +100,8 @@ final class ExtensionCatalogState {
     selectedExtensionIds.removeIf(
         selectedExtensionId -> !availableExtensionIds.contains(selectedExtensionId));
     favoriteExtensionIds.removeIf(favoriteId -> !availableExtensionIds.contains(favoriteId));
-    persistFavoritesAsync();
+    recentExtensionIds.removeIf(recentId -> !availableExtensionIds.contains(recentId));
+    persistUserStateAsync();
     catalogIndex = new ExtensionCatalogIndex(items);
     applyFiltered(query, searchResultGate.nextToken(), onFiltered);
   }
@@ -124,7 +129,7 @@ final class ExtensionCatalogState {
     if (!isNowFavorite) {
       favoriteExtensionIds.remove(selected.id());
     }
-    persistFavoritesAsync();
+    persistUserStateAsync();
     applyFiltered(currentQuery, searchResultGate.nextToken(), onFiltered);
     return new FavoriteToggleResult(true, selected.name(), isNowFavorite);
   }
@@ -291,8 +296,11 @@ final class ExtensionCatalogState {
       if (extension == null) {
         return false;
       }
-      if (!selectedExtensionIds.add(extension.id())) {
+      boolean selectedNow = selectedExtensionIds.add(extension.id());
+      if (!selectedNow) {
         selectedExtensionIds.remove(extension.id());
+      } else {
+        recordRecentSelection(extension.id());
       }
       onToggled.accept(extension.name());
       return true;
@@ -364,13 +372,15 @@ final class ExtensionCatalogState {
       return List.of();
     }
 
+    List<ExtensionCatalogRow> rows = new ArrayList<>();
+    prependRecentRows(rows, rankedItems);
+
     Map<String, Integer> categoryItemCount = new LinkedHashMap<>();
     for (ExtensionCatalogItem item : rankedItems) {
       String categoryTitle = resolveCategoryTitle(item.categoryKey(), item.category());
       categoryItemCount.merge(categoryTitle, 1, Integer::sum);
     }
 
-    List<ExtensionCatalogRow> rows = new ArrayList<>();
     String previousCategoryTitle = null;
     for (ExtensionCatalogItem item : rankedItems) {
       String categoryTitle = resolveCategoryTitle(item.categoryKey(), item.category());
@@ -386,6 +396,39 @@ final class ExtensionCatalogState {
       rows.add(ExtensionCatalogRow.item(item));
     }
     return List.copyOf(rows);
+  }
+
+  private void prependRecentRows(
+      List<ExtensionCatalogRow> rows, List<ExtensionCatalogItem> rankedItems) {
+    if (!currentQuery.isBlank() || favoritesOnlyFilterEnabled || recentExtensionIds.isEmpty()) {
+      return;
+    }
+    List<ExtensionCatalogItem> recentItems = resolveRecentItems(rankedItems);
+    if (recentItems.isEmpty()) {
+      return;
+    }
+    rows.add(ExtensionCatalogRow.section(RECENT_SECTION_TITLE, false, 0));
+    for (ExtensionCatalogItem item : recentItems) {
+      rows.add(ExtensionCatalogRow.item(item));
+    }
+  }
+
+  private List<ExtensionCatalogItem> resolveRecentItems(List<ExtensionCatalogItem> rankedItems) {
+    Map<String, ExtensionCatalogItem> byId = new LinkedHashMap<>();
+    for (ExtensionCatalogItem item : rankedItems) {
+      byId.put(item.id(), item);
+    }
+    List<ExtensionCatalogItem> recentItems = new ArrayList<>();
+    for (String recentId : recentExtensionIds) {
+      ExtensionCatalogItem item = byId.get(recentId);
+      if (item != null) {
+        recentItems.add(item);
+      }
+      if (recentItems.size() >= MAX_RECENT_SELECTIONS) {
+        break;
+      }
+    }
+    return recentItems;
   }
 
   private static String resolveCategoryTitle(String categoryKey, String rawCategory) {
@@ -554,6 +597,9 @@ final class ExtensionCatalogState {
     }
     ExtensionCatalogRow row = filteredRows.get(rowIndex);
     if (row.isSectionHeader()) {
+      if (RECENT_SECTION_TITLE.equals(row.label())) {
+        return null;
+      }
       return row.label();
     }
     ExtensionCatalogItem extension = row.extension();
@@ -573,13 +619,27 @@ final class ExtensionCatalogState {
     return null;
   }
 
-  private void persistFavoritesAsync() {
-    Set<String> snapshot = Set.copyOf(favoriteExtensionIds);
-    favoritePersistenceChain =
-        favoritePersistenceChain
+  private void recordRecentSelection(String extensionId) {
+    recentExtensionIds.remove(extensionId);
+    recentExtensionIds.addFirst(extensionId);
+    while (recentExtensionIds.size() > MAX_RECENT_SELECTIONS) {
+      recentExtensionIds.removeLast();
+    }
+    persistUserStateAsync();
+    refreshRows(extensionId);
+  }
+
+  private void persistUserStateAsync() {
+    Set<String> favoriteSnapshot = Set.copyOf(favoriteExtensionIds);
+    List<String> recentSnapshot = List.copyOf(recentExtensionIds);
+    preferencePersistenceChain =
+        preferencePersistenceChain
             .exceptionally(ignored -> null)
             .thenRunAsync(
-                () -> favoritesStore.saveFavoriteExtensionIds(snapshot),
+                () -> {
+                  favoritesStore.saveFavoriteExtensionIds(favoriteSnapshot);
+                  favoritesStore.saveRecentExtensionIds(recentSnapshot);
+                },
                 favoritesPersistenceExecutor);
   }
 

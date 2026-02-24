@@ -41,34 +41,39 @@ final class FooterLinesComposer {
           ? "Esc: cancel generation | Enter disabled"
           : "Esc: cancel generation | Enter disabled while generation is loading";
     }
+    if (snapshot.helpOverlayVisible()) {
+      return width < NARROW_WIDTH_THRESHOLD
+          ? "Help: Esc/? close | Ctrl+P palette"
+          : "Help overlay: Esc or ?: close | Ctrl+P: open command palette";
+    }
     if (snapshot.commandPaletteVisible()) {
       return width < NARROW_WIDTH_THRESHOLD
-          ? "Palette: Up/Down | Enter run | Esc/? close"
-          : "Command palette: Up/Down/Home/End or j/k: navigate | Enter: run | 1-9: quick run | Esc or ?: close";
+          ? "Palette: Up/Down | Enter run | Esc/Ctrl+P close"
+          : "Command palette: Up/Down/Home/End or j/k: navigate | Enter: run | 1-9: quick run | Esc or Ctrl+P: close";
     }
     if (snapshot.focusTarget() == FocusTarget.EXTENSION_LIST) {
       return width < NARROW_WIDTH_THRESHOLD
-          ? "Up/Down or j/k: nav | PgUp/PgDn: category | Space: select | F: favorite | c: category | ?: commands"
-          : "Up/Down/Home/End or j/k: list nav | PgUp/PgDn: category jump | Space: select | F: favorite | c: close/open category | C: open all | Ctrl+J: jump favorite | Ctrl+K: favorite filter | Ctrl+R: reload | Ctrl+E: error details | ?: commands";
+          ? "Up/Down or j/k: nav | PgUp/PgDn: category | Space: select | F: favorite | ?: help"
+          : "Up/Down/Home/End or j/k: list nav | PgUp/PgDn: category jump | Space: select | F: favorite | c: close/open category | C: open all | Ctrl+J: jump favorite | Ctrl+K: favorite filter | Ctrl+R: reload | Ctrl+E: error details | ?: help | Ctrl+P: commands";
     }
     if (snapshot.focusTarget() == FocusTarget.EXTENSION_SEARCH) {
       return width < NARROW_WIDTH_THRESHOLD
-          ? "Type: filter | Down: list | Ctrl+K: fav filter | ?: commands"
-          : "Type: filter extensions | Down: list | Ctrl+R: reload | Ctrl+J: jump favorite | Ctrl+K: favorite filter | Ctrl+E: error details | ?: commands";
+          ? "Type: filter | Down: list | Ctrl+K: fav filter | ?: help"
+          : "Type: filter extensions | Down: list | Ctrl+R: reload | Ctrl+J: jump favorite | Ctrl+K: favorite filter | Ctrl+E: error details | ?: help | Ctrl+P: commands";
     }
     if (snapshot.focusTarget() == FocusTarget.SUBMIT) {
       return width < NARROW_WIDTH_THRESHOLD
-          ? "Enter: submit | j/k: focus | Ctrl+E: error details | ?: commands"
-          : "Enter: submit | Tab/Shift+Tab or j/k: focus | Ctrl+E: error details | Esc: cancel/quit | ?: commands";
+          ? "Enter: submit | j/k: focus | Ctrl+E: error details | ?: help"
+          : "Enter: submit | Tab/Shift+Tab or j/k: focus | Ctrl+E: error details | Esc: cancel/quit | ?: help | Ctrl+P: commands";
     }
     if (snapshot.metadataSelectorFocus()) {
       return width < NARROW_WIDTH_THRESHOLD
-          ? "Left/Right or h/l: pick | Up/Down or j/k: cycle | ?: commands"
-          : "Left/Right/Home/End or h/l/j/k: pick value | Tab/Shift+Tab: focus | Enter: submit | Ctrl+E: error details | ?: commands";
+          ? "Left/Right or h/l: pick | Up/Down or j/k: cycle | ?: help"
+          : "Left/Right/Home/End or h/l/j/k: pick value | Tab/Shift+Tab: focus | Enter: submit | Ctrl+E: error details | ?: help | Ctrl+P: commands";
     }
     return width < NARROW_WIDTH_THRESHOLD
-        ? "Tab: focus | Enter: submit | Ctrl+E: error details | ?: commands"
-        : "Tab/Shift+Tab: focus | Enter: submit | /: search | Ctrl+K: favorite filter | Ctrl+E: error details | Esc: cancel/quit | ?: commands";
+        ? "Tab: focus | Enter: submit | Ctrl+E: error details | ?: help"
+        : "Tab/Shift+Tab: focus | Enter: submit | /: search | Ctrl+K: favorite filter | Ctrl+E: error details | Esc: cancel/quit | ?: help | Ctrl+P: commands";
   }
 
   private static int expandedErrorDetailLines(
@@ -119,6 +124,7 @@ final class FooterLinesComposer {
       FocusTarget focusTarget,
       boolean metadataSelectorFocus,
       boolean commandPaletteVisible,
+      boolean helpOverlayVisible,
       String modeLabel,
       String generationStateLabel,
       String statusMessage,

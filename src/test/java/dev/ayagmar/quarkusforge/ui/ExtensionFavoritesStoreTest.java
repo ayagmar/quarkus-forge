@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -25,6 +26,19 @@ class ExtensionFavoritesStoreTest {
   }
 
   @Test
+  void fileBackedStorePersistsRecentIdsAcrossInstances() {
+    Path favoritesFile = tempDir.resolve("favorites.json");
+    ExtensionFavoritesStore writerStore = ExtensionFavoritesStore.fileBacked(favoritesFile);
+
+    writerStore.saveRecentExtensionIds(
+        List.of("io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc", "io.quarkus:quarkus-rest"));
+
+    ExtensionFavoritesStore readerStore = ExtensionFavoritesStore.fileBacked(favoritesFile);
+    assertThat(readerStore.loadRecentExtensionIds())
+        .containsExactly("io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc");
+  }
+
+  @Test
   void invalidSchemaReturnsEmptyFavorites() throws Exception {
     Path favoritesFile = tempDir.resolve("favorites.json");
     Files.writeString(
@@ -38,5 +52,6 @@ class ExtensionFavoritesStoreTest {
 
     ExtensionFavoritesStore store = ExtensionFavoritesStore.fileBacked(favoritesFile);
     assertThat(store.loadFavoriteExtensionIds()).isEmpty();
+    assertThat(store.loadRecentExtensionIds()).isEmpty();
   }
 }

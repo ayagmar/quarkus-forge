@@ -134,6 +134,7 @@ class CoreTuiShellPilotTest {
   void slashShortcutJumpsFocusToExtensionSearch() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    moveFocusTo(controller, FocusTarget.SUBMIT);
 
     controller.onEvent(KeyEvent.ofChar('/'));
 
@@ -142,17 +143,35 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
-  void questionMarkTogglesCommandPaletteOverlay() {
+  void questionMarkTogglesHelpOverlay() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    moveFocusTo(controller, FocusTarget.SUBMIT);
+
+    controller.onEvent(KeyEvent.ofChar('?'));
+    String opened = renderToString(controller);
+    assertThat(opened).contains("Help [focus]");
+    assertThat(opened).contains("Global");
+    assertThat(controller.helpOverlayVisible()).isTrue();
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    String closed = renderToString(controller);
+    assertThat(closed).doesNotContain("Help [focus]");
+    assertThat(controller.helpOverlayVisible()).isFalse();
+  }
+
+  @Test
+  void ctrlPTogglesCommandPaletteOverlay() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
 
-    controller.onEvent(KeyEvent.ofChar('?'));
+    controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
     String opened = renderToString(controller);
     assertThat(opened).contains("Command Palette [focus]");
     assertThat(opened).contains("Focus extension search");
     assertThat(controller.commandPaletteVisible()).isTrue();
 
-    controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
     String closed = renderToString(controller);
     assertThat(closed).doesNotContain("Command Palette [focus]");
     assertThat(controller.commandPaletteVisible()).isFalse();
@@ -164,7 +183,7 @@ class CoreTuiShellPilotTest {
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
 
-    controller.onEvent(KeyEvent.ofChar('?'));
+    controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
     controller.onEvent(KeyEvent.ofChar('j'));
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
@@ -185,6 +204,19 @@ class CoreTuiShellPilotTest {
     assertThat(action.shouldQuit()).isFalse();
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.OUTPUT_DIR);
     assertThat(controller.request().outputDirectory()).endsWith("/");
+  }
+
+  @Test
+  void questionMarkIsInsertedInGroupIdWithoutOpeningHelp() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
+
+    controller.onEvent(KeyEvent.ofChar('?'));
+
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
+    assertThat(controller.request().groupId()).endsWith("?");
+    assertThat(controller.helpOverlayVisible()).isFalse();
   }
 
   @Test

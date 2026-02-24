@@ -78,6 +78,33 @@ public final class CoreTuiController {
           new CommandPaletteEntry("Reload catalog", "Ctrl+R", CommandPaletteAction.RELOAD_CATALOG),
           new CommandPaletteEntry(
               "Toggle error details", "Ctrl+E", CommandPaletteAction.TOGGLE_ERROR_DETAILS));
+  private static final List<String> HELP_OVERLAY_LINES =
+      List.of(
+          "Global",
+          "  Tab / Shift+Tab : move focus",
+          "  Enter           : submit generation",
+          "  Esc / Ctrl+C    : cancel generation or quit",
+          "  ?               : toggle help",
+          "  Ctrl+P          : command palette",
+          "",
+          "Extensions",
+          "  / or Ctrl+F     : focus extension search",
+          "  Ctrl+L          : focus extension list",
+          "  Up/Down or j/k  : move in list",
+          "  Home/End        : first/last list row",
+          "  PgUp/PgDn       : previous/next category",
+          "  Space           : toggle extension",
+          "  f               : toggle favorite",
+          "  c / C           : close/open focused category / open all",
+          "  Ctrl+J          : jump to next favorite",
+          "  Ctrl+K          : toggle favorites filter",
+          "  Ctrl+R          : reload extension catalog",
+          "",
+          "Diagnostics",
+          "  Ctrl+E          : toggle expanded error details",
+          "",
+          "Help",
+          "  Esc or ?        : close this help");
   private final EnumMap<FocusTarget, TextInputState> inputStates = new EnumMap<>(FocusTarget.class);
   private final ProjectRequestValidator requestValidator = new ProjectRequestValidator();
   private MetadataCompatibilityContext metadataCompatibility;
@@ -112,6 +139,7 @@ public final class CoreTuiController {
   private String successHint;
   private boolean showErrorDetails;
   private boolean commandPaletteVisible;
+  private boolean helpOverlayVisible;
   private int commandPaletteSelection;
 
   private CoreTuiController(
@@ -154,6 +182,7 @@ public final class CoreTuiController {
     successHint = "";
     showErrorDetails = false;
     commandPaletteVisible = false;
+    helpOverlayVisible = false;
     commandPaletteSelection = 0;
     availableBuildTools = List.of();
     availableJavaVersions = List.of();
@@ -341,6 +370,14 @@ public final class CoreTuiController {
     if (!(event instanceof KeyEvent keyEvent)) {
       return UiAction.ignored();
     }
+    UiAction helpOverlayAction = handleHelpOverlayKey(keyEvent);
+    if (helpOverlayAction != null) {
+      return helpOverlayAction;
+    }
+    if (shouldToggleHelpOverlay(keyEvent, focusTarget)) {
+      toggleHelpOverlay();
+      return UiAction.handled(false);
+    }
     if (isCommandPaletteToggleKey(keyEvent)) {
       toggleCommandPalette();
       return UiAction.handled(false);
@@ -520,6 +557,9 @@ public final class CoreTuiController {
     if (commandPaletteVisible) {
       renderCommandPalette(frame, area);
     }
+    if (helpOverlayVisible) {
+      renderHelpOverlay(frame, area);
+    }
   }
 
   FocusTarget focusTarget() {
@@ -544,6 +584,10 @@ public final class CoreTuiController {
 
   boolean commandPaletteVisible() {
     return commandPaletteVisible;
+  }
+
+  boolean helpOverlayVisible() {
+    return helpOverlayVisible;
   }
 
   boolean submitRequested() {
@@ -709,7 +753,7 @@ public final class CoreTuiController {
       lines.add(prefix + (i + 1) + ". " + entry.label() + " [" + entry.shortcut() + "]");
     }
     lines.add("");
-    lines.add("Enter: run | 1-9: quick run | Up/Down: navigate | Esc or ?: close");
+    lines.add("Enter: run | 1-9: quick run | Up/Down: navigate | Esc or Ctrl+P: close");
 
     int maxLineLength = lines.stream().mapToInt(String::length).max().orElse(40);
     int width = Math.min(Math.max(56, maxLineLength + 4), viewport.width() - 2);
@@ -737,12 +781,43 @@ public final class CoreTuiController {
     frame.renderWidget(palette, overlayArea);
   }
 
+  private void renderHelpOverlay(Frame frame, Rect viewport) {
+    if (viewport.width() < 36 || viewport.height() < 12) {
+      return;
+    }
+    int maxLineLength = HELP_OVERLAY_LINES.stream().mapToInt(String::length).max().orElse(40);
+    int width = Math.min(Math.max(68, maxLineLength + 4), viewport.width() - 2);
+    int height = Math.min(HELP_OVERLAY_LINES.size() + 2, viewport.height() - 2);
+    Rect overlayArea =
+        new Rect(
+            viewport.x() + Math.max(0, (viewport.width() - width) / 2),
+            viewport.y() + Math.max(0, (viewport.height() - height) / 2),
+            width,
+            height);
+
+    Paragraph helpOverlay =
+        Paragraph.builder()
+            .text(String.join("\n", HELP_OVERLAY_LINES))
+            .style(Style.EMPTY.fg(theme.color("text")).bg(theme.color("base")))
+            .overflow(Overflow.ELLIPSIS)
+            .block(
+                Block.builder()
+                    .title("Help [focus]")
+                    .borders(Borders.ALL)
+                    .borderType(BorderType.ROUNDED)
+                    .borderStyle(Style.EMPTY.fg(theme.color("focus")).bold())
+                    .build())
+            .build();
+    frame.renderWidget(helpOverlay, overlayArea);
+  }
+
   private FooterLinesComposer.FooterSnapshot footerSnapshot() {
     return new FooterLinesComposer.FooterSnapshot(
         isGenerationInProgress(),
         focusTarget,
         isMetadataSelectorFocus(focusTarget),
         commandPaletteVisible,
+        helpOverlayVisible,
         generationStateTracker.modeLabel(),
         generationStateLabel(),
         statusMessage,
@@ -858,6 +933,7 @@ public final class CoreTuiController {
       statusMessage = "Generation in progress. Press Esc to cancel.";
       return;
     }
+    closeHelpOverlay();
     commandPaletteVisible = true;
     commandPaletteSelection = 0;
     statusMessage = "Command palette opened";
@@ -865,6 +941,46 @@ public final class CoreTuiController {
 
   private void closeCommandPalette() {
     commandPaletteVisible = false;
+  }
+
+  private UiAction handleHelpOverlayKey(KeyEvent keyEvent) {
+    if (!helpOverlayVisible) {
+      return null;
+    }
+    if (keyEvent.isCtrlC()) {
+      cancelPendingAsyncOperations();
+      return UiAction.handled(true);
+    }
+    if (keyEvent.isCancel() || isHelpOverlayToggleKey(keyEvent)) {
+      closeHelpOverlay();
+      statusMessage = "Help closed";
+      return UiAction.handled(false);
+    }
+    if (isCommandPaletteToggleKey(keyEvent)) {
+      closeHelpOverlay();
+      toggleCommandPalette();
+      return UiAction.handled(false);
+    }
+    return UiAction.handled(false);
+  }
+
+  private void toggleHelpOverlay() {
+    if (helpOverlayVisible) {
+      closeHelpOverlay();
+      statusMessage = "Help closed";
+      return;
+    }
+    if (isGenerationInProgress()) {
+      statusMessage = "Generation in progress. Press Esc to cancel.";
+      return;
+    }
+    closeCommandPalette();
+    helpOverlayVisible = true;
+    statusMessage = "Help opened";
+  }
+
+  private void closeHelpOverlay() {
+    helpOverlayVisible = false;
   }
 
   private boolean isMetadataFocused() {
@@ -1648,9 +1764,20 @@ public final class CoreTuiController {
 
   private static boolean isCommandPaletteToggleKey(KeyEvent keyEvent) {
     return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
+        && keyEvent.hasCtrl()
+        && !keyEvent.hasAlt()
+        && (keyEvent.character() == 'p' || keyEvent.character() == 'P');
+  }
+
+  private static boolean isHelpOverlayToggleKey(KeyEvent keyEvent) {
+    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
         && !keyEvent.hasCtrl()
         && !keyEvent.hasAlt()
         && keyEvent.character() == '?';
+  }
+
+  private static boolean shouldToggleHelpOverlay(KeyEvent keyEvent, FocusTarget currentFocus) {
+    return isHelpOverlayToggleKey(keyEvent) && !isTextInputFocus(currentFocus);
   }
 
   private static boolean shouldQuitKeyEvent(KeyEvent keyEvent) {
@@ -1702,7 +1829,7 @@ public final class CoreTuiController {
       return false;
     }
     if (!keyEvent.hasCtrl() && !keyEvent.hasAlt() && keyEvent.character() == '/') {
-      return currentFocus != FocusTarget.OUTPUT_DIR && currentFocus != FocusTarget.EXTENSION_SEARCH;
+      return !isTextInputFocus(currentFocus) && currentFocus != FocusTarget.EXTENSION_SEARCH;
     }
     return keyEvent.hasCtrl() && (keyEvent.character() == 'f' || keyEvent.character() == 'F');
   }
@@ -1799,8 +1926,7 @@ public final class CoreTuiController {
     }
   }
 
-  private record CommandPaletteEntry(
-      String label, String shortcut, CommandPaletteAction action) {
+  private record CommandPaletteEntry(String label, String shortcut, CommandPaletteAction action) {
     CommandPaletteEntry {
       label = Objects.requireNonNull(label);
       shortcut = Objects.requireNonNull(shortcut);

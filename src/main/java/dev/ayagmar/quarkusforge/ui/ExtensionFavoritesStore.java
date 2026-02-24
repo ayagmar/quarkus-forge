@@ -23,6 +23,10 @@ public interface ExtensionFavoritesStore {
 
   void saveFavoriteExtensionIds(Set<String> favoriteExtensionIds);
 
+  List<String> loadRecentExtensionIds();
+
+  void saveRecentExtensionIds(List<String> recentExtensionIds);
+
   static ExtensionFavoritesStore inMemory() {
     return new InMemoryExtensionFavoritesStore();
   }
@@ -38,6 +42,7 @@ public interface ExtensionFavoritesStore {
 
   final class InMemoryExtensionFavoritesStore implements ExtensionFavoritesStore {
     private Set<String> favoriteExtensionIds = Set.of();
+    private List<String> recentExtensionIds = List.of();
 
     @Override
     public synchronized Set<String> loadFavoriteExtensionIds() {
@@ -47,6 +52,16 @@ public interface ExtensionFavoritesStore {
     @Override
     public synchronized void saveFavoriteExtensionIds(Set<String> favoriteExtensionIds) {
       this.favoriteExtensionIds = normalizeIds(favoriteExtensionIds);
+    }
+
+    @Override
+    public synchronized List<String> loadRecentExtensionIds() {
+      return recentExtensionIds;
+    }
+
+    @Override
+    public synchronized void saveRecentExtensionIds(List<String> recentExtensionIds) {
+      this.recentExtensionIds = normalizeIdList(recentExtensionIds);
     }
   }
 
@@ -61,41 +76,77 @@ public interface ExtensionFavoritesStore {
 
     @Override
     public Set<String> loadFavoriteExtensionIds() {
-      if (!Files.isRegularFile(file)) {
+      JsonNode root = loadRoot();
+      if (root == null) {
         return Set.of();
       }
-      try {
-        JsonNode root = objectMapper.readTree(file.toFile());
-        if (!root.isObject()) {
-          return Set.of();
-        }
-        JsonNode schemaVersion = root.get("schemaVersion");
-        if (schemaVersion == null || !schemaVersion.canConvertToInt()) {
-          return Set.of();
-        }
-        if (schemaVersion.intValue() != SCHEMA_VERSION) {
-          return Set.of();
-        }
-        JsonNode favoritesNode = root.get("favoriteExtensionIds");
-        if (favoritesNode == null || !favoritesNode.isArray()) {
-          return Set.of();
-        }
-        List<String> favoriteIds = new ArrayList<>();
-        for (JsonNode favoriteNode : favoritesNode) {
-          if (!favoriteNode.isTextual()) {
-            return Set.of();
-          }
-          favoriteIds.add(favoriteNode.textValue());
-        }
-        return normalizeIds(favoriteIds);
-      } catch (IOException ignored) {
+      JsonNode favoritesNode = root.get("favoriteExtensionIds");
+      if (favoritesNode == null || !favoritesNode.isArray()) {
         return Set.of();
       }
+      List<String> favoriteIds = new ArrayList<>();
+      for (JsonNode favoriteNode : favoritesNode) {
+        if (!favoriteNode.isTextual()) {
+          return Set.of();
+        }
+        favoriteIds.add(favoriteNode.textValue());
+      }
+      return normalizeIds(favoriteIds);
+    }
+
+    @Override
+    public List<String> loadRecentExtensionIds() {
+      JsonNode root = loadRoot();
+      if (root == null) {
+        return List.of();
+      }
+      JsonNode recentNode = root.get("recentExtensionIds");
+      if (recentNode == null || !recentNode.isArray()) {
+        return List.of();
+      }
+      List<String> recentIds = new ArrayList<>();
+      for (JsonNode recentEntry : recentNode) {
+        if (!recentEntry.isTextual()) {
+          return List.of();
+        }
+        recentIds.add(recentEntry.textValue());
+      }
+      return normalizeIdList(recentIds);
     }
 
     @Override
     public void saveFavoriteExtensionIds(Set<String> favoriteExtensionIds) {
-      Set<String> normalizedIds = normalizeIds(favoriteExtensionIds);
+      writeState(normalizeIds(favoriteExtensionIds), loadRecentExtensionIds());
+    }
+
+    @Override
+    public void saveRecentExtensionIds(List<String> recentExtensionIds) {
+      writeState(loadFavoriteExtensionIds(), normalizeIdList(recentExtensionIds));
+    }
+
+    private JsonNode loadRoot() {
+      if (!Files.isRegularFile(file)) {
+        return null;
+      }
+      try {
+        JsonNode root = objectMapper.readTree(file.toFile());
+        if (!root.isObject()) {
+          return null;
+        }
+        JsonNode schemaVersion = root.get("schemaVersion");
+        if (schemaVersion == null || !schemaVersion.canConvertToInt()) {
+          return null;
+        }
+        if (schemaVersion.intValue() != SCHEMA_VERSION) {
+          return null;
+        }
+        return root;
+      } catch (IOException ignored) {
+        return null;
+      }
+    }
+
+    private void writeState(Set<String> favoriteExtensionIds, List<String> recentExtensionIds) {
       try {
         Path parent = file.toAbsolutePath().normalize().getParent();
         if (parent == null) {
@@ -106,7 +157,10 @@ public interface ExtensionFavoritesStore {
         try {
           ObjectNode root = objectMapper.createObjectNode();
           root.put("schemaVersion", SCHEMA_VERSION);
-          root.set("favoriteExtensionIds", objectMapper.valueToTree(new TreeSet<>(normalizedIds)));
+          root.set(
+              "favoriteExtensionIds",
+              objectMapper.valueToTree(new TreeSet<>(favoriteExtensionIds)));
+          root.set("recentExtensionIds", objectMapper.valueToTree(recentExtensionIds));
           Files.write(
               tempFile,
               objectMapper.writeValueAsBytes(root),
@@ -146,5 +200,21 @@ public interface ExtensionFavoritesStore {
       }
     }
     return Set.copyOf(normalized);
+  }
+
+  private static List<String> normalizeIdList(Iterable<String> source) {
+    List<String> normalized = new ArrayList<>();
+    Set<String> seen = new LinkedHashSet<>();
+    for (String extensionId : source) {
+      if (extensionId == null) {
+        continue;
+      }
+      String trimmed = extensionId.trim();
+      if (trimmed.isBlank() || !seen.add(trimmed)) {
+        continue;
+      }
+      normalized.add(trimmed);
+    }
+    return List.copyOf(normalized);
   }
 }

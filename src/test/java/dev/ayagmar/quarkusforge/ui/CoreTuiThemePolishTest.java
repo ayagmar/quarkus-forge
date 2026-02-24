@@ -33,9 +33,7 @@ class CoreTuiThemePolishTest {
         .contains("PgUp/PgDn: category jump");
 
     String listFooterNarrow = renderToString(controller, 80, 32);
-    assertThat(listFooterNarrow)
-        .contains("Up/Down or j/k: nav")
-        .contains("PgUp/PgDn: category");
+    assertThat(listFooterNarrow).contains("Up/Down or j/k: nav").contains("PgUp/PgDn: category");
   }
 
   @Test

@@ -427,6 +427,50 @@ class CoreTuiExtensionSearchPilotTest {
     assertThat(secondController.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
   }
 
+  @Test
+  void selectingExtensionShowsRecentlySelectedSection() {
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    controller.onEvent(KeyEvent.ofChar(' '));
+
+    String rendered = renderToString(controller);
+
+    assertThat(rendered).contains("Recently Selected");
+    assertThat(rendered).contains("CDI");
+  }
+
+  @Test
+  void recentSelectionsPersistAcrossControllerRestarts() {
+    Path favoritesFile = tempDir.resolve("favorites.json");
+    ExtensionFavoritesStore favoritesStore = ExtensionFavoritesStore.fileBacked(favoritesFile);
+
+    CoreTuiController firstController = controllerWithFavoritesStore(favoritesStore);
+    firstController.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10)))));
+    moveFocusTo(firstController, FocusTarget.EXTENSION_LIST);
+    firstController.onEvent(KeyEvent.ofChar(' '));
+    assertThat(renderToString(firstController)).contains("Recently Selected");
+
+    CoreTuiController secondController = controllerWithFavoritesStore(favoritesStore);
+    secondController.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10)))));
+
+    assertThat(renderToString(secondController)).contains("Recently Selected");
+    assertThat(renderToString(secondController)).contains("CDI");
+  }
+
   private static void moveFocusTo(CoreTuiController controller, FocusTarget target) {
     for (int i = 0; i < 20 && controller.focusTarget() != target; i++) {
       controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));

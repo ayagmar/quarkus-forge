@@ -37,12 +37,13 @@ class FooterLinesComposerTest {
   }
 
   @Test
-  void defaultHintIncludesCommandPaletteShortcut() {
+  void defaultHintIncludesHelpAndCommandPaletteShortcuts() {
     FooterLinesComposer.FooterSnapshot snapshot = snapshotBuilder().build();
 
     List<String> lines = composer.compose(120, snapshot);
 
-    assertThat(lines.getFirst()).contains("?: commands");
+    assertThat(lines.getFirst()).contains("?: help");
+    assertThat(lines.getFirst()).contains("Ctrl+P: commands");
   }
 
   @Test
@@ -76,6 +77,7 @@ class FooterLinesComposerTest {
     private FocusTarget focusTarget = FocusTarget.GROUP_ID;
     private boolean metadataSelectorFocus;
     private boolean commandPaletteVisible;
+    private boolean helpOverlayVisible;
     private String modeLabel = "READY";
     private String generationStateLabel = "IDLE";
     private String statusMessage = "Ready";
@@ -116,6 +118,7 @@ class FooterLinesComposerTest {
           focusTarget,
           metadataSelectorFocus,
           commandPaletteVisible,
+          helpOverlayVisible,
           modeLabel,
           generationStateLabel,
           statusMessage,

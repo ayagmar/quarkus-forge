@@ -26,7 +26,7 @@ The shell keeps a stable widget tree and switches only the body split strategy b
   11. submit action
 - `Tab` moves to next focus target.
 - `Shift+Tab` moves to previous focus target.
-- `/` jumps directly to extension search when focus is not editing `outputDir` or extension search input.
+- `/` jumps directly to extension search when focus is not editing any text input.
 - `Ctrl+F` jumps directly to extension search from any focus target.
 - `Ctrl+L` jumps directly to extension list.
 - In extension search, `Down` moves focus to extension list.
@@ -46,7 +46,8 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - `Ctrl+J`: jump to next visible favorite extension.
 - `Ctrl+K`: toggle favorites-only filter mode.
 - `Ctrl+E`: toggle expanded full error details in footer.
-- `?`: toggle command palette with quick actions (`search/list focus`, favorites actions, category actions, reload, error details).
+- `?`: toggle full-screen help overlay (shortcut matrix) when not editing a text input.
+- `Ctrl+P`: toggle command palette with quick actions (`search/list focus`, favorites actions, category actions, reload, error details).
 - `Enter`: attempt submit (blocked with validation feedback if invalid).
 - `Esc` or `Ctrl+C`: cancel active generation if running, otherwise exit the TUI.
 - Backend startup preference is deterministic:
@@ -90,6 +91,7 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - Cancellation and stale-result protection ensure outdated async callbacks never overwrite newer search state.
 - Multi-selection is tracked by stable extension IDs, independent from list navigation cursor state.
 - Favorites are persisted under `~/.quarkus-forge/favorites.json` and restored on startup.
+- Recently selected extensions are surfaced in a `Recently Selected` section (when no search/filter is active) and persisted in the same store.
 - Catalog rows are grouped with stable category section headers.
 - Keyboard navigation prefers extension rows; when the current focus is a section header (or all
   categories are collapsed), navigation moves across visible headers to keep traversal usable.
