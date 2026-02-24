@@ -255,6 +255,10 @@ final class ExtensionCatalogState {
     return favoriteExtensionIds.size();
   }
 
+  int totalCatalogExtensionCount() {
+    return catalogIndex.totalItemCount();
+  }
+
   String focusedExtensionId() {
     ExtensionCatalogItem selected = selectedListItem();
     return selected == null ? "" : selected.id();

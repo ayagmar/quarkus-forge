@@ -113,7 +113,8 @@ final class BodyPanelRenderer {
             .constraints(Constraint.length(3), Constraint.fill(), Constraint.length(4))
             .split(inner);
 
-    inputRenderer.render(frame, sections.get(0), "Search Extensions", FocusTarget.EXTENSION_SEARCH);
+    inputRenderer.render(
+        frame, sections.get(0), searchInputLabel(snapshot), FocusTarget.EXTENSION_SEARCH);
     renderExtensionList(
         frame,
         sections.get(1),
@@ -277,6 +278,14 @@ final class BodyPanelRenderer {
     return extension.name();
   }
 
+  private static String searchInputLabel(ExtensionsPanelSnapshot snapshot) {
+    return "Search Extensions ("
+        + snapshot.filteredExtensionCount()
+        + "/"
+        + snapshot.totalCatalogExtensionCount()
+        + ")";
+  }
+
   private static String sectionHeaderLabel(ExtensionCatalogRow row) {
     String prefix = row.collapsed() ? "[+]" : "[-]";
     String suffix = row.collapsed() ? " (" + row.hiddenCount() + " hidden)" : "";
@@ -320,12 +329,16 @@ final class BodyPanelRenderer {
       boolean catalogStale,
       boolean favoritesOnlyFilterEnabled,
       int favoriteCount,
+      int filteredExtensionCount,
+      int totalCatalogExtensionCount,
       List<ExtensionCatalogRow> filteredRows,
       List<String> selectedExtensionIds) {
     ExtensionsPanelSnapshot {
       title = Objects.requireNonNull(title);
       catalogErrorMessage = catalogErrorMessage == null ? "" : catalogErrorMessage;
       catalogSource = catalogSource == null ? "" : catalogSource;
+      filteredExtensionCount = Math.max(0, filteredExtensionCount);
+      totalCatalogExtensionCount = Math.max(0, totalCatalogExtensionCount);
       filteredRows = List.copyOf(Objects.requireNonNull(filteredRows));
       selectedExtensionIds = List.copyOf(Objects.requireNonNull(selectedExtensionIds));
     }

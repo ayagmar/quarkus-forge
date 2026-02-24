@@ -259,6 +259,22 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void searchInputTitleShowsLiveMatchCounters() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+
+    assertThat(renderToString(controller)).contains("Search Extensions (7/7)");
+
+    moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
+    controller.onEvent(KeyEvent.ofChar('j'));
+    controller.onEvent(KeyEvent.ofChar('d'));
+    controller.onEvent(KeyEvent.ofChar('b'));
+    controller.onEvent(KeyEvent.ofChar('c'));
+
+    assertThat(renderToString(controller)).contains("Search Extensions (1/7)");
+  }
+
+  @Test
   void escapeClearsExtensionSearchBeforeQuitWhenSearchInputIsFocused() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());

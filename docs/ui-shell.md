@@ -101,6 +101,7 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - Section headers show open/closed state (`[-]` / `[+]`) and hidden-item counts for closed categories.
 - Favorites keep ranked position (API order precedence is preserved) and are marked/toggled via `*` indicator and favorite key actions.
 - Extension list labels use one rule: display extension `name` only (no alias/short-name suffix noise).
+- Extension search input title shows live match counters (`<matches>/<total>`).
 - Catalog rendering has explicit loading and fallback/degraded visuals.
 - Source labeling is explicit: `live`, `cache`, or `snapshot`; stale cache is marked `[stale]`.
 - `Ctrl+R` triggers catalog refresh/retry without restarting the TUI.

@@ -76,6 +76,10 @@ final class ExtensionCatalogIndex {
     return matches.stream().map(searchResult -> searchResult.item().item()).toList();
   }
 
+  int totalItemCount() {
+    return indexedItems.size();
+  }
+
   private Comparator<IndexedItem> emptyQueryComparator(Set<String> normalizedFavorites) {
     return Comparator.comparingInt(IndexedItem::apiOrderRank)
         .thenComparingInt(indexedItem -> baselineRank(indexedItem, normalizedFavorites))

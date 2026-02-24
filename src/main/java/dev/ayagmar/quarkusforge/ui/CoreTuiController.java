@@ -732,6 +732,8 @@ public final class CoreTuiController {
         extensionCatalogStale,
         extensionCatalogState.favoritesOnlyFilterEnabled(),
         extensionCatalogState.favoriteExtensionCount(),
+        extensionCatalogState.filteredExtensions().size(),
+        extensionCatalogState.totalCatalogExtensionCount(),
         extensionCatalogState.filteredRows(),
         extensionCatalogState.selectedExtensionIds());
   }
