@@ -329,6 +329,27 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void xClearsSelectedExtensionsWhenListIsFocused() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+
+    controller.onEvent(KeyEvent.ofChar(' '));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    controller.onEvent(KeyEvent.ofChar(' '));
+    assertThat(controller.selectedExtensionIds()).hasSize(2);
+
+    CoreTuiController.UiAction clearAction = controller.onEvent(KeyEvent.ofChar('x'));
+    assertThat(clearAction.handled()).isTrue();
+    assertThat(clearAction.shouldQuit()).isFalse();
+    assertThat(controller.selectedExtensionIds()).isEmpty();
+    assertThat(controller.statusMessage()).contains("Cleared 2 selected extensions");
+
+    controller.onEvent(KeyEvent.ofChar('x'));
+    assertThat(controller.statusMessage()).contains("No selected extensions to clear");
+  }
+
+  @Test
   void qNoLongerTriggersQuitByDefault() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());

@@ -55,6 +55,7 @@ class FooterLinesComposerTest {
 
     assertThat(lines.getFirst()).contains("PgUp/PgDn: category jump");
     assertThat(lines.getFirst()).contains("Left/Right or h/l: section hierarchy");
+    assertThat(lines.getFirst()).contains("X: clear selected");
   }
 
   @Test

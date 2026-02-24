@@ -95,6 +95,7 @@ public final class CoreTuiController {
           "  Home/End        : first/last list row",
           "  PgUp/PgDn       : previous/next category",
           "  Space           : toggle extension",
+          "  x               : clear selected extensions",
           "  f               : toggle favorite",
           "  c / C           : close/open focused category / open all",
           "  Ctrl+J          : jump to next favorite",
@@ -531,6 +532,10 @@ public final class CoreTuiController {
     }
     if (focusTarget == FocusTarget.EXTENSION_LIST && isFavoriteToggleKey(keyEvent)) {
       toggleFavoriteAtSelection();
+      return UiAction.handled(false);
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST && isClearSelectedExtensionsKey(keyEvent)) {
+      clearSelectedExtensions();
       return UiAction.handled(false);
     }
     if (focusTarget == FocusTarget.EXTENSION_LIST && isCategoryCollapseToggleKey(keyEvent)) {
@@ -1673,6 +1678,16 @@ public final class CoreTuiController {
             + toggleResult.extensionName();
   }
 
+  private void clearSelectedExtensions() {
+    int clearedCount = extensionCatalogState.clearSelectedExtensions();
+    if (clearedCount == 0) {
+      statusMessage = "No selected extensions to clear";
+      return;
+    }
+    statusMessage =
+        "Cleared " + clearedCount + " selected " + (clearedCount == 1 ? "extension" : "extensions");
+  }
+
   private void toggleCategoryCollapseAtSelection() {
     ExtensionCatalogState.CategoryCollapseResult collapseResult =
         extensionCatalogState.toggleCategoryCollapseAtSelection();
@@ -1780,6 +1795,13 @@ public final class CoreTuiController {
         && !keyEvent.hasCtrl()
         && !keyEvent.hasAlt()
         && (keyEvent.character() == 'f' || keyEvent.character() == 'F');
+  }
+
+  private static boolean isClearSelectedExtensionsKey(KeyEvent keyEvent) {
+    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
+        && !keyEvent.hasCtrl()
+        && !keyEvent.hasAlt()
+        && (keyEvent.character() == 'x' || keyEvent.character() == 'X');
   }
 
   private static boolean isJumpToFavoriteKey(KeyEvent keyEvent) {

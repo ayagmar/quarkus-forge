@@ -242,6 +242,15 @@ final class ExtensionCatalogState {
     return selectedExtensionIds.size();
   }
 
+  int clearSelectedExtensions() {
+    int clearedCount = selectedExtensionIds.size();
+    if (clearedCount == 0) {
+      return 0;
+    }
+    selectedExtensionIds.clear();
+    return clearedCount;
+  }
+
   int favoriteExtensionCount() {
     return favoriteExtensionIds.size();
   }
