@@ -58,7 +58,7 @@ class CoreTuiAsyncDeterministicTest {
   }
 
   @Test
-  void cancellationPreventsPendingDebounceTaskFromApplying() {
+  void escapeClearPreventsPendingDebounceTaskFromApplying() {
     ManualUiScheduler scheduler = new ManualUiScheduler(false);
     CoreTuiController controller =
         CoreTuiController.from(
@@ -68,8 +68,9 @@ class CoreTuiAsyncDeterministicTest {
     for (char character : "jdbc".toCharArray()) {
       controller.onEvent(KeyEvent.ofChar(character));
     }
-    CoreTuiController.UiAction quitAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
-    assertThat(quitAction.shouldQuit()).isTrue();
+    CoreTuiController.UiAction clearAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(clearAction.handled()).isTrue();
+    assertThat(clearAction.shouldQuit()).isFalse();
 
     scheduler.advanceBy(Duration.ofMillis(500));
     assertThat(controller.filteredExtensionCount()).isEqualTo(7);
@@ -98,6 +99,27 @@ class CoreTuiAsyncDeterministicTest {
 
     scheduler.advanceBy(Duration.ofMillis(120));
     assertThat(controller.statusMessage()).contains("Generation in progress");
+  }
+
+  @Test
+  void escapeClearsSearchImmediatelyEvenWhenDebounceIsConfigured() {
+    ManualUiScheduler scheduler = new ManualUiScheduler(false);
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ofMillis(200));
+    moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
+
+    for (char character : "jdbc".toCharArray()) {
+      controller.onEvent(KeyEvent.ofChar(character));
+    }
+    scheduler.advanceBy(Duration.ofMillis(200));
+    assertThat(controller.filteredExtensionCount()).isEqualTo(1);
+
+    CoreTuiController.UiAction escape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(escape.handled()).isTrue();
+    assertThat(escape.shouldQuit()).isFalse();
+    assertThat(controller.filteredExtensionCount()).isEqualTo(7);
+    assertThat(controller.statusMessage()).contains("Extension search cleared");
   }
 
   private static void moveFocusTo(CoreTuiController controller, FocusTarget target) {

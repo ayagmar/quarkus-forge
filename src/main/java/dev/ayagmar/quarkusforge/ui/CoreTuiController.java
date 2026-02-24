@@ -89,6 +89,7 @@ public final class CoreTuiController {
           "",
           "Extensions",
           "  / or Ctrl+F     : focus extension search",
+          "  Esc             : clear search/filter or return to list",
           "  Ctrl+L          : focus extension list",
           "  Up/Down or j/k  : move in list",
           "  Home/End        : first/last list row",
@@ -385,6 +386,19 @@ public final class CoreTuiController {
     UiAction commandPaletteAction = handleCommandPaletteKey(keyEvent);
     if (commandPaletteAction != null) {
       return commandPaletteAction;
+    }
+
+    if (shouldClearExtensionSearchOnCancel(keyEvent)) {
+      clearExtensionSearchFilter();
+      return UiAction.handled(false);
+    }
+    if (shouldDisableFavoritesFilterOnCancel(keyEvent)) {
+      toggleFavoritesOnlyFilter();
+      return UiAction.handled(false);
+    }
+    if (shouldExitExtensionSearchOnCancel(keyEvent)) {
+      focusExtensionList();
+      return UiAction.handled(false);
     }
 
     if (shouldQuitKeyEvent(keyEvent)) {
@@ -1832,6 +1846,39 @@ public final class CoreTuiController {
     return keyEvent.isCancel() || keyEvent.isCtrlC();
   }
 
+  private boolean shouldClearExtensionSearchOnCancel(KeyEvent keyEvent) {
+    if (!keyEvent.isCancel() || isGenerationInProgress()) {
+      return false;
+    }
+    if (focusTarget != FocusTarget.EXTENSION_SEARCH && focusTarget != FocusTarget.EXTENSION_LIST) {
+      return false;
+    }
+    return !inputStates.get(FocusTarget.EXTENSION_SEARCH).text().isBlank();
+  }
+
+  private boolean shouldExitExtensionSearchOnCancel(KeyEvent keyEvent) {
+    if (!keyEvent.isCancel() || isGenerationInProgress()) {
+      return false;
+    }
+    if (focusTarget != FocusTarget.EXTENSION_SEARCH) {
+      return false;
+    }
+    return inputStates.get(FocusTarget.EXTENSION_SEARCH).text().isBlank();
+  }
+
+  private boolean shouldDisableFavoritesFilterOnCancel(KeyEvent keyEvent) {
+    if (!keyEvent.isCancel() || isGenerationInProgress()) {
+      return false;
+    }
+    if (focusTarget != FocusTarget.EXTENSION_SEARCH && focusTarget != FocusTarget.EXTENSION_LIST) {
+      return false;
+    }
+    if (!inputStates.get(FocusTarget.EXTENSION_SEARCH).text().isBlank()) {
+      return false;
+    }
+    return extensionCatalogState.favoritesOnlyFilterEnabled();
+  }
+
   private static boolean isErrorDetailsToggleKey(KeyEvent keyEvent) {
     return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
         && keyEvent.hasCtrl()
@@ -1901,6 +1948,14 @@ public final class CoreTuiController {
     statusMessage = "Focus moved to extensionList";
     errorMessage = "";
     submitBlockedByValidation = false;
+  }
+
+  private void clearExtensionSearchFilter() {
+    TextInputState searchState = inputStates.get(FocusTarget.EXTENSION_SEARCH);
+    searchState.setText("");
+    searchState.moveCursorToStart();
+    extensionCatalogState.refreshNow("", this::updateExtensionFilterStatus);
+    statusMessage = "Extension search cleared";
   }
 
   private static String catalogLoadedStatusMessage(CatalogSource source, boolean stale) {

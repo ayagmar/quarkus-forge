@@ -259,6 +259,76 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void escapeClearsExtensionSearchBeforeQuitWhenSearchInputIsFocused() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
+    controller.onEvent(KeyEvent.ofChar('j'));
+    controller.onEvent(KeyEvent.ofChar('d'));
+    controller.onEvent(KeyEvent.ofChar('b'));
+    controller.onEvent(KeyEvent.ofChar('c'));
+    assertThat(controller.filteredExtensionCount()).isEqualTo(1);
+
+    CoreTuiController.UiAction firstEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(firstEscape.handled()).isTrue();
+    assertThat(firstEscape.shouldQuit()).isFalse();
+    assertThat(controller.filteredExtensionCount()).isEqualTo(7);
+    assertThat(controller.statusMessage()).contains("Extension search cleared");
+
+    CoreTuiController.UiAction secondEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(secondEscape.handled()).isTrue();
+    assertThat(secondEscape.shouldQuit()).isFalse();
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
+
+    CoreTuiController.UiAction thirdEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(thirdEscape.handled()).isTrue();
+    assertThat(thirdEscape.shouldQuit()).isTrue();
+  }
+
+  @Test
+  void escapeClearsExtensionSearchBeforeQuitWhenListIsFocused() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
+    controller.onEvent(KeyEvent.ofChar('j'));
+    controller.onEvent(KeyEvent.ofChar('d'));
+    controller.onEvent(KeyEvent.ofChar('b'));
+    controller.onEvent(KeyEvent.ofChar('c'));
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+
+    CoreTuiController.UiAction firstEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(firstEscape.handled()).isTrue();
+    assertThat(firstEscape.shouldQuit()).isFalse();
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
+    assertThat(controller.filteredExtensionCount()).isEqualTo(7);
+    assertThat(controller.statusMessage()).contains("Extension search cleared");
+
+    CoreTuiController.UiAction secondEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(secondEscape.handled()).isTrue();
+    assertThat(secondEscape.shouldQuit()).isTrue();
+  }
+
+  @Test
+  void escapeDisablesFavoritesFilterBeforeQuitWhenListIsFocused() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+
+    controller.onEvent(KeyEvent.ofChar('k', KeyModifiers.CTRL));
+    assertThat(controller.favoritesOnlyFilterEnabled()).isTrue();
+
+    CoreTuiController.UiAction firstEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(firstEscape.handled()).isTrue();
+    assertThat(firstEscape.shouldQuit()).isFalse();
+    assertThat(controller.favoritesOnlyFilterEnabled()).isFalse();
+    assertThat(controller.statusMessage()).contains("Favorites filter disabled");
+
+    CoreTuiController.UiAction secondEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(secondEscape.handled()).isTrue();
+    assertThat(secondEscape.shouldQuit()).isTrue();
+  }
+
+  @Test
   void qNoLongerTriggersQuitByDefault() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());

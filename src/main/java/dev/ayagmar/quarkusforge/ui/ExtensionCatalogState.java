@@ -112,6 +112,11 @@ final class ExtensionCatalogState {
     searchDebouncer.submit(() -> applyFiltered(query, token, onFiltered));
   }
 
+  void refreshNow(String query, IntConsumer onFiltered) {
+    Objects.requireNonNull(onFiltered);
+    applyFiltered(query, searchResultGate.nextToken(), onFiltered);
+  }
+
   boolean toggleFavoritesOnlyFilter(IntConsumer onFiltered) {
     Objects.requireNonNull(onFiltered);
     favoritesOnlyFilterEnabled = !favoritesOnlyFilterEnabled;

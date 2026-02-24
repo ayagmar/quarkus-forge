@@ -58,6 +58,26 @@ class FooterLinesComposerTest {
   }
 
   @Test
+  void extensionSearchHintIncludesEscapeBehavior() {
+    FooterLinesComposer.FooterSnapshot snapshot =
+        snapshotBuilder().focusTarget(FocusTarget.EXTENSION_SEARCH).build();
+
+    List<String> lines = composer.compose(120, snapshot);
+
+    assertThat(lines.getFirst()).contains("Esc: clear filters or return to list");
+  }
+
+  @Test
+  void extensionListHintIncludesEscapeClearOrQuitBehavior() {
+    FooterLinesComposer.FooterSnapshot snapshot =
+        snapshotBuilder().focusTarget(FocusTarget.EXTENSION_LIST).build();
+
+    List<String> lines = composer.compose(120, snapshot);
+
+    assertThat(lines.getFirst()).contains("Esc: clear filters/quit");
+  }
+
+  @Test
   void nextHintIsTruncatedOnNarrowViewports() {
     FooterLinesComposer.FooterSnapshot snapshot =
         snapshotBuilder()
