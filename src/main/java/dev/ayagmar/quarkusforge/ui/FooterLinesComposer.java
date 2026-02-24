@@ -63,17 +63,17 @@ final class FooterLinesComposer {
     }
     if (snapshot.focusTarget() == FocusTarget.SUBMIT) {
       return width < NARROW_WIDTH_THRESHOLD
-          ? "Enter: submit | j/k: focus | Ctrl+E: error details | ?: help"
-          : "Enter: submit | Tab/Shift+Tab or j/k: focus | Ctrl+E: error details | Esc: cancel/quit | ?: help | Ctrl+P: commands";
+          ? "Enter/Alt+G: submit | j/k: focus | Ctrl+E: error details | ?: help"
+          : "Enter or Alt+G: submit | Tab/Shift+Tab or j/k: focus | Ctrl+E: error details | Esc: cancel/quit | ?: help | Ctrl+P: commands";
     }
     if (snapshot.metadataSelectorFocus()) {
       return width < NARROW_WIDTH_THRESHOLD
           ? "Left/Right or h/l: pick | Up/Down or j/k: cycle | ?: help"
-          : "Left/Right/Home/End or h/l/j/k: pick value | Tab/Shift+Tab: focus | Enter: submit | Ctrl+E: error details | ?: help | Ctrl+P: commands";
+          : "Left/Right/Home/End or h/l/j/k: pick value | Tab/Shift+Tab: focus | Enter/Alt+G: submit | Ctrl+E: error details | ?: help | Ctrl+P: commands";
     }
     return width < NARROW_WIDTH_THRESHOLD
         ? "Tab: focus | Enter: submit | Ctrl+E: error details | ?: help"
-        : "Tab/Shift+Tab: focus | Enter: submit | /: search | Ctrl+K: favorite filter | Ctrl+E: error details | Esc: cancel/quit | ?: help | Ctrl+P: commands";
+        : "Tab/Shift+Tab: focus | Enter/Alt+G: submit | /: search | Ctrl+K: favorite filter | Ctrl+E: error details | Esc: cancel/quit | ?: help | Ctrl+P: commands";
   }
 
   private static int expandedErrorDetailLines(

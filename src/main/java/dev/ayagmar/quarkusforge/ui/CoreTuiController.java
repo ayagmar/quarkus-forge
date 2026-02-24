@@ -83,6 +83,7 @@ public final class CoreTuiController {
           "Global",
           "  Tab / Shift+Tab : move focus",
           "  Enter           : submit generation",
+          "  Alt+G           : submit generation",
           "  Esc / Ctrl+C    : cancel generation or quit",
           "  ?               : toggle help",
           "  Ctrl+P          : command palette",
@@ -470,31 +471,8 @@ public final class CoreTuiController {
       }
     }
 
-    if (keyEvent.isConfirm()) {
-      submitRequested = true;
-      resetGenerationStateAfterTerminalOutcome();
-      if (!transitionGenerationState(GenerationState.VALIDATING)) {
-        statusMessage = "Submit ignored in state: " + generationStateLabel();
-        return UiAction.handled(false);
-      }
-      if (!validation.isValid()) {
-        submitBlockedByValidation = true;
-        errorMessage = firstValidationError(validation);
-        statusMessage = "Submit blocked: invalid input";
-        transitionGenerationState(GenerationState.ERROR);
-      } else {
-        submitBlockedByValidation = false;
-        errorMessage = "";
-        if (projectGenerationRunner == NOOP_PROJECT_GENERATION_RUNNER) {
-          statusMessage =
-              "Submit requested with "
-                  + extensionCatalogState.selectedExtensionCount()
-                  + " extension(s), but generation service is not configured.";
-          transitionGenerationState(GenerationState.IDLE);
-        } else {
-          startGenerationFlow();
-        }
-      }
+    if (keyEvent.isConfirm() || isGenerateShortcutKey(keyEvent)) {
+      handleSubmitRequest();
       return UiAction.handled(false);
     }
 
@@ -1661,6 +1639,34 @@ public final class CoreTuiController {
         : report.errors().getFirst().field() + ": " + report.errors().getFirst().message();
   }
 
+  private void handleSubmitRequest() {
+    submitRequested = true;
+    resetGenerationStateAfterTerminalOutcome();
+    if (!transitionGenerationState(GenerationState.VALIDATING)) {
+      statusMessage = "Submit ignored in state: " + generationStateLabel();
+      return;
+    }
+    if (!validation.isValid()) {
+      submitBlockedByValidation = true;
+      errorMessage = firstValidationError(validation);
+      statusMessage = "Submit blocked: invalid input";
+      transitionGenerationState(GenerationState.ERROR);
+      return;
+    }
+
+    submitBlockedByValidation = false;
+    errorMessage = "";
+    if (projectGenerationRunner == NOOP_PROJECT_GENERATION_RUNNER) {
+      statusMessage =
+          "Submit requested with "
+              + extensionCatalogState.selectedExtensionCount()
+              + " extension(s), but generation service is not configured.";
+      transitionGenerationState(GenerationState.IDLE);
+      return;
+    }
+    startGenerationFlow();
+  }
+
   private void updateExtensionFilterStatus(int filteredCount) {
     if (asyncOperationsCancelled || isGenerationInProgress()) {
       return;
@@ -1790,6 +1796,13 @@ public final class CoreTuiController {
     return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
         && keyEvent.hasCtrl()
         && (keyEvent.character() == 'r' || keyEvent.character() == 'R');
+  }
+
+  private static boolean isGenerateShortcutKey(KeyEvent keyEvent) {
+    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
+        && keyEvent.hasAlt()
+        && !keyEvent.hasCtrl()
+        && (keyEvent.character() == 'g' || keyEvent.character() == 'G');
   }
 
   private static boolean isFavoriteToggleKey(KeyEvent keyEvent) {

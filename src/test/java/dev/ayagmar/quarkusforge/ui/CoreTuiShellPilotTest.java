@@ -81,6 +81,23 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void altGSubmitsWithoutChangingFocusedField() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
+    String originalGroupId = controller.request().groupId();
+
+    CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofChar('g', KeyModifiers.ALT));
+
+    assertThat(action.handled()).isTrue();
+    assertThat(action.shouldQuit()).isFalse();
+    assertThat(controller.submitRequested()).isTrue();
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
+    assertThat(controller.request().groupId()).isEqualTo(originalGroupId);
+    assertThat(controller.statusMessage()).contains("Submit requested");
+  }
+
+  @Test
   void enterSubmitsInsteadOfTogglingWhenExtensionListIsFocused() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());

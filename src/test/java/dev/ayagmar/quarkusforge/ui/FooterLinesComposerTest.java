@@ -42,6 +42,7 @@ class FooterLinesComposerTest {
 
     List<String> lines = composer.compose(120, snapshot);
 
+    assertThat(lines.getFirst()).contains("Enter/Alt+G: submit");
     assertThat(lines.getFirst()).contains("?: help");
     assertThat(lines.getFirst()).contains("Ctrl+P: commands");
   }

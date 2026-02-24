@@ -52,6 +52,7 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - `?`: toggle full-screen help overlay (shortcut matrix) when not editing a text input.
 - `Ctrl+P`: toggle command palette with quick actions (`search/list focus`, favorites actions, category actions, reload, error details).
 - `Enter`: attempt submit (blocked with validation feedback if invalid).
+- `Alt+G`: attempt submit from any focus target.
 - `Esc` or `Ctrl+C`: cancel active generation if running; in extension search/list, `Esc` clears active search/favorites filter, then from empty search returns focus to list; otherwise exits the TUI.
 - Backend startup preference is deterministic:
   - JVM with native access enabled: `panama,jline3`.
