@@ -356,6 +356,47 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void allCollapsedCategoriesStillSupportHeaderNavigationAndReopen() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
+                        new ExtensionDto(
+                            "io.quarkus:quarkus-jdbc-postgresql",
+                            "JDBC PostgreSQL",
+                            "jdbc-postgresql",
+                            "Data",
+                            30)))));
+
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    controller.onEvent(KeyEvent.ofChar('c'));
+    controller.onEvent(KeyEvent.ofChar('j'));
+    controller.onEvent(KeyEvent.ofChar('c'));
+    controller.onEvent(KeyEvent.ofChar('j'));
+    controller.onEvent(KeyEvent.ofChar('c'));
+
+    String allCollapsed = renderToString(controller);
+    assertThat(allCollapsed).contains("[+] Core (1 hidden)");
+    assertThat(allCollapsed).contains("[+] Web (1 hidden)");
+    assertThat(allCollapsed).contains("[+] Data (1 hidden)");
+    assertThat(allCollapsed).doesNotContain("CDI");
+    assertThat(allCollapsed).doesNotContain("REST");
+    assertThat(allCollapsed).doesNotContain("JDBC PostgreSQL");
+    assertThat(controller.focusedListExtensionId()).isEmpty();
+
+    controller.onEvent(KeyEvent.ofChar('k'));
+    controller.onEvent(KeyEvent.ofChar('c'));
+
+    assertThat(controller.statusMessage()).contains("Opened category: Web");
+    assertThat(renderToString(controller)).contains("REST");
+  }
+
+  @Test
   void metadataSelectorsCycleFromLoadedOptionsAndBlockFreeTextEdits() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());

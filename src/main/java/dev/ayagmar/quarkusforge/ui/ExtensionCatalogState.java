@@ -48,6 +48,7 @@ final class ExtensionCatalogState {
   private List<ExtensionCatalogItem> filteredExtensions;
   private List<ExtensionCatalogRow> filteredRows;
   private List<Integer> selectableRowIndexes;
+  private List<Integer> allRowIndexes;
   private Map<String, Integer> rowIndexByExtensionId;
   private String currentQuery;
   private boolean favoritesOnlyFilterEnabled;
@@ -77,6 +78,7 @@ final class ExtensionCatalogState {
     filteredExtensions = List.of();
     filteredRows = List.of();
     selectableRowIndexes = List.of();
+    allRowIndexes = List.of();
     rowIndexByExtensionId = Map.of();
     currentQuery = initialQuery == null ? "" : initialQuery;
     favoritesOnlyFilterEnabled = false;
@@ -227,10 +229,11 @@ final class ExtensionCatalogState {
 
   boolean isSelectionAtTop() {
     Integer selected = listState.selected();
-    if (selected == null || selectableRowIndexes.isEmpty()) {
+    List<Integer> navigationRowIndexes = navigationRowIndexes(selected);
+    if (selected == null || navigationRowIndexes.isEmpty()) {
       return true;
     }
-    return selected <= selectableRowIndexes.getFirst();
+    return selected <= navigationRowIndexes.getFirst();
   }
 
   boolean isSelected(String extensionId) {
@@ -244,23 +247,25 @@ final class ExtensionCatalogState {
   boolean handleListKeys(KeyEvent keyEvent, Consumer<String> onToggled) {
     Objects.requireNonNull(keyEvent);
     Objects.requireNonNull(onToggled);
-    if (selectableRowIndexes.isEmpty()) {
+    Integer selectedRow = listState.selected();
+    List<Integer> navigationRowIndexes = navigationRowIndexes(selectedRow);
+    if (navigationRowIndexes.isEmpty()) {
       return false;
     }
     if (keyEvent.isUp() || isVimUpKey(keyEvent)) {
-      selectPrevious();
+      selectPrevious(navigationRowIndexes);
       return true;
     }
     if (keyEvent.isDown() || isVimDownKey(keyEvent)) {
-      selectNext();
+      selectNext(navigationRowIndexes);
       return true;
     }
     if (keyEvent.isHome() || isVimHomeKey(keyEvent)) {
-      selectFirst();
+      selectFirst(navigationRowIndexes);
       return true;
     }
     if (keyEvent.isEnd() || isVimEndKey(keyEvent)) {
-      selectLast();
+      selectLast(navigationRowIndexes);
       return true;
     }
     if (keyEvent.isSelect()) {
@@ -323,6 +328,7 @@ final class ExtensionCatalogState {
   private void refreshRows(String previousFocusedExtensionId) {
     filteredRows = buildRows(filteredExtensions);
     selectableRowIndexes = buildSelectableIndexes(filteredRows);
+    allRowIndexes = buildAllRowIndexes(filteredRows);
     rowIndexByExtensionId = buildRowIndexByExtensionId(filteredRows);
     restoreSelection(previousFocusedExtensionId);
   }
@@ -413,9 +419,17 @@ final class ExtensionCatalogState {
     return Map.copyOf(indexes);
   }
 
+  private static List<Integer> buildAllRowIndexes(List<ExtensionCatalogRow> rows) {
+    List<Integer> indexes = new ArrayList<>();
+    for (int i = 0; i < rows.size(); i++) {
+      indexes.add(i);
+    }
+    return List.copyOf(indexes);
+  }
+
   private void restoreSelection(String previouslyFocusedExtensionId) {
     if (selectableRowIndexes.isEmpty()) {
-      listState.select(null);
+      listState.select(allRowIndexes.isEmpty() ? null : allRowIndexes.getFirst());
       return;
     }
     if (previouslyFocusedExtensionId != null) {
@@ -456,48 +470,64 @@ final class ExtensionCatalogState {
     return indexes;
   }
 
-  private void selectPrevious() {
-    int currentPosition = selectedPosition();
+  private void selectPrevious(List<Integer> navigationRowIndexes) {
+    int currentPosition = selectedPosition(navigationRowIndexes);
     if (currentPosition <= 0) {
-      listState.select(selectableRowIndexes.getFirst());
+      listState.select(navigationRowIndexes.getFirst());
       return;
     }
-    listState.select(selectableRowIndexes.get(currentPosition - 1));
+    listState.select(navigationRowIndexes.get(currentPosition - 1));
   }
 
-  private void selectNext() {
-    int currentPosition = selectedPosition();
-    int nextPosition = Math.min(currentPosition + 1, selectableRowIndexes.size() - 1);
-    listState.select(selectableRowIndexes.get(nextPosition));
+  private void selectNext(List<Integer> navigationRowIndexes) {
+    int currentPosition = selectedPosition(navigationRowIndexes);
+    int nextPosition = Math.min(currentPosition + 1, navigationRowIndexes.size() - 1);
+    listState.select(navigationRowIndexes.get(nextPosition));
   }
 
-  private void selectFirst() {
-    listState.select(selectableRowIndexes.getFirst());
+  private void selectFirst(List<Integer> navigationRowIndexes) {
+    listState.select(navigationRowIndexes.getFirst());
   }
 
-  private void selectLast() {
-    listState.select(selectableRowIndexes.getLast());
+  private void selectLast(List<Integer> navigationRowIndexes) {
+    listState.select(navigationRowIndexes.getLast());
   }
 
-  private int selectedPosition() {
+  private int selectedPosition(List<Integer> navigationRowIndexes) {
     Integer selected = listState.selected();
     if (selected == null) {
       return -1;
     }
-    int position = selectableRowIndexes.indexOf(selected);
+    int position = navigationRowIndexes.indexOf(selected);
     if (position >= 0) {
       return position;
     }
 
     int nearestPreviousSelectable = -1;
-    for (int i = 0; i < selectableRowIndexes.size(); i++) {
-      if (selectableRowIndexes.get(i) <= selected) {
+    for (int i = 0; i < navigationRowIndexes.size(); i++) {
+      if (navigationRowIndexes.get(i) <= selected) {
         nearestPreviousSelectable = i;
         continue;
       }
       break;
     }
     return nearestPreviousSelectable;
+  }
+
+  private List<Integer> navigationRowIndexes(Integer selectedRow) {
+    if (allRowIndexes.isEmpty()) {
+      return List.of();
+    }
+    if (selectableRowIndexes.isEmpty()) {
+      return allRowIndexes;
+    }
+    if (selectedRow != null
+        && selectedRow >= 0
+        && selectedRow < filteredRows.size()
+        && filteredRows.get(selectedRow).isSectionHeader()) {
+      return allRowIndexes;
+    }
+    return selectableRowIndexes;
   }
 
   private String selectedCategoryTitleForRow(int rowIndex) {
