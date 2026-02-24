@@ -128,16 +128,24 @@ final class ExtensionCatalogState {
   }
 
   CategoryCollapseResult toggleCategoryCollapseAtSelection() {
-    ExtensionCatalogItem selected = selectedListItem();
-    if (selected == null) {
+    Integer selectedRow = listState.selected();
+    if (selectedRow == null) {
       return CategoryCollapseResult.none();
     }
-    String categoryTitle = resolveCategoryTitle(selected.categoryKey(), selected.category());
+    String categoryTitle = selectedCategoryTitleForRow(selectedRow);
+    if (categoryTitle == null) {
+      return CategoryCollapseResult.none();
+    }
+
     boolean collapsed = collapsedCategoryTitles.add(categoryTitle);
     if (!collapsed) {
       collapsedCategoryTitles.remove(categoryTitle);
     }
-    refreshRows(selected.id());
+    refreshRows(selectedListItemId());
+    Integer sectionHeaderIndex = sectionHeaderRowIndex(categoryTitle);
+    if (sectionHeaderIndex != null) {
+      listState.select(sectionHeaderIndex);
+    }
     return new CategoryCollapseResult(true, categoryTitle, collapsed);
   }
 
@@ -474,10 +482,47 @@ final class ExtensionCatalogState {
   private int selectedPosition() {
     Integer selected = listState.selected();
     if (selected == null) {
-      return 0;
+      return -1;
     }
     int position = selectableRowIndexes.indexOf(selected);
-    return position < 0 ? 0 : position;
+    if (position >= 0) {
+      return position;
+    }
+
+    int nearestPreviousSelectable = -1;
+    for (int i = 0; i < selectableRowIndexes.size(); i++) {
+      if (selectableRowIndexes.get(i) <= selected) {
+        nearestPreviousSelectable = i;
+        continue;
+      }
+      break;
+    }
+    return nearestPreviousSelectable;
+  }
+
+  private String selectedCategoryTitleForRow(int rowIndex) {
+    if (rowIndex < 0 || rowIndex >= filteredRows.size()) {
+      return null;
+    }
+    ExtensionCatalogRow row = filteredRows.get(rowIndex);
+    if (row.isSectionHeader()) {
+      return row.label();
+    }
+    ExtensionCatalogItem extension = row.extension();
+    if (extension == null) {
+      return null;
+    }
+    return resolveCategoryTitle(extension.categoryKey(), extension.category());
+  }
+
+  private Integer sectionHeaderRowIndex(String categoryTitle) {
+    for (int i = 0; i < filteredRows.size(); i++) {
+      ExtensionCatalogRow row = filteredRows.get(i);
+      if (row.isSectionHeader() && row.label().equals(categoryTitle)) {
+        return i;
+      }
+    }
+    return null;
   }
 
   private void persistFavoritesAsync() {

@@ -309,7 +309,7 @@ class CoreTuiShellPilotTest {
 
     controller.onEvent(KeyEvent.ofChar('c'));
 
-    assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-rest");
+    assertThat(controller.focusedListExtensionId()).isEmpty();
     assertThat(controller.statusMessage()).contains("Closed category: Core");
     assertThat(renderToString(controller)).contains("[+] Core (1 hidden)");
     assertThat(renderToString(controller)).doesNotContain("CDI");
@@ -318,6 +318,41 @@ class CoreTuiShellPilotTest {
 
     assertThat(controller.statusMessage()).contains("Opened 1 category");
     assertThat(renderToString(controller)).contains("CDI");
+  }
+
+  @Test
+  void categoryCloseCanBeUndoneWithSameKeyAndListNavigationRemainsPredictable() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
+                        new ExtensionDto(
+                            "io.quarkus:quarkus-jdbc-postgresql",
+                            "JDBC PostgreSQL",
+                            "jdbc-postgresql",
+                            "Data",
+                            30)))));
+
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
+
+    controller.onEvent(KeyEvent.ofChar('c'));
+    assertThat(controller.statusMessage()).contains("Closed category: Core");
+    assertThat(controller.focusedListExtensionId()).isEmpty();
+    assertThat(renderToString(controller)).contains("[+] Core (1 hidden)");
+
+    controller.onEvent(KeyEvent.ofChar('c'));
+    assertThat(controller.statusMessage()).contains("Opened category: Core");
+    assertThat(renderToString(controller)).contains("CDI");
+    assertThat(renderToString(controller)).contains("[-] Core");
+
+    controller.onEvent(KeyEvent.ofChar('j'));
+    assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
   }
 
   @Test
