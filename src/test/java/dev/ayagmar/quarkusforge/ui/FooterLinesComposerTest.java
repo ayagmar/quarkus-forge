@@ -46,6 +46,16 @@ class FooterLinesComposerTest {
   }
 
   @Test
+  void extensionListHintIncludesSectionJumpShortcut() {
+    FooterLinesComposer.FooterSnapshot snapshot =
+        snapshotBuilder().focusTarget(FocusTarget.EXTENSION_LIST).build();
+
+    List<String> lines = composer.compose(120, snapshot);
+
+    assertThat(lines.getFirst()).contains("PgUp/PgDn: category jump");
+  }
+
+  @Test
   void nextHintIsTruncatedOnNarrowViewports() {
     FooterLinesComposer.FooterSnapshot snapshot =
         snapshotBuilder()
@@ -82,6 +92,11 @@ class FooterLinesComposerTest {
 
     FooterSnapshotBuilder activeErrorDetails(String value) {
       activeErrorDetails = value;
+      return this;
+    }
+
+    FooterSnapshotBuilder focusTarget(FocusTarget value) {
+      focusTarget = value;
       return this;
     }
 

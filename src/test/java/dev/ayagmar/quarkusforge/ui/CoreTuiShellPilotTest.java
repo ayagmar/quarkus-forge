@@ -353,6 +353,41 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void pageUpAndPageDownJumpBetweenCategorySections() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
+                        new ExtensionDto(
+                            "io.quarkus:quarkus-jdbc-postgresql",
+                            "JDBC PostgreSQL",
+                            "jdbc-postgresql",
+                            "Data",
+                            30)))));
+
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.PAGE_DOWN));
+    assertThat(controller.statusMessage()).contains("Jumped to category: Web");
+    assertThat(controller.focusedListExtensionId()).isEmpty();
+
+    controller.onEvent(KeyEvent.ofChar('c'));
+    assertThat(controller.statusMessage()).contains("Closed category: Web");
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.PAGE_DOWN));
+    assertThat(controller.statusMessage()).contains("Jumped to category: Data");
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.PAGE_UP));
+    assertThat(controller.statusMessage()).contains("Jumped to category: Web");
+  }
+
+  @Test
   void categoryCloseCanBeUndoneWithSameKeyAndListNavigationRemainsPredictable() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());

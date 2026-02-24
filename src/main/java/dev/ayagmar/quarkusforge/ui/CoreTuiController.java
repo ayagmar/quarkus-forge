@@ -456,6 +456,14 @@ public final class CoreTuiController {
       focusExtensionSearch();
       return UiAction.handled(false);
     }
+    if (focusTarget == FocusTarget.EXTENSION_LIST && isSectionJumpDownKey(keyEvent)) {
+      jumpToAdjacentCategorySection(true);
+      return UiAction.handled(false);
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST && isSectionJumpUpKey(keyEvent)) {
+      jumpToAdjacentCategorySection(false);
+      return UiAction.handled(false);
+    }
     if (focusTarget == FocusTarget.EXTENSION_LIST && isFavoriteToggleKey(keyEvent)) {
       toggleFavoriteAtSelection();
       return UiAction.handled(false);
@@ -1555,6 +1563,16 @@ public final class CoreTuiController {
     statusMessage = "Jumped to favorite: " + jumpResult.extensionName();
   }
 
+  private void jumpToAdjacentCategorySection(boolean forward) {
+    ExtensionCatalogState.SectionJumpResult jumpResult =
+        extensionCatalogState.jumpToAdjacentSection(forward);
+    if (!jumpResult.moved()) {
+      statusMessage = forward ? "No next category section" : "No previous category section";
+      return;
+    }
+    statusMessage = "Jumped to category: " + jumpResult.categoryTitle();
+  }
+
   private void toggleFavoritesOnlyFilter() {
     boolean enabled =
         extensionCatalogState.toggleFavoritesOnlyFilter(this::updateExtensionFilterStatus);
@@ -1618,6 +1636,14 @@ public final class CoreTuiController {
         && !keyEvent.hasCtrl()
         && !keyEvent.hasAlt()
         && keyEvent.character() == 'C';
+  }
+
+  private static boolean isSectionJumpUpKey(KeyEvent keyEvent) {
+    return keyEvent.isPageUp();
+  }
+
+  private static boolean isSectionJumpDownKey(KeyEvent keyEvent) {
+    return keyEvent.isPageDown();
   }
 
   private static boolean isCommandPaletteToggleKey(KeyEvent keyEvent) {

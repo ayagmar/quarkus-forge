@@ -189,6 +189,24 @@ final class ExtensionCatalogState {
         : new JumpToFavoriteResult(true, focusedItem.name());
   }
 
+  SectionJumpResult jumpToAdjacentSection(boolean forward) {
+    if (filteredRows.isEmpty()) {
+      return SectionJumpResult.none();
+    }
+    Integer currentSelection = listState.selected();
+    int start = currentSelection == null ? (forward ? -1 : filteredRows.size()) : currentSelection;
+    int step = forward ? 1 : -1;
+    for (int i = start + step; i >= 0 && i < filteredRows.size(); i += step) {
+      ExtensionCatalogRow row = filteredRows.get(i);
+      if (!row.isSectionHeader()) {
+        continue;
+      }
+      listState.select(i);
+      return new SectionJumpResult(true, row.label());
+    }
+    return SectionJumpResult.none();
+  }
+
   void cancelPendingAsync() {
     searchDebouncer.cancel();
     searchResultGate.cancel();
@@ -574,6 +592,12 @@ final class ExtensionCatalogState {
   record JumpToFavoriteResult(boolean jumped, String extensionName) {
     static JumpToFavoriteResult none() {
       return new JumpToFavoriteResult(false, "");
+    }
+  }
+
+  record SectionJumpResult(boolean moved, String categoryTitle) {
+    static SectionJumpResult none() {
+      return new SectionJumpResult(false, "");
     }
   }
 

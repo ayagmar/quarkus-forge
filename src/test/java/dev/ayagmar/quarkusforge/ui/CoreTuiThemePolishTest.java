@@ -29,12 +29,13 @@ class CoreTuiThemePolishTest {
     moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     String listFooterWide = renderToString(controller, 120, 32);
     assertThat(listFooterWide)
-        .contains(
-            "Up/Down/Home/End or j/k: list nav | Space: select | F: favorite | c: close/open category");
+        .contains("Up/Down/Home/End or j/k: list nav")
+        .contains("PgUp/PgDn: category jump");
 
     String listFooterNarrow = renderToString(controller, 80, 32);
     assertThat(listFooterNarrow)
-        .contains("Up/Down or j/k: nav | Space: select | F: favorite | c: category");
+        .contains("Up/Down or j/k: nav")
+        .contains("PgUp/PgDn: category");
   }
 
   @Test
