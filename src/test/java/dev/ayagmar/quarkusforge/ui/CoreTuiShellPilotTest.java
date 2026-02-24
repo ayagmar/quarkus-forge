@@ -142,6 +142,38 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void questionMarkTogglesCommandPaletteOverlay() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+
+    controller.onEvent(KeyEvent.ofChar('?'));
+    String opened = renderToString(controller);
+    assertThat(opened).contains("Command Palette [focus]");
+    assertThat(opened).contains("Focus extension search");
+    assertThat(controller.commandPaletteVisible()).isTrue();
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    String closed = renderToString(controller);
+    assertThat(closed).doesNotContain("Command Palette [focus]");
+    assertThat(controller.commandPaletteVisible()).isFalse();
+  }
+
+  @Test
+  void commandPaletteRunsSelectedAction() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
+
+    controller.onEvent(KeyEvent.ofChar('?'));
+    controller.onEvent(KeyEvent.ofChar('j'));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    assertThat(controller.commandPaletteVisible()).isFalse();
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
+    assertThat(controller.statusMessage()).contains("Focus moved to extensionList");
+  }
+
+  @Test
   void slashIsInsertedInOutputDirectoryWithoutStealingFocus() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());

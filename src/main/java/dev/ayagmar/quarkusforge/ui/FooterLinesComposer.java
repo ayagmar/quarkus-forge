@@ -41,29 +41,34 @@ final class FooterLinesComposer {
           ? "Esc: cancel generation | Enter disabled"
           : "Esc: cancel generation | Enter disabled while generation is loading";
     }
+    if (snapshot.commandPaletteVisible()) {
+      return width < NARROW_WIDTH_THRESHOLD
+          ? "Palette: Up/Down | Enter run | Esc/? close"
+          : "Command palette: Up/Down/Home/End or j/k: navigate | Enter: run | 1-9: quick run | Esc or ?: close";
+    }
     if (snapshot.focusTarget() == FocusTarget.EXTENSION_LIST) {
       return width < NARROW_WIDTH_THRESHOLD
-          ? "Up/Down or j/k: nav | Space: select | F: favorite | c: category"
-          : "Up/Down/Home/End or j/k: list nav | Space: select | F: favorite | c: close/open category | C: open all | Ctrl+J: jump favorite | Ctrl+K: favorite filter | Ctrl+R: reload | Ctrl+E: error details";
+          ? "Up/Down or j/k: nav | Space: select | F: favorite | c: category | ?: commands"
+          : "Up/Down/Home/End or j/k: list nav | Space: select | F: favorite | c: close/open category | C: open all | Ctrl+J: jump favorite | Ctrl+K: favorite filter | Ctrl+R: reload | Ctrl+E: error details | ?: commands";
     }
     if (snapshot.focusTarget() == FocusTarget.EXTENSION_SEARCH) {
       return width < NARROW_WIDTH_THRESHOLD
-          ? "Type: filter | Down: list | Ctrl+K: fav filter"
-          : "Type: filter extensions | Down: list | Ctrl+R: reload | Ctrl+J: jump favorite | Ctrl+K: favorite filter | Ctrl+E: error details";
+          ? "Type: filter | Down: list | Ctrl+K: fav filter | ?: commands"
+          : "Type: filter extensions | Down: list | Ctrl+R: reload | Ctrl+J: jump favorite | Ctrl+K: favorite filter | Ctrl+E: error details | ?: commands";
     }
     if (snapshot.focusTarget() == FocusTarget.SUBMIT) {
       return width < NARROW_WIDTH_THRESHOLD
-          ? "Enter: submit | j/k: focus | Ctrl+E: error details"
-          : "Enter: submit | Tab/Shift+Tab or j/k: focus | Ctrl+E: error details | Esc: cancel/quit";
+          ? "Enter: submit | j/k: focus | Ctrl+E: error details | ?: commands"
+          : "Enter: submit | Tab/Shift+Tab or j/k: focus | Ctrl+E: error details | Esc: cancel/quit | ?: commands";
     }
     if (snapshot.metadataSelectorFocus()) {
       return width < NARROW_WIDTH_THRESHOLD
-          ? "Left/Right or h/l: pick | Up/Down or j/k: cycle"
-          : "Left/Right/Home/End or h/l/j/k: pick value | Tab/Shift+Tab: focus | Enter: submit | Ctrl+E: error details";
+          ? "Left/Right or h/l: pick | Up/Down or j/k: cycle | ?: commands"
+          : "Left/Right/Home/End or h/l/j/k: pick value | Tab/Shift+Tab: focus | Enter: submit | Ctrl+E: error details | ?: commands";
     }
     return width < NARROW_WIDTH_THRESHOLD
-        ? "Tab: focus | Enter: submit | Ctrl+E: error details"
-        : "Tab/Shift+Tab: focus | Enter: submit | /: search | Ctrl+K: favorite filter | Ctrl+E: error details | Esc: cancel/quit";
+        ? "Tab: focus | Enter: submit | Ctrl+E: error details | ?: commands"
+        : "Tab/Shift+Tab: focus | Enter: submit | /: search | Ctrl+K: favorite filter | Ctrl+E: error details | Esc: cancel/quit | ?: commands";
   }
 
   private static int expandedErrorDetailLines(
@@ -113,6 +118,7 @@ final class FooterLinesComposer {
       boolean generationInProgress,
       FocusTarget focusTarget,
       boolean metadataSelectorFocus,
+      boolean commandPaletteVisible,
       String modeLabel,
       String generationStateLabel,
       String statusMessage,

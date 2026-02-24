@@ -62,6 +62,22 @@ public final class CoreTuiController {
       (generationRequest, outputDirectory, cancelled, progressListener) ->
           CompletableFuture.failedFuture(
               new IllegalStateException("Generation flow is not configured in this runtime"));
+  private static final List<CommandPaletteEntry> COMMAND_PALETTE_ENTRIES =
+      List.of(
+          new CommandPaletteEntry(
+              "Focus extension search", "/ or Ctrl+F", CommandPaletteAction.FOCUS_EXTENSION_SEARCH),
+          new CommandPaletteEntry(
+              "Focus extension list", "Ctrl+L", CommandPaletteAction.FOCUS_EXTENSION_LIST),
+          new CommandPaletteEntry(
+              "Toggle favorite filter", "Ctrl+K", CommandPaletteAction.TOGGLE_FAVORITES_FILTER),
+          new CommandPaletteEntry(
+              "Jump to next favorite", "Ctrl+J", CommandPaletteAction.JUMP_TO_FAVORITE),
+          new CommandPaletteEntry("Toggle category", "c", CommandPaletteAction.TOGGLE_CATEGORY),
+          new CommandPaletteEntry(
+              "Open all categories", "C", CommandPaletteAction.OPEN_ALL_CATEGORIES),
+          new CommandPaletteEntry("Reload catalog", "Ctrl+R", CommandPaletteAction.RELOAD_CATALOG),
+          new CommandPaletteEntry(
+              "Toggle error details", "Ctrl+E", CommandPaletteAction.TOGGLE_ERROR_DETAILS));
   private final EnumMap<FocusTarget, TextInputState> inputStates = new EnumMap<>(FocusTarget.class);
   private final ProjectRequestValidator requestValidator = new ProjectRequestValidator();
   private MetadataCompatibilityContext metadataCompatibility;
@@ -95,6 +111,8 @@ public final class CoreTuiController {
   private ExtensionCatalogLoader extensionCatalogLoader;
   private String successHint;
   private boolean showErrorDetails;
+  private boolean commandPaletteVisible;
+  private int commandPaletteSelection;
 
   private CoreTuiController(
       ForgeUiState initialState,
@@ -135,6 +153,8 @@ public final class CoreTuiController {
     extensionCatalogLoader = null;
     successHint = "";
     showErrorDetails = false;
+    commandPaletteVisible = false;
+    commandPaletteSelection = 0;
     availableBuildTools = List.of();
     availableJavaVersions = List.of();
     availablePlatformStreams = List.of();
@@ -321,6 +341,14 @@ public final class CoreTuiController {
     if (!(event instanceof KeyEvent keyEvent)) {
       return UiAction.ignored();
     }
+    if (isCommandPaletteToggleKey(keyEvent)) {
+      toggleCommandPalette();
+      return UiAction.handled(false);
+    }
+    UiAction commandPaletteAction = handleCommandPaletteKey(keyEvent);
+    if (commandPaletteAction != null) {
+      return commandPaletteAction;
+    }
 
     if (shouldQuitKeyEvent(keyEvent)) {
       if (isGenerationInProgress()) {
@@ -481,6 +509,9 @@ public final class CoreTuiController {
     renderHeader(frame, rootLayout.get(0));
     renderBody(frame, rootLayout.get(1));
     renderFooter(frame, rootLayout.get(2), footerLines);
+    if (commandPaletteVisible) {
+      renderCommandPalette(frame, area);
+    }
   }
 
   FocusTarget focusTarget() {
@@ -501,6 +532,10 @@ public final class CoreTuiController {
 
   String statusMessage() {
     return statusMessage;
+  }
+
+  boolean commandPaletteVisible() {
+    return commandPaletteVisible;
   }
 
   boolean submitRequested() {
@@ -655,11 +690,51 @@ public final class CoreTuiController {
     frame.renderWidget(footer, area);
   }
 
+  private void renderCommandPalette(Frame frame, Rect viewport) {
+    if (viewport.width() < 28 || viewport.height() < 10) {
+      return;
+    }
+    List<String> lines = new ArrayList<>();
+    for (int i = 0; i < COMMAND_PALETTE_ENTRIES.size(); i++) {
+      CommandPaletteEntry entry = COMMAND_PALETTE_ENTRIES.get(i);
+      String prefix = i == commandPaletteSelection ? "> " : "  ";
+      lines.add(prefix + (i + 1) + ". " + entry.label() + " [" + entry.shortcut() + "]");
+    }
+    lines.add("");
+    lines.add("Enter: run | 1-9: quick run | Up/Down: navigate | Esc or ?: close");
+
+    int maxLineLength = lines.stream().mapToInt(String::length).max().orElse(40);
+    int width = Math.min(Math.max(56, maxLineLength + 4), viewport.width() - 2);
+    int height = Math.min(lines.size() + 2, viewport.height() - 2);
+    Rect overlayArea =
+        new Rect(
+            viewport.x() + Math.max(0, (viewport.width() - width) / 2),
+            viewport.y() + Math.max(0, (viewport.height() - height) / 2),
+            width,
+            height);
+
+    Paragraph palette =
+        Paragraph.builder()
+            .text(String.join("\n", lines))
+            .style(Style.EMPTY.fg(theme.color("text")).bg(theme.color("base")))
+            .overflow(Overflow.ELLIPSIS)
+            .block(
+                Block.builder()
+                    .title("Command Palette [focus]")
+                    .borders(Borders.ALL)
+                    .borderType(BorderType.ROUNDED)
+                    .borderStyle(Style.EMPTY.fg(theme.color("focus")).bold())
+                    .build())
+            .build();
+    frame.renderWidget(palette, overlayArea);
+  }
+
   private FooterLinesComposer.FooterSnapshot footerSnapshot() {
     return new FooterLinesComposer.FooterSnapshot(
         isGenerationInProgress(),
         focusTarget,
         isMetadataSelectorFocus(focusTarget),
+        commandPaletteVisible,
         generationStateTracker.modeLabel(),
         generationStateLabel(),
         statusMessage,
@@ -678,6 +753,110 @@ public final class CoreTuiController {
     statusMessage = "Focus moved to " + focusTargetName(focusTarget);
     errorMessage = "";
     submitBlockedByValidation = false;
+  }
+
+  private UiAction handleCommandPaletteKey(KeyEvent keyEvent) {
+    if (!commandPaletteVisible) {
+      return null;
+    }
+    if (keyEvent.isCtrlC()) {
+      cancelPendingAsyncOperations();
+      return UiAction.handled(true);
+    }
+    if (keyEvent.isCancel()) {
+      closeCommandPalette();
+      statusMessage = "Command palette closed";
+      return UiAction.handled(false);
+    }
+    if (keyEvent.isUp() || isVimUpKey(keyEvent)) {
+      moveCommandPaletteSelection(-1);
+      return UiAction.handled(false);
+    }
+    if (keyEvent.isDown() || isVimDownKey(keyEvent)) {
+      moveCommandPaletteSelection(1);
+      return UiAction.handled(false);
+    }
+    if (keyEvent.isHome()) {
+      commandPaletteSelection = 0;
+      return UiAction.handled(false);
+    }
+    if (keyEvent.isEnd()) {
+      commandPaletteSelection = COMMAND_PALETTE_ENTRIES.size() - 1;
+      return UiAction.handled(false);
+    }
+    if (isDigitKey(keyEvent)) {
+      int selected = Character.digit(keyEvent.character(), 10) - 1;
+      if (selected >= 0 && selected < COMMAND_PALETTE_ENTRIES.size()) {
+        commandPaletteSelection = selected;
+        executeCommandPaletteSelection();
+      }
+      return UiAction.handled(false);
+    }
+    if (keyEvent.isConfirm() || keyEvent.isSelect()) {
+      executeCommandPaletteSelection();
+      return UiAction.handled(false);
+    }
+    return UiAction.handled(false);
+  }
+
+  private void moveCommandPaletteSelection(int delta) {
+    int size = COMMAND_PALETTE_ENTRIES.size();
+    if (size == 0) {
+      return;
+    }
+    commandPaletteSelection = Math.floorMod(commandPaletteSelection + delta, size);
+  }
+
+  private void executeCommandPaletteSelection() {
+    if (COMMAND_PALETTE_ENTRIES.isEmpty()) {
+      closeCommandPalette();
+      return;
+    }
+    CommandPaletteAction action = COMMAND_PALETTE_ENTRIES.get(commandPaletteSelection).action();
+    closeCommandPalette();
+    executeCommandPaletteAction(action);
+  }
+
+  private void executeCommandPaletteAction(CommandPaletteAction action) {
+    switch (action) {
+      case FOCUS_EXTENSION_SEARCH -> focusExtensionSearch();
+      case FOCUS_EXTENSION_LIST -> focusExtensionList();
+      case TOGGLE_FAVORITES_FILTER -> toggleFavoritesOnlyFilter();
+      case JUMP_TO_FAVORITE -> jumpToFavorite();
+      case TOGGLE_CATEGORY -> {
+        if (focusTarget != FocusTarget.EXTENSION_LIST) {
+          focusExtensionList();
+        }
+        toggleCategoryCollapseAtSelection();
+      }
+      case OPEN_ALL_CATEGORIES -> {
+        if (focusTarget != FocusTarget.EXTENSION_LIST) {
+          focusExtensionList();
+        }
+        expandAllCategories();
+      }
+      case RELOAD_CATALOG -> requestCatalogReload();
+      case TOGGLE_ERROR_DETAILS -> toggleErrorDetails();
+    }
+  }
+
+  private void toggleCommandPalette() {
+    if (commandPaletteVisible) {
+      closeCommandPalette();
+      statusMessage = "Command palette closed";
+      return;
+    }
+    if (isGenerationInProgress()) {
+      statusMessage = "Generation in progress. Press Esc to cancel.";
+      return;
+    }
+    commandPaletteVisible = true;
+    commandPaletteSelection = 0;
+    statusMessage = "Command palette opened";
+  }
+
+  private void closeCommandPalette() {
+    commandPaletteVisible = false;
   }
 
   private boolean isMetadataFocused() {
@@ -1441,6 +1620,13 @@ public final class CoreTuiController {
         && keyEvent.character() == 'C';
   }
 
+  private static boolean isCommandPaletteToggleKey(KeyEvent keyEvent) {
+    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
+        && !keyEvent.hasCtrl()
+        && !keyEvent.hasAlt()
+        && keyEvent.character() == '?';
+  }
+
   private static boolean shouldQuitKeyEvent(KeyEvent keyEvent) {
     return keyEvent.isCancel() || keyEvent.isCtrlC();
   }
@@ -1476,6 +1662,13 @@ public final class CoreTuiController {
         && !keyEvent.hasCtrl()
         && !keyEvent.hasAlt()
         && (keyEvent.character() == lower || keyEvent.character() == upper);
+  }
+
+  private static boolean isDigitKey(KeyEvent keyEvent) {
+    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
+        && !keyEvent.hasCtrl()
+        && !keyEvent.hasAlt()
+        && Character.isDigit(keyEvent.character());
   }
 
   private static boolean shouldFocusExtensionSearch(KeyEvent keyEvent, FocusTarget currentFocus) {
@@ -1578,5 +1771,25 @@ public final class CoreTuiController {
     static UiAction handled(boolean shouldQuit) {
       return new UiAction(true, shouldQuit);
     }
+  }
+
+  private record CommandPaletteEntry(
+      String label, String shortcut, CommandPaletteAction action) {
+    CommandPaletteEntry {
+      label = Objects.requireNonNull(label);
+      shortcut = Objects.requireNonNull(shortcut);
+      action = Objects.requireNonNull(action);
+    }
+  }
+
+  private enum CommandPaletteAction {
+    FOCUS_EXTENSION_SEARCH,
+    FOCUS_EXTENSION_LIST,
+    TOGGLE_FAVORITES_FILTER,
+    JUMP_TO_FAVORITE,
+    TOGGLE_CATEGORY,
+    OPEN_ALL_CATEGORIES,
+    RELOAD_CATALOG,
+    TOGGLE_ERROR_DETAILS
   }
 }
