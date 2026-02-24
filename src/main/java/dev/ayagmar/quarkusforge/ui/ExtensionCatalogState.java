@@ -55,6 +55,7 @@ final class ExtensionCatalogState {
   private Map<String, Integer> rowIndexByExtensionId;
   private String currentQuery;
   private boolean favoritesOnlyFilterEnabled;
+  private String activeCategoryFilterTitle;
   private CompletableFuture<Void> preferencePersistenceChain;
 
   ExtensionCatalogState(UiScheduler scheduler, Duration debounceDelay, String initialQuery) {
@@ -86,6 +87,7 @@ final class ExtensionCatalogState {
     rowIndexByExtensionId = Map.of();
     currentQuery = initialQuery == null ? "" : initialQuery;
     favoritesOnlyFilterEnabled = false;
+    activeCategoryFilterTitle = "";
     preferencePersistenceChain = CompletableFuture.completedFuture(null);
     applyFiltered(currentQuery, searchResultGate.nextToken(), ignored -> {});
   }
@@ -122,6 +124,32 @@ final class ExtensionCatalogState {
     favoritesOnlyFilterEnabled = !favoritesOnlyFilterEnabled;
     applyFiltered(currentQuery, searchResultGate.nextToken(), onFiltered);
     return favoritesOnlyFilterEnabled;
+  }
+
+  CategoryFilterResult cycleCategoryFilter(IntConsumer onFiltered) {
+    Objects.requireNonNull(onFiltered);
+    List<String> categoryTitles = filterableCategoryTitles();
+    if (categoryTitles.isEmpty()) {
+      activeCategoryFilterTitle = "";
+      applyFiltered(currentQuery, searchResultGate.nextToken(), onFiltered);
+      return CategoryFilterResult.none(filteredExtensions.size());
+    }
+
+    if (activeCategoryFilterTitle.isBlank()) {
+      activeCategoryFilterTitle = categoryTitles.getFirst();
+    } else {
+      int index = categoryTitles.indexOf(activeCategoryFilterTitle);
+      if (index < 0 || index >= categoryTitles.size() - 1) {
+        activeCategoryFilterTitle = "";
+      } else {
+        activeCategoryFilterTitle = categoryTitles.get(index + 1);
+      }
+    }
+    applyFiltered(currentQuery, searchResultGate.nextToken(), onFiltered);
+    if (activeCategoryFilterTitle.isBlank()) {
+      return CategoryFilterResult.none(filteredExtensions.size());
+    }
+    return new CategoryFilterResult(true, activeCategoryFilterTitle, filteredExtensions.size());
   }
 
   FavoriteToggleResult toggleFavoriteAtSelection(IntConsumer onFiltered) {
@@ -266,6 +294,10 @@ final class ExtensionCatalogState {
 
   boolean favoritesOnlyFilterEnabled() {
     return favoritesOnlyFilterEnabled;
+  }
+
+  String activeCategoryFilterTitle() {
+    return activeCategoryFilterTitle;
   }
 
   boolean isSelectionAtTop() {
@@ -428,10 +460,39 @@ final class ExtensionCatalogState {
           rankedResults.stream().filter(item -> favoriteExtensionIds.contains(item.id())).toList();
     }
 
+    if (!currentQuery.isBlank()) {
+      activeCategoryFilterTitle = "";
+    }
+    Set<String> availableCategoryTitles = availableCategoryTitles(rankedResults);
+    if (!activeCategoryFilterTitle.isBlank()
+        && !availableCategoryTitles.contains(activeCategoryFilterTitle)) {
+      activeCategoryFilterTitle = "";
+    }
+
+    if (!activeCategoryFilterTitle.isBlank()) {
+      rankedResults =
+          rankedResults.stream()
+              .filter(
+                  item ->
+                      activeCategoryFilterTitle.equals(
+                          resolveCategoryTitle(item.categoryKey(), item.category())))
+              .toList();
+    }
+
     filteredExtensions = rankedResults;
     collapsedCategoryTitles.retainAll(availableCategoryTitles(rankedResults));
     refreshRows(previousFocusedId);
     onFiltered.accept(filteredExtensions.size());
+  }
+
+  private List<String> filterableCategoryTitles() {
+    List<ExtensionCatalogItem> rankedResults =
+        catalogIndex.search(currentQuery, favoriteExtensionIds);
+    if (favoritesOnlyFilterEnabled) {
+      rankedResults =
+          rankedResults.stream().filter(item -> favoriteExtensionIds.contains(item.id())).toList();
+    }
+    return List.copyOf(availableCategoryTitles(rankedResults));
   }
 
   private void refreshRows(String previousFocusedExtensionId) {
@@ -753,6 +814,12 @@ final class ExtensionCatalogState {
   record SectionFocusResult(boolean moved, String sectionTitle) {
     static SectionFocusResult none() {
       return new SectionFocusResult(false, "");
+    }
+  }
+
+  record CategoryFilterResult(boolean filtered, String categoryTitle, int matchCount) {
+    static CategoryFilterResult none(int matchCount) {
+      return new CategoryFilterResult(false, "", matchCount);
     }
   }
 }

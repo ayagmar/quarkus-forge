@@ -72,6 +72,8 @@ public final class CoreTuiController {
               "Toggle favorite filter", "Ctrl+K", CommandPaletteAction.TOGGLE_FAVORITES_FILTER),
           new CommandPaletteEntry(
               "Jump to next favorite", "Ctrl+J", CommandPaletteAction.JUMP_TO_FAVORITE),
+          new CommandPaletteEntry(
+              "Cycle category filter", "v", CommandPaletteAction.CYCLE_CATEGORY_FILTER),
           new CommandPaletteEntry("Toggle category", "c", CommandPaletteAction.TOGGLE_CATEGORY),
           new CommandPaletteEntry(
               "Open all categories", "C", CommandPaletteAction.OPEN_ALL_CATEGORIES),
@@ -96,6 +98,7 @@ public final class CoreTuiController {
           "  Home/End        : first/last list row",
           "  PgUp/PgDn       : previous/next category",
           "  Space           : toggle extension",
+          "  v               : cycle category filter",
           "  x               : clear selected extensions",
           "  f               : toggle favorite",
           "  c / C           : close/open focused category / open all",
@@ -512,6 +515,10 @@ public final class CoreTuiController {
       toggleFavoriteAtSelection();
       return UiAction.handled(false);
     }
+    if (focusTarget == FocusTarget.EXTENSION_LIST && isCategoryFilterCycleKey(keyEvent)) {
+      cycleCategoryFilter();
+      return UiAction.handled(false);
+    }
     if (focusTarget == FocusTarget.EXTENSION_LIST && isClearSelectedExtensionsKey(keyEvent)) {
       clearSelectedExtensions();
       return UiAction.handled(false);
@@ -710,6 +717,7 @@ public final class CoreTuiController {
         extensionCatalogStale,
         extensionCatalogState.favoritesOnlyFilterEnabled(),
         extensionCatalogState.favoriteExtensionCount(),
+        extensionCatalogState.activeCategoryFilterTitle(),
         extensionCatalogState.filteredExtensions().size(),
         extensionCatalogState.totalCatalogExtensionCount(),
         extensionCatalogState.filteredRows(),
@@ -919,6 +927,12 @@ public final class CoreTuiController {
       case FOCUS_EXTENSION_LIST -> focusExtensionList();
       case TOGGLE_FAVORITES_FILTER -> toggleFavoritesOnlyFilter();
       case JUMP_TO_FAVORITE -> jumpToFavorite();
+      case CYCLE_CATEGORY_FILTER -> {
+        if (focusTarget != FocusTarget.EXTENSION_LIST) {
+          focusExtensionList();
+        }
+        cycleCategoryFilter();
+      }
       case TOGGLE_CATEGORY -> {
         if (focusTarget != FocusTarget.EXTENSION_LIST) {
           focusExtensionList();
@@ -1686,6 +1700,17 @@ public final class CoreTuiController {
             + toggleResult.extensionName();
   }
 
+  private void cycleCategoryFilter() {
+    ExtensionCatalogState.CategoryFilterResult result =
+        extensionCatalogState.cycleCategoryFilter(this::updateExtensionFilterStatus);
+    if (!result.filtered()) {
+      statusMessage = "Category filter cleared (" + result.matchCount() + " matches)";
+      return;
+    }
+    statusMessage =
+        "Category filter: " + result.categoryTitle() + " (" + result.matchCount() + " matches)";
+  }
+
   private void clearSelectedExtensions() {
     int clearedCount = extensionCatalogState.clearSelectedExtensions();
     if (clearedCount == 0) {
@@ -1817,6 +1842,13 @@ public final class CoreTuiController {
         && !keyEvent.hasCtrl()
         && !keyEvent.hasAlt()
         && (keyEvent.character() == 'x' || keyEvent.character() == 'X');
+  }
+
+  private static boolean isCategoryFilterCycleKey(KeyEvent keyEvent) {
+    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
+        && !keyEvent.hasCtrl()
+        && !keyEvent.hasAlt()
+        && (keyEvent.character() == 'v' || keyEvent.character() == 'V');
   }
 
   private static boolean isJumpToFavoriteKey(KeyEvent keyEvent) {
@@ -2079,6 +2111,7 @@ public final class CoreTuiController {
     FOCUS_EXTENSION_LIST,
     TOGGLE_FAVORITES_FILTER,
     JUMP_TO_FAVORITE,
+    CYCLE_CATEGORY_FILTER,
     TOGGLE_CATEGORY,
     OPEN_ALL_CATEGORIES,
     RELOAD_CATALOG,

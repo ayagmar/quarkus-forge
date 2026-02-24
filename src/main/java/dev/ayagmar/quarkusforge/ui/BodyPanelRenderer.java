@@ -228,6 +228,9 @@ final class BodyPanelRenderer {
     if (snapshot.favoritesOnlyFilterEnabled()) {
       summary += " [filter:on]";
     }
+    if (!snapshot.activeCategoryFilterTitle().isBlank()) {
+      summary += "\nCategory filter: " + snapshot.activeCategoryFilterTitle();
+    }
     if (snapshot.submitFocused()) {
       summary += "\nSubmit focus active - press Enter to submit";
     }
@@ -329,6 +332,7 @@ final class BodyPanelRenderer {
       boolean catalogStale,
       boolean favoritesOnlyFilterEnabled,
       int favoriteCount,
+      String activeCategoryFilterTitle,
       int filteredExtensionCount,
       int totalCatalogExtensionCount,
       List<ExtensionCatalogRow> filteredRows,
@@ -337,6 +341,8 @@ final class BodyPanelRenderer {
       title = Objects.requireNonNull(title);
       catalogErrorMessage = catalogErrorMessage == null ? "" : catalogErrorMessage;
       catalogSource = catalogSource == null ? "" : catalogSource;
+      activeCategoryFilterTitle =
+          activeCategoryFilterTitle == null ? "" : activeCategoryFilterTitle;
       filteredExtensionCount = Math.max(0, filteredExtensionCount);
       totalCatalogExtensionCount = Math.max(0, totalCatalogExtensionCount);
       filteredRows = List.copyOf(Objects.requireNonNull(filteredRows));

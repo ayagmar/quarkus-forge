@@ -383,6 +383,45 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void vCyclesCategoryFilterAcrossVisibleCategories() {
+    CoreTuiController controller =
+        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
+                        new ExtensionDto(
+                            "io.quarkus:quarkus-jdbc-postgresql",
+                            "JDBC PostgreSQL",
+                            "jdbc-postgresql",
+                            "Data",
+                            30)))));
+    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+
+    assertThat(controller.catalogSectionHeaders()).containsExactly("Core", "Web", "Data");
+
+    controller.onEvent(KeyEvent.ofChar('v'));
+    assertThat(controller.catalogSectionHeaders()).containsExactly("Core");
+    assertThat(controller.statusMessage()).contains("Category filter: Core");
+
+    controller.onEvent(KeyEvent.ofChar('v'));
+    assertThat(controller.catalogSectionHeaders()).containsExactly("Web");
+    assertThat(controller.statusMessage()).contains("Category filter: Web");
+
+    controller.onEvent(KeyEvent.ofChar('v'));
+    assertThat(controller.catalogSectionHeaders()).containsExactly("Data");
+    assertThat(controller.statusMessage()).contains("Category filter: Data");
+    assertThat(renderToString(controller)).contains("Category filter: Data");
+
+    controller.onEvent(KeyEvent.ofChar('v'));
+    assertThat(controller.catalogSectionHeaders()).containsExactly("Core", "Web", "Data");
+    assertThat(controller.statusMessage()).contains("Category filter cleared");
+  }
+
+  @Test
   void qNoLongerTriggersQuitByDefault() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
