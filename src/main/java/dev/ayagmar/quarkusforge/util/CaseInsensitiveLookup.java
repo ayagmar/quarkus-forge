@@ -15,7 +15,7 @@ public final class CaseInsensitiveLookup {
     }
     String normalizedExpected = normalize(expected);
     for (String value : values) {
-      if (normalize(value).equals(normalizedExpected)) {
+      if (value != null && normalize(value).equals(normalizedExpected)) {
         return true;
       }
     }
@@ -29,7 +29,7 @@ public final class CaseInsensitiveLookup {
     }
     String normalizedExpected = normalize(expectedKey);
     for (var entry : values.entrySet()) {
-      if (normalize(entry.getKey()).equals(normalizedExpected)) {
+      if (entry.getKey() != null && normalize(entry.getKey()).equals(normalizedExpected)) {
         return entry.getValue();
       }
     }

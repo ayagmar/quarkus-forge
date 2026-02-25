@@ -38,10 +38,28 @@ class UiThemeTest {
 
   @Test
   void loadDefaultIgnoresMissingUserThemeOverrideFile() {
+    UiTheme baseline = UiTheme.loadDefault();
     System.setProperty(THEME_PATH_PROPERTY, tempDir.resolve("missing.tcss").toString());
 
     UiTheme theme = UiTheme.loadDefault();
 
-    assertThat(theme.color("accent")).isEqualTo(Color.hex("#ff3b66"));
+    assertThat(theme.color("accent")).isEqualTo(baseline.color("accent"));
+  }
+
+  @Test
+  void loadDefaultIgnoresInvalidUserThemeOverridePath() {
+    System.setProperty(THEME_PATH_PROPERTY, "\u0000invalid-path");
+
+    UiTheme theme = UiTheme.loadDefault();
+
+    assertThat(theme.color("accent")).isEqualTo(UiTheme.loadDefault().color("accent"));
+  }
+
+  @Test
+  void colorFallsBackToTextForNullToken() {
+    UiTheme theme = UiTheme.loadDefault();
+    Color baselineText = theme.color("text");
+
+    assertThat(theme.color(null)).isEqualTo(baselineText);
   }
 }

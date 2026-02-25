@@ -752,11 +752,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     }
 
     Paragraph paragraph =
-        Paragraph.builder()
-            .text(line.toString())
-            .style(style)
-            .overflow(Overflow.ELLIPSIS)
-            .build();
+        Paragraph.builder().text(line.toString()).style(style).overflow(Overflow.ELLIPSIS).build();
     frame.renderWidget(paragraph, area);
   }
 
@@ -777,11 +773,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     }
 
     Paragraph paragraph =
-        Paragraph.builder()
-            .text(line)
-            .style(style)
-            .overflow(Overflow.ELLIPSIS)
-            .build();
+        Paragraph.builder().text(line).style(style).overflow(Overflow.ELLIPSIS).build();
     frame.renderWidget(paragraph, area);
   }
 
@@ -888,12 +880,6 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     int percent = (int) (ratio * 100);
     String percentLabel = percent + "%";
 
-    List<String> lines = new ArrayList<>();
-    lines.add("");
-    lines.add("  " + phase);
-    lines.add("");
-    lines.add("  Esc: cancel");
-
     Block overlayBlock =
         Block.builder()
             .title("Generating Project (" + percentLabel + ")")
@@ -912,10 +898,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     List<Rect> rows =
         Layout.vertical()
             .constraints(
-                Constraint.length(1),
-                Constraint.length(1),
-                Constraint.length(1),
-                Constraint.fill())
+                Constraint.length(1), Constraint.length(1), Constraint.length(1), Constraint.fill())
             .split(inner);
 
     Paragraph phaseLine =
@@ -938,10 +921,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     frame.renderWidget(gauge, rows.get(1));
 
     Paragraph emptyLine =
-        Paragraph.builder()
-            .text("")
-            .style(Style.EMPTY.bg(theme.color("base")))
-            .build();
+        Paragraph.builder().text("").style(Style.EMPTY.bg(theme.color("base"))).build();
     frame.renderWidget(emptyLine, rows.get(2));
 
     Paragraph hintLine =
@@ -1789,7 +1769,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       case ARTIFACT_ID -> "artifactId";
       case VERSION -> "version";
       case PACKAGE_NAME -> "packageName";
-      case OUTPUT_DIR -> "outputDir";
+      case OUTPUT_DIR -> "outputDirectory";
       case PLATFORM_STREAM -> "platformStream";
       case BUILD_TOOL -> "buildTool";
       case JAVA_VERSION -> "javaVersion";

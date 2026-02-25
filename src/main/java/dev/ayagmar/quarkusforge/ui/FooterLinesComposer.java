@@ -13,7 +13,11 @@ final class FooterLinesComposer {
     if (!snapshot.activeErrorDetails().isBlank()) {
       if (snapshot.showErrorDetails()) {
         lines.add("Error details:");
-        lines.add(snapshot.activeErrorDetails());
+        String detail = snapshot.activeErrorDetails();
+        if (detail.length() > width) {
+          detail = detail.substring(0, Math.max(0, width - 3)) + "...";
+        }
+        lines.add(detail);
       } else {
         lines.add("Error: " + snapshot.activeErrorDetails());
       }

@@ -44,6 +44,9 @@ final class UiTheme {
   }
 
   Color color(String tokenName) {
+    if (tokenName == null) {
+      return DEFAULT_COLORS.get("text");
+    }
     return colors.getOrDefault(normalizeToken(tokenName), DEFAULT_COLORS.get("text"));
   }
 
@@ -87,7 +90,12 @@ final class UiTheme {
   }
 
   private static void loadThemeFromFile(String filePath, Map<String, Color> target) {
-    Path path = Path.of(filePath).toAbsolutePath().normalize();
+    Path path;
+    try {
+      path = Path.of(filePath).toAbsolutePath().normalize();
+    } catch (IllegalArgumentException | NullPointerException ignored) {
+      return;
+    }
     if (!Files.isRegularFile(path)) {
       return;
     }
@@ -107,6 +115,9 @@ final class UiTheme {
   }
 
   private static String normalizeToken(String tokenName) {
+    if (tokenName == null) {
+      return "";
+    }
     return tokenName.trim().toLowerCase(Locale.ROOT);
   }
 

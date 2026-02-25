@@ -13,13 +13,19 @@ final class Debouncer {
     this.delay = Objects.requireNonNull(delay);
   }
 
-  synchronized void submit(Runnable task) {
-    cancel();
-    if (delay.isZero()) {
-      task.run();
-      return;
+  void submit(Runnable task) {
+    Runnable immediateTask = null;
+    synchronized (this) {
+      cancel();
+      if (delay.isZero()) {
+        immediateTask = task;
+      } else {
+        pendingTask = scheduler.schedule(delay, task);
+      }
     }
-    pendingTask = scheduler.schedule(delay, task);
+    if (immediateTask != null) {
+      immediateTask.run();
+    }
   }
 
   synchronized void cancel() {

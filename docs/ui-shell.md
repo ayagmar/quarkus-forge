@@ -13,12 +13,12 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 
 ## Focus Routing
 - Deterministic focus order:
-  1. `groupId`
-  2. `artifactId`
-  3. `version`
-  4. `platformStream`
-  5. `buildTool`
-  6. `javaVersion`
+  1. `platformStream`
+  2. `buildTool`
+  3. `javaVersion`
+  4. `groupId`
+  5. `artifactId`
+  6. `version`
   7. `packageName`
   8. `outputDir`
   9. extension search
@@ -29,8 +29,8 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - `/` jumps directly to extension search when focus is not editing any text input.
 - `Ctrl+F` jumps directly to extension search from any focus target.
 - `Ctrl+L` jumps directly to extension list.
-- In extension search, `Down` moves focus to extension list.
-- In extension list, `Up` on the top row moves focus back to search.
+- From extension search, press `Down` to move focus to extension list.
+- When extension list is focused, `Up` on the top row moves focus back to search.
 
 ## Key Bindings
 - `Up` / `Down`: navigate extension list when focused.
@@ -54,7 +54,7 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - `Ctrl+P`: toggle command palette with quick actions (`search/list focus`, favorites actions, category actions, reload, error details).
 - `Enter`: attempt submit (blocked with validation feedback if invalid).
 - `Alt+G`: attempt submit from any focus target.
-- `Esc` or `Ctrl+C`: cancel active generation if running; in extension search/list, `Esc` clears active search/favorites filter, then from empty search returns focus to list; otherwise exits the TUI.
+- `Esc` or `Ctrl+C`: cancel active generation if running; in extension search/list, `Esc` clears active search, then favorites-only filter, then category filter; from empty search it returns focus to list; otherwise it exits the TUI.
 - Backend startup preference is deterministic:
   - JVM with native access enabled: `panama,jline3`.
   - JVM without native access: `jline3` (with guidance to use `--enable-native-access=ALL-UNNAMED`; some terminal-native warnings can still appear).

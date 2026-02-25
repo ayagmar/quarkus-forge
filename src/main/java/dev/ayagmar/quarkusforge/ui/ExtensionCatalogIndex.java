@@ -37,9 +37,8 @@ final class ExtensionCatalogIndex {
     indexedItems =
         uniqueById.values().stream()
             .sorted(
-                Comparator.comparing(
-                        (ExtensionCatalogItem item) -> item.name().toLowerCase(Locale.ROOT))
-                    .thenComparing(item -> item.id().toLowerCase(Locale.ROOT)))
+                Comparator.comparing((ExtensionCatalogItem item) -> normalize(item.name()))
+                    .thenComparing(item -> normalize(item.id())))
             .map(IndexedItem::from)
             .toList();
 
@@ -122,6 +121,9 @@ final class ExtensionCatalogIndex {
   }
 
   private static Set<String> normalizeIdSet(Set<String> extensionIds) {
+    if (extensionIds == null || extensionIds.isEmpty()) {
+      return Set.of();
+    }
     Set<String> normalized = new LinkedHashSet<>();
     for (String extensionId : extensionIds) {
       normalized.add(normalize(extensionId));

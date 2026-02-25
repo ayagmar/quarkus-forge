@@ -56,4 +56,20 @@ class CaseInsensitiveLookupTest {
         .doesNotThrowAnyException();
     assertThat(CaseInsensitiveLookup.find(Map.of("maven", "ok"), null)).isNull();
   }
+
+  @Test
+  void containsSkipsNullValuesWithoutMatchingBlankExpected() {
+    assertThat(CaseInsensitiveLookup.contains(java.util.Arrays.asList((String) null), "  "))
+        .isFalse();
+  }
+
+  @Test
+  void findSkipsNullKeysInsteadOfMatchingBlankExpected() {
+    Map<String, String> values = new java.util.LinkedHashMap<>();
+    values.put(null, "null-key");
+    values.put("maven", "ok");
+
+    assertThat(CaseInsensitiveLookup.find(values, "  ")).isNull();
+    assertThat(CaseInsensitiveLookup.find(values, "maven")).isEqualTo("ok");
+  }
 }

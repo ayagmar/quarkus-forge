@@ -96,7 +96,7 @@ class CoreTuiThemePolishTest {
     controller.onEvent(KeyEvent.ofChar('e', dev.tamboui.tui.event.KeyModifiers.CTRL));
     String expanded = renderToString(controller, 90, 36);
     assertThat(expanded).contains("Error details:");
-    assertThat(expanded).contains("expected JSON payload");
+    assertThat(expanded).contains("did not return");
   }
 
   private static void moveFocusTo(CoreTuiController controller, FocusTarget target) {

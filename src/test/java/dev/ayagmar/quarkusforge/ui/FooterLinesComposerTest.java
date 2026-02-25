@@ -37,6 +37,20 @@ class FooterLinesComposerTest {
   }
 
   @Test
+  void expandedErrorDetailsAreTruncatedOnNarrowViewports() {
+    FooterLinesComposer.FooterSnapshot snapshot =
+        snapshotBuilder()
+            .activeErrorDetails("0123456789abcdefghijklmnopqrstuvwxyz")
+            .showErrorDetails(true)
+            .build();
+
+    List<String> lines = composer.compose(16, snapshot);
+
+    assertThat(lines).contains("Error details:");
+    assertThat(lines).anyMatch(line -> line.endsWith("..."));
+  }
+
+  @Test
   void defaultHintIncludesHelpAndCommandPaletteShortcuts() {
     FooterLinesComposer.FooterSnapshot snapshot = snapshotBuilder().build();
 

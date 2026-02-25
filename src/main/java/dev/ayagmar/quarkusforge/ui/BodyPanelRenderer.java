@@ -68,7 +68,8 @@ final class BodyPanelRenderer {
     List<Rect> rows = Layout.vertical().constraints(constraints).split(inner);
 
     int rowIdx = 0;
-    inputRenderer.renderSelector(frame, rows.get(rowIdx++), "Platform", FocusTarget.PLATFORM_STREAM);
+    inputRenderer.renderSelector(
+        frame, rows.get(rowIdx++), "Platform", FocusTarget.PLATFORM_STREAM);
     inputRenderer.renderSelector(frame, rows.get(rowIdx++), "Build Tool", FocusTarget.BUILD_TOOL);
     inputRenderer.renderSelector(frame, rows.get(rowIdx++), "Java", FocusTarget.JAVA_VERSION);
     rowIdx++;
@@ -202,11 +203,7 @@ final class BodyPanelRenderer {
     }
 
     Paragraph paragraph =
-        Paragraph.builder()
-            .text(hint.toString())
-            .style(style)
-            .overflow(Overflow.ELLIPSIS)
-            .build();
+        Paragraph.builder().text(hint.toString()).style(style).overflow(Overflow.ELLIPSIS).build();
     frame.renderWidget(paragraph, area);
   }
 

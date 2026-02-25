@@ -90,4 +90,15 @@ class ExtensionCatalogIndexTest {
     assertThat(results).hasSize(1);
     assertThat(results.getFirst().id()).isEqualTo("io.quarkus:quarkus-jdbc-postgresql");
   }
+
+  @Test
+  void searchTreatsNullFavoritesAsEmptySet() {
+    ExtensionCatalogIndex index =
+        new ExtensionCatalogIndex(
+            List.of(new ExtensionCatalogItem("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 1)));
+
+    assertThat(index.search("", null))
+        .extracting(ExtensionCatalogItem::id)
+        .containsExactly("io.quarkus:quarkus-arc");
+  }
 }
