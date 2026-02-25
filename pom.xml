@@ -266,6 +266,7 @@
     <profile>
       <id>native</id>
       <properties>
+        <native.skip>false</native.skip>
         <native.access.flag>--enable-native-access=ALL-UNNAMED</native.access.flag>
         <native.profile.active>true</native.profile.active>
       </properties>
