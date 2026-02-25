@@ -69,7 +69,9 @@ class QuarkusForgeCliTest {
               "--build-tool",
               "gradle",
               "--java-version",
-              "11"
+              "11",
+              "--output-dir",
+              "./tmp/output"
             });
 
     assertThat(exitCode).isEqualTo(2);

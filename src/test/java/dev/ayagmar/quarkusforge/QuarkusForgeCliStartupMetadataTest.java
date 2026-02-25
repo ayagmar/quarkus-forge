@@ -87,15 +87,7 @@ class QuarkusForgeCliStartupMetadataTest {
     QuarkusForgeCli.RuntimeConfig runtimeConfig =
         runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
-    CommandResult result =
-        runCommand(
-            runtimeConfig,
-            "--verbose",
-            "--smoke",
-            "--group-id",
-            "com.example",
-            "--artifact-id",
-            "forge-app");
+    CommandResult result = runSmoke(runtimeConfig, true);
 
     assertThat(result.exitCode()).isZero();
     assertThat(result.standardError()).contains("\"event\":\"tui.session.start\"");
@@ -104,6 +96,20 @@ class QuarkusForgeCliStartupMetadataTest {
         .contains("\"event\":\"catalog.load.success\"")
         .contains("\"mode\":\"tui\"");
     assertThat(result.standardError()).contains("\"event\":\"tui.session.exit\"");
+  }
+
+  @Test
+  void smokeModeWithoutInteractiveConsoleAvoidsTerminalEscapeOutput() {
+    stubLiveMetadataWithMavenOnly();
+    stubExtensionCatalog();
+    QuarkusForgeCli.RuntimeConfig runtimeConfig =
+        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+
+    CommandResult result = runSmoke(runtimeConfig, true);
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(result.standardError()).contains("\"mode\":\"headless-smoke\"");
+    assertThat(result.standardOut()).doesNotContain("\u001B");
   }
 
   @Test
@@ -186,6 +192,25 @@ class QuarkusForgeCliStartupMetadataTest {
       System.setOut(new PrintStream(stdout, true, StandardCharsets.UTF_8));
       System.setErr(new PrintStream(stderr, true, StandardCharsets.UTF_8));
       int exitCode = QuarkusForgeCli.runWithArgs(args, runtimeConfig);
+      return new CommandResult(
+          exitCode,
+          stdout.toString(StandardCharsets.UTF_8),
+          stderr.toString(StandardCharsets.UTF_8));
+    } finally {
+      System.setOut(originalOut);
+      System.setErr(originalErr);
+    }
+  }
+
+  private CommandResult runSmoke(QuarkusForgeCli.RuntimeConfig runtimeConfig, boolean verbose) {
+    PrintStream originalOut = System.out;
+    PrintStream originalErr = System.err;
+    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+    ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+    try {
+      System.setOut(new PrintStream(stdout, true, StandardCharsets.UTF_8));
+      System.setErr(new PrintStream(stderr, true, StandardCharsets.UTF_8));
+      int exitCode = new QuarkusForgeCli(runtimeConfig).runSmokeForTest(verbose);
       return new CommandResult(
           exitCode,
           stdout.toString(StandardCharsets.UTF_8),

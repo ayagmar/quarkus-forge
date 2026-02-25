@@ -28,6 +28,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class QuarkusForgeGenerateCommandTest {
+  private static final String HEADLESS_CATALOG_TIMEOUT_PROPERTY =
+      "quarkus.forge.headless.catalog-timeout-ms";
+  private static final String HEADLESS_GENERATION_TIMEOUT_PROPERTY =
+      "quarkus.forge.headless.generation-timeout-ms";
+
   @TempDir Path tempDir;
 
   private WireMockServer wireMockServer;
@@ -259,6 +264,128 @@ class QuarkusForgeGenerateCommandTest {
 
     assertThat(result.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_ARCHIVE);
     assertThat(result.standardError()).contains("Failed to extract ZIP archive");
+  }
+
+  @Test
+  void downloadHttpFailureReturnsNetworkExitCode() {
+    stubCatalogEndpoints();
+    stubFor(get(urlPathEqualTo("/api/download")).willReturn(aResponse().withStatus(503)));
+    QuarkusForgeCli.RuntimeConfig runtimeConfig =
+        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+
+    CommandResult result =
+        runCommand(
+            runtimeConfig,
+            "generate",
+            "--group-id",
+            "com.example",
+            "--artifact-id",
+            "headless-app");
+
+    assertThat(result.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_NETWORK);
+    assertThat(result.standardError()).contains("Quarkus API request failed (HTTP 503)");
+  }
+
+  @Test
+  void catalogLoadTimeoutReturnsNetworkExitCode() {
+    stubFor(
+        get(urlPathEqualTo("/api/extensions"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withFixedDelay(500)
+                    .withHeader("Content-Type", "application/json")
+                    .withBody("[]")));
+    stubFor(
+        get(urlPathEqualTo("/api/streams"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        [
+                          {
+                            "key":"io.quarkus.platform:3.31",
+                            "javaCompatibility": {
+                              "versions":[17,21,25],
+                              "recommended":25
+                            },
+                            "recommended":true,
+                            "status":"FINAL"
+                          }
+                        ]
+                        """)));
+    stubFor(
+        get(urlPathEqualTo("/q/openapi"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        {
+                          "paths": {
+                            "/api/download": {
+                              "get": {
+                                "parameters": [
+                                  {"name":"b","schema":{"enum":["MAVEN"]}}
+                                ]
+                              }
+                            }
+                          }
+                        }
+                        """)));
+    QuarkusForgeCli.RuntimeConfig runtimeConfig =
+        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+
+    CommandResult result =
+        withSystemProperty(
+            HEADLESS_CATALOG_TIMEOUT_PROPERTY,
+            "50",
+            () ->
+                runCommand(
+                    runtimeConfig,
+                    "generate",
+                    "--dry-run",
+                    "--group-id",
+                    "com.example",
+                    "--artifact-id",
+                    "headless-app"));
+
+    assertThat(result.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_NETWORK);
+    assertThat(result.standardError()).contains("timed out");
+  }
+
+  @Test
+  void generationTimeoutReturnsNetworkExitCode() {
+    stubCatalogEndpoints();
+    stubFor(
+        get(urlPathEqualTo("/api/download"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withFixedDelay(500)
+                    .withHeader("Content-Type", "application/zip")
+                    .withBody(new byte[] {80, 75, 3, 4})));
+    QuarkusForgeCli.RuntimeConfig runtimeConfig =
+        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+
+    CommandResult result =
+        withSystemProperty(
+            HEADLESS_GENERATION_TIMEOUT_PROPERTY,
+            "50",
+            () ->
+                runCommand(
+                    runtimeConfig,
+                    "generate",
+                    "--group-id",
+                    "com.example",
+                    "--artifact-id",
+                    "headless-app"));
+
+    assertThat(result.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_NETWORK);
+    assertThat(result.standardError()).contains("timed out");
   }
 
   @Test
@@ -500,6 +627,21 @@ class QuarkusForgeGenerateCommandTest {
       }
     }
     return outputStream.toByteArray();
+  }
+
+  private static CommandResult withSystemProperty(
+      String key, String value, java.util.function.Supplier<CommandResult> supplier) {
+    String previous = System.getProperty(key);
+    try {
+      System.setProperty(key, value);
+      return supplier.get();
+    } finally {
+      if (previous == null) {
+        System.clearProperty(key);
+      } else {
+        System.setProperty(key, previous);
+      }
+    }
   }
 
   private record CommandResult(int exitCode, String standardOut, String standardError) {}

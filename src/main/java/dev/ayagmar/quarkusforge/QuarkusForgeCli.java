@@ -43,6 +43,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -74,6 +75,12 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   private static final Map<String, List<String>> BUILTIN_PRESETS = builtInPresets();
   private static final String PRESET_FAVORITES = "favorites";
   private static final Duration STARTUP_METADATA_REFRESH_TIMEOUT = Duration.ofSeconds(2);
+  private static final Duration DEFAULT_HEADLESS_CATALOG_TIMEOUT = Duration.ofSeconds(20);
+  private static final Duration DEFAULT_HEADLESS_GENERATION_TIMEOUT = Duration.ofMinutes(2);
+  private static final String HEADLESS_CATALOG_TIMEOUT_PROPERTY =
+      "quarkus.forge.headless.catalog-timeout-ms";
+  private static final String HEADLESS_GENERATION_TIMEOUT_PROPERTY =
+      "quarkus.forge.headless.generation-timeout-ms";
 
   @Mixin private RequestOptions requestOptions = new RequestOptions();
 
@@ -84,12 +91,6 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       defaultValue = "false",
       description = "Validate CLI prefill and print summary without starting TUI")
   private boolean dryRun;
-
-  @Option(
-      names = "--smoke",
-      defaultValue = "false",
-      description = "Start the TUI and auto-exit after a short delay")
-  private boolean smokeMode;
 
   @Option(
       names = "--search-debounce-ms",
@@ -145,7 +146,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     }
 
     diagnostics.info("cli.tui.launch", Map.of("searchDebounceMs", searchDebounceMs));
-    runTui(smokeMode, initialState, searchDebounceMs, runtimeConfig, diagnostics);
+    runTui(initialState, searchDebounceMs, runtimeConfig, diagnostics);
     return CommandLine.ExitCode.OK;
   }
 
@@ -165,7 +166,6 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   }
 
   static void runTui(
-      boolean smokeMode,
       ForgeUiState initialState,
       int searchDebounceMs,
       RuntimeConfig runtimeConfig,
@@ -173,7 +173,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       throws Exception {
     diagnostics.info(
         "tui.session.start",
-        Map.of("smokeMode", smokeMode, "searchDebounceMs", Math.max(0, searchDebounceMs)));
+        Map.of("smokeMode", false, "searchDebounceMs", Math.max(0, searchDebounceMs)));
     configureTerminalBackendPreference();
     try (var tui = TuiRunner.create()) {
       QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
@@ -208,9 +208,6 @@ public final class QuarkusForgeCli implements Callable<Integer> {
                 .load()
                 .handle(QuarkusForgeCli.catalogLoadDiagnostics(diagnostics));
           });
-      if (smokeMode) {
-        tui.scheduler().schedule(tui::quit, 350, TimeUnit.MILLISECONDS);
-      }
 
       tui.run(
           (event, runner) -> {
@@ -231,6 +228,67 @@ public final class QuarkusForgeCli implements Callable<Integer> {
               "message", userFriendlyError(exception)));
       throw exception;
     }
+  }
+
+  int runSmokeForTest(boolean verbose) {
+    DiagnosticLogger diagnostics = DiagnosticLogger.create(verbose);
+    diagnostics.info("cli.start", Map.of("mode", "smoke-test"));
+
+    ProjectRequest request = toProjectRequest(defaultRequestOptions());
+    StartupMetadataSelection startupMetadataSelection = loadStartupMetadataSelection(diagnostics);
+    ProjectRequest requestWithResolvedStream =
+        applyRecommendedPlatformStream(request, startupMetadataSelection.metadataCompatibility());
+    ForgeUiState initialState =
+        buildInitialState(
+            requestWithResolvedStream, startupMetadataSelection.metadataCompatibility());
+    if (!initialState.canSubmit()) {
+      diagnostics.error(
+          "cli.validation.failed", Map.of("errorCount", initialState.validation().errors().size()));
+      printValidationErrors(
+          initialState.validation(),
+          startupMetadataSelection.sourceLabel(),
+          startupMetadataSelection.detailMessage());
+      return CommandLine.ExitCode.USAGE;
+    }
+
+    runHeadlessSmoke(initialState, 0, runtimeConfig, diagnostics);
+    return CommandLine.ExitCode.OK;
+  }
+
+  private static RequestOptions defaultRequestOptions() {
+    RequestOptions defaults = new RequestOptions();
+    defaults.groupId = "org.acme";
+    defaults.artifactId = "quarkus-app";
+    defaults.version = "1.0.0-SNAPSHOT";
+    defaults.packageName = null;
+    defaults.outputDirectory = ".";
+    defaults.platformStream = "";
+    defaults.buildTool = "maven";
+    defaults.javaVersion = "25";
+    return defaults;
+  }
+
+  static void runHeadlessSmoke(
+      ForgeUiState initialState,
+      int searchDebounceMs,
+      RuntimeConfig runtimeConfig,
+      DiagnosticLogger diagnostics) {
+    diagnostics.info(
+        "tui.session.start",
+        Map.of(
+            "smokeMode",
+            true,
+            "searchDebounceMs",
+            Math.max(0, searchDebounceMs),
+            "mode",
+            "headless-smoke"));
+    QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
+    CatalogDataService catalogDataService =
+        new CatalogDataService(
+            apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
+    diagnostics.info("catalog.load.start", Map.of("mode", "tui"));
+    catalogDataService.load().handle(QuarkusForgeCli.catalogLoadDiagnostics(diagnostics)).join();
+    diagnostics.info("tui.session.exit", Map.of("outcome", "completed"));
   }
 
   private static java.util.function.BiFunction<
@@ -461,12 +519,20 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     return presetName.trim().toLowerCase(Locale.ROOT);
   }
 
-  private CatalogData loadCatalogData() throws ExecutionException, InterruptedException {
+  private CatalogData loadCatalogData()
+      throws ExecutionException, InterruptedException, TimeoutException {
     QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
     CatalogDataService catalogDataService =
         new CatalogDataService(
             apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
-    return catalogDataService.load().get();
+    Duration timeout = headlessCatalogTimeout();
+    CompletableFuture<CatalogData> loadFuture = catalogDataService.load();
+    try {
+      return loadFuture.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+    } catch (TimeoutException timeoutException) {
+      loadFuture.cancel(true);
+      throw new TimeoutException("catalog load timed out after " + timeout.toMillis() + "ms");
+    }
   }
 
   private List<String> resolveRequestedExtensions(
@@ -597,6 +663,12 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       diagnostics.error("catalog.load.cancelled", Map.of("phase", "interrupted"));
       System.err.println("Generation cancelled before start.");
       return EXIT_CODE_CANCELLED;
+    } catch (TimeoutException timeoutException) {
+      Duration timeout = headlessCatalogTimeout();
+      diagnostics.error("catalog.load.timeout", Map.of("timeoutMs", timeout.toMillis()));
+      System.err.println(
+          "Failed to load extension catalog: request timed out after " + timeout.toMillis() + "ms");
+      return EXIT_CODE_NETWORK;
     } catch (ExecutionException executionException) {
       Throwable cause = unwrapCompletionFailure(executionException);
       diagnostics.error(
@@ -680,24 +752,25 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
     ProjectArchiveService archiveService =
         new ProjectArchiveService(apiClient, new SafeZipExtractor());
+    CompletableFuture<Path> generationFuture =
+        archiveService.downloadAndExtract(
+            generationRequest,
+            outputPath,
+            OverwritePolicy.FAIL_IF_EXISTS,
+            () -> Thread.currentThread().isInterrupted(),
+            progress ->
+                System.out.println(
+                    switch (progress) {
+                      case DOWNLOADING_ARCHIVE -> "downloading project archive...";
+                      case EXTRACTING_ARCHIVE -> "extracting project archive...";
+                    }));
     try {
+      Duration generationTimeout = headlessGenerationTimeout();
       diagnostics.info(
           "generate.execute.start",
           Map.of("outputPath", outputPath.toString(), "extensionCount", extensionIds.size()));
       Path generatedProjectRoot =
-          archiveService
-              .downloadAndExtract(
-                  generationRequest,
-                  outputPath,
-                  OverwritePolicy.FAIL_IF_EXISTS,
-                  () -> Thread.currentThread().isInterrupted(),
-                  progress ->
-                      System.out.println(
-                          switch (progress) {
-                            case DOWNLOADING_ARCHIVE -> "downloading project archive...";
-                            case EXTRACTING_ARCHIVE -> "extracting project archive...";
-                          }))
-              .get();
+          generationFuture.get(generationTimeout.toMillis(), TimeUnit.MILLISECONDS);
       diagnostics.info(
           "generate.execute.success", Map.of("projectRoot", generatedProjectRoot.toString()));
       System.out.println(
@@ -712,6 +785,12 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       diagnostics.error("generate.execute.cancelled", Map.of("phase", "interrupted"));
       System.err.println("Generation cancelled.");
       return EXIT_CODE_CANCELLED;
+    } catch (TimeoutException timeoutException) {
+      generationFuture.cancel(true);
+      Duration timeout = headlessGenerationTimeout();
+      diagnostics.error("generate.execute.timeout", Map.of("timeoutMs", timeout.toMillis()));
+      System.err.println("Generation failed: request timed out after " + timeout.toMillis() + "ms");
+      return EXIT_CODE_NETWORK;
     } catch (ExecutionException executionException) {
       Throwable cause = unwrapCompletionFailure(executionException);
       int exitCode = mapHeadlessFailureToExitCode(cause);
@@ -723,6 +802,32 @@ public final class QuarkusForgeCli implements Callable<Integer> {
               "exitCode", exitCode));
       System.err.println("Generation failed: " + userFriendlyError(cause));
       return exitCode;
+    }
+  }
+
+  private static Duration headlessCatalogTimeout() {
+    return durationFromProperty(
+        HEADLESS_CATALOG_TIMEOUT_PROPERTY, DEFAULT_HEADLESS_CATALOG_TIMEOUT);
+  }
+
+  private static Duration headlessGenerationTimeout() {
+    return durationFromProperty(
+        HEADLESS_GENERATION_TIMEOUT_PROPERTY, DEFAULT_HEADLESS_GENERATION_TIMEOUT);
+  }
+
+  private static Duration durationFromProperty(String propertyName, Duration fallback) {
+    String rawValue = System.getProperty(propertyName);
+    if (rawValue == null || rawValue.isBlank()) {
+      return fallback;
+    }
+    try {
+      long millis = Long.parseLong(rawValue.trim());
+      if (millis <= 0) {
+        return fallback;
+      }
+      return Duration.ofMillis(millis);
+    } catch (NumberFormatException ignored) {
+      return fallback;
     }
   }
 
