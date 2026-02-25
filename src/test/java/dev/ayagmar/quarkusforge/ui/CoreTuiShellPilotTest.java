@@ -167,6 +167,7 @@ class CoreTuiShellPilotTest {
     String opened = renderToString(controller);
     assertThat(opened).contains("Help [focus]");
     assertThat(opened).contains("Global");
+    assertThat(opened).contains("Help [focus] - submit");
     assertThat(controller.helpOverlayVisible()).isTrue();
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));

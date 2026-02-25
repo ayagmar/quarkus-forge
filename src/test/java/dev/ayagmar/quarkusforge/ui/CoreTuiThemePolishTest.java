@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.tamboui.buffer.Buffer;
 import dev.tamboui.layout.Rect;
@@ -56,6 +57,50 @@ class CoreTuiThemePolishTest {
     assertThat(rendered).contains("Extensions [fallback]");
     assertThat(rendered).contains("Catalog: snapshot");
     assertThat(rendered).contains("Error: Catalog load failed: network down");
+  }
+
+  @Test
+  void startupOverlayTracksCatalogLoadingAndReadyStates() {
+    QueueingScheduler scheduler = new QueueingScheduler();
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ofMillis(50));
+    CompletableFuture<CoreTuiController.ExtensionCatalogLoadResult> loadFuture =
+        new CompletableFuture<>();
+
+    controller.loadExtensionCatalogAsync(() -> loadFuture);
+    String loading = renderToString(controller, 120, 32);
+    assertThat(loading).contains("Startup");
+    assertThat(loading).contains("catalog load     : in progress");
+
+    loadFuture.complete(
+        CoreTuiController.ExtensionCatalogLoadResult.live(
+            List.of(
+                new ExtensionDto(
+                    "io.quarkus:quarkus-rest", "REST", "rest", "Web", 10))));
+    scheduler.runAll();
+    String ready = renderToString(controller, 120, 32);
+    assertThat(ready).doesNotContain("Startup");
+    assertThat(ready).contains("Loaded extension catalog from live API");
+  }
+
+  @Test
+  void startupOverlayAutoHidesWhenReady() {
+    QueueingScheduler scheduler = new QueueingScheduler();
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ofMillis(50));
+    CompletableFuture<CoreTuiController.ExtensionCatalogLoadResult> loadFuture =
+        new CompletableFuture<>();
+
+    controller.loadExtensionCatalogAsync(() -> loadFuture);
+    loadFuture.complete(
+        CoreTuiController.ExtensionCatalogLoadResult.live(
+            List.of(
+                new ExtensionDto(
+                    "io.quarkus:quarkus-rest", "REST", "rest", "Web", 10))));
+    scheduler.runAll();
+    assertThat(renderToString(controller, 120, 32)).doesNotContain("Startup");
   }
 
   @Test

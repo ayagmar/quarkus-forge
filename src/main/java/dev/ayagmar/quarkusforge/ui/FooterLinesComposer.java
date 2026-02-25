@@ -49,6 +49,9 @@ final class FooterLinesComposer {
     if (snapshot.helpOverlayVisible()) {
       return "Esc: close help";
     }
+    if (snapshot.postGenerationMenuVisible()) {
+      return "Up/Down or j/k: select action | Enter: confirm | Esc: quit";
+    }
     if (snapshot.commandPaletteVisible()) {
       return "Up/Down: navigate | Enter: run | 1-9: quick run | Esc: close";
     }
@@ -75,24 +78,16 @@ final class FooterLinesComposer {
   record FooterSnapshot(
       boolean generationInProgress,
       FocusTarget focusTarget,
-      boolean metadataSelectorFocus,
       boolean commandPaletteVisible,
       boolean helpOverlayVisible,
-      String modeLabel,
-      String generationStateLabel,
+      boolean postGenerationMenuVisible,
       String statusMessage,
-      String validationLabel,
-      String focusTargetName,
       String activeErrorDetails,
       boolean showErrorDetails,
       String successHint) {
     FooterSnapshot {
       focusTarget = Objects.requireNonNull(focusTarget);
-      modeLabel = normalize(modeLabel);
-      generationStateLabel = normalize(generationStateLabel);
       statusMessage = normalize(statusMessage);
-      validationLabel = normalize(validationLabel);
-      focusTargetName = normalize(focusTargetName);
       activeErrorDetails = normalize(activeErrorDetails);
       successHint = normalize(successHint);
     }

@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -80,7 +81,9 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
           new CommandPaletteEntry("Reload catalog", "Ctrl+R", CommandPaletteAction.RELOAD_CATALOG),
           new CommandPaletteEntry(
               "Toggle error details", "Ctrl+E", CommandPaletteAction.TOGGLE_ERROR_DETAILS));
-  private static final List<String> HELP_OVERLAY_LINES =
+  private static final List<String> POST_GENERATION_ACTION_LABELS =
+      List.of("Open in IDE", "Open in terminal", "Generate again", "Quit");
+  private static final List<String> GLOBAL_HELP_LINES =
       List.of(
           "Global",
           "  Tab / Shift+Tab : move focus",
@@ -147,6 +150,12 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   private boolean commandPaletteVisible;
   private boolean helpOverlayVisible;
   private int commandPaletteSelection;
+  private boolean postGenerationMenuVisible;
+  private int postGenerationActionSelection;
+  private Path lastGeneratedProjectPath;
+  private String lastGeneratedNextCommand;
+  private PostGenerationExitPlan postGenerationExitPlan;
+  private boolean startupStatusVisible;
 
   private CoreTuiController(
       ForgeUiState initialState,
@@ -190,6 +199,12 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     commandPaletteVisible = false;
     helpOverlayVisible = false;
     commandPaletteSelection = 0;
+    postGenerationMenuVisible = false;
+    postGenerationActionSelection = 0;
+    lastGeneratedProjectPath = null;
+    lastGeneratedNextCommand = "";
+    postGenerationExitPlan = null;
+    startupStatusVisible = false;
     availableBuildTools = List.of();
     availableJavaVersions = List.of();
     availablePlatformStreams = List.of();
@@ -280,6 +295,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     asyncOperationsCancelled = false;
     long loadToken = ++extensionCatalogLoadToken;
     extensionCatalogLoading = true;
+    startupStatusVisible = true;
     extensionCatalogErrorMessage = "";
     statusMessage = "Loading extension catalog...";
 
@@ -311,6 +327,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
                   extensionCatalogErrorMessage = message;
                   errorMessage = message;
                   statusMessage = catalogReloadFailureStatusMessage();
+                  startupStatusVisible = false;
                   return;
                 }
 
@@ -319,6 +336,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
                   extensionCatalogErrorMessage = "Catalog load failed: empty load result";
                   errorMessage = "Catalog load failed: empty load result";
                   statusMessage = catalogReloadFailureStatusMessage();
+                  startupStatusVisible = false;
                   return;
                 }
 
@@ -338,6 +356,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
                   extensionCatalogErrorMessage = "Catalog load returned no extensions";
                   errorMessage = "Catalog load returned no extensions";
                   statusMessage = catalogReloadFailureStatusMessage();
+                  startupStatusVisible = false;
                   return;
                 }
 
@@ -363,6 +382,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
                 }
                 extensionCatalogState.replaceCatalog(
                     items, inputStates.get(FocusTarget.EXTENSION_SEARCH).text(), ignored -> {});
+                startupStatusVisible = false;
               });
         });
   }
@@ -391,6 +411,10 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     UiAction commandPaletteAction = handleCommandPaletteKey(keyEvent);
     if (commandPaletteAction != null) {
       return commandPaletteAction;
+    }
+    UiAction postGenerationAction = handlePostGenerationMenuKey(keyEvent);
+    if (postGenerationAction != null) {
+      return postGenerationAction;
     }
 
     if (shouldClearExtensionSearchOnCancel(keyEvent)) {
@@ -585,6 +609,12 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     if (helpOverlayVisible) {
       renderHelpOverlay(frame, area);
     }
+    if (postGenerationMenuVisible) {
+      renderPostGenerationOverlay(frame, area);
+    }
+    if (startupStatusVisible) {
+      renderStartupStatusOverlay(frame, area);
+    }
   }
 
   FocusTarget focusTarget() {
@@ -595,7 +625,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     return validation;
   }
 
-  ProjectRequest request() {
+  public ProjectRequest request() {
     return request;
   }
 
@@ -617,6 +647,10 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
 
   boolean submitRequested() {
     return submitRequested;
+  }
+
+  public Optional<PostGenerationExitPlan> postGenerationExitPlan() {
+    return Optional.ofNullable(postGenerationExitPlan);
   }
 
   GenerationState generationState() {
@@ -937,9 +971,10 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     if (viewport.width() < 36 || viewport.height() < 12) {
       return;
     }
-    int maxLineLength = HELP_OVERLAY_LINES.stream().mapToInt(String::length).max().orElse(40);
+    List<String> helpLines = helpOverlayLines();
+    int maxLineLength = helpLines.stream().mapToInt(String::length).max().orElse(40);
     int width = Math.min(Math.max(68, maxLineLength + 4), viewport.width() - 2);
-    int height = Math.min(HELP_OVERLAY_LINES.size() + 2, viewport.height() - 2);
+    int height = Math.min(helpLines.size() + 2, viewport.height() - 2);
     Rect overlayArea =
         new Rect(
             viewport.x() + Math.max(0, (viewport.width() - width) / 2),
@@ -949,12 +984,12 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
 
     Paragraph helpOverlay =
         Paragraph.builder()
-            .text(String.join("\n", HELP_OVERLAY_LINES))
+            .text(String.join("\n", helpLines))
             .style(Style.EMPTY.fg(theme.color("text")).bg(theme.color("base")))
             .overflow(Overflow.ELLIPSIS)
             .block(
                 Block.builder()
-                    .title("Help [focus]")
+                    .title(helpOverlayTitle())
                     .borders(Borders.ALL)
                     .borderType(BorderType.ROUNDED)
                     .borderStyle(Style.EMPTY.fg(theme.color("focus")).bold())
@@ -963,24 +998,169 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     frame.renderWidget(helpOverlay, overlayArea);
   }
 
+  private List<String> helpOverlayLines() {
+    List<String> lines = new ArrayList<>(GLOBAL_HELP_LINES);
+    lines.add("");
+    lines.add("Context (" + contextHelpTitle() + ")");
+    lines.addAll(contextHelpLines());
+    return lines;
+  }
+
+  private String helpOverlayTitle() {
+    return "Help [focus] - " + contextHelpTitle();
+  }
+
+  private String contextHelpTitle() {
+    if (postGenerationMenuVisible) {
+      return "post-generate";
+    }
+    if (isGenerationInProgress()) {
+      return "generation";
+    }
+    return switch (focusTarget) {
+      case EXTENSION_SEARCH -> "extension search";
+      case EXTENSION_LIST -> "extension list";
+      case SUBMIT -> "submit";
+      default -> "metadata";
+    };
+  }
+
+  private List<String> contextHelpLines() {
+    if (postGenerationMenuVisible) {
+      return List.of(
+          "  Up/Down or j/k  : choose post-generate action",
+          "  Enter           : run selected action",
+          "  Esc             : quit");
+    }
+    if (isGenerationInProgress()) {
+      return List.of(
+          "  Esc / Ctrl+C    : cancel current generation",
+          "  Enter           : disabled while generation is active");
+    }
+    return switch (focusTarget) {
+      case EXTENSION_SEARCH ->
+          List.of(
+              "  Type            : filter extensions",
+              "  Down            : move focus to extension list",
+              "  Esc             : clear filter or return to list");
+      case EXTENSION_LIST ->
+          List.of(
+              "  Up/Down or j/k  : move list selection",
+              "  Space           : toggle extension",
+              "  f               : toggle favorite",
+              "  v               : cycle category filter");
+      case SUBMIT ->
+          List.of(
+              "  Enter / Alt+G   : submit generation",
+              "  j/k             : move focus",
+              "  Esc             : quit");
+      default ->
+          List.of(
+              "  Left/Right      : change selector value",
+              "  Type            : edit focused text field",
+              "  Enter / Alt+G   : submit generation");
+    };
+  }
+
+  private void renderStartupStatusOverlay(Frame frame, Rect viewport) {
+    if (viewport.width() < 44 || viewport.height() < 12) {
+      return;
+    }
+    List<String> lines = startupStatusLines();
+    int maxLineLength = lines.stream().mapToInt(String::length).max().orElse(40);
+    int width = Math.min(Math.max(64, maxLineLength + 4), viewport.width() - 2);
+    int height = Math.min(lines.size() + 2, viewport.height() - 2);
+    Rect overlayArea =
+        new Rect(
+            viewport.x() + Math.max(0, (viewport.width() - width) / 2),
+            viewport.y() + Math.max(0, (viewport.height() - height) / 2),
+            width,
+            height);
+
+    Paragraph overlay =
+        Paragraph.builder()
+            .text(String.join("\n", lines))
+            .style(Style.EMPTY.fg(theme.color("text")).bg(theme.color("base")))
+            .overflow(Overflow.ELLIPSIS)
+            .block(
+                Block.builder()
+                    .title("Startup")
+                    .borders(Borders.ALL)
+                    .borderType(BorderType.ROUNDED)
+                    .borderStyle(Style.EMPTY.fg(theme.color("accent")).bold())
+                    .build())
+            .build();
+    frame.renderWidget(overlay, overlayArea);
+  }
+
+  private List<String> startupStatusLines() {
+    String metadataLabel =
+        metadataCompatibility.loadError() == null ? "done" : "done (snapshot fallback)";
+    String catalogLabel = extensionCatalogLoading ? "in progress" : "done";
+    String readyLabel = extensionCatalogLoading ? "waiting" : "ready";
+    return List.of(
+        "  metadata fetch   : " + metadataLabel,
+        "  catalog load     : " + catalogLabel,
+        "  ready            : " + readyLabel,
+        "",
+        "  Please wait...");
+  }
+
+  private void renderPostGenerationOverlay(Frame frame, Rect viewport) {
+    if (viewport.width() < 36 || viewport.height() < 10) {
+      return;
+    }
+    List<String> lines = new ArrayList<>();
+    for (int i = 0; i < POST_GENERATION_ACTION_LABELS.size(); i++) {
+      String prefix = i == postGenerationActionSelection ? "> " : "  ";
+      lines.add(prefix + (i + 1) + ". " + POST_GENERATION_ACTION_LABELS.get(i));
+    }
+    lines.add("");
+    lines.add("Enter: select | Up/Down or j/k: navigate | Esc: quit");
+
+    int maxLineLength = lines.stream().mapToInt(String::length).max().orElse(40);
+    int width = Math.min(Math.max(58, maxLineLength + 4), viewport.width() - 2);
+    int height = Math.min(lines.size() + 2, viewport.height() - 2);
+    Rect overlayArea =
+        new Rect(
+            viewport.x() + Math.max(0, (viewport.width() - width) / 2),
+            viewport.y() + Math.max(0, (viewport.height() - height) / 2),
+            width,
+            height);
+
+    Paragraph overlay =
+        Paragraph.builder()
+            .text(String.join("\n", lines))
+            .style(Style.EMPTY.fg(theme.color("text")).bg(theme.color("base")))
+            .overflow(Overflow.ELLIPSIS)
+            .block(
+                Block.builder()
+                    .title("Project Generated [focus]")
+                    .borders(Borders.ALL)
+                    .borderType(BorderType.ROUNDED)
+                    .borderStyle(Style.EMPTY.fg(theme.color("focus")).bold())
+                    .build())
+            .build();
+    frame.renderWidget(overlay, overlayArea);
+  }
+
   private FooterLinesComposer.FooterSnapshot footerSnapshot() {
     return new FooterLinesComposer.FooterSnapshot(
         isGenerationInProgress(),
         focusTarget,
-        isMetadataSelectorFocus(focusTarget),
         commandPaletteVisible,
         helpOverlayVisible,
-        generationStateTracker.modeLabel(),
-        generationStateLabel(),
+        postGenerationMenuVisible,
         statusMessage,
-        validationLabel(),
-        focusTargetName(focusTarget),
         activeErrorDetails(),
         showErrorDetails,
         successHint);
   }
 
   private void moveFocus(int offset) {
+    if (postGenerationMenuVisible) {
+      return;
+    }
     int index = FOCUS_ORDER.indexOf(focusTarget);
     int size = FOCUS_ORDER.size();
     int nextIndex = Math.floorMod(index + offset, size);
@@ -1032,6 +1212,90 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       return UiAction.handled(false);
     }
     return UiAction.handled(false);
+  }
+
+  private UiAction handlePostGenerationMenuKey(KeyEvent keyEvent) {
+    if (!postGenerationMenuVisible) {
+      return null;
+    }
+    if (keyEvent.isCtrlC()) {
+      cancelPendingAsyncOperations();
+      selectPostGenerationExit(PostGenerationExitAction.QUIT);
+      return UiAction.handled(true);
+    }
+    if (keyEvent.isCancel()) {
+      cancelPendingAsyncOperations();
+      selectPostGenerationExit(PostGenerationExitAction.QUIT);
+      return UiAction.handled(true);
+    }
+    if (keyEvent.isUp() || isVimUpKey(keyEvent)) {
+      movePostGenerationSelection(-1);
+      return UiAction.handled(false);
+    }
+    if (keyEvent.isDown() || isVimDownKey(keyEvent)) {
+      movePostGenerationSelection(1);
+      return UiAction.handled(false);
+    }
+    if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && keyEvent.hasShift()) {
+      movePostGenerationSelection(-1);
+      return UiAction.handled(false);
+    }
+    if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && !keyEvent.hasShift()) {
+      movePostGenerationSelection(1);
+      return UiAction.handled(false);
+    }
+    if (isDigitKey(keyEvent)) {
+      int selected = Character.digit(keyEvent.character(), 10) - 1;
+      if (selected >= 0 && selected < POST_GENERATION_ACTION_LABELS.size()) {
+        postGenerationActionSelection = selected;
+        return executePostGenerationSelection();
+      }
+      return UiAction.handled(false);
+    }
+    if (keyEvent.isConfirm() || keyEvent.isSelect()) {
+      return executePostGenerationSelection();
+    }
+    return UiAction.handled(false);
+  }
+
+  private void movePostGenerationSelection(int delta) {
+    int size = POST_GENERATION_ACTION_LABELS.size();
+    if (size == 0) {
+      return;
+    }
+    postGenerationActionSelection = Math.floorMod(postGenerationActionSelection + delta, size);
+  }
+
+  private UiAction executePostGenerationSelection() {
+    PostGenerationExitAction action =
+        switch (postGenerationActionSelection) {
+          case 0 -> PostGenerationExitAction.OPEN_IDE;
+          case 1 -> PostGenerationExitAction.OPEN_TERMINAL;
+          case 2 -> PostGenerationExitAction.GENERATE_AGAIN;
+          default -> PostGenerationExitAction.QUIT;
+        };
+    if (action == PostGenerationExitAction.GENERATE_AGAIN) {
+      postGenerationMenuVisible = false;
+      postGenerationActionSelection = 0;
+      postGenerationExitPlan = null;
+      successHint = "";
+      lastGeneratedProjectPath = null;
+      lastGeneratedNextCommand = "";
+      resetGenerationStateAfterTerminalOutcome();
+      statusMessage = "Ready for next generation";
+      errorMessage = "";
+      return UiAction.handled(false);
+    }
+    cancelPendingAsyncOperations();
+    selectPostGenerationExit(action);
+    return UiAction.handled(true);
+  }
+
+  private void selectPostGenerationExit(PostGenerationExitAction action) {
+    postGenerationMenuVisible = false;
+    postGenerationActionSelection = 0;
+    postGenerationExitPlan =
+        new PostGenerationExitPlan(action, lastGeneratedProjectPath, lastGeneratedNextCommand);
   }
 
   private void moveCommandPaletteSelection(int delta) {
@@ -1091,6 +1355,10 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       statusMessage = "Generation in progress. Press Esc to cancel.";
       return;
     }
+    if (postGenerationMenuVisible) {
+      statusMessage = "Post-generation actions are open.";
+      return;
+    }
     closeHelpOverlay();
     commandPaletteVisible = true;
     commandPaletteSelection = 0;
@@ -1130,6 +1398,10 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     }
     if (isGenerationInProgress()) {
       statusMessage = "Generation in progress. Press Esc to cancel.";
+      return;
+    }
+    if (postGenerationMenuVisible) {
+      statusMessage = "Post-generation actions are open.";
       return;
     }
     closeCommandPalette();
@@ -1185,21 +1457,6 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     return Style.EMPTY.fg(theme.color("accent"));
   }
 
-  private Style accentBorderStyle() {
-    return Style.EMPTY.fg(theme.color("accent")).bold();
-  }
-
-  private Style inputBorderStyle(FocusTarget target, boolean focused) {
-    boolean invalidField = hasValidationErrorFor(target);
-    if (invalidField) {
-      return Style.EMPTY.fg(theme.color("error")).bold();
-    }
-    if (focused) {
-      return Style.EMPTY.fg(theme.color("focus")).bold();
-    }
-    return Style.EMPTY.fg(theme.color("muted"));
-  }
-
   private boolean hasValidationErrorFor(FocusTarget target) {
     if ((!isTextInputFocus(target) && !isMetadataSelectorFocus(target))
         || target == FocusTarget.EXTENSION_SEARCH) {
@@ -1208,13 +1465,6 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     String fieldName = focusTargetName(target);
     return validation.errors().stream()
         .anyMatch(error -> error.field().equalsIgnoreCase(fieldName));
-  }
-
-  private String validationLabel() {
-    if (validation.isValid()) {
-      return "OK";
-    }
-    return "INVALID - " + firstValidationError(validation);
   }
 
   private String activeErrorDetails() {
@@ -1528,6 +1778,10 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
 
   private void startGenerationFlow() {
     successHint = "";
+    postGenerationMenuVisible = false;
+    postGenerationExitPlan = null;
+    lastGeneratedProjectPath = null;
+    lastGeneratedNextCommand = "";
     extensionCatalogState.cancelPendingAsync();
     generationCancelRequested = false;
     long token = ++generationToken;
@@ -1585,9 +1839,14 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     if (cause == null && generatedPath != null) {
       transitionGenerationState(GenerationState.SUCCESS);
       Path normalizedPath = generatedPath.toAbsolutePath().normalize();
+      String nextCommand = nextStepCommand(request.buildTool());
+      lastGeneratedProjectPath = normalizedPath;
+      lastGeneratedNextCommand = nextCommand;
       statusMessage = "Generation succeeded: " + normalizedPath;
       errorMessage = "";
-      successHint = "cd " + normalizedPath + " && " + nextStepCommand(request.buildTool());
+      successHint = "cd " + normalizedPath + " && " + nextCommand;
+      postGenerationMenuVisible = true;
+      postGenerationActionSelection = 0;
       return;
     }
 
@@ -1600,6 +1859,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       statusMessage = "Generation cancelled. Update inputs and press Enter to retry.";
       errorMessage = "";
       successHint = "";
+      postGenerationMenuVisible = false;
       return;
     }
 
@@ -1607,6 +1867,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     statusMessage = "Generation failed.";
     errorMessage = userFriendlyError(cause);
     successHint = "";
+    postGenerationMenuVisible = false;
   }
 
   private void reconcileGenerationCompletionIfDone() {
@@ -1786,6 +2047,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private void handleSubmitRequest() {
+    postGenerationMenuVisible = false;
+    postGenerationExitPlan = null;
     submitRequested = true;
     resetGenerationStateAfterTerminalOutcome();
     if (!transitionGenerationState(GenerationState.VALIDATING)) {
@@ -2257,6 +2520,21 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
 
     static UiAction handled(boolean shouldQuit) {
       return new UiAction(true, shouldQuit);
+    }
+  }
+
+  public enum PostGenerationExitAction {
+    OPEN_IDE,
+    OPEN_TERMINAL,
+    QUIT,
+    GENERATE_AGAIN
+  }
+
+  public record PostGenerationExitPlan(
+      PostGenerationExitAction action, Path projectDirectory, String nextCommand) {
+    public PostGenerationExitPlan {
+      action = Objects.requireNonNull(action);
+      nextCommand = nextCommand == null ? "" : nextCommand.strip();
     }
   }
 

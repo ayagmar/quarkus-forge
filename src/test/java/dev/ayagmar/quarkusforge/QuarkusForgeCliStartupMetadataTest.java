@@ -11,6 +11,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -178,9 +179,40 @@ class QuarkusForgeCliStartupMetadataTest {
                 + " Java 25");
   }
 
+  @Test
+  void dryRunIgnoresStoredTuiPreferences() throws Exception {
+    stubLiveMetadataWithMavenOnly();
+    QuarkusForgeCli.RuntimeConfig runtimeConfig =
+        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    Files.writeString(
+        tempDir.resolve("preferences.json"),
+        """
+        {
+          "schemaVersion": 1,
+          "groupId": "org.saved",
+          "artifactId": "saved-app",
+          "version": "9.9.9",
+          "packageName": "org.saved.app",
+          "outputDirectory": "./saved",
+          "platformStream": "",
+          "buildTool": "gradle",
+          "javaVersion": "25"
+        }
+        """);
+
+    CommandResult result = runCommand(runtimeConfig, "--dry-run");
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(result.standardOut()).contains("buildTool: maven");
+    assertThat(result.standardError()).doesNotContain("unsupported build tool 'gradle'");
+  }
+
   private QuarkusForgeCli.RuntimeConfig runtimeConfig(URI baseUri) {
     return new QuarkusForgeCli.RuntimeConfig(
-        baseUri, tempDir.resolve("catalog-cache.json"), tempDir.resolve("favorites.json"));
+        baseUri,
+        tempDir.resolve("catalog-cache.json"),
+        tempDir.resolve("favorites.json"),
+        tempDir.resolve("preferences.json"));
   }
 
   private CommandResult runCommand(QuarkusForgeCli.RuntimeConfig runtimeConfig, String... args) {

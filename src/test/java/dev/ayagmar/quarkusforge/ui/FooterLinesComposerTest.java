@@ -133,14 +133,10 @@ class FooterLinesComposerTest {
   private static final class FooterSnapshotBuilder {
     private boolean generationInProgress;
     private FocusTarget focusTarget = FocusTarget.GROUP_ID;
-    private boolean metadataSelectorFocus;
     private boolean commandPaletteVisible;
     private boolean helpOverlayVisible;
-    private String modeLabel = "READY";
-    private String generationStateLabel = "IDLE";
+    private boolean postGenerationMenuVisible;
     private String statusMessage = "Ready";
-    private String validationLabel = "OK";
-    private String focusTargetName = "groupId";
     private String activeErrorDetails = "";
     private boolean showErrorDetails;
     private String successHint = "";
@@ -174,14 +170,10 @@ class FooterLinesComposerTest {
       return new FooterLinesComposer.FooterSnapshot(
           generationInProgress,
           focusTarget,
-          metadataSelectorFocus,
           commandPaletteVisible,
           helpOverlayVisible,
-          modeLabel,
-          generationStateLabel,
+          postGenerationMenuVisible,
           statusMessage,
-          validationLabel,
-          focusTargetName,
           activeErrorDetails,
           showErrorDetails,
           successHint);

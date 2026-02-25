@@ -6,6 +6,7 @@
   - Left panel: project metadata input fields (`groupId`, `artifactId`, `version`, `platformStream`, `buildTool`, `javaVersion`, `packageName`, `outputDir`).
   - Right panel: extension search, extension catalog list, selected summary.
 - Footer: structured key hints + live status + validation feedback.
+- Startup overlay: transient status screen with phases (`metadata fetch`, `catalog load`, `ready`).
 
 The shell keeps a stable widget tree and switches only the body split strategy by width:
 - narrow terminals: vertical stack
@@ -51,6 +52,8 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - `Ctrl+K`: toggle favorites-only filter mode.
 - `Ctrl+E`: toggle expanded full error details in footer.
 - `?`: toggle full-screen help overlay (shortcut matrix) when not editing a text input.
+- Help overlay keeps global shortcuts and appends context-specific shortcuts for current state
+  (`metadata`, `extension search`, `extension list`, `submit`, `generation`, `post-generate`).
 - `Ctrl+P`: toggle command palette with quick actions (`search/list focus`, favorites actions, category actions, reload, error details).
 - `Enter`: attempt submit (blocked with validation feedback if invalid).
 - `Alt+G`: attempt submit from any focus target.
@@ -81,6 +84,16 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - On success, footer shows build-tool-specific next step hint:
   - Maven: `cd <generated-path> && mvn quarkus:dev`
   - Gradle: `cd <generated-path> && ./gradlew quarkusDev`
+- On success, a post-generate action menu is shown:
+  1. `Open in IDE` (runs `code .` in generated directory after exit)
+  2. `Open in terminal` (prints handoff commands on exit)
+  3. `Generate again` (stays in TUI and resets generation state)
+  4. `Quit`
+- If terminal mode is chosen, the app prints explicit handoff commands:
+  - `cd <generated-path>`
+  - build-tool-specific dev command (`mvn quarkus:dev` or `./gradlew quarkusDev`)
+- Optional root CLI flag `--post-generate-hook "<command>"` executes the command in the generated
+  project directory after TUI exit.
 - For non-interactive generation (CI/scripts), use `quarkus-forge generate` documented in `docs/cli-generate.md`.
 
 ## Deterministic Async Search
@@ -97,6 +110,8 @@ The shell keeps a stable widget tree and switches only the body split strategy b
 - Multi-selection is tracked by stable extension IDs, independent from list navigation cursor state.
 - Favorites are persisted under `~/.quarkus-forge/favorites.json` and restored on startup.
 - Recently selected extensions are surfaced in a `Recently Selected` section (when no search/filter is active) and persisted in the same store.
+- Last-used project metadata defaults are persisted under `~/.quarkus-forge/preferences.json`
+  and reused as startup defaults for subsequent TUI runs when CLI values are not explicitly customized.
 - Catalog rows are grouped with stable category section headers.
 - Keyboard navigation prefers extension rows; when the current focus is a section header (or all
   categories are collapsed), navigation moves across visible headers to keep traversal usable.

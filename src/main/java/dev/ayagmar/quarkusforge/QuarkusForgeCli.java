@@ -26,7 +26,9 @@ import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.ayagmar.quarkusforge.ui.CoreTuiController;
 import dev.ayagmar.quarkusforge.ui.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.ui.UiScheduler;
+import dev.ayagmar.quarkusforge.ui.UserPreferencesStore;
 import dev.tamboui.tui.TuiRunner;
+import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -104,6 +106,12 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       description = "Emit structured JSON-line diagnostics to stderr")
   private boolean verbose;
 
+  @Option(
+      names = "--post-generate-hook",
+      defaultValue = "",
+      description = "Shell command executed in generated project directory after TUI exits")
+  private String postGenerateHookCommand;
+
   public QuarkusForgeCli() {
     this(RuntimeConfig.defaults());
   }
@@ -117,6 +125,11 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     DiagnosticLogger diagnostics = DiagnosticLogger.create(verbose);
     diagnostics.info("cli.start", Map.of("mode", dryRun ? "dry-run" : "tui"));
 
+    UserPreferencesStore preferencesStore =
+        UserPreferencesStore.fileBacked(runtimeConfig.preferencesFile());
+    if (!dryRun) {
+      applyStoredRequestDefaults(requestOptions, preferencesStore.loadLastRequest());
+    }
     ProjectRequest request = toProjectRequest(requestOptions);
     StartupMetadataSelection startupMetadataSelection = loadStartupMetadataSelection(diagnostics);
     ProjectRequest requestWithResolvedStream =
@@ -146,7 +159,9 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     }
 
     diagnostics.info("cli.tui.launch", Map.of("searchDebounceMs", searchDebounceMs));
-    runTui(initialState, searchDebounceMs, runtimeConfig, diagnostics);
+    TuiSessionSummary summary = runTui(initialState, searchDebounceMs, runtimeConfig, diagnostics);
+    preferencesStore.saveLastRequest(summary.finalRequest());
+    executePostTuiActions(summary, postGenerateHookCommand, diagnostics);
     return CommandLine.ExitCode.OK;
   }
 
@@ -165,7 +180,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     }
   }
 
-  static void runTui(
+  static TuiSessionSummary runTui(
       ForgeUiState initialState,
       int searchDebounceMs,
       RuntimeConfig runtimeConfig,
@@ -220,6 +235,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
           },
           controller::render);
       diagnostics.info("tui.session.exit", Map.of("outcome", "completed"));
+      return new TuiSessionSummary(controller.request(), controller.postGenerationExitPlan().orElse(null));
     } catch (Exception exception) {
       diagnostics.error(
           "tui.session.failure",
@@ -268,6 +284,44 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     return defaults;
   }
 
+  private static void applyStoredRequestDefaults(
+      RequestOptions requestOptions, CliPrefill storedPrefill) {
+    if (storedPrefill == null) {
+      return;
+    }
+    RequestOptions defaults = defaultRequestOptions();
+    if (Objects.equals(requestOptions.groupId, defaults.groupId) && !storedPrefill.groupId().isBlank()) {
+      requestOptions.groupId = storedPrefill.groupId();
+    }
+    if (Objects.equals(requestOptions.artifactId, defaults.artifactId)
+        && !storedPrefill.artifactId().isBlank()) {
+      requestOptions.artifactId = storedPrefill.artifactId();
+    }
+    if (Objects.equals(requestOptions.version, defaults.version) && !storedPrefill.version().isBlank()) {
+      requestOptions.version = storedPrefill.version();
+    }
+    if ((requestOptions.packageName == null || requestOptions.packageName.isBlank())
+        && !storedPrefill.packageName().isBlank()) {
+      requestOptions.packageName = storedPrefill.packageName();
+    }
+    if (Objects.equals(requestOptions.outputDirectory, defaults.outputDirectory)
+        && !storedPrefill.outputDirectory().isBlank()) {
+      requestOptions.outputDirectory = storedPrefill.outputDirectory();
+    }
+    if (Objects.equals(requestOptions.platformStream, defaults.platformStream)
+        && !storedPrefill.platformStream().isBlank()) {
+      requestOptions.platformStream = storedPrefill.platformStream();
+    }
+    if (Objects.equals(requestOptions.buildTool, defaults.buildTool)
+        && !storedPrefill.buildTool().isBlank()) {
+      requestOptions.buildTool = storedPrefill.buildTool();
+    }
+    if (Objects.equals(requestOptions.javaVersion, defaults.javaVersion)
+        && !storedPrefill.javaVersion().isBlank()) {
+      requestOptions.javaVersion = storedPrefill.javaVersion();
+    }
+  }
+
   static void runHeadlessSmoke(
       ForgeUiState initialState,
       int searchDebounceMs,
@@ -289,6 +343,78 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     diagnostics.info("catalog.load.start", Map.of("mode", "tui"));
     catalogDataService.load().handle(QuarkusForgeCli.catalogLoadDiagnostics(diagnostics)).join();
     diagnostics.info("tui.session.exit", Map.of("outcome", "completed"));
+  }
+
+  private static void executePostTuiActions(
+      TuiSessionSummary summary, String postGenerateHookCommand, DiagnosticLogger diagnostics) {
+    CoreTuiController.PostGenerationExitPlan exitPlan = summary.exitPlan();
+    if (exitPlan == null || exitPlan.projectDirectory() == null) {
+      return;
+    }
+    Path generatedProjectDir = exitPlan.projectDirectory();
+    switch (exitPlan.action()) {
+      case OPEN_IDE -> {
+        diagnostics.info(
+            "tui.post-action.start",
+            Map.of("action", "open-ide", "directory", generatedProjectDir.toString()));
+        executeShellCommand("code .", generatedProjectDir, diagnostics, "open-ide");
+      }
+      case OPEN_TERMINAL -> {
+        diagnostics.info(
+            "tui.post-action.start",
+            Map.of("action", "open-terminal", "directory", generatedProjectDir.toString()));
+        printTerminalHandoff(generatedProjectDir, exitPlan.nextCommand());
+      }
+      case QUIT, GENERATE_AGAIN -> {
+        // No direct action.
+      }
+    }
+    if (postGenerateHookCommand != null && !postGenerateHookCommand.isBlank()) {
+      diagnostics.info(
+          "tui.post-hook.start",
+          Map.of("directory", generatedProjectDir.toString(), "command", postGenerateHookCommand));
+      executeShellCommand(
+          postGenerateHookCommand.strip(), generatedProjectDir, diagnostics, "post-generate-hook");
+    }
+  }
+
+  private static void printTerminalHandoff(Path generatedProjectDir, String nextCommand) {
+    System.out.println();
+    System.out.println("Terminal handoff:");
+    System.out.println("  cd " + generatedProjectDir);
+    if (nextCommand != null && !nextCommand.isBlank()) {
+      System.out.println("  " + nextCommand);
+    }
+    System.out.println();
+  }
+
+  private static void executeShellCommand(
+      String command, Path workingDirectory, DiagnosticLogger diagnostics, String actionName) {
+    ProcessBuilder processBuilder = new ProcessBuilder("sh", "-lc", command);
+    processBuilder.directory(workingDirectory.toFile());
+    processBuilder.inheritIO();
+    int exitCode;
+    try {
+      exitCode = processBuilder.start().waitFor();
+    } catch (IOException ioException) {
+      diagnostics.error(
+          "tui.post-action.failure",
+          Map.of("action", actionName, "message", userFriendlyError(ioException)));
+      return;
+    } catch (InterruptedException interruptedException) {
+      Thread.currentThread().interrupt();
+      diagnostics.error(
+          "tui.post-action.failure",
+          Map.of("action", actionName, "message", "Interrupted while executing post action"));
+      return;
+    }
+    if (exitCode != 0) {
+      diagnostics.error(
+          "tui.post-action.failure",
+          Map.of("action", actionName, "message", "Command exited with status " + exitCode));
+      return;
+    }
+    diagnostics.info("tui.post-action.success", Map.of("action", actionName));
   }
 
   private static java.util.function.BiFunction<
@@ -911,18 +1037,28 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     }
   }
 
-  record RuntimeConfig(URI apiBaseUri, Path catalogCacheFile, Path favoritesFile) {
+  record RuntimeConfig(
+      URI apiBaseUri, Path catalogCacheFile, Path favoritesFile, Path preferencesFile) {
     RuntimeConfig {
       Objects.requireNonNull(apiBaseUri);
       Objects.requireNonNull(catalogCacheFile);
       Objects.requireNonNull(favoritesFile);
+      Objects.requireNonNull(preferencesFile);
     }
 
     static RuntimeConfig defaults() {
       return new RuntimeConfig(
           URI.create("https://code.quarkus.io"),
           CatalogSnapshotCache.defaultCacheFile(),
-          ExtensionFavoritesStore.defaultFile());
+          ExtensionFavoritesStore.defaultFile(),
+          UserPreferencesStore.defaultFile());
+    }
+  }
+
+  private record TuiSessionSummary(
+      ProjectRequest finalRequest, CoreTuiController.PostGenerationExitPlan exitPlan) {
+    private TuiSessionSummary {
+      Objects.requireNonNull(finalRequest);
     }
   }
 

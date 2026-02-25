@@ -515,7 +515,10 @@ class QuarkusForgeGenerateCommandTest {
 
   private QuarkusForgeCli.RuntimeConfig runtimeConfig(URI baseUri) {
     return new QuarkusForgeCli.RuntimeConfig(
-        baseUri, tempDir.resolve("catalog-cache.json"), tempDir.resolve("favorites.json"));
+        baseUri,
+        tempDir.resolve("catalog-cache.json"),
+        tempDir.resolve("favorites.json"),
+        tempDir.resolve("preferences.json"));
   }
 
   private CommandResult runCommand(QuarkusForgeCli.RuntimeConfig runtimeConfig, String... args) {

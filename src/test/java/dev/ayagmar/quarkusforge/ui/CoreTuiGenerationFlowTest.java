@@ -43,6 +43,55 @@ class CoreTuiGenerationFlowTest {
     assertThat(controller.statusMessage()).contains("Generation succeeded");
     assertThat(renderToString(controller)).contains("Next: cd");
     assertThat(renderToString(controller)).contains("mvn quarkus:dev");
+    assertThat(renderToString(controller)).contains("Project Generated [focus]");
+  }
+
+  @Test
+  void postGenerationMenuOpenInTerminalQuitsWithExitPlan() {
+    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(),
+            UiScheduler.immediate(),
+            Duration.ZERO,
+            generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    generationRunner.complete(Path.of("build/generated-project"));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    assertThat(action.shouldQuit()).isTrue();
+    assertThat(controller.postGenerationExitPlan()).isPresent();
+    assertThat(controller.postGenerationExitPlan().orElseThrow().action())
+        .isEqualTo(CoreTuiController.PostGenerationExitAction.OPEN_TERMINAL);
+    assertThat(controller.postGenerationExitPlan().orElseThrow().projectDirectory())
+        .isEqualTo(Path.of("build/generated-project").toAbsolutePath().normalize());
+  }
+
+  @Test
+  void postGenerationMenuGenerateAgainStaysInTuiAndAllowsResubmit() {
+    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(),
+            UiScheduler.immediate(),
+            Duration.ZERO,
+            generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    generationRunner.complete(Path.of("build/generated-project"));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    assertThat(action.shouldQuit()).isFalse();
+    assertThat(renderToString(controller)).doesNotContain("Project Generated [focus]");
+    assertThat(renderToString(controller)).doesNotContain("Next: ");
+    assertThat(controller.statusMessage()).isEqualTo("Ready for next generation");
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    assertThat(generationRunner.callCount()).isEqualTo(2);
   }
 
   @Test
