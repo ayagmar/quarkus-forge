@@ -140,6 +140,16 @@ class ProjectRequestValidatorTest {
   }
 
   @Test
+  void derivesPackageNameWithNormalizedGroupIdSegments() {
+    CliPrefill prefill =
+        new CliPrefill("Acme-Labs", "forge-app", "1.0.0", "", "./tmp", "maven", "25");
+
+    ProjectRequest request = CliPrefillMapper.map(prefill);
+
+    assertThat(request.packageName()).isEqualTo("acme.labs.forge.app");
+  }
+
+  @Test
   void acceptsNumericJavaFeatureVersionWithoutTwoDigitConstraint() {
     ProjectRequest request =
         new ProjectRequest(
@@ -188,6 +198,23 @@ class ProjectRequestValidatorTest {
             "1.0.0",
             "com.example.forge",
             "./tmp/cache:",
+            "maven",
+            "25");
+
+    ValidationReport report = validator.validate(request);
+
+    assertThat(report.errors()).extracting(ValidationError::field).contains("outputDirectory");
+  }
+
+  @Test
+  void rejectsDriveLetterSegmentWhenNotFirstMeaningfulSegment() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example",
+            "forge-app",
+            "1.0.0",
+            "com.example.forge",
+            "./tmp/C:/nested",
             "maven",
             "25");
 

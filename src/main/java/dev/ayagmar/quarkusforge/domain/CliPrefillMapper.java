@@ -26,7 +26,7 @@ public final class CliPrefillMapper {
   }
 
   static String derivePackageName(String groupId, String artifactId) {
-    String group = trim(groupId).toLowerCase(Locale.ROOT);
+    String group = normalizeArtifactForPackage(trim(groupId));
     String artifact = normalizeArtifactForPackage(trim(artifactId));
 
     if (artifact.isBlank()) {

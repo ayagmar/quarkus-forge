@@ -83,31 +83,36 @@ public final class ProjectArchiveService {
           new ArchiveException("Failed to allocate temporary archive file", ioException));
     }
 
-    progressListener.accept(ProgressStep.DOWNLOADING_ARCHIVE);
-    return apiClient
-        .downloadProjectZipToFile(request, tempZip)
-        .thenCompose(
-            archivePath -> {
-              if (cancelled.getAsBoolean()) {
-                return CompletableFuture.failedFuture(
-                    new CancellationException("Generation cancelled before extraction"));
-              }
-              return CompletableFuture.supplyAsync(
-                  () -> {
-                    if (cancelled.getAsBoolean()) {
-                      throw new CancellationException("Generation cancelled before extraction");
-                    }
-                    progressListener.accept(ProgressStep.EXTRACTING_ARCHIVE);
-                    SafeZipExtractor.ExtractionResult result =
-                        zipExtractor.extract(archivePath, outputDirectory, overwritePolicy);
-                    if (cancelled.getAsBoolean()) {
-                      throw new CancellationException("Generation cancelled during extraction");
-                    }
-                    return result.extractedRoot();
-                  },
-                  extractionExecutor);
-            })
-        .whenComplete((ignored, throwable) -> SafeZipExtractor.deleteRecursivelyQuietly(tempZip));
+    try {
+      progressListener.accept(ProgressStep.DOWNLOADING_ARCHIVE);
+      return apiClient
+          .downloadProjectZipToFile(request, tempZip)
+          .thenCompose(
+              archivePath -> {
+                if (cancelled.getAsBoolean()) {
+                  return CompletableFuture.failedFuture(
+                      new CancellationException("Generation cancelled before extraction"));
+                }
+                return CompletableFuture.supplyAsync(
+                    () -> {
+                      if (cancelled.getAsBoolean()) {
+                        throw new CancellationException("Generation cancelled before extraction");
+                      }
+                      progressListener.accept(ProgressStep.EXTRACTING_ARCHIVE);
+                      SafeZipExtractor.ExtractionResult result =
+                          zipExtractor.extract(archivePath, outputDirectory, overwritePolicy);
+                      if (cancelled.getAsBoolean()) {
+                        throw new CancellationException("Generation cancelled during extraction");
+                      }
+                      return result.extractedRoot();
+                    },
+                    extractionExecutor);
+              })
+          .whenComplete((ignored, throwable) -> SafeZipExtractor.deleteRecursivelyQuietly(tempZip));
+    } catch (RuntimeException runtimeException) {
+      SafeZipExtractor.deleteRecursivelyQuietly(tempZip);
+      throw runtimeException;
+    }
   }
 
   public enum ProgressStep {

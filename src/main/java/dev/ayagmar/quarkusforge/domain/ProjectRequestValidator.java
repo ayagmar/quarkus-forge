@@ -122,11 +122,13 @@ public final class ProjectRequestValidator {
     }
 
     String[] segments = outputDirectory.replace('\\', '/').split("/");
+    int nonBlankSegmentIndex = 0;
     for (String rawSegment : segments) {
       if (rawSegment.isBlank()) {
         continue;
       }
-      if (isWindowsDriveLetterSegment(rawSegment)) {
+      if (isWindowsDriveLetterSegment(rawSegment, nonBlankSegmentIndex)) {
+        nonBlankSegmentIndex++;
         continue;
       }
 
@@ -159,11 +161,13 @@ public final class ProjectRequestValidator {
                 "outputDirectory", "contains Windows reserved name segment '" + segment + "'"));
         return;
       }
+      nonBlankSegmentIndex++;
     }
   }
 
-  private static boolean isWindowsDriveLetterSegment(String segment) {
-    return segment.length() == 2
+  private static boolean isWindowsDriveLetterSegment(String segment, int nonBlankSegmentIndex) {
+    return nonBlankSegmentIndex == 0
+        && segment.length() == 2
         && Character.isLetter(segment.charAt(0))
         && segment.charAt(1) == ':';
   }

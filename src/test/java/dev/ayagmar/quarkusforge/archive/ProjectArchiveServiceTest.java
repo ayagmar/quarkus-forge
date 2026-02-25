@@ -290,6 +290,39 @@ class ProjectArchiveServiceTest {
     assertThat(Files.exists(tempArchive)).isFalse();
   }
 
+  @Test
+  void throwingProgressListenerBeforeDownloadCleansTemporaryArchive() throws Exception {
+    stubFor(
+        get(urlPathEqualTo("/api/download"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withBody(createZipPayload("demo/pom.xml", "<project/>"))));
+
+    Path tempArchive = tempDir.resolve("download.zip");
+    ProjectArchiveService service =
+        new ProjectArchiveService(newClient(), new SafeZipExtractor(), () -> tempArchive);
+
+    GenerationRequest request =
+        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+
+    assertThatThrownBy(
+            () ->
+                service.downloadAndExtract(
+                    request,
+                    tempDir.resolve("generated-project"),
+                    OverwritePolicy.FAIL_IF_EXISTS,
+                    () -> false,
+                    progress -> {
+                      throw new IllegalStateException("progress-hook-failure");
+                    }))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("progress-hook-failure");
+
+    assertThat(Files.exists(tempArchive)).isFalse();
+    verify(0, getRequestedFor(urlPathEqualTo("/api/download")));
+  }
+
   private QuarkusApiClient newClient() {
     return new QuarkusApiClient(
         HttpClient.newHttpClient(),

@@ -105,7 +105,7 @@ final class ZipCentralDirectoryReader {
       consumed += CEN_FIXED_LENGTH + fileNameLength + skip;
     }
 
-    if (eocd.entries() > 0 && entries.size() != eocd.entries()) {
+    if (entries.size() != eocd.entries()) {
       throw new ArchiveException(
           "ZIP central directory entry count mismatch, expected "
               + eocd.entries()
