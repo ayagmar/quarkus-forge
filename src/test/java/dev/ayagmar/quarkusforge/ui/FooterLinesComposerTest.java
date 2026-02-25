@@ -16,8 +16,8 @@ class FooterLinesComposerTest {
     List<String> narrow = composer.compose(80, snapshot);
     List<String> wide = composer.compose(120, snapshot);
 
-    assertThat(narrow.getFirst()).isEqualTo("Esc: cancel generation | Enter disabled");
-    assertThat(wide.getFirst())
+    assertThat(narrow.getLast()).isEqualTo("Esc: cancel generation | Enter disabled");
+    assertThat(wide.getLast())
         .isEqualTo("Esc: cancel generation | Enter disabled while generation is loading");
   }
 
@@ -42,9 +42,9 @@ class FooterLinesComposerTest {
 
     List<String> lines = composer.compose(120, snapshot);
 
-    assertThat(lines.getFirst()).contains("Enter/Alt+G: submit");
-    assertThat(lines.getFirst()).contains("?: help");
-    assertThat(lines.getFirst()).contains("Ctrl+P: commands");
+    assertThat(lines.getLast()).contains("Enter/Alt+G: submit");
+    assertThat(lines.getLast()).contains("?: help");
+    assertThat(lines.getLast()).contains("Ctrl+P: commands");
   }
 
   @Test
@@ -54,10 +54,10 @@ class FooterLinesComposerTest {
 
     List<String> lines = composer.compose(120, snapshot);
 
-    assertThat(lines.getFirst()).contains("PgUp/PgDn: category jump");
-    assertThat(lines.getFirst()).contains("Left/Right or h/l: section hierarchy");
-    assertThat(lines.getFirst()).contains("v: category filter");
-    assertThat(lines.getFirst()).contains("X: clear selected");
+    assertThat(lines.getLast()).contains("PgUp/PgDn: category jump");
+    assertThat(lines.getLast()).contains("Left/Right or h/l: section hierarchy");
+    assertThat(lines.getLast()).contains("v: category filter");
+    assertThat(lines.getLast()).contains("X: clear selected");
   }
 
   @Test
@@ -67,7 +67,7 @@ class FooterLinesComposerTest {
 
     List<String> lines = composer.compose(120, snapshot);
 
-    assertThat(lines.getFirst()).contains("Esc: clear filters or return to list");
+    assertThat(lines.getLast()).contains("Esc: clear filters or return to list");
   }
 
   @Test
@@ -77,7 +77,7 @@ class FooterLinesComposerTest {
 
     List<String> lines = composer.compose(120, snapshot);
 
-    assertThat(lines.getFirst()).contains("Esc: clear filters/quit");
+    assertThat(lines.getLast()).contains("Esc: clear filters/quit");
   }
 
   @Test
@@ -90,6 +90,26 @@ class FooterLinesComposerTest {
     List<String> lines = composer.compose(70, snapshot);
 
     assertThat(lines).anyMatch(line -> line.startsWith("Next: ") && line.contains("..."));
+  }
+
+  @Test
+  void statusLineIsAlwaysPresent() {
+    FooterLinesComposer.FooterSnapshot snapshot = snapshotBuilder().build();
+
+    List<String> lines = composer.compose(120, snapshot);
+
+    assertThat(lines.getFirst()).startsWith("Status: ");
+    assertThat(lines.getFirst()).contains("Ready");
+  }
+
+  @Test
+  void errorLineShownWhenActiveErrorExists() {
+    FooterLinesComposer.FooterSnapshot snapshot =
+        snapshotBuilder().activeErrorDetails("something went wrong").build();
+
+    List<String> lines = composer.compose(120, snapshot);
+
+    assertThat(lines).anyMatch(line -> line.equals("Error: something went wrong"));
   }
 
   private static FooterSnapshotBuilder snapshotBuilder() {

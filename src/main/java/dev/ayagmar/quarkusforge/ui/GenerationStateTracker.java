@@ -2,9 +2,13 @@ package dev.ayagmar.quarkusforge.ui;
 
 final class GenerationStateTracker {
   private CoreTuiController.GenerationState currentState;
+  private double progressRatio;
+  private String progressPhase;
 
   GenerationStateTracker() {
     currentState = CoreTuiController.GenerationState.IDLE;
+    progressRatio = 0.0;
+    progressPhase = "";
   }
 
   CoreTuiController.GenerationState currentState() {
@@ -16,7 +20,47 @@ final class GenerationStateTracker {
       return false;
     }
     currentState = targetState;
+    if (targetState == CoreTuiController.GenerationState.VALIDATING) {
+      progressRatio = 0.05;
+      progressPhase = "Validating input...";
+    } else if (targetState == CoreTuiController.GenerationState.LOADING) {
+      progressRatio = 0.1;
+      progressPhase = "Preparing request...";
+    } else if (targetState == CoreTuiController.GenerationState.SUCCESS) {
+      progressRatio = 1.0;
+      progressPhase = "Done!";
+    } else if (targetState == CoreTuiController.GenerationState.ERROR
+        || targetState == CoreTuiController.GenerationState.CANCELLED) {
+      progressPhase = "";
+    } else if (targetState == CoreTuiController.GenerationState.IDLE) {
+      progressRatio = 0.0;
+      progressPhase = "";
+    }
     return true;
+  }
+
+  void updateProgress(String message) {
+    progressPhase = message == null ? "" : message;
+    if (message != null) {
+      String lower = message.toLowerCase();
+      if (lower.contains("downloading")) {
+        progressRatio = 0.3;
+      } else if (lower.contains("extracting")) {
+        progressRatio = 0.7;
+      } else if (lower.contains("done") || lower.contains("succeed")) {
+        progressRatio = 1.0;
+      } else {
+        progressRatio = Math.min(progressRatio + 0.05, 0.9);
+      }
+    }
+  }
+
+  double progressRatio() {
+    return progressRatio;
+  }
+
+  String progressPhase() {
+    return progressPhase;
   }
 
   void resetAfterTerminalOutcome() {

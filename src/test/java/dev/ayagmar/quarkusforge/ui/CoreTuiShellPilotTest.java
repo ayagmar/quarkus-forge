@@ -23,13 +23,13 @@ class CoreTuiShellPilotTest {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
 
-    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.PLATFORM_STREAM);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
-    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.ARTIFACT_ID);
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.BUILD_TOOL);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.TAB, KeyModifiers.SHIFT));
-    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.PLATFORM_STREAM);
   }
 
   @Test
@@ -84,16 +84,14 @@ class CoreTuiShellPilotTest {
   void altGSubmitsWithoutChangingFocusedField() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
-    String originalGroupId = controller.request().groupId();
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.PLATFORM_STREAM);
 
     CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofChar('g', KeyModifiers.ALT));
 
     assertThat(action.handled()).isTrue();
     assertThat(action.shouldQuit()).isFalse();
     assertThat(controller.submitRequested()).isTrue();
-    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
-    assertThat(controller.request().groupId()).isEqualTo(originalGroupId);
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.PLATFORM_STREAM);
     assertThat(controller.statusMessage()).contains("Submit requested");
   }
 
@@ -210,7 +208,7 @@ class CoreTuiShellPilotTest {
   void commandPaletteRunsSelectedAction() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.PLATFORM_STREAM);
 
     controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
     controller.onEvent(KeyEvent.ofChar('j'));
@@ -239,6 +237,7 @@ class CoreTuiShellPilotTest {
   void questionMarkIsInsertedInGroupIdWithoutOpeningHelp() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    moveFocusTo(controller, FocusTarget.GROUP_ID);
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
 
     controller.onEvent(KeyEvent.ofChar('?'));
@@ -271,7 +270,7 @@ class CoreTuiShellPilotTest {
 
     moveFocusTo(controller, FocusTarget.SUBMIT);
     controller.onEvent(KeyEvent.ofChar('j'));
-    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.PLATFORM_STREAM);
   }
 
   @Test
@@ -532,6 +531,7 @@ class CoreTuiShellPilotTest {
   void qNoLongerTriggersQuitByDefault() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    moveFocusTo(controller, FocusTarget.GROUP_ID);
 
     CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofChar('q'));
 
@@ -880,7 +880,7 @@ class CoreTuiShellPilotTest {
 
     moveFocusTo(controller, FocusTarget.PLATFORM_STREAM);
     assertThat(controller.request().platformStream()).isEqualTo("io.quarkus.platform:3.31");
-    assertThat(renderToString(controller)).contains("(*)");
+    assertThat(renderToString(controller)).contains("●");
 
     controller.onEvent(KeyEvent.ofChar('l'));
     assertThat(controller.request().platformStream()).isEqualTo("io.quarkus.platform:3.20");

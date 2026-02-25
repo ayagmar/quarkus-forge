@@ -5,118 +5,67 @@ import java.util.List;
 import java.util.Objects;
 
 final class FooterLinesComposer {
-  private static final int NARROW_WIDTH_THRESHOLD = 100;
-
   List<String> compose(int width, FooterSnapshot snapshot) {
     Objects.requireNonNull(snapshot);
     List<String> lines = new ArrayList<>();
-    lines.add(footerHintLine(snapshot, width));
-    lines.add(
-        "Mode: " + snapshot.modeLabel() + " | Generation: " + snapshot.generationStateLabel());
-    lines.add("Status: " + snapshot.statusMessage());
-    lines.add(
-        "Validation: " + snapshot.validationLabel() + " | Focus: " + snapshot.focusTargetName());
+    lines.add(statusLine(snapshot));
 
-    String activeError = snapshot.activeErrorDetails();
-    if (!activeError.isBlank()) {
-      lines.add("Error: " + activeError);
-    }
-
-    int expandedErrorLines =
-        expandedErrorDetailLines(activeError, snapshot.showErrorDetails(), width);
-    if (expandedErrorLines > 0) {
-      lines.add("Error details:");
-      lines.addAll(wrapToWidth(activeError, Math.max(24, width - 6), expandedErrorLines));
+    if (!snapshot.activeErrorDetails().isBlank()) {
+      if (snapshot.showErrorDetails()) {
+        lines.add("Error details:");
+        lines.add(snapshot.activeErrorDetails());
+      } else {
+        lines.add("Error: " + snapshot.activeErrorDetails());
+      }
     }
 
     if (!snapshot.successHint().isBlank()) {
-      lines.add("Next: " + truncate(snapshot.successHint(), Math.max(24, width - 16)));
+      String nextHint = "Next: " + snapshot.successHint();
+      if (nextHint.length() > width) {
+        nextHint = nextHint.substring(0, Math.max(6, width - 3)) + "...";
+      }
+      lines.add(nextHint);
     }
+
+    lines.add(footerHintLine(width, snapshot));
     return lines;
   }
 
-  private static String footerHintLine(FooterSnapshot snapshot, int width) {
+  private static String statusLine(FooterSnapshot snapshot) {
+    return "Status: " + snapshot.statusMessage();
+  }
+
+  private static String footerHintLine(int width, FooterSnapshot snapshot) {
     if (snapshot.generationInProgress()) {
-      return width < NARROW_WIDTH_THRESHOLD
-          ? "Esc: cancel generation | Enter disabled"
-          : "Esc: cancel generation | Enter disabled while generation is loading";
+      if (width >= 100) {
+        return "Esc: cancel generation | Enter disabled while generation is loading";
+      }
+      return "Esc: cancel generation | Enter disabled";
     }
     if (snapshot.helpOverlayVisible()) {
-      return width < NARROW_WIDTH_THRESHOLD
-          ? "Help: Esc/? close | Ctrl+P palette"
-          : "Help overlay: Esc or ?: close | Ctrl+P: open command palette";
+      return "Esc: close help";
     }
     if (snapshot.commandPaletteVisible()) {
-      return width < NARROW_WIDTH_THRESHOLD
-          ? "Palette: Up/Down | Enter run | Esc/Ctrl+P close"
-          : "Command palette: Up/Down/Home/End or j/k: navigate | Enter: run | 1-9: quick run | Esc or Ctrl+P: close";
+      return "Up/Down: navigate | Enter: run | 1-9: quick run | Esc: close";
     }
     if (snapshot.focusTarget() == FocusTarget.EXTENSION_LIST) {
-      return width < NARROW_WIDTH_THRESHOLD
-          ? "Up/Down or j/k: nav | Left/Right: section | PgUp/PgDn: category | Space: select | V: category filter | X: clear selected | F: favorite | Esc: clear filters/quit | ?: help"
-          : "Up/Down/Home/End or j/k: list nav | Left/Right or h/l: section hierarchy | PgUp/PgDn: category jump | Space: select | v: category filter | X: clear selected | F: favorite | c: close/open category | C: open all | Ctrl+J: jump favorite | Ctrl+K: favorite filter | Ctrl+R: reload | Ctrl+E: error details | Esc: clear filters/quit | ?: help | Ctrl+P: commands";
+      if (width >= 100) {
+        return "Up/Down/Home/End or j/k: list nav | Space: toggle | f: fav"
+            + " | PgUp/PgDn: category jump | Left/Right or h/l: section hierarchy"
+            + " | v: category filter | c/C: close/open | X: clear selected"
+            + " | Esc: clear filters/quit | ?: help";
+      }
+      return "Up/Down or j/k: nav | Space: toggle | PgUp/PgDn: category"
+          + " | v: filter | X: clear selected | Esc: clear filters/quit | ?: help";
     }
     if (snapshot.focusTarget() == FocusTarget.EXTENSION_SEARCH) {
-      return width < NARROW_WIDTH_THRESHOLD
-          ? "Type: filter | Down: list | Esc: clear/list | Ctrl+K: fav filter | ?: help"
-          : "Type: filter extensions | Down: list | Esc: clear filters or return to list | Ctrl+R: reload | Ctrl+J: jump favorite | Ctrl+K: favorite filter | Ctrl+E: error details | ?: help | Ctrl+P: commands";
+      return "Type: search | Down: list | Esc: clear filters or return to list"
+          + " | Ctrl+K: favorites | Ctrl+R: reload | ?: help";
     }
     if (snapshot.focusTarget() == FocusTarget.SUBMIT) {
-      return width < NARROW_WIDTH_THRESHOLD
-          ? "Enter/Alt+G: submit | j/k: focus | Ctrl+E: error details | ?: help"
-          : "Enter or Alt+G: submit | Tab/Shift+Tab or j/k: focus | Ctrl+E: error details | Esc: cancel/quit | ?: help | Ctrl+P: commands";
+      return "Enter/Alt+G: submit | Tab: focus | j/k: move | Ctrl+E: errors | ?: help | Esc: quit";
     }
-    if (snapshot.metadataSelectorFocus()) {
-      return width < NARROW_WIDTH_THRESHOLD
-          ? "Left/Right or h/l: pick | Up/Down or j/k: cycle | ?: help"
-          : "Left/Right/Home/End or h/l/j/k: pick value | Tab/Shift+Tab: focus | Enter/Alt+G: submit | Ctrl+E: error details | ?: help | Ctrl+P: commands";
-    }
-    return width < NARROW_WIDTH_THRESHOLD
-        ? "Tab: focus | Enter: submit | Ctrl+E: error details | ?: help"
-        : "Tab/Shift+Tab: focus | Enter/Alt+G: submit | /: search | Ctrl+K: favorite filter | Ctrl+E: error details | Esc: cancel/quit | ?: help | Ctrl+P: commands";
-  }
-
-  private static int expandedErrorDetailLines(
-      String activeError, boolean showErrorDetails, int width) {
-    if (!showErrorDetails || activeError.isBlank()) {
-      return 0;
-    }
-    return wrapToWidth(activeError, Math.max(24, width - 6), 6).size();
-  }
-
-  private static List<String> wrapToWidth(String text, int width, int maxLines) {
-    List<String> lines = new ArrayList<>();
-    if (text == null || text.isBlank() || width <= 0 || maxLines <= 0) {
-      return lines;
-    }
-
-    String remaining = text.strip();
-    while (!remaining.isBlank() && lines.size() < maxLines) {
-      if (remaining.length() <= width) {
-        lines.add(remaining);
-        break;
-      }
-
-      int breakIndex = remaining.lastIndexOf(' ', width);
-      if (breakIndex <= 0) {
-        breakIndex = width;
-      }
-      lines.add(remaining.substring(0, breakIndex).stripTrailing());
-      remaining = remaining.substring(Math.min(remaining.length(), breakIndex + 1)).stripLeading();
-    }
-
-    if (!remaining.isBlank() && lines.size() == maxLines) {
-      int lastIndex = lines.size() - 1;
-      lines.set(lastIndex, truncate(lines.get(lastIndex), Math.max(4, width)));
-    }
-    return lines;
-  }
-
-  private static String truncate(String value, int maxLength) {
-    if (value.length() <= maxLength) {
-      return value;
-    }
-    return value.substring(0, maxLength - 3) + "...";
+    return "Tab/Shift+Tab: focus | Enter/Alt+G: submit | /: search | ?: help | Ctrl+P: commands | Esc: quit";
   }
 
   record FooterSnapshot(

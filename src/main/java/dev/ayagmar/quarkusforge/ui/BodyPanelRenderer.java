@@ -33,7 +33,7 @@ final class BodyPanelRenderer {
       Frame frame,
       Rect area,
       MetadataPanelSnapshot snapshot,
-      InputRenderer inputRenderer,
+      CompactInputRenderer inputRenderer,
       PanelTitleFormatter panelTitleFormatter,
       PanelBorderStyleResolver panelBorderStyleResolver) {
     Objects.requireNonNull(snapshot);
@@ -57,20 +57,26 @@ final class BodyPanelRenderer {
     }
 
     List<Constraint> constraints = new ArrayList<>();
-    for (int i = 0; i < 8; i++) {
-      constraints.add(Constraint.length(3));
+    for (int i = 0; i < 3; i++) {
+      constraints.add(Constraint.length(1));
+    }
+    constraints.add(Constraint.length(1));
+    for (int i = 0; i < 5; i++) {
+      constraints.add(Constraint.length(1));
     }
     constraints.add(Constraint.fill());
     List<Rect> rows = Layout.vertical().constraints(constraints).split(inner);
 
-    inputRenderer.render(frame, rows.get(0), "Group Id", FocusTarget.GROUP_ID);
-    inputRenderer.render(frame, rows.get(1), "Artifact Id", FocusTarget.ARTIFACT_ID);
-    inputRenderer.render(frame, rows.get(2), "Version", FocusTarget.VERSION);
-    inputRenderer.render(frame, rows.get(3), "Quarkus Platform", FocusTarget.PLATFORM_STREAM);
-    inputRenderer.render(frame, rows.get(4), "Build Tool", FocusTarget.BUILD_TOOL);
-    inputRenderer.render(frame, rows.get(5), "Java Version", FocusTarget.JAVA_VERSION);
-    inputRenderer.render(frame, rows.get(6), "Package Name", FocusTarget.PACKAGE_NAME);
-    inputRenderer.render(frame, rows.get(7), "Output Dir", FocusTarget.OUTPUT_DIR);
+    int rowIdx = 0;
+    inputRenderer.renderSelector(frame, rows.get(rowIdx++), "Platform", FocusTarget.PLATFORM_STREAM);
+    inputRenderer.renderSelector(frame, rows.get(rowIdx++), "Build Tool", FocusTarget.BUILD_TOOL);
+    inputRenderer.renderSelector(frame, rows.get(rowIdx++), "Java", FocusTarget.JAVA_VERSION);
+    rowIdx++;
+    inputRenderer.renderText(frame, rows.get(rowIdx++), "Group", FocusTarget.GROUP_ID);
+    inputRenderer.renderText(frame, rows.get(rowIdx++), "Artifact", FocusTarget.ARTIFACT_ID);
+    inputRenderer.renderText(frame, rows.get(rowIdx++), "Version", FocusTarget.VERSION);
+    inputRenderer.renderText(frame, rows.get(rowIdx++), "Package", FocusTarget.PACKAGE_NAME);
+    inputRenderer.renderText(frame, rows.get(rowIdx++), "Output", FocusTarget.OUTPUT_DIR);
   }
 
   void renderExtensionsPanel(
@@ -78,7 +84,7 @@ final class BodyPanelRenderer {
       Rect area,
       ExtensionsPanelSnapshot snapshot,
       ListState listState,
-      InputRenderer inputRenderer,
+      CompactInputRenderer inputRenderer,
       PanelTitleFormatter panelTitleFormatter,
       PanelBorderStyleResolver panelBorderStyleResolver,
       ExtensionFlagLookup selectedLookup,
@@ -92,9 +98,10 @@ final class BodyPanelRenderer {
     Objects.requireNonNull(favoriteLookup);
 
     boolean extensionError = !snapshot.catalogErrorMessage().isBlank();
+    String title = buildExtensionsTitle(snapshot);
     Block panelBlock =
         Block.builder()
-            .title(panelTitleFormatter.format(snapshot.title(), snapshot.panelFocused()))
+            .title(panelTitleFormatter.format(title, snapshot.panelFocused()))
             .borders(Borders.ALL)
             .borderType(BorderType.ROUNDED)
             .borderStyle(
@@ -108,24 +115,133 @@ final class BodyPanelRenderer {
       return;
     }
 
-    List<Rect> sections =
-        Layout.vertical()
-            .constraints(Constraint.length(3), Constraint.fill(), Constraint.length(4))
-            .split(inner);
+    boolean showSearchInput = snapshot.searchFocused();
+    boolean showSubmitButton = true;
+    List<Constraint> sectionConstraints = new ArrayList<>();
+    sectionConstraints.add(Constraint.length(1));
+    if (showSearchInput) {
+      sectionConstraints.add(Constraint.length(1));
+    }
+    sectionConstraints.add(Constraint.fill());
+    if (showSubmitButton) {
+      sectionConstraints.add(Constraint.length(1));
+    }
+    List<Rect> sections = Layout.vertical().constraints(sectionConstraints).split(inner);
 
-    inputRenderer.render(
-        frame, sections.get(0), searchInputLabel(snapshot), FocusTarget.EXTENSION_SEARCH);
+    int idx = 0;
+    renderSearchHint(frame, sections.get(idx++), snapshot);
+    if (showSearchInput) {
+      renderSearchInput(frame, sections.get(idx++), snapshot);
+    }
     renderExtensionList(
         frame,
-        sections.get(1),
+        sections.get(idx++),
         snapshot,
         listState,
         panelTitleFormatter,
         panelBorderStyleResolver,
         selectedLookup,
         favoriteLookup);
-    renderSelectedSummary(
-        frame, sections.get(2), snapshot, panelTitleFormatter, panelBorderStyleResolver);
+    if (showSubmitButton) {
+      renderSubmitButton(frame, sections.get(idx), snapshot);
+    }
+  }
+
+  private String buildExtensionsTitle(ExtensionsPanelSnapshot snapshot) {
+    StringBuilder title = new StringBuilder("Extensions");
+    if (snapshot.loading()) {
+      title.append(" [loading]");
+    } else if (!snapshot.catalogErrorMessage().isBlank()) {
+      title.append(" [fallback]");
+    }
+    int selected = snapshot.selectedExtensionIds().size();
+    int total = snapshot.totalCatalogExtensionCount();
+    if (selected > 0) {
+      title.append(" (").append(selected).append(" selected)");
+    } else {
+      title.append(" (").append(total).append(")");
+    }
+    if (snapshot.favoritesOnlyFilterEnabled()) {
+      title.append(" [fav]");
+    }
+    if (!snapshot.activeCategoryFilterTitle().isBlank()) {
+      title.append(" [").append(snapshot.activeCategoryFilterTitle()).append("]");
+    }
+    return title.toString();
+  }
+
+  private void renderSearchHint(Frame frame, Rect area, ExtensionsPanelSnapshot snapshot) {
+    StringBuilder hint = new StringBuilder();
+    if (snapshot.loading()) {
+      hint.append("Loading extension catalog...");
+    } else if (!snapshot.catalogErrorMessage().isBlank()) {
+      hint.append(catalogSourceLabel(snapshot));
+      hint.append(" | error: ").append(snapshot.catalogErrorMessage());
+    } else {
+      int filtered = snapshot.filteredExtensionCount();
+      int total = snapshot.totalCatalogExtensionCount();
+      if (!snapshot.activeCategoryFilterTitle().isBlank()) {
+        hint.append("Category filter: ").append(snapshot.activeCategoryFilterTitle());
+        hint.append(" | ").append(filtered).append("/").append(total);
+      } else {
+        hint.append(catalogSourceLabel(snapshot));
+        hint.append(" | Search Extensions (")
+            .append(filtered)
+            .append("/")
+            .append(total)
+            .append(")");
+      }
+      if (snapshot.favoriteCount() > 0) {
+        hint.append(" | Favorites: ").append(snapshot.favoriteCount());
+      }
+    }
+
+    Style style = Style.EMPTY.fg(theme.color("muted"));
+    if (!snapshot.catalogErrorMessage().isBlank()) {
+      style = Style.EMPTY.fg(theme.color("warning"));
+    }
+
+    Paragraph paragraph =
+        Paragraph.builder()
+            .text(hint.toString())
+            .style(style)
+            .overflow(Overflow.ELLIPSIS)
+            .build();
+    frame.renderWidget(paragraph, area);
+  }
+
+  private void renderSearchInput(Frame frame, Rect area, ExtensionsPanelSnapshot snapshot) {
+    String query = snapshot.searchQuery();
+    String display = "  / [ " + query + "_ ]";
+    Paragraph paragraph =
+        Paragraph.builder()
+            .text(display)
+            .style(Style.EMPTY.fg(theme.color("focus")).bold())
+            .overflow(Overflow.ELLIPSIS)
+            .build();
+    frame.renderWidget(paragraph, area);
+  }
+
+  private void renderSubmitButton(Frame frame, Rect area, ExtensionsPanelSnapshot snapshot) {
+    boolean focused = snapshot.submitFocused();
+    String label = focused ? "  >> [ Generate (Enter/Alt+G) ] <<" : "  [ Generate (Enter/Alt+G) ]";
+    Style style =
+        focused
+            ? Style.EMPTY.fg(theme.color("focus")).bold().reversed()
+            : Style.EMPTY.fg(theme.color("accent"));
+    Paragraph paragraph =
+        Paragraph.builder().text(label).style(style).overflow(Overflow.ELLIPSIS).build();
+    frame.renderWidget(paragraph, area);
+  }
+
+  private static String catalogSourceLabel(ExtensionsPanelSnapshot snapshot) {
+    StringBuilder label = new StringBuilder("Catalog: ");
+    String source = snapshot.catalogSource();
+    label.append(source.isBlank() ? "snapshot" : source);
+    if (snapshot.catalogStale()) {
+      label.append(" [stale]");
+    }
+    return label.toString();
   }
 
   private void renderExtensionList(
@@ -137,26 +253,7 @@ final class BodyPanelRenderer {
       PanelBorderStyleResolver panelBorderStyleResolver,
       ExtensionFlagLookup selectedLookup,
       ExtensionFlagLookup favoriteLookup) {
-    boolean extensionError = !snapshot.catalogErrorMessage().isBlank();
-    Block listBlock =
-        Block.builder()
-            .title(panelTitleFormatter.format("Catalog", snapshot.listFocused()))
-            .borders(Borders.ALL)
-            .borderType(BorderType.ROUNDED)
-            .borderStyle(
-                panelBorderStyleResolver.resolve(
-                    snapshot.listFocused(), extensionError, snapshot.loading()))
-            .build();
-
     if (snapshot.loading()) {
-      Paragraph loading =
-          Paragraph.builder()
-              .text("Loading extension catalog...")
-              .block(listBlock)
-              .style(Style.EMPTY.fg(theme.color("warning")).bold())
-              .overflow(Overflow.ELLIPSIS)
-              .build();
-      frame.renderWidget(loading, area);
       return;
     }
 
@@ -169,26 +266,26 @@ final class BodyPanelRenderer {
       ExtensionCatalogItem extension = row.extension();
       boolean selected = selectedLookup.matches(extension.id());
       boolean favorite = favoriteLookup.matches(extension.id());
-      String checkedPrefix = selected ? "[x] " : "[ ] ";
-      String favoritePrefix = favorite ? "* " : "  ";
+      String checkedPrefix = selected ? "● " : "○ ";
+      String favoritePrefix = favorite ? "★ " : "  ";
       String displayLabel = extensionDisplayLabel(extension);
       items.add(ListItem.from(checkedPrefix + favoritePrefix + displayLabel).toSizedWidget());
     }
 
+    boolean extensionError = !snapshot.catalogErrorMessage().isBlank();
     if (items.isEmpty()) {
       String emptyMessage;
       if (extensionError) {
-        emptyMessage = "Catalog unavailable - using fallback snapshot";
+        emptyMessage = "  Catalog unavailable - using fallback snapshot";
       } else if (snapshot.favoritesOnlyFilterEnabled()) {
-        emptyMessage = "No favorite extension matches current filter";
+        emptyMessage = "  No favorites match current filter";
       } else {
-        emptyMessage = "No extension matches current filter";
+        emptyMessage = "  No extensions match current filter";
       }
       Paragraph empty =
           Paragraph.builder()
               .text(emptyMessage)
-              .block(listBlock)
-              .style(Style.EMPTY.fg(extensionError ? theme.color("error") : theme.color("warning")))
+              .style(Style.EMPTY.fg(extensionError ? theme.color("error") : theme.color("muted")))
               .overflow(Overflow.ELLIPSIS)
               .build();
       frame.renderWidget(empty, area);
@@ -205,99 +302,24 @@ final class BodyPanelRenderer {
             .scrollBarPolicy(ScrollBarPolicy.AS_NEEDED)
             .scrollbarThumbStyle(Style.EMPTY.fg(theme.color("focus")).bold())
             .scrollbarTrackStyle(Style.EMPTY.fg(theme.color("muted")))
-            .block(listBlock)
             .build();
     frame.renderStatefulWidget(listWidget, area, listState);
-  }
-
-  private void renderSelectedSummary(
-      Frame frame,
-      Rect area,
-      ExtensionsPanelSnapshot snapshot,
-      PanelTitleFormatter panelTitleFormatter,
-      PanelBorderStyleResolver panelBorderStyleResolver) {
-    String summary = selectedExtensionsSummary(snapshot.selectedExtensionIds(), area.width());
-    if (!snapshot.activeCategoryFilterTitle().isBlank()) {
-      summary += "\nCategory filter: " + snapshot.activeCategoryFilterTitle();
-    }
-    summary += "\nCatalog: " + snapshot.catalogSource();
-    if (snapshot.catalogStale()) {
-      summary += " [stale]";
-    }
-    if (!snapshot.catalogErrorMessage().isBlank()) {
-      summary += " | error: " + snapshot.catalogErrorMessage();
-    }
-    summary += "\nFavorites: " + snapshot.favoriteCount();
-    if (snapshot.favoritesOnlyFilterEnabled()) {
-      summary += " [filter:on]";
-    }
-    if (snapshot.submitFocused()) {
-      summary += "\nSubmit focus active - press Enter to submit";
-    }
-
-    Style summaryStyle = Style.EMPTY.fg(theme.color("text"));
-    if (!snapshot.catalogErrorMessage().isBlank()) {
-      summaryStyle = summaryStyle.fg(theme.color("warning"));
-    }
-
-    Paragraph paragraph =
-        Paragraph.builder()
-            .text(summary)
-            .style(summaryStyle)
-            .overflow(Overflow.ELLIPSIS)
-            .block(
-                Block.builder()
-                    .title(panelTitleFormatter.format("Selection", snapshot.submitFocused()))
-                    .borders(Borders.ALL)
-                    .borderType(BorderType.ROUNDED)
-                    .borderStyle(
-                        panelBorderStyleResolver.resolve(snapshot.submitFocused(), false, false))
-                    .build())
-            .build();
-    frame.renderWidget(paragraph, area);
-  }
-
-  private static String selectedExtensionsSummary(List<String> selectedExtensionIds, int width) {
-    if (selectedExtensionIds.isEmpty()) {
-      return "Selected: none";
-    }
-    int maxVisible = width < NARROW_WIDTH_THRESHOLD ? 1 : 3;
-    int visibleCount = Math.min(maxVisible, selectedExtensionIds.size());
-    String visible = String.join(", ", selectedExtensionIds.subList(0, visibleCount));
-    if (selectedExtensionIds.size() > visibleCount) {
-      int remaining = selectedExtensionIds.size() - visibleCount;
-      return "Selected ("
-          + selectedExtensionIds.size()
-          + "): "
-          + visible
-          + " +"
-          + remaining
-          + " more";
-    }
-    return "Selected (" + selectedExtensionIds.size() + "): " + visible;
   }
 
   private static String extensionDisplayLabel(ExtensionCatalogItem extension) {
     return extension.name();
   }
 
-  private static String searchInputLabel(ExtensionsPanelSnapshot snapshot) {
-    return "Search Extensions ("
-        + snapshot.filteredExtensionCount()
-        + "/"
-        + snapshot.totalCatalogExtensionCount()
-        + ")";
-  }
-
   private static String sectionHeaderLabel(ExtensionCatalogRow row) {
-    String prefix = row.collapsed() ? "[+]" : "[-]";
+    String prefix = row.collapsed() ? "[+] " : "[-] ";
     String suffix = row.collapsed() ? " (" + row.hiddenCount() + " hidden)" : "";
-    return "-- " + prefix + " " + row.label() + suffix + " --";
+    return prefix + row.label() + suffix;
   }
 
-  @FunctionalInterface
-  interface InputRenderer {
-    void render(Frame frame, Rect area, String label, FocusTarget target);
+  interface CompactInputRenderer {
+    void renderSelector(Frame frame, Rect area, String label, FocusTarget target);
+
+    void renderText(Frame frame, Rect area, String label, FocusTarget target);
   }
 
   @FunctionalInterface
@@ -326,6 +348,7 @@ final class BodyPanelRenderer {
       boolean panelFocused,
       boolean listFocused,
       boolean submitFocused,
+      boolean searchFocused,
       boolean loading,
       String catalogErrorMessage,
       String catalogSource,
@@ -336,7 +359,8 @@ final class BodyPanelRenderer {
       int filteredExtensionCount,
       int totalCatalogExtensionCount,
       List<ExtensionCatalogRow> filteredRows,
-      List<String> selectedExtensionIds) {
+      List<String> selectedExtensionIds,
+      String searchQuery) {
     ExtensionsPanelSnapshot {
       title = Objects.requireNonNull(title);
       catalogErrorMessage = catalogErrorMessage == null ? "" : catalogErrorMessage;
@@ -347,6 +371,7 @@ final class BodyPanelRenderer {
       totalCatalogExtensionCount = Math.max(0, totalCatalogExtensionCount);
       filteredRows = List.copyOf(Objects.requireNonNull(filteredRows));
       selectedExtensionIds = List.copyOf(Objects.requireNonNull(selectedExtensionIds));
+      searchQuery = searchQuery == null ? "" : searchQuery;
     }
   }
 }

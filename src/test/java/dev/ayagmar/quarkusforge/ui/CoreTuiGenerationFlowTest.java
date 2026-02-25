@@ -36,7 +36,7 @@ class CoreTuiGenerationFlowTest {
     assertThat(controller.statusMessage()).contains("Generation in progress");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
-    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.PLATFORM_STREAM);
 
     generationRunner.complete(Path.of("build/generated-project"));
 
@@ -158,7 +158,7 @@ class CoreTuiGenerationFlowTest {
     assertThat(renderToString(controller)).contains("Error: download failed");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
-    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.ARTIFACT_ID);
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.BUILD_TOOL);
   }
 
   @Test
@@ -234,6 +234,43 @@ class CoreTuiGenerationFlowTest {
 
     assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.SUCCESS);
     assertThat(controller.statusMessage()).contains("Generation succeeded");
+  }
+
+  @Test
+  void generationProgressOverlayShowsGaugeAndPhase() {
+    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(),
+            UiScheduler.immediate(),
+            Duration.ZERO,
+            generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    String rendered = renderToString(controller);
+    assertThat(rendered).contains("Generating Project");
+    assertThat(rendered).contains("downloading project archive");
+    assertThat(rendered).contains("Esc: cancel");
+  }
+
+  @Test
+  void generationProgressOverlayDisappearsAfterCompletion() {
+    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(),
+            UiScheduler.immediate(),
+            Duration.ZERO,
+            generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    assertThat(renderToString(controller)).contains("Generating Project");
+
+    generationRunner.complete(Path.of("build/output"));
+    String afterCompletion = renderToString(controller);
+    assertThat(afterCompletion).doesNotContain("Generating Project");
+    assertThat(afterCompletion).contains("Generation succeeded");
   }
 
   private static String renderToString(CoreTuiController controller) {

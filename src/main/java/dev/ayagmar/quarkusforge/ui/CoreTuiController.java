@@ -25,7 +25,7 @@ import dev.tamboui.tui.event.ResizeEvent;
 import dev.tamboui.widgets.block.Block;
 import dev.tamboui.widgets.block.BorderType;
 import dev.tamboui.widgets.block.Borders;
-import dev.tamboui.widgets.input.TextInput;
+import dev.tamboui.widgets.gauge.LineGauge;
 import dev.tamboui.widgets.input.TextInputState;
 import dev.tamboui.widgets.paragraph.Paragraph;
 import java.nio.file.Path;
@@ -42,15 +42,15 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
-public final class CoreTuiController {
+public final class CoreTuiController implements BodyPanelRenderer.CompactInputRenderer {
   private static final List<FocusTarget> FOCUS_ORDER =
       List.of(
-          FocusTarget.GROUP_ID,
-          FocusTarget.ARTIFACT_ID,
-          FocusTarget.VERSION,
           FocusTarget.PLATFORM_STREAM,
           FocusTarget.BUILD_TOOL,
           FocusTarget.JAVA_VERSION,
+          FocusTarget.GROUP_ID,
+          FocusTarget.ARTIFACT_ID,
+          FocusTarget.VERSION,
           FocusTarget.PACKAGE_NAME,
           FocusTarget.OUTPUT_DIR,
           FocusTarget.EXTENSION_SEARCH,
@@ -163,7 +163,7 @@ public final class CoreTuiController {
     Objects.requireNonNull(favoritesPersistenceExecutor);
     request = initialState.request();
     validation = initialState.validation();
-    focusTarget = FocusTarget.GROUP_ID;
+    focusTarget = FocusTarget.PLATFORM_STREAM;
     statusMessage = "Ready";
     errorMessage = "";
     submitRequested = false;
@@ -567,15 +567,18 @@ public final class CoreTuiController {
     reconcileGenerationCompletionIfDone();
     Rect area = frame.area();
     List<String> footerLines = footerLinesComposer.compose(area.width(), footerSnapshot());
-    int footerHeight = Math.max(3, footerLines.size() + 2);
+    int footerHeight = estimateFooterHeight(footerLines, Math.max(1, area.width() - 2));
     List<Rect> rootLayout =
         Layout.vertical()
-            .constraints(Constraint.length(3), Constraint.fill(), Constraint.length(footerHeight))
+            .constraints(Constraint.length(1), Constraint.fill(), Constraint.length(footerHeight))
             .split(area);
 
     renderHeader(frame, rootLayout.get(0));
     renderBody(frame, rootLayout.get(1));
     renderFooter(frame, rootLayout.get(2), footerLines);
+    if (isGenerationActive()) {
+      renderGenerationOverlay(frame, area);
+    }
     if (commandPaletteVisible) {
       renderCommandPalette(frame, area);
     }
@@ -655,20 +658,12 @@ public final class CoreTuiController {
   }
 
   private void renderHeader(Frame frame, Rect area) {
-    Block block =
-        Block.builder()
-            .title("Quarkus Forge")
-            .borders(Borders.ALL)
-            .borderType(BorderType.ROUNDED)
-            .borderStyle(accentBorderStyle())
-            .build();
-    String text = "Keyboard-first Quarkus project generator";
+    String text = "  QUARKUS FORGE  ─  Keyboard-first project generator";
     Paragraph header =
         Paragraph.builder()
             .text(text)
-            .style(Style.EMPTY.fg(theme.color("text")))
+            .style(Style.EMPTY.fg(theme.color("accent")).bold())
             .overflow(Overflow.ELLIPSIS)
-            .block(block)
             .build();
     frame.renderWidget(header, area);
   }
@@ -689,7 +684,7 @@ public final class CoreTuiController {
         frame,
         bodyLayout.get(0),
         metadataPanelSnapshot(),
-        this::renderInput,
+        this,
         CoreTuiController::panelTitle,
         this::panelBorderStyle);
     bodyPanelRenderer.renderExtensionsPanel(
@@ -697,7 +692,7 @@ public final class CoreTuiController {
         bodyLayout.get(1),
         extensionsPanelSnapshot(),
         extensionCatalogState.listState(),
-        this::renderInput,
+        this,
         CoreTuiController::panelTitle,
         this::panelBorderStyle,
         extensionCatalogState::isSelected,
@@ -715,6 +710,7 @@ public final class CoreTuiController {
         isExtensionPanelFocused(),
         focusTarget == FocusTarget.EXTENSION_LIST,
         focusTarget == FocusTarget.SUBMIT,
+        focusTarget == FocusTarget.EXTENSION_SEARCH,
         extensionCatalogLoading,
         extensionCatalogErrorMessage,
         extensionCatalogSource,
@@ -725,46 +721,109 @@ public final class CoreTuiController {
         extensionCatalogState.filteredExtensions().size(),
         extensionCatalogState.totalCatalogExtensionCount(),
         extensionCatalogState.filteredRows(),
-        extensionCatalogState.selectedExtensionIds());
+        extensionCatalogState.selectedExtensionIds(),
+        inputStates.get(FocusTarget.EXTENSION_SEARCH).text());
   }
 
-  private void renderInput(Frame frame, Rect area, String label, FocusTarget target) {
+  @Override
+  public void renderSelector(Frame frame, Rect area, String label, FocusTarget target) {
     boolean focused = focusTarget == target;
-    Block inputBlock =
-        Block.builder()
-            .title(panelTitle(label, focused))
-            .borders(Borders.ALL)
-            .borderType(BorderType.ROUNDED)
-            .borderStyle(inputBorderStyle(target, focused))
-            .build();
+    String value = selectorInlineLabel(target);
 
-    TextInput input =
-        TextInput.builder()
-            .placeholder(label)
-            .style(Style.EMPTY.fg(theme.color("text")))
-            .block(inputBlock)
-            .placeholderStyle(Style.EMPTY.fg(theme.color("muted")))
+    StringBuilder line = new StringBuilder();
+    line.append(String.format("  %-10s  ", label));
+
+    String[] parts = value.split("  ");
+    for (String part : parts) {
+      if (part.startsWith("(*)")) {
+        line.append("● ").append(part.substring(3).trim()).append("  ");
+      } else if (part.startsWith("( )")) {
+        line.append("○ ").append(part.substring(3).trim()).append("  ");
+      }
+    }
+
+    if (focused) {
+      line.append("◀ ▶");
+    }
+
+    Style style = Style.EMPTY.fg(focused ? theme.color("focus") : theme.color("text"));
+    if (hasValidationErrorFor(target)) {
+      style = Style.EMPTY.fg(theme.color("error"));
+    }
+
+    Paragraph paragraph =
+        Paragraph.builder()
+            .text(line.toString())
+            .style(style)
+            .overflow(Overflow.ELLIPSIS)
             .build();
-    frame.renderStatefulWidget(input, area, inputStates.get(target));
+    frame.renderWidget(paragraph, area);
+  }
+
+  @Override
+  public void renderText(Frame frame, Rect area, String label, FocusTarget target) {
+    boolean focused = focusTarget == target;
+    String value = inputStates.get(target).text();
+    if (value.isBlank()) {
+      value = defaultValueFor(target);
+    }
+
+    String display = focused ? "[ " + value + "_ ]" : "[ " + value + " ]";
+    String line = String.format("  %-10s  %s", label, display);
+
+    Style style = Style.EMPTY.fg(focused ? theme.color("focus") : theme.color("text"));
+    if (hasValidationErrorFor(target)) {
+      style = Style.EMPTY.fg(theme.color("error"));
+    }
+
+    Paragraph paragraph =
+        Paragraph.builder()
+            .text(line)
+            .style(style)
+            .overflow(Overflow.ELLIPSIS)
+            .build();
+    frame.renderWidget(paragraph, area);
+  }
+
+  private String defaultValueFor(FocusTarget target) {
+    return switch (target) {
+      case GROUP_ID -> "org.acme";
+      case ARTIFACT_ID -> "quarkus-app";
+      case VERSION -> "1.0.0-SNAPSHOT";
+      case PACKAGE_NAME -> "org.acme.quarkus";
+      case OUTPUT_DIR -> ".";
+      default -> "";
+    };
   }
 
   private void renderFooter(Frame frame, Rect area, List<String> footerLines) {
-    String footerText = String.join("\n", footerLines);
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < footerLines.size(); i++) {
+      if (i > 0) {
+        sb.append("\n");
+      }
+      sb.append("  ").append(footerLines.get(i));
+    }
 
     Paragraph footer =
         Paragraph.builder()
-            .text(footerText)
-            .style(Style.EMPTY.fg(theme.color("text")))
-            .overflow(Overflow.ELLIPSIS)
-            .block(
-                Block.builder()
-                    .title("Status")
-                    .borders(Borders.ALL)
-                    .borderType(BorderType.ROUNDED)
-                    .borderStyle(accentBorderStyle())
-                    .build())
+            .text(sb.toString())
+            .style(Style.EMPTY.fg(theme.color("muted")))
+            .overflow(Overflow.WRAP_WORD)
             .build();
     frame.renderWidget(footer, area);
+  }
+
+  private static int estimateFooterHeight(List<String> lines, int availableWidth) {
+    if (availableWidth <= 0) {
+      return Math.max(1, lines.size());
+    }
+    int height = 0;
+    for (String line : lines) {
+      int lineWidth = line.length() + 2;
+      height += Math.max(1, (lineWidth + availableWidth - 1) / availableWidth);
+    }
+    return Math.max(1, height);
   }
 
   private void renderCommandPalette(Frame frame, Rect viewport) {
@@ -804,6 +863,94 @@ public final class CoreTuiController {
                     .build())
             .build();
     frame.renderWidget(palette, overlayArea);
+  }
+
+  private boolean isGenerationActive() {
+    GenerationState state = generationStateTracker.currentState();
+    return state == GenerationState.VALIDATING || state == GenerationState.LOADING;
+  }
+
+  private void renderGenerationOverlay(Frame frame, Rect viewport) {
+    if (viewport.width() < 30 || viewport.height() < 8) {
+      return;
+    }
+    int width = Math.min(60, viewport.width() - 4);
+    int height = 7;
+    Rect overlayArea =
+        new Rect(
+            viewport.x() + Math.max(0, (viewport.width() - width) / 2),
+            viewport.y() + Math.max(0, (viewport.height() - height) / 2),
+            width,
+            height);
+
+    double ratio = generationStateTracker.progressRatio();
+    String phase = generationStateTracker.progressPhase();
+    int percent = (int) (ratio * 100);
+    String percentLabel = percent + "%";
+
+    List<String> lines = new ArrayList<>();
+    lines.add("");
+    lines.add("  " + phase);
+    lines.add("");
+    lines.add("  Esc: cancel");
+
+    Block overlayBlock =
+        Block.builder()
+            .title("Generating Project (" + percentLabel + ")")
+            .borders(Borders.ALL)
+            .borderType(BorderType.ROUNDED)
+            .borderStyle(Style.EMPTY.fg(theme.color("accent")).bold())
+            .build();
+
+    Rect inner = overlayBlock.inner(overlayArea);
+    frame.renderWidget(overlayBlock, overlayArea);
+
+    if (inner.isEmpty() || inner.height() < 4) {
+      return;
+    }
+
+    List<Rect> rows =
+        Layout.vertical()
+            .constraints(
+                Constraint.length(1),
+                Constraint.length(1),
+                Constraint.length(1),
+                Constraint.fill())
+            .split(inner);
+
+    Paragraph phaseLine =
+        Paragraph.builder()
+            .text("  " + phase)
+            .style(Style.EMPTY.fg(theme.color("text")).bg(theme.color("base")))
+            .overflow(Overflow.ELLIPSIS)
+            .build();
+    frame.renderWidget(phaseLine, rows.get(0));
+
+    LineGauge gauge =
+        LineGauge.builder()
+            .ratio(ratio)
+            .label("  ")
+            .lineSet(LineGauge.THICK)
+            .filledStyle(Style.EMPTY.fg(theme.color("accent")))
+            .unfilledStyle(Style.EMPTY.fg(theme.color("muted")))
+            .style(Style.EMPTY.bg(theme.color("base")))
+            .build();
+    frame.renderWidget(gauge, rows.get(1));
+
+    Paragraph emptyLine =
+        Paragraph.builder()
+            .text("")
+            .style(Style.EMPTY.bg(theme.color("base")))
+            .build();
+    frame.renderWidget(emptyLine, rows.get(2));
+
+    Paragraph hintLine =
+        Paragraph.builder()
+            .text("  Esc: cancel")
+            .style(Style.EMPTY.fg(theme.color("muted")).bg(theme.color("base")))
+            .overflow(Overflow.ELLIPSIS)
+            .build();
+    frame.renderWidget(hintLine, rows.get(3));
   }
 
   private void renderHelpOverlay(Frame frame, Rect viewport) {
@@ -1443,6 +1590,7 @@ public final class CoreTuiController {
         || generationStateTracker.currentState() != GenerationState.LOADING) {
       return;
     }
+    generationStateTracker.updateProgress(progressMessage);
     statusMessage = "Generation in progress: " + progressMessage;
   }
 
