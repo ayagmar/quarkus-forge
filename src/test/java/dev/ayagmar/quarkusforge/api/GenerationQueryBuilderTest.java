@@ -1,6 +1,7 @@
 package dev.ayagmar.quarkusforge.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.URI;
 import java.util.List;
@@ -57,5 +58,42 @@ class GenerationQueryBuilderTest {
     URI uri = GenerationQueryBuilder.build(URI.create("https://code.quarkus.io"), request);
 
     assertThat(uri.toString()).contains("S=io.quarkus.platform%3A3.31");
+  }
+
+  @Test
+  void buildPreservesBaseUriPathPrefix() {
+    GenerationRequest request =
+        new GenerationRequest(
+            "com.example", "demo", "1.0.0-SNAPSHOT", "maven", "25", List.of("ext-a"));
+
+    URI uri =
+        GenerationQueryBuilder.build(URI.create("https://code.quarkus.io/code-quarkus/"), request);
+
+    assertThat(uri.toString())
+        .startsWith("https://code.quarkus.io/code-quarkus/api/download")
+        .contains("&e=ext-a");
+  }
+
+  @Test
+  void buildPreservesBaseUriPathPrefixWithoutTrailingSlash() {
+    GenerationRequest request =
+        new GenerationRequest(
+            "com.example", "demo", "1.0.0-SNAPSHOT", "maven", "25", List.of("ext-a"));
+
+    URI uri =
+        GenerationQueryBuilder.build(URI.create("https://code.quarkus.io/code-quarkus"), request);
+
+    assertThat(uri.toString())
+        .startsWith("https://code.quarkus.io/code-quarkus/api/download")
+        .contains("&e=ext-a");
+  }
+
+  @Test
+  void generationRequestRejectsNullExtensionsWithClearMessage() {
+    assertThatThrownBy(
+            () ->
+                new GenerationRequest("com.example", "demo", "1.0.0-SNAPSHOT", "maven", "25", null))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("extensions must not be null");
   }
 }

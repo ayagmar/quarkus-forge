@@ -20,7 +20,7 @@ public record MetadataDto(
     buildTools = copyNormalized(buildTools);
 
     Map<String, List<String>> copy = new LinkedHashMap<>();
-    compatibility.forEach((key, value) -> copy.put(normalizeText(key), copyNormalized(value)));
+    compatibility.forEach((key, value) -> copy.put(normalizeKey(key), copyNormalized(value)));
     compatibility = Map.copyOf(copy);
 
     Map<String, PlatformStream> streamByKey = new LinkedHashMap<>();

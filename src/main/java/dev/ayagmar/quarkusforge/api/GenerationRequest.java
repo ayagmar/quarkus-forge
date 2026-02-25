@@ -1,6 +1,7 @@
 package dev.ayagmar.quarkusforge.api;
 
 import java.util.List;
+import java.util.Objects;
 
 public record GenerationRequest(
     String groupId,
@@ -21,6 +22,6 @@ public record GenerationRequest(
   }
 
   public GenerationRequest {
-    extensions = List.copyOf(extensions);
+    extensions = List.copyOf(Objects.requireNonNull(extensions, "extensions must not be null"));
   }
 }

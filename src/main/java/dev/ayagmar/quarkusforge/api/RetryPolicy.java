@@ -1,10 +1,13 @@
 package dev.ayagmar.quarkusforge.api;
 
 import java.time.Duration;
+import java.util.Objects;
 
 public record RetryPolicy(
     int maxAttempts, Duration requestTimeout, Duration baseDelay, double jitterRatio) {
   public RetryPolicy {
+    Objects.requireNonNull(requestTimeout, "requestTimeout must not be null");
+    Objects.requireNonNull(baseDelay, "baseDelay must not be null");
     if (maxAttempts < 1) {
       throw new IllegalArgumentException("maxAttempts must be >= 1");
     }

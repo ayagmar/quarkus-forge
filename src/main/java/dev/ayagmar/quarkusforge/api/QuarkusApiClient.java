@@ -12,7 +12,9 @@ import java.net.http.HttpResponse.BodyHandler;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.Clock;
 import java.time.Duration;
@@ -39,6 +41,7 @@ import java.util.function.Supplier;
 public final class QuarkusApiClient {
   private static final List<String> FALLBACK_BUILD_TOOLS =
       List.of("maven", "gradle", "gradle-kotlin-dsl");
+  private static final Duration MAX_RETRY_DELAY = Duration.ofSeconds(30);
 
   private final HttpClient httpClient;
   private final ObjectMapper objectMapper;
@@ -257,17 +260,27 @@ public final class QuarkusApiClient {
       GenerationRequest generationRequest, Path destinationFile) {
     URI uri = GenerationQueryBuilder.build(baseUri, generationRequest);
     HttpRequest request = newGetRequest(uri, "application/zip, application/octet-stream");
+    Path temporaryArchive =
+        destinationFile.resolveSibling(
+            destinationFile.getFileName() + ".part-" + java.util.UUID.randomUUID());
 
     return sendWithRetry(
             request,
             BodyHandlers.ofFile(
-                destinationFile,
+                temporaryArchive,
                 StandardOpenOption.CREATE,
                 StandardOpenOption.WRITE,
                 StandardOpenOption.TRUNCATE_EXISTING),
             1)
         .thenApply(this::assertSuccessful)
-        .thenApply(HttpResponse::body);
+        .thenApply(HttpResponse::body)
+        .thenApply(path -> moveDownloadedArchive(path, destinationFile))
+        .whenComplete(
+            (ignored, throwable) -> {
+              if (throwable != null) {
+                deleteIfExistsQuietly(temporaryArchive);
+              }
+            });
   }
 
   static List<ExtensionDto> parseExtensionsPayload(String payload, ObjectMapper objectMapper) {
@@ -344,7 +357,7 @@ public final class QuarkusApiClient {
   private Duration computeRetryDelay(int attempt, HttpHeaders headers) {
     Duration retryAfter = parseRetryAfter(headers);
     if (retryAfter != null) {
-      return retryAfter;
+      return boundRetryDelay(retryAfter);
     }
 
     Duration baseDelay = exponentialDelay(attempt);
@@ -356,7 +369,7 @@ public final class QuarkusApiClient {
     double jitter = (jitterSupplier.get() * 2.0d) - 1.0d;
     double factor = 1.0d + (retryPolicy.jitterRatio() * jitter);
     long adjustedMillis = Math.max(0, Math.round(millis * factor));
-    return Duration.ofMillis(adjustedMillis);
+    return boundRetryDelay(Duration.ofMillis(adjustedMillis));
   }
 
   private Duration parseRetryAfter(HttpHeaders headers) {
@@ -364,15 +377,16 @@ public final class QuarkusApiClient {
   }
 
   private Duration parseRetryAfterValue(String rawValue) {
+    String value = rawValue == null ? "" : rawValue.trim();
     try {
-      long seconds = Long.parseLong(rawValue.trim());
+      long seconds = Long.parseLong(value);
       return Duration.ofSeconds(Math.max(0, seconds));
     } catch (NumberFormatException ignored) {
       // Continue with HTTP-date parsing.
     }
 
     try {
-      ZonedDateTime retryTime = ZonedDateTime.parse(rawValue, DateTimeFormatter.RFC_1123_DATE_TIME);
+      ZonedDateTime retryTime = ZonedDateTime.parse(value, DateTimeFormatter.RFC_1123_DATE_TIME);
       long delayMillis = retryTime.toInstant().toEpochMilli() - Instant.now(clock).toEpochMilli();
       return Duration.ofMillis(Math.max(0, delayMillis));
     } catch (DateTimeParseException ignored) {
@@ -388,6 +402,13 @@ public final class QuarkusApiClient {
     } catch (ArithmeticException arithmeticException) {
       return Duration.ofMillis(Long.MAX_VALUE);
     }
+  }
+
+  private static Duration boundRetryDelay(Duration candidate) {
+    if (candidate.compareTo(MAX_RETRY_DELAY) > 0) {
+      return MAX_RETRY_DELAY;
+    }
+    return candidate;
   }
 
   private HttpRequest newGetRequest(URI uri, String acceptHeader) {
@@ -411,8 +432,26 @@ public final class QuarkusApiClient {
   private static JsonNode readPayload(String payload, ObjectMapper objectMapper) {
     try {
       return objectMapper.readTree(payload);
-    } catch (IOException ioException) {
+    } catch (IOException | RuntimeException ioException) {
       throw new ApiContractException("Malformed JSON payload", ioException);
+    }
+  }
+
+  private static Path moveDownloadedArchive(Path temporaryArchive, Path destinationFile) {
+    try {
+      Files.move(temporaryArchive, destinationFile, StandardCopyOption.REPLACE_EXISTING);
+      return destinationFile;
+    } catch (IOException ioException) {
+      throw new ApiClientException(
+          "Failed to move downloaded archive to destination: " + destinationFile, ioException);
+    }
+  }
+
+  private static void deleteIfExistsQuietly(Path path) {
+    try {
+      Files.deleteIfExists(path);
+    } catch (IOException ignored) {
+      // Best-effort cleanup only.
     }
   }
 

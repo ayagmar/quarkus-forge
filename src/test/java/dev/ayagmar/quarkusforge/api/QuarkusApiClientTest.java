@@ -234,6 +234,35 @@ class QuarkusApiClientTest {
   }
 
   @Test
+  void fetchExtensionsCapsExcessiveRetryAfterHeaderOn429() {
+    stubFor(
+        get(urlEqualTo("/api/extensions"))
+            .inScenario("retry-after-cap")
+            .whenScenarioStateIs(Scenario.STARTED)
+            .willSetStateTo("second")
+            .willReturn(aResponse().withStatus(429).withHeader("Retry-After", "999999")));
+
+    stubFor(
+        get(urlEqualTo("/api/extensions"))
+            .inScenario("retry-after-cap")
+            .whenScenarioStateIs("second")
+            .willReturn(
+                okJson(
+                    """
+                    [{"id":"io.quarkus:quarkus-rest","name":"REST","shortName":"rest"}]
+                    """)));
+
+    RecordingSleeper sleeper = new RecordingSleeper();
+    RetryPolicy retryPolicy = new RetryPolicy(3, Duration.ofMillis(300), Duration.ofMillis(20), 0d);
+    QuarkusApiClient client = newClient(retryPolicy, sleeper);
+
+    client.fetchExtensions().join();
+
+    verify(2, getRequestedFor(urlEqualTo("/api/extensions")));
+    assertThat(sleeper.delays).containsExactly(Duration.ofSeconds(30));
+  }
+
+  @Test
   void fetchExtensionsRespectsHttpDateRetryAfterHeaderOn429() {
     String retryAfter =
         DateTimeFormatter.RFC_1123_DATE_TIME.format(
@@ -266,6 +295,40 @@ class QuarkusApiClientTest {
   }
 
   @Test
+  void fetchExtensionsRespectsTrimmedHttpDateRetryAfterHeaderOn429() {
+    String retryAfter =
+        " "
+            + DateTimeFormatter.RFC_1123_DATE_TIME.format(
+                ZonedDateTime.ofInstant(Instant.parse("2026-02-21T00:00:03Z"), ZoneOffset.UTC))
+            + " ";
+    stubFor(
+        get(urlEqualTo("/api/extensions"))
+            .inScenario("retry-after-http-date-trimmed")
+            .whenScenarioStateIs(Scenario.STARTED)
+            .willSetStateTo("second")
+            .willReturn(aResponse().withStatus(429).withHeader("Retry-After", retryAfter)));
+
+    stubFor(
+        get(urlEqualTo("/api/extensions"))
+            .inScenario("retry-after-http-date-trimmed")
+            .whenScenarioStateIs("second")
+            .willReturn(
+                okJson(
+                    """
+                    [{"id":"io.quarkus:quarkus-rest","name":"REST","shortName":"rest"}]
+                    """)));
+
+    RecordingSleeper sleeper = new RecordingSleeper();
+    RetryPolicy retryPolicy = new RetryPolicy(3, Duration.ofMillis(300), Duration.ofMillis(20), 0d);
+    QuarkusApiClient client = newClient(retryPolicy, sleeper);
+
+    client.fetchExtensions().join();
+
+    verify(2, getRequestedFor(urlEqualTo("/api/extensions")));
+    assertThat(sleeper.delays).containsExactly(Duration.ofSeconds(3));
+  }
+
+  @Test
   void fetchExtensionsFailsOnMalformedJson() {
     stubFor(get(urlEqualTo("/api/extensions")).willReturn(okJson("{not-json")));
 
@@ -275,6 +338,14 @@ class QuarkusApiClientTest {
         .isInstanceOf(java.util.concurrent.CompletionException.class)
         .hasCauseInstanceOf(ApiContractException.class)
         .cause()
+        .hasMessage("Malformed JSON payload");
+  }
+
+  @Test
+  void parseExtensionsPayloadNullIsReportedAsContractError() {
+    assertThatThrownBy(
+            () -> QuarkusApiClient.parseExtensionsPayload(null, ObjectMapperProvider.shared()))
+        .isInstanceOf(ApiContractException.class)
         .hasMessage("Malformed JSON payload");
   }
 
@@ -468,7 +539,7 @@ class QuarkusApiClientTest {
   }
 
   @Test
-  void downloadProjectZipToFileRetriesThenSurfacesHttpErrorWithFinalBodyPersisted()
+  void downloadProjectZipToFileRetriesThenSurfacesHttpErrorWithoutPersistingErrorBody()
       throws Exception {
     stubFor(
         get(urlPathEqualTo("/api/download"))
@@ -494,7 +565,7 @@ class QuarkusApiClientTest {
         .hasRootCauseInstanceOf(ApiHttpException.class)
         .rootCause()
         .hasMessageContaining("Unexpected HTTP status 503");
-    assertThat(java.nio.file.Files.readString(destination)).isEqualTo("second-failure");
+    assertThat(java.nio.file.Files.exists(destination)).isFalse();
     verify(2, getRequestedFor(urlPathEqualTo("/api/download")));
     assertThat(sleeper.delays).containsExactly(Duration.ofMillis(20));
   }

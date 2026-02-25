@@ -73,8 +73,8 @@ class QuarkusApiContractDriftTest {
     MetadataDto metadata =
         QuarkusApiClient.parseMetadataPayload(mixedCaseMetadataPayload, objectMapper);
 
-    assertThat(metadata.compatibility()).containsEntry("Maven", List.of("21", "25"));
-    assertThat(metadata.compatibility()).containsEntry("Gradle", List.of("25"));
+    assertThat(metadata.compatibility()).containsEntry("maven", List.of("21", "25"));
+    assertThat(metadata.compatibility()).containsEntry("gradle", List.of("25"));
   }
 
   @Test
