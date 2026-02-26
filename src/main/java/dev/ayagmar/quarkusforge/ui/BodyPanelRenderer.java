@@ -57,6 +57,7 @@ final class BodyPanelRenderer {
     }
 
     List<Constraint> constraints = new ArrayList<>();
+    constraints.add(Constraint.length(1));
     for (int i = 0; i < 3; i++) {
       constraints.add(Constraint.length(1));
     }
@@ -67,7 +68,7 @@ final class BodyPanelRenderer {
     constraints.add(Constraint.fill());
     List<Rect> rows = Layout.vertical().constraints(constraints).split(inner);
 
-    int rowIdx = 0;
+    int rowIdx = 1;
     inputRenderer.renderSelector(
         frame, rows.get(rowIdx++), "Platform", FocusTarget.PLATFORM_STREAM);
     inputRenderer.renderSelector(frame, rows.get(rowIdx++), "Build Tool", FocusTarget.BUILD_TOOL);

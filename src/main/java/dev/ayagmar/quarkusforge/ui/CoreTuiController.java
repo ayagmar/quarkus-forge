@@ -664,7 +664,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     } else {
       bodyLayout =
           Layout.horizontal()
-              .constraints(Constraint.ratio(11, 20), Constraint.ratio(9, 20))
+              .constraints(Constraint.length(60), Constraint.fill())
               .split(area);
     }
 
