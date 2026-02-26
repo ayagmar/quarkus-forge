@@ -23,13 +23,13 @@ class CoreTuiShellPilotTest {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
 
-    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.PLATFORM_STREAM);
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
-    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.BUILD_TOOL);
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.ARTIFACT_ID);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.TAB, KeyModifiers.SHIFT));
-    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.PLATFORM_STREAM);
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
   }
 
   @Test
@@ -84,14 +84,14 @@ class CoreTuiShellPilotTest {
   void altGSubmitsWithoutChangingFocusedField() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.PLATFORM_STREAM);
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
 
     CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofChar('g', KeyModifiers.ALT));
 
     assertThat(action.handled()).isTrue();
     assertThat(action.shouldQuit()).isFalse();
     assertThat(controller.submitRequested()).isTrue();
-    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.PLATFORM_STREAM);
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
     assertThat(controller.statusMessage()).contains("Submit requested");
   }
 
@@ -209,7 +209,7 @@ class CoreTuiShellPilotTest {
   void commandPaletteRunsSelectedAction() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.PLATFORM_STREAM);
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
 
     controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
     controller.onEvent(KeyEvent.ofChar('j'));
@@ -271,7 +271,7 @@ class CoreTuiShellPilotTest {
 
     moveFocusTo(controller, FocusTarget.SUBMIT);
     controller.onEvent(KeyEvent.ofChar('j'));
-    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.PLATFORM_STREAM);
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
   }
 
   @Test
@@ -292,7 +292,7 @@ class CoreTuiShellPilotTest {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
 
-    assertThat(renderToString(controller)).contains("Search Extensions (7/7)");
+    assertThat(renderToString(controller)).contains("7 shown");
 
     moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
     controller.onEvent(KeyEvent.ofChar('j'));
@@ -300,7 +300,7 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('b'));
     controller.onEvent(KeyEvent.ofChar('c'));
 
-    assertThat(renderToString(controller)).contains("Search Extensions (1/7)");
+    assertThat(renderToString(controller)).contains("1 shown");
   }
 
   @Test
@@ -459,7 +459,7 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('v'));
     assertThat(controller.catalogSectionHeaders()).containsExactly("Data");
     assertThat(controller.statusMessage()).contains("Category filter: Data");
-    assertThat(renderToString(controller)).contains("Category filter: Data");
+    assertThat(renderToString(controller)).contains("Filter: Data");
 
     controller.onEvent(KeyEvent.ofChar('v'));
     assertThat(controller.catalogSectionHeaders()).containsExactly("Core", "Web", "Data");
@@ -481,7 +481,7 @@ class CoreTuiShellPilotTest {
 
     controller.onEvent(KeyEvent.ofChar('v'));
     assertThat(controller.catalogSectionHeaders()).containsExactly("Core");
-    assertThat(renderToString(controller)).contains("Category filter: Core");
+    assertThat(renderToString(controller)).contains("Filter: Core");
 
     controller.onEvent(KeyEvent.ofChar('f', KeyModifiers.CTRL));
     controller.onEvent(KeyEvent.ofChar('r'));
@@ -489,7 +489,7 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('s'));
     controller.onEvent(KeyEvent.ofChar('t'));
     assertThat(controller.filteredExtensionCount()).isZero();
-    assertThat(renderToString(controller)).contains("Category filter: Core");
+    assertThat(renderToString(controller)).contains("Filter: Core");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(controller.filteredExtensionCount()).isEqualTo(1);
@@ -517,7 +517,7 @@ class CoreTuiShellPilotTest {
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.PAGE_DOWN));
     controller.onEvent(KeyEvent.ofChar('c'));
-    assertThat(renderToString(controller)).contains("[+] Web (1 hidden)");
+    assertThat(renderToString(controller)).contains("▶ Web");
 
     controller.onEvent(KeyEvent.ofChar('v'));
     controller.onEvent(KeyEvent.ofChar('v'));
@@ -525,7 +525,7 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('v'));
 
     assertThat(controller.catalogSectionHeaders()).containsExactly("Core", "Web", "Data");
-    assertThat(renderToString(controller)).contains("[+] Web (1 hidden)");
+    assertThat(renderToString(controller)).contains("▶ Web ");
   }
 
   @Test
@@ -646,7 +646,7 @@ class CoreTuiShellPilotTest {
 
     assertThat(controller.focusedListExtensionId()).isEmpty();
     assertThat(controller.statusMessage()).contains("Closed category: Core");
-    assertThat(renderToString(controller)).contains("[+] Core (1 hidden)");
+    assertThat(renderToString(controller)).contains("▶ Core ");
     assertThat(renderToString(controller)).doesNotContain("CDI");
 
     controller.onEvent(KeyEvent.ofChar('C'));
@@ -687,7 +687,7 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('h'));
     controller.onEvent(KeyEvent.ofKey(KeyCode.LEFT));
     assertThat(controller.statusMessage()).contains("Closed category: Core");
-    assertThat(renderToString(controller)).contains("[+] Core (1 hidden)");
+    assertThat(renderToString(controller)).contains("▶ Core ");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.RIGHT));
     assertThat(controller.statusMessage()).contains("Opened category: Core");
@@ -714,7 +714,7 @@ class CoreTuiShellPilotTest {
 
     moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     controller.onEvent(KeyEvent.ofChar('c'));
-    assertThat(renderToString(controller)).contains("[+] Core (1 hidden)");
+    assertThat(renderToString(controller)).contains("▶ Core ");
 
     controller.onEvent(KeyEvent.ofChar(' '));
 
@@ -781,12 +781,12 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('c'));
     assertThat(controller.statusMessage()).contains("Closed category: Core");
     assertThat(controller.focusedListExtensionId()).isEmpty();
-    assertThat(renderToString(controller)).contains("[+] Core (1 hidden)");
+    assertThat(renderToString(controller)).contains("▶ Core ");
 
     controller.onEvent(KeyEvent.ofChar('c'));
     assertThat(controller.statusMessage()).contains("Opened category: Core");
     assertThat(renderToString(controller)).contains("CDI");
-    assertThat(renderToString(controller)).contains("[-] Core");
+    assertThat(renderToString(controller)).contains("▼ Core");
 
     controller.onEvent(KeyEvent.ofChar('j'));
     assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
@@ -818,9 +818,9 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('c'));
 
     String allCollapsed = renderToString(controller);
-    assertThat(allCollapsed).contains("[+] Core (1 hidden)");
-    assertThat(allCollapsed).contains("[+] Web (1 hidden)");
-    assertThat(allCollapsed).contains("[+] Data (1 hidden)");
+    assertThat(allCollapsed).contains("▶ Core ");
+    assertThat(allCollapsed).contains("▶ Web ");
+    assertThat(allCollapsed).contains("▶ Data ");
     assertThat(allCollapsed).doesNotContain("CDI");
     assertThat(allCollapsed).doesNotContain("REST");
     assertThat(allCollapsed).doesNotContain("JDBC PostgreSQL");
@@ -846,7 +846,7 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('c'));
 
     assertThat(controller.statusMessage()).contains("No category selected to close");
-    assertThat(renderToString(controller)).doesNotContain("[+] Core");
+    assertThat(renderToString(controller)).doesNotContain("▶ Core");
   }
 
   @Test
@@ -881,7 +881,8 @@ class CoreTuiShellPilotTest {
 
     moveFocusTo(controller, FocusTarget.PLATFORM_STREAM);
     assertThat(controller.request().platformStream()).isEqualTo("io.quarkus.platform:3.31");
-    assertThat(renderToString(controller)).contains("●");
+    // Selector uses "Platform:" prefix in compact mode
+    assertThat(renderToString(controller)).contains("Platform:");
 
     controller.onEvent(KeyEvent.ofChar('l'));
     assertThat(controller.request().platformStream()).isEqualTo("io.quarkus.platform:3.20");

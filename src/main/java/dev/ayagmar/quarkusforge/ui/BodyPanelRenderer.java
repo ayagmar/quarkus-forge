@@ -22,6 +22,7 @@ import java.util.Objects;
 
 final class BodyPanelRenderer {
   private static final int NARROW_WIDTH_THRESHOLD = 100;
+  private static final String RECENT_SECTION_TITLE = "Recently Selected";
 
   private final UiTheme theme;
 
@@ -56,29 +57,105 @@ final class BodyPanelRenderer {
       return;
     }
 
-    List<Constraint> constraints = new ArrayList<>();
-    constraints.add(Constraint.length(1));
-    for (int i = 0; i < 3; i++) {
-      constraints.add(Constraint.length(1));
+    if (inner.width() < NARROW_WIDTH_THRESHOLD || inner.height() < 2) {
+      renderMetadataPanelNarrow(frame, inner, snapshot, inputRenderer);
+      return;
     }
-    constraints.add(Constraint.length(1));
-    for (int i = 0; i < 5; i++) {
+
+    renderMetadataPanelWide(frame, inner, snapshot, inputRenderer);
+  }
+
+  private void renderMetadataPanelNarrow(
+      Frame frame,
+      Rect area,
+      MetadataPanelSnapshot snapshot,
+      CompactInputRenderer inputRenderer) {
+    List<Constraint> constraints = new ArrayList<>();
+    for (int i = 0; i < 8; i++) {
       constraints.add(Constraint.length(1));
     }
     constraints.add(Constraint.fill());
-    List<Rect> rows = Layout.vertical().constraints(constraints).split(inner);
+    List<Rect> rows = Layout.vertical().constraints(constraints).split(area);
 
-    int rowIdx = 1;
-    inputRenderer.renderSelector(
-        frame, rows.get(rowIdx++), "Platform", FocusTarget.PLATFORM_STREAM);
-    inputRenderer.renderSelector(frame, rows.get(rowIdx++), "Build Tool", FocusTarget.BUILD_TOOL);
-    inputRenderer.renderSelector(frame, rows.get(rowIdx++), "Java", FocusTarget.JAVA_VERSION);
-    rowIdx++;
-    inputRenderer.renderText(frame, rows.get(rowIdx++), "Group", FocusTarget.GROUP_ID);
-    inputRenderer.renderText(frame, rows.get(rowIdx++), "Artifact", FocusTarget.ARTIFACT_ID);
-    inputRenderer.renderText(frame, rows.get(rowIdx++), "Version", FocusTarget.VERSION);
-    inputRenderer.renderText(frame, rows.get(rowIdx++), "Package", FocusTarget.PACKAGE_NAME);
-    inputRenderer.renderText(frame, rows.get(rowIdx++), "Output", FocusTarget.OUTPUT_DIR);
+    int rowIdx = 0;
+    inputRenderer.renderCompactText(
+        frame, rows.get(rowIdx++), "Group", snapshot.groupId(), FocusTarget.GROUP_ID);
+    inputRenderer.renderCompactText(
+        frame, rows.get(rowIdx++), "Artifact", snapshot.artifactId(), FocusTarget.ARTIFACT_ID);
+    inputRenderer.renderCompactSelector(
+        frame, rows.get(rowIdx++), "Build", snapshot.buildTool(), FocusTarget.BUILD_TOOL);
+    inputRenderer.renderCompactSelector(
+        frame,
+        rows.get(rowIdx++),
+        "Platform",
+        snapshot.platformStream(),
+        FocusTarget.PLATFORM_STREAM);
+    inputRenderer.renderCompactText(
+        frame, rows.get(rowIdx++), "Version", snapshot.version(), FocusTarget.VERSION);
+    inputRenderer.renderCompactText(
+        frame,
+        rows.get(rowIdx++),
+        "Package",
+        snapshot.packageName(),
+        FocusTarget.PACKAGE_NAME);
+    inputRenderer.renderCompactSelector(
+        frame, rows.get(rowIdx++), "Java", snapshot.javaVersion(), FocusTarget.JAVA_VERSION);
+    inputRenderer.renderCompactText(
+        frame, rows.get(rowIdx), "Output", snapshot.outputDir(), FocusTarget.OUTPUT_DIR);
+  }
+
+  private void renderMetadataPanelWide(
+      Frame frame,
+      Rect area,
+      MetadataPanelSnapshot snapshot,
+      CompactInputRenderer inputRenderer) {
+    List<Rect> rows =
+        Layout.vertical()
+            .constraints(Constraint.length(1), Constraint.length(1), Constraint.fill())
+            .split(area);
+
+    List<Rect> topRow =
+        Layout.horizontal()
+            .constraints(
+                Constraint.ratio(1, 4),
+                Constraint.ratio(1, 4),
+                Constraint.ratio(1, 4),
+                Constraint.ratio(1, 4))
+            .split(rows.get(0));
+    List<Rect> bottomRow =
+        Layout.horizontal()
+            .constraints(
+                Constraint.ratio(1, 4),
+                Constraint.ratio(1, 4),
+                Constraint.ratio(1, 4),
+                Constraint.ratio(1, 4))
+            .split(rows.get(1));
+
+    inputRenderer.renderCompactText(
+        frame, topRow.get(0), "Group", snapshot.groupId(), FocusTarget.GROUP_ID);
+    inputRenderer.renderCompactText(
+        frame, topRow.get(1), "Artifact", snapshot.artifactId(), FocusTarget.ARTIFACT_ID);
+    inputRenderer.renderCompactSelector(
+        frame, topRow.get(2), "Build", snapshot.buildTool(), FocusTarget.BUILD_TOOL);
+    inputRenderer.renderCompactSelector(
+        frame,
+        topRow.get(3),
+        "Platform",
+        snapshot.platformStream(),
+        FocusTarget.PLATFORM_STREAM);
+
+    inputRenderer.renderCompactText(
+        frame, bottomRow.get(0), "Version", snapshot.version(), FocusTarget.VERSION);
+    inputRenderer.renderCompactText(
+        frame,
+        bottomRow.get(1),
+        "Package",
+        snapshot.packageName(),
+        FocusTarget.PACKAGE_NAME);
+    inputRenderer.renderCompactSelector(
+        frame, bottomRow.get(2), "Java", snapshot.javaVersion(), FocusTarget.JAVA_VERSION);
+    inputRenderer.renderCompactText(
+        frame, bottomRow.get(3), "Output", snapshot.outputDir(), FocusTarget.OUTPUT_DIR);
   }
 
   void renderExtensionsPanel(
@@ -86,14 +163,12 @@ final class BodyPanelRenderer {
       Rect area,
       ExtensionsPanelSnapshot snapshot,
       ListState listState,
-      CompactInputRenderer inputRenderer,
       PanelTitleFormatter panelTitleFormatter,
       PanelBorderStyleResolver panelBorderStyleResolver,
       ExtensionFlagLookup selectedLookup,
       ExtensionFlagLookup favoriteLookup) {
     Objects.requireNonNull(snapshot);
     Objects.requireNonNull(listState);
-    Objects.requireNonNull(inputRenderer);
     Objects.requireNonNull(panelTitleFormatter);
     Objects.requireNonNull(panelBorderStyleResolver);
     Objects.requireNonNull(selectedLookup);
@@ -117,16 +192,22 @@ final class BodyPanelRenderer {
       return;
     }
 
+    // Layout: Search + Selected Summary + Extension List + Submit Button
     boolean showSearchInput = snapshot.searchFocused();
+    boolean hasSelected = !snapshot.selectedExtensionIds().isEmpty();
     boolean showSubmitButton = true;
+
     List<Constraint> sectionConstraints = new ArrayList<>();
-    sectionConstraints.add(Constraint.length(1));
+    sectionConstraints.add(Constraint.length(1)); // Search hint
     if (showSearchInput) {
-      sectionConstraints.add(Constraint.length(1));
+      sectionConstraints.add(Constraint.length(1)); // Search input
     }
-    sectionConstraints.add(Constraint.fill());
+    if (hasSelected) {
+      sectionConstraints.add(Constraint.length(1)); // Selected extensions summary
+    }
+    sectionConstraints.add(Constraint.fill()); // Extension list
     if (showSubmitButton) {
-      sectionConstraints.add(Constraint.length(1));
+      sectionConstraints.add(Constraint.length(1)); // Submit button
     }
     List<Rect> sections = Layout.vertical().constraints(sectionConstraints).split(inner);
 
@@ -135,15 +216,11 @@ final class BodyPanelRenderer {
     if (showSearchInput) {
       renderSearchInput(frame, sections.get(idx++), snapshot);
     }
+    if (hasSelected) {
+      renderSelectedSummary(frame, sections.get(idx++), snapshot);
+    }
     renderExtensionList(
-        frame,
-        sections.get(idx++),
-        snapshot,
-        listState,
-        panelTitleFormatter,
-        panelBorderStyleResolver,
-        selectedLookup,
-        favoriteLookup);
+        frame, sections.get(idx++), snapshot, listState, selectedLookup, favoriteLookup);
     if (showSubmitButton) {
       renderSubmitButton(frame, sections.get(idx), snapshot);
     }
@@ -161,7 +238,7 @@ final class BodyPanelRenderer {
     if (selected > 0) {
       title.append(" (").append(selected).append(" selected)");
     } else {
-      title.append(" (").append(total).append(")");
+      title.append(" (").append(total).append(" available)");
     }
     if (snapshot.favoritesOnlyFilterEnabled()) {
       title.append(" [fav]");
@@ -183,18 +260,14 @@ final class BodyPanelRenderer {
       int filtered = snapshot.filteredExtensionCount();
       int total = snapshot.totalCatalogExtensionCount();
       if (!snapshot.activeCategoryFilterTitle().isBlank()) {
-        hint.append("Category filter: ").append(snapshot.activeCategoryFilterTitle());
-        hint.append(" | ").append(filtered).append("/").append(total);
+        hint.append("Filter: ").append(snapshot.activeCategoryFilterTitle());
+        hint.append(" | ").append(filtered).append(" of ").append(total);
       } else {
         hint.append(catalogSourceLabel(snapshot));
-        hint.append(" | Search Extensions (")
-            .append(filtered)
-            .append("/")
-            .append(total)
-            .append(")");
+        hint.append(" | Type '/' to search (").append(filtered).append(" shown)");
       }
       if (snapshot.favoriteCount() > 0) {
-        hint.append(" | Favorites: ").append(snapshot.favoriteCount());
+        hint.append(" | ").append(snapshot.favoriteCount()).append(" favorites");
       }
     }
 
@@ -204,13 +277,13 @@ final class BodyPanelRenderer {
     }
 
     Paragraph paragraph =
-        Paragraph.builder().text(hint.toString()).style(style).overflow(Overflow.ELLIPSIS).build();
+        Paragraph.builder().text("  " + hint.toString()).style(style).overflow(Overflow.ELLIPSIS).build();
     frame.renderWidget(paragraph, area);
   }
 
   private void renderSearchInput(Frame frame, Rect area, ExtensionsPanelSnapshot snapshot) {
     String query = snapshot.searchQuery();
-    String display = "  / [ " + query + "_ ]";
+    String display = "  Search: [ " + query + "_ ]  (Esc to clear)";
     Paragraph paragraph =
         Paragraph.builder()
             .text(display)
@@ -220,9 +293,47 @@ final class BodyPanelRenderer {
     frame.renderWidget(paragraph, area);
   }
 
+  private void renderSelectedSummary(Frame frame, Rect area, ExtensionsPanelSnapshot snapshot) {
+    List<String> selectedIds = snapshot.selectedExtensionIds();
+    if (selectedIds.isEmpty()) {
+      return;
+    }
+
+    // Build a compact summary of selected extensions
+    StringBuilder summary = new StringBuilder("  Selected: ");
+    int maxDisplay = Math.min(selectedIds.size(), 5);
+    for (int i = 0; i < maxDisplay; i++) {
+      if (i > 0) summary.append(", ");
+      String id = selectedIds.get(i);
+      // Extract short name from full ID
+      String shortName = id.contains(":") ? id.substring(id.lastIndexOf(':') + 1) : id;
+      // Remove quarkus- prefix for brevity
+      if (shortName.startsWith("quarkus-")) {
+        shortName = shortName.substring(8);
+      }
+      summary.append(shortName);
+    }
+    if (selectedIds.size() > maxDisplay) {
+      summary.append(" +").append(selectedIds.size() - maxDisplay).append(" more");
+    }
+    summary.append("  [x: clear all]");
+
+    Paragraph paragraph =
+        Paragraph.builder()
+            .text(summary.toString())
+            .style(Style.EMPTY.fg(theme.color("accent")).bold())
+            .overflow(Overflow.ELLIPSIS)
+            .build();
+    frame.renderWidget(paragraph, area);
+  }
+
   private void renderSubmitButton(Frame frame, Rect area, ExtensionsPanelSnapshot snapshot) {
     boolean focused = snapshot.submitFocused();
-    String label = focused ? "  >> [ Generate (Enter/Alt+G) ] <<" : "  [ Generate (Enter/Alt+G) ]";
+    int selectedCount = snapshot.selectedExtensionIds().size();
+    String countLabel = selectedCount > 0 ? " (" + selectedCount + " extensions)" : "";
+    String label = focused
+        ? "  >> [ Generate Project" + countLabel + " (Enter) ] <<"
+        : "  [ Generate Project" + countLabel + " (Enter/Alt+G) ]";
     Style style =
         focused
             ? Style.EMPTY.fg(theme.color("focus")).bold().reversed()
@@ -247,8 +358,6 @@ final class BodyPanelRenderer {
       Rect area,
       ExtensionsPanelSnapshot snapshot,
       ListState listState,
-      PanelTitleFormatter panelTitleFormatter,
-      PanelBorderStyleResolver panelBorderStyleResolver,
       ExtensionFlagLookup selectedLookup,
       ExtensionFlagLookup favoriteLookup) {
     if (snapshot.loading()) {
@@ -258,13 +367,19 @@ final class BodyPanelRenderer {
     List<SizedWidget> items = new ArrayList<>();
     for (ExtensionCatalogRow row : snapshot.filteredRows()) {
       if (row.isSectionHeader()) {
-        items.add(ListItem.from(sectionHeaderLabel(row)).toSizedWidget());
+        String headerLabel = sectionHeaderLabel(row);
+        // Make Recent section header more prominent
+        if (RECENT_SECTION_TITLE.equals(row.label())) {
+          headerLabel = "▼ " + RECENT_SECTION_TITLE;
+        }
+        items.add(ListItem.from(headerLabel).toSizedWidget());
         continue;
       }
       ExtensionCatalogItem extension = row.extension();
       boolean selected = selectedLookup.matches(extension.id());
       boolean favorite = favoriteLookup.matches(extension.id());
-      String checkedPrefix = selected ? "● " : "○ ";
+      // Use clearer visual indicators
+      String checkedPrefix = selected ? "[x] " : "[ ] ";
       String favoritePrefix = favorite ? "★ " : "  ";
       String displayLabel = extensionDisplayLabel(extension);
       items.add(ListItem.from(checkedPrefix + favoritePrefix + displayLabel).toSizedWidget());
@@ -309,15 +424,17 @@ final class BodyPanelRenderer {
   }
 
   private static String sectionHeaderLabel(ExtensionCatalogRow row) {
-    String prefix = row.collapsed() ? "[+] " : "[-] ";
+    String prefix = row.collapsed() ? "▶ " : "▼ ";
     String suffix = row.collapsed() ? " (" + row.hiddenCount() + " hidden)" : "";
     return prefix + row.label() + suffix;
   }
 
   interface CompactInputRenderer {
-    void renderSelector(Frame frame, Rect area, String label, FocusTarget target);
+    void renderCompactSelector(
+        Frame frame, Rect area, String label, String value, FocusTarget target);
 
-    void renderText(Frame frame, Rect area, String label, FocusTarget target);
+    void renderCompactText(
+        Frame frame, Rect area, String label, String value, FocusTarget target);
   }
 
   @FunctionalInterface
@@ -335,9 +452,28 @@ final class BodyPanelRenderer {
     boolean matches(String extensionId);
   }
 
-  record MetadataPanelSnapshot(String title, boolean focused, boolean invalid) {
+  record MetadataPanelSnapshot(
+      String title,
+      boolean focused,
+      boolean invalid,
+      String groupId,
+      String artifactId,
+      String version,
+      String packageName,
+      String outputDir,
+      String platformStream,
+      String buildTool,
+      String javaVersion) {
     MetadataPanelSnapshot {
       title = Objects.requireNonNull(title);
+      groupId = groupId == null ? "" : groupId;
+      artifactId = artifactId == null ? "" : artifactId;
+      version = version == null ? "" : version;
+      packageName = packageName == null ? "" : packageName;
+      outputDir = outputDir == null ? "" : outputDir;
+      platformStream = platformStream == null ? "" : platformStream;
+      buildTool = buildTool == null ? "" : buildTool;
+      javaVersion = javaVersion == null ? "" : javaVersion;
     }
   }
 

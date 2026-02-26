@@ -39,7 +39,7 @@ class CoreTuiGenerationFlowTest {
     assertThat(controller.statusMessage()).contains("Generation in progress");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
-    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.PLATFORM_STREAM);
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
 
     generationRunner.complete(Path.of("build/generated-project"));
 
@@ -210,7 +210,7 @@ class CoreTuiGenerationFlowTest {
     assertThat(renderToString(controller)).contains("Error: download failed");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
-    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.BUILD_TOOL);
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.ARTIFACT_ID);
   }
 
   @Test

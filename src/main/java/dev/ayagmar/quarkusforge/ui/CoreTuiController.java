@@ -45,15 +45,17 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 public final class CoreTuiController implements BodyPanelRenderer.CompactInputRenderer {
+  private static final int METADATA_PANEL_HEIGHT_COMPACT = 4;
+  private static final int METADATA_PANEL_HEIGHT_NARROW = 10;
   private static final List<FocusTarget> FOCUS_ORDER =
       List.of(
-          FocusTarget.PLATFORM_STREAM,
-          FocusTarget.BUILD_TOOL,
-          FocusTarget.JAVA_VERSION,
           FocusTarget.GROUP_ID,
           FocusTarget.ARTIFACT_ID,
+          FocusTarget.BUILD_TOOL,
+          FocusTarget.PLATFORM_STREAM,
           FocusTarget.VERSION,
           FocusTarget.PACKAGE_NAME,
+          FocusTarget.JAVA_VERSION,
           FocusTarget.OUTPUT_DIR,
           FocusTarget.EXTENSION_SEARCH,
           FocusTarget.EXTENSION_LIST,
@@ -183,7 +185,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     Objects.requireNonNull(favoritesPersistenceExecutor);
     request = initialState.request();
     validation = initialState.validation();
-    focusTarget = FocusTarget.PLATFORM_STREAM;
+    focusTarget = FocusTarget.GROUP_ID;
     statusMessage = "Ready";
     errorMessage = "";
     submitRequested = false;
@@ -657,16 +659,12 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private void renderBody(Frame frame, Rect area) {
-    List<Rect> bodyLayout;
-    if (area.width() < NARROW_WIDTH_THRESHOLD) {
-      bodyLayout =
-          Layout.vertical().constraints(Constraint.ratio(1, 2), Constraint.ratio(1, 2)).split(area);
-    } else {
-      bodyLayout =
-          Layout.horizontal()
-              .constraints(Constraint.length(60), Constraint.fill())
-              .split(area);
-    }
+    int metadataHeight =
+        area.width() < NARROW_WIDTH_THRESHOLD
+            ? METADATA_PANEL_HEIGHT_NARROW
+            : METADATA_PANEL_HEIGHT_COMPACT;
+    List<Rect> bodyLayout =
+        Layout.vertical().constraints(Constraint.length(metadataHeight), Constraint.fill()).split(area);
 
     bodyPanelRenderer.renderMetadataPanel(
         frame,
@@ -680,7 +678,6 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
         bodyLayout.get(1),
         extensionsPanelSnapshot(),
         extensionCatalogState.listState(),
-        this,
         CoreTuiController::panelTitle,
         this::panelBorderStyle,
         extensionCatalogState::isSelected,
@@ -689,7 +686,17 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
 
   private BodyPanelRenderer.MetadataPanelSnapshot metadataPanelSnapshot() {
     return new BodyPanelRenderer.MetadataPanelSnapshot(
-        metadataPanelTitle(), isMetadataFocused(), !validation.isValid());
+        metadataPanelTitle(),
+        isMetadataFocused(),
+        !validation.isValid(),
+        request.groupId(),
+        request.artifactId(),
+        request.version(),
+        request.packageName(),
+        request.outputDirectory(),
+        selectorValue(FocusTarget.PLATFORM_STREAM),
+        selectorValue(FocusTarget.BUILD_TOOL),
+        selectorValue(FocusTarget.JAVA_VERSION));
   }
 
   private BodyPanelRenderer.ExtensionsPanelSnapshot extensionsPanelSnapshot() {
@@ -714,50 +721,56 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   @Override
-  public void renderSelector(Frame frame, Rect area, String label, FocusTarget target) {
+  public void renderCompactSelector(Frame frame, Rect area, String label, String value, FocusTarget target) {
     boolean focused = focusTarget == target;
-    String value = selectorInlineLabel(target);
+    String displayValue = value.isBlank() ? "default" : value;
 
-    StringBuilder line = new StringBuilder();
-    line.append(String.format("  %-10s  ", label));
-
-    String[] parts = value.split("  ");
-    for (String part : parts) {
-      if (part.startsWith("(*)")) {
-        line.append("● ").append(part.substring(3).trim()).append("  ");
-      } else if (part.startsWith("( )")) {
-        line.append("○ ").append(part.substring(3).trim()).append("  ");
-      }
+    // Truncate if too long
+    int maxValueLen = Math.max(8, area.width() - label.length() - 5);
+    if (displayValue.length() > maxValueLen) {
+      displayValue = displayValue.substring(0, maxValueLen - 2) + "..";
     }
 
+    String line = String.format("  %s: %s", label, displayValue);
     if (focused) {
-      line.append("◀ ▶");
+      line = "  " + label + ": [" + displayValue + "]";
     }
 
     Style style = Style.EMPTY.fg(focused ? theme.color("focus") : theme.color("text"));
     if (hasValidationErrorFor(target)) {
       style = Style.EMPTY.fg(theme.color("error"));
     }
+    if (focused) {
+      style = style.bold();
+    }
 
     Paragraph paragraph =
-        Paragraph.builder().text(line.toString()).style(style).overflow(Overflow.ELLIPSIS).build();
+        Paragraph.builder().text(line).style(style).overflow(Overflow.ELLIPSIS).build();
     frame.renderWidget(paragraph, area);
   }
 
   @Override
-  public void renderText(Frame frame, Rect area, String label, FocusTarget target) {
+  public void renderCompactText(Frame frame, Rect area, String label, String value, FocusTarget target) {
     boolean focused = focusTarget == target;
-    String value = inputStates.get(target).text();
-    if (value.isBlank()) {
-      value = defaultValueFor(target);
+    String displayValue = value.isBlank() ? defaultValueFor(target) : value;
+
+    // Truncate if too long
+    int maxValueLen = Math.max(8, area.width() - label.length() - 5);
+    if (displayValue.length() > maxValueLen) {
+      displayValue = displayValue.substring(0, maxValueLen - 2) + "..";
     }
 
-    String display = focused ? "[ " + value + "_ ]" : "[ " + value + " ]";
-    String line = String.format("  %-10s  %s", label, display);
+    String line = String.format("  %s: %s", label, displayValue);
+    if (focused) {
+      line = "  " + label + ": [" + displayValue + "_]";
+    }
 
     Style style = Style.EMPTY.fg(focused ? theme.color("focus") : theme.color("text"));
     if (hasValidationErrorFor(target)) {
       style = Style.EMPTY.fg(theme.color("error"));
+    }
+    if (focused) {
+      style = style.bold();
     }
 
     Paragraph paragraph =
