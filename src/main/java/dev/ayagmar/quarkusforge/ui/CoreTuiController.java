@@ -22,6 +22,7 @@ import dev.tamboui.terminal.Frame;
 import dev.tamboui.tui.event.Event;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.ResizeEvent;
+import dev.tamboui.tui.event.TickEvent;
 import dev.tamboui.widgets.block.Block;
 import dev.tamboui.widgets.block.BorderType;
 import dev.tamboui.widgets.block.Borders;
@@ -59,6 +60,13 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
           FocusTarget.SUBMIT);
 
   private static final int NARROW_WIDTH_THRESHOLD = 100;
+  private static final List<String> STARTUP_SPLASH_ART =
+      List.of(
+          "   ____ _   _   _    ____  _  ___   _ ____",
+          "  / __ \\ | | | / \\  |  _ \\| |/ / | | / ___|",
+          " | |  | | |_| |/ _ \\ | |_) | ' /| | | \\___ \\",
+          " | |__| |  _  / ___ \\|  _ <| . \\| |_| |___) |",
+          "  \\___\\_\\_| |_/_/   \\_\\_| \\_\\_|\\_\\\\___/|____/");
   private static final ProjectGenerationRunner NOOP_PROJECT_GENERATION_RUNNER =
       (generationRequest, outputDirectory, cancelled, progressListener) ->
           CompletableFuture.failedFuture(
@@ -135,11 +143,12 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   private boolean submitBlockedByValidation;
   private final GenerationStateTracker generationStateTracker;
   private final FooterLinesComposer footerLinesComposer;
+  private final AsyncRepaintSignal asyncRepaintSignal;
   private CompletableFuture<Path> generationFuture;
+  private long generationStartedAtNanos;
   private volatile boolean generationCancelRequested;
   private volatile long generationToken;
   private volatile long extensionCatalogLoadToken;
-  private volatile boolean asyncOperationsCancelled;
   private boolean extensionCatalogLoading;
   private String extensionCatalogErrorMessage;
   private String extensionCatalogSource;
@@ -155,7 +164,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   private Path lastGeneratedProjectPath;
   private String lastGeneratedNextCommand;
   private PostGenerationExitPlan postGenerationExitPlan;
-  private boolean startupStatusVisible;
+  private long startupOverlayMinDurationNanos;
+  private long startupOverlayVisibleUntilNanos;
 
   private CoreTuiController(
       ForgeUiState initialState,
@@ -184,11 +194,12 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     bodyPanelRenderer = new BodyPanelRenderer(theme);
     generationStateTracker = new GenerationStateTracker();
     footerLinesComposer = new FooterLinesComposer();
+    asyncRepaintSignal = new AsyncRepaintSignal();
     generationFuture = null;
+    generationStartedAtNanos = 0L;
     generationCancelRequested = false;
     generationToken = 0L;
     extensionCatalogLoadToken = 0L;
-    asyncOperationsCancelled = false;
     extensionCatalogLoading = false;
     extensionCatalogErrorMessage = "";
     extensionCatalogSource = "snapshot";
@@ -204,7 +215,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     lastGeneratedProjectPath = null;
     lastGeneratedNextCommand = "";
     postGenerationExitPlan = null;
-    startupStatusVisible = false;
+    startupOverlayMinDurationNanos = 0L;
+    startupOverlayVisibleUntilNanos = 0L;
     availableBuildTools = List.of();
     availableJavaVersions = List.of();
     availablePlatformStreams = List.of();
@@ -292,12 +304,15 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   public void loadExtensionCatalogAsync(ExtensionCatalogLoader loader) {
     Objects.requireNonNull(loader);
     extensionCatalogLoader = loader;
-    asyncOperationsCancelled = false;
     long loadToken = ++extensionCatalogLoadToken;
     extensionCatalogLoading = true;
-    startupStatusVisible = true;
     extensionCatalogErrorMessage = "";
     statusMessage = "Loading extension catalog...";
+    startupOverlayVisibleUntilNanos =
+        loadToken == 1 && startupOverlayMinDurationNanos > 0L
+            ? System.nanoTime() + startupOverlayMinDurationNanos
+            : 0L;
+    requestAsyncRepaint();
 
     CompletableFuture<ExtensionCatalogLoadResult> loadFuture;
     try {
@@ -312,83 +327,15 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
 
     loadFuture.whenComplete(
         (result, throwable) -> {
-          if (asyncOperationsCancelled || loadToken != extensionCatalogLoadToken) {
-            return;
-          }
-          scheduleOnRenderThread(
-              () -> {
-                if (asyncOperationsCancelled || loadToken != extensionCatalogLoadToken) {
-                  return;
-                }
-                if (throwable != null) {
-                  Throwable cause = unwrapCompletionCause(throwable);
-                  String message = catalogLoadFailureMessage(cause);
-                  extensionCatalogLoading = false;
-                  extensionCatalogErrorMessage = message;
-                  errorMessage = message;
-                  statusMessage = catalogReloadFailureStatusMessage();
-                  startupStatusVisible = false;
-                  return;
-                }
-
-                if (result == null) {
-                  extensionCatalogLoading = false;
-                  extensionCatalogErrorMessage = "Catalog load failed: empty load result";
-                  errorMessage = "Catalog load failed: empty load result";
-                  statusMessage = catalogReloadFailureStatusMessage();
-                  startupStatusVisible = false;
-                  return;
-                }
-
-                List<ExtensionCatalogItem> items =
-                    result.extensions().stream()
-                        .map(
-                            extension ->
-                                new ExtensionCatalogItem(
-                                    extension.id(),
-                                    extension.name(),
-                                    extension.shortName(),
-                                    extension.category(),
-                                    extension.order()))
-                        .toList();
-                if (items.isEmpty()) {
-                  extensionCatalogLoading = false;
-                  extensionCatalogErrorMessage = "Catalog load returned no extensions";
-                  errorMessage = "Catalog load returned no extensions";
-                  statusMessage = catalogReloadFailureStatusMessage();
-                  startupStatusVisible = false;
-                  return;
-                }
-
-                if (result.metadata() != null) {
-                  metadataCompatibility = MetadataCompatibilityContext.success(result.metadata());
-                  syncMetadataSelectors();
-                  revalidate();
-                }
-
-                extensionCatalogLoading = false;
-                extensionCatalogSource = result.source().label();
-                extensionCatalogStale = result.stale();
-                errorMessage = "";
-                if (result.source() == CatalogSource.LIVE) {
-                  extensionCatalogErrorMessage = "";
-                  statusMessage =
-                      result.detailMessage().isBlank()
-                          ? catalogLoadedStatusMessage(result.source(), result.stale())
-                          : result.detailMessage();
-                } else {
-                  extensionCatalogErrorMessage = result.detailMessage();
-                  statusMessage = catalogLoadedStatusMessage(result.source(), result.stale());
-                }
-                extensionCatalogState.replaceCatalog(
-                    items, inputStates.get(FocusTarget.EXTENSION_SEARCH).text(), ignored -> {});
-                startupStatusVisible = false;
-              });
+          scheduleOnRenderThread(() -> applyCatalogLoadCompletion(loadToken, result, throwable));
         });
   }
 
   public UiAction onEvent(Event event) {
     reconcileGenerationCompletionIfDone();
+    if (event instanceof TickEvent tickEvent) {
+      return handleTickEvent(tickEvent);
+    }
     if (event instanceof ResizeEvent resizeEvent) {
       statusMessage = "Terminal resized to " + resizeEvent.width() + "x" + resizeEvent.height();
       return UiAction.handled(false);
@@ -587,6 +534,11 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     return UiAction.ignored();
   }
 
+  public void setStartupOverlayMinDuration(Duration minimumDuration) {
+    Objects.requireNonNull(minimumDuration);
+    startupOverlayMinDurationNanos = Math.max(0L, minimumDuration.toNanos());
+  }
+
   public void render(Frame frame) {
     reconcileGenerationCompletionIfDone();
     Rect area = frame.area();
@@ -612,7 +564,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     if (postGenerationMenuVisible) {
       renderPostGenerationOverlay(frame, area);
     }
-    if (startupStatusVisible) {
+    if (isStartupOverlayVisible()) {
       renderStartupStatusOverlay(frame, area);
     }
   }
@@ -1098,12 +1050,16 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
         metadataCompatibility.loadError() == null ? "done" : "done (snapshot fallback)";
     String catalogLabel = extensionCatalogLoading ? "in progress" : "done";
     String readyLabel = extensionCatalogLoading ? "waiting" : "ready";
-    return List.of(
-        "  metadata fetch   : " + metadataLabel,
-        "  catalog load     : " + catalogLabel,
-        "  ready            : " + readyLabel,
-        "",
-        "  Please wait...");
+    String spinner = extensionCatalogLoading ? "|" : "-";
+    List<String> lines = new ArrayList<>();
+    lines.addAll(STARTUP_SPLASH_ART);
+    lines.add("");
+    lines.add("  metadata fetch   : " + metadataLabel);
+    lines.add("  catalog load     : " + catalogLabel);
+    lines.add("  ready            : " + readyLabel);
+    lines.add("");
+    lines.add("  " + spinner + " Please wait...");
+    return List.copyOf(lines);
   }
 
   private void renderPostGenerationOverlay(Frame frame, Rect viewport) {
@@ -1771,7 +1727,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private void cancelPendingAsyncOperations() {
-    asyncOperationsCancelled = true;
+    extensionCatalogLoadToken++;
     extensionCatalogLoading = false;
     extensionCatalogState.cancelPendingAsync();
   }
@@ -1789,7 +1745,11 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       statusMessage = "Submit ignored in state: " + generationStateLabel();
       return;
     }
-    statusMessage = "Generation in progress: preparing request...";
+    generationStartedAtNanos = System.nanoTime();
+    onGenerationProgress(
+        token,
+        GenerationProgressUpdate.requestingArchive(
+            "requesting project archive from Quarkus API..."));
 
     GenerationRequest generationRequest = toGenerationRequest();
     Path outputDirectory = resolveGeneratedProjectDirectory();
@@ -1801,8 +1761,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
               generationRequest,
               outputDirectory,
               () -> generationCancelRequested || token != generationToken,
-              progressMessage ->
-                  scheduleOnRenderThread(() -> onGenerationProgress(token, progressMessage)));
+              progressUpdate ->
+                  scheduleOnRenderThread(() -> onGenerationProgress(token, progressUpdate)));
     } catch (RuntimeException runtimeException) {
       onGenerationCompleted(token, null, runtimeException);
       return;
@@ -1819,12 +1779,13 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
             scheduleOnRenderThread(() -> onGenerationCompleted(token, generatedPath, throwable)));
   }
 
-  private void onGenerationProgress(long token, String progressMessage) {
+  private void onGenerationProgress(long token, GenerationProgressUpdate progressUpdate) {
     if (token != generationToken
         || generationStateTracker.currentState() != GenerationState.LOADING) {
       return;
     }
-    generationStateTracker.updateProgress(progressMessage);
+    generationStateTracker.updateProgress(progressUpdate);
+    String progressMessage = progressUpdate.message().isBlank() ? "working..." : progressUpdate.message();
     statusMessage = "Generation in progress: " + progressMessage;
   }
 
@@ -1847,6 +1808,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       successHint = "cd " + normalizedPath + " && " + nextCommand;
       postGenerationMenuVisible = true;
       postGenerationActionSelection = 0;
+      requestAsyncRepaint();
       return;
     }
 
@@ -1860,6 +1822,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       errorMessage = "";
       successHint = "";
       postGenerationMenuVisible = false;
+      requestAsyncRepaint();
       return;
     }
 
@@ -1868,6 +1831,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     errorMessage = userFriendlyError(cause);
     successHint = "";
     postGenerationMenuVisible = false;
+    requestAsyncRepaint();
   }
 
   private void reconcileGenerationCompletionIfDone() {
@@ -1891,6 +1855,10 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
 
   private void requestGenerationCancellation() {
     if (generationStateTracker.currentState() != GenerationState.LOADING) {
+      return;
+    }
+    if (generationFuture != null && generationFuture.isDone()) {
+      reconcileGenerationCompletionIfDone();
       return;
     }
     generationCancelRequested = true;
@@ -2046,6 +2014,22 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
         : report.errors().getFirst().field() + ": " + report.errors().getFirst().message();
   }
 
+  private UiAction handleTickEvent(TickEvent ignored) {
+    boolean shouldRender = extensionCatalogLoading || isStartupOverlayVisible();
+    if (asyncRepaintSignal.consume()) {
+      shouldRender = true;
+    }
+    if (generationStateTracker.currentState() == GenerationState.LOADING) {
+      if (!generationCancelRequested) {
+        long elapsedMillis = Math.max(0L, (System.nanoTime() - generationStartedAtNanos) / 1_000_000L);
+        generationStateTracker.tick(elapsedMillis);
+        statusMessage = "Generation in progress: " + generationStateTracker.progressPhase();
+      }
+      shouldRender = true;
+    }
+    return shouldRender ? new UiAction(true, false) : UiAction.ignored();
+  }
+
   private void handleSubmitRequest() {
     postGenerationMenuVisible = false;
     postGenerationExitPlan = null;
@@ -2077,10 +2061,84 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private void updateExtensionFilterStatus(int filteredCount) {
-    if (asyncOperationsCancelled || isGenerationInProgress()) {
+    if (isGenerationInProgress()) {
       return;
     }
     statusMessage = "Extensions filtered: " + filteredCount;
+  }
+
+  private void applyCatalogLoadCompletion(
+      long loadToken, ExtensionCatalogLoadResult result, Throwable throwable) {
+    if (isStaleCatalogLoadToken(loadToken)) {
+      return;
+    }
+    if (throwable != null) {
+      applyCatalogLoadFailure(catalogLoadFailureMessage(unwrapCompletionCause(throwable)));
+      return;
+    }
+    if (result == null) {
+      applyCatalogLoadFailure("Catalog load failed: empty load result");
+      return;
+    }
+    List<ExtensionCatalogItem> items =
+        result.extensions().stream()
+            .map(
+                extension ->
+                    new ExtensionCatalogItem(
+                        extension.id(),
+                        extension.name(),
+                        extension.shortName(),
+                        extension.category(),
+                        extension.order()))
+            .toList();
+    if (items.isEmpty()) {
+      applyCatalogLoadFailure("Catalog load returned no extensions");
+      return;
+    }
+    if (result.metadata() != null) {
+      metadataCompatibility = MetadataCompatibilityContext.success(result.metadata());
+      syncMetadataSelectors();
+      revalidate();
+    }
+    extensionCatalogLoading = false;
+    extensionCatalogSource = result.source().label();
+    extensionCatalogStale = result.stale();
+    errorMessage = "";
+    extensionCatalogErrorMessage = catalogPanelErrorMessage(result);
+    statusMessage =
+        !result.detailMessage().isBlank()
+            ? result.detailMessage()
+            : catalogLoadedStatusMessage(result.source(), result.stale());
+    extensionCatalogState.replaceCatalog(
+        items, inputStates.get(FocusTarget.EXTENSION_SEARCH).text(), ignored -> {});
+    requestAsyncRepaint();
+  }
+
+  private boolean isStaleCatalogLoadToken(long loadToken) {
+    return loadToken != extensionCatalogLoadToken;
+  }
+
+  private void applyCatalogLoadFailure(String message) {
+    extensionCatalogLoading = false;
+    extensionCatalogErrorMessage = message;
+    errorMessage = message;
+    statusMessage = catalogReloadFailureStatusMessage();
+    requestAsyncRepaint();
+  }
+
+  private boolean isStartupOverlayVisible() {
+    return extensionCatalogLoading || System.nanoTime() < startupOverlayVisibleUntilNanos;
+  }
+
+  private void requestAsyncRepaint() {
+    asyncRepaintSignal.request();
+  }
+
+  private static String catalogPanelErrorMessage(ExtensionCatalogLoadResult result) {
+    if (result.detailMessage().isBlank()) {
+      return "";
+    }
+    return result.source() == CatalogSource.SNAPSHOT ? result.detailMessage() : "";
   }
 
   private void toggleFavoriteAtSelection() {
@@ -2469,7 +2527,32 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
         GenerationRequest generationRequest,
         Path outputDirectory,
         BooleanSupplier cancelled,
-        Consumer<String> progressListener);
+        Consumer<GenerationProgressUpdate> progressListener);
+  }
+
+  public enum GenerationProgressStep {
+    REQUESTING_ARCHIVE,
+    EXTRACTING_ARCHIVE,
+    FINALIZING
+  }
+
+  public record GenerationProgressUpdate(GenerationProgressStep step, String message) {
+    public GenerationProgressUpdate {
+      step = Objects.requireNonNull(step);
+      message = message == null ? "" : message.strip();
+    }
+
+    public static GenerationProgressUpdate requestingArchive(String message) {
+      return new GenerationProgressUpdate(GenerationProgressStep.REQUESTING_ARCHIVE, message);
+    }
+
+    public static GenerationProgressUpdate extractingArchive(String message) {
+      return new GenerationProgressUpdate(GenerationProgressStep.EXTRACTING_ARCHIVE, message);
+    }
+
+    public static GenerationProgressUpdate finalizing(String message) {
+      return new GenerationProgressUpdate(GenerationProgressStep.FINALIZING, message);
+    }
   }
 
   enum GenerationState {

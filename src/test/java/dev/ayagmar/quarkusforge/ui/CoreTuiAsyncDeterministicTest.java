@@ -85,7 +85,9 @@ class CoreTuiAsyncDeterministicTest {
             scheduler,
             Duration.ofMillis(120),
             (generationRequest, outputDirectory, cancelled, progressListener) -> {
-              progressListener.accept("downloading project archive...");
+              progressListener.accept(
+                  CoreTuiController.GenerationProgressUpdate.requestingArchive(
+                      "requesting project archive from Quarkus API..."));
               return new CompletableFuture<>();
             });
     moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);

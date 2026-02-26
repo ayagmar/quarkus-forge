@@ -96,7 +96,7 @@ class GeneratedProjectE2EIT {
     assertThat(generatedProject).isEqualTo(generatedProjectRoot);
     assertThat(progressSteps)
         .containsExactly(
-            ProjectArchiveService.ProgressStep.DOWNLOADING_ARCHIVE,
+            ProjectArchiveService.ProgressStep.REQUESTING_ARCHIVE,
             ProjectArchiveService.ProgressStep.EXTRACTING_ARCHIVE);
 
     verify(

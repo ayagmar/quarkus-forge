@@ -163,9 +163,11 @@ class CoreTuiStateMachineTest {
         GenerationRequest generationRequest,
         Path outputDirectory,
         BooleanSupplier cancelled,
-        Consumer<String> progressListener) {
+        Consumer<CoreTuiController.GenerationProgressUpdate> progressListener) {
       callCount++;
-      progressListener.accept("downloading project archive...");
+      progressListener.accept(
+          CoreTuiController.GenerationProgressUpdate.requestingArchive(
+              "requesting project archive from Quarkus API..."));
       return future;
     }
 

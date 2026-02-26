@@ -71,6 +71,7 @@ class CoreTuiThemePolishTest {
     controller.loadExtensionCatalogAsync(() -> loadFuture);
     String loading = renderToString(controller, 120, 32);
     assertThat(loading).contains("Startup");
+    assertThat(loading).contains("____ _   _");
     assertThat(loading).contains("catalog load     : in progress");
 
     loadFuture.complete(
@@ -101,6 +102,26 @@ class CoreTuiThemePolishTest {
                     "io.quarkus:quarkus-rest", "REST", "rest", "Web", 10))));
     scheduler.runAll();
     assertThat(renderToString(controller, 120, 32)).doesNotContain("Startup");
+  }
+
+  @Test
+  void startupOverlayCanBeHeldForMinimumDurationAfterLoadCompletes() {
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+    controller.setStartupOverlayMinDuration(Duration.ofSeconds(5));
+
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto(
+                            "io.quarkus:quarkus-rest", "REST", "rest", "Web", 10)))));
+
+    String rendered = renderToString(controller, 120, 32);
+    assertThat(rendered).contains("Startup");
+    assertThat(rendered).contains("ready            : ready");
   }
 
   @Test
@@ -185,7 +206,7 @@ class CoreTuiThemePolishTest {
         GenerationRequest generationRequest,
         Path outputDirectory,
         BooleanSupplier cancelled,
-        Consumer<String> progressListener) {
+        Consumer<CoreTuiController.GenerationProgressUpdate> progressListener) {
       return future;
     }
 

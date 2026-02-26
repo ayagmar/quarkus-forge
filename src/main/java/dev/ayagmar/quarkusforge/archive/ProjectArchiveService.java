@@ -84,7 +84,7 @@ public final class ProjectArchiveService {
     }
 
     try {
-      progressListener.accept(ProgressStep.DOWNLOADING_ARCHIVE);
+      progressListener.accept(ProgressStep.REQUESTING_ARCHIVE);
       return apiClient
           .downloadProjectZipToFile(request, tempZip)
           .thenCompose(
@@ -116,7 +116,7 @@ public final class ProjectArchiveService {
   }
 
   public enum ProgressStep {
-    DOWNLOADING_ARCHIVE,
+    REQUESTING_ARCHIVE,
     EXTRACTING_ARCHIVE
   }
 

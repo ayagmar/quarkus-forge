@@ -11,6 +11,7 @@ import dev.tamboui.terminal.Frame;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.KeyModifiers;
+import dev.tamboui.tui.event.TickEvent;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -191,6 +192,27 @@ class CoreTuiExtensionSearchPilotTest {
   }
 
   @Test
+  void tickEventRequestsRepaintAfterAsyncCatalogCompletion() {
+    QueueingScheduler scheduler = new QueueingScheduler();
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ZERO);
+    CompletableFuture<CoreTuiController.ExtensionCatalogLoadResult> loadFuture =
+        new CompletableFuture<>();
+    controller.loadExtensionCatalogAsync(() -> loadFuture);
+
+    loadFuture.complete(
+        CoreTuiController.ExtensionCatalogLoadResult.live(
+            List.of(new ExtensionDto("io.quarkus:quarkus-funqy", "Funqy", "funqy"))));
+    scheduler.runAll();
+
+    CoreTuiController.UiAction tickAction = controller.onEvent(TickEvent.of(1, Duration.ofMillis(40)));
+    assertThat(tickAction.handled()).isTrue();
+    assertThat(controller.statusMessage()).contains("Loaded extension catalog from live API");
+    assertThat(controller.filteredExtensionCount()).isEqualTo(1);
+  }
+
+  @Test
   void cachedCatalogResultShowsSourceAndStaleIndicator() {
     CoreTuiController controller =
         CoreTuiController.from(
@@ -208,8 +230,8 @@ class CoreTuiExtensionSearchPilotTest {
 
     String rendered = renderToString(controller);
     assertThat(rendered).contains("Catalog: cache [stale]");
-    assertThat(rendered).contains("Catalog: cache [stale] | error:");
-    assertThat(controller.statusMessage()).contains("stale extension catalog");
+    assertThat(rendered).doesNotContain("Catalog: cache [stale] | error:");
+    assertThat(controller.statusMessage()).contains("stale cached snapshot");
   }
 
   @Test
@@ -243,7 +265,8 @@ class CoreTuiExtensionSearchPilotTest {
 
     assertThat(callCount.get()).isEqualTo(2);
     assertThat(controller.firstFilteredExtensionId()).contains("jdbc-postgresql");
-    assertThat(controller.statusMessage()).contains("Loaded extension catalog from cache");
+    assertThat(controller.statusMessage())
+        .contains("Live catalog unavailable (network down); using cached snapshot");
   }
 
   @Test

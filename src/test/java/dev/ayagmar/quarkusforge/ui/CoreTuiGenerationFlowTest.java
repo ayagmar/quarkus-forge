@@ -9,8 +9,11 @@ import dev.tamboui.layout.Rect;
 import dev.tamboui.terminal.Frame;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
+import dev.tamboui.tui.event.TickEvent;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BooleanSupplier;
@@ -286,6 +289,27 @@ class CoreTuiGenerationFlowTest {
   }
 
   @Test
+  void escapeDoesNotCancelWhenGenerationAlreadyCompleted() {
+    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    UiScheduler droppingScheduler = (delay, task) -> () -> false;
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(),
+            droppingScheduler,
+            Duration.ZERO,
+            generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    generationRunner.complete(Path.of("build/generated-project"));
+
+    CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+
+    assertThat(action.shouldQuit()).isTrue();
+    assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.SUCCESS);
+    assertThat(controller.statusMessage()).contains("Generation succeeded");
+  }
+
+  @Test
   void generationProgressOverlayShowsGaugeAndPhase() {
     ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
     CoreTuiController controller =
@@ -299,8 +323,60 @@ class CoreTuiGenerationFlowTest {
 
     String rendered = renderToString(controller);
     assertThat(rendered).contains("Generating Project");
-    assertThat(rendered).contains("downloading project archive");
+    assertThat(rendered).contains("requesting project archive from Quarkus API");
     assertThat(rendered).contains("Esc: cancel");
+  }
+
+  @Test
+  void generationProgressOverlayStartsWithRequestingApiStep() {
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(),
+            UiScheduler.immediate(),
+            Duration.ZERO,
+            (generationRequest, outputDirectory, cancelled, progressListener) ->
+                new CompletableFuture<>());
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    String rendered = renderToString(controller);
+    assertThat(rendered).contains("Generating Project");
+    assertThat(rendered).contains("requesting project archive from Quarkus API");
+  }
+
+  @Test
+  void tickEventRequestsRepaintWhileGenerationIsLoading() {
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(),
+            UiScheduler.immediate(),
+            Duration.ZERO,
+            (generationRequest, outputDirectory, cancelled, progressListener) ->
+                new CompletableFuture<>());
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    CoreTuiController.UiAction tickAction = controller.onEvent(TickEvent.of(1, Duration.ofMillis(40)));
+
+    assertThat(tickAction.handled()).isTrue();
+    assertThat(tickAction.shouldQuit()).isFalse();
+    assertThat(controller.statusMessage()).contains("Generation in progress");
+  }
+
+  @Test
+  void tickEventRequestsRepaintAfterAsyncGenerationCompletion() {
+    QueueingScheduler scheduler = new QueueingScheduler();
+    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ZERO, generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    generationRunner.complete(Path.of("build/generated-project"));
+    scheduler.runAll();
+
+    CoreTuiController.UiAction tickAction = controller.onEvent(TickEvent.of(2, Duration.ofMillis(40)));
+    assertThat(tickAction.handled()).isTrue();
+    assertThat(controller.statusMessage()).contains("Generation succeeded");
   }
 
   @Test
@@ -329,6 +405,24 @@ class CoreTuiGenerationFlowTest {
     return buffer.toAnsiStringTrimmed();
   }
 
+  private static final class QueueingScheduler implements UiScheduler {
+    private final List<Runnable> queuedTasks = new ArrayList<>();
+
+    @Override
+    public Cancellable schedule(Duration delay, Runnable task) {
+      queuedTasks.add(task);
+      return () -> queuedTasks.remove(task);
+    }
+
+    void runAll() {
+      List<Runnable> pendingTasks = new ArrayList<>(queuedTasks);
+      queuedTasks.clear();
+      for (Runnable pendingTask : pendingTasks) {
+        pendingTask.run();
+      }
+    }
+  }
+
   private static final class ControlledGenerationRunner
       implements CoreTuiController.ProjectGenerationRunner {
     private int callCount;
@@ -346,10 +440,12 @@ class CoreTuiGenerationFlowTest {
         GenerationRequest generationRequest,
         Path outputDirectory,
         BooleanSupplier cancelled,
-        Consumer<String> progressListener) {
+        Consumer<CoreTuiController.GenerationProgressUpdate> progressListener) {
       callCount++;
       lastOutputDirectory = outputDirectory;
-      progressListener.accept("downloading project archive...");
+      progressListener.accept(
+          CoreTuiController.GenerationProgressUpdate.requestingArchive(
+              "requesting project archive from Quarkus API..."));
       return future;
     }
 
