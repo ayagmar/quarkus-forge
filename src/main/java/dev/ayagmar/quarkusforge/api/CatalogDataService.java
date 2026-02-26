@@ -24,6 +24,25 @@ public final class CatalogDataService {
         .exceptionallyCompose(this::fallbackToCache);
   }
 
+  public CompletableFuture<CatalogData> loadForStartup() {
+    Optional<CatalogSnapshotCache.CachedCatalogSnapshot> cachedSnapshot = snapshotCache.read();
+    if (cachedSnapshot.isPresent()) {
+      CatalogSnapshotCache.CachedCatalogSnapshot snapshot = cachedSnapshot.get();
+      String detail =
+          snapshot.stale()
+              ? "Loaded stale extension catalog from cache at startup (Ctrl+R to refresh live data)"
+              : "Loaded extension catalog from cache at startup (Ctrl+R to refresh live data)";
+      return CompletableFuture.completedFuture(
+          new CatalogData(
+              snapshot.metadata(),
+              snapshot.extensions(),
+              CatalogSource.CACHE,
+              snapshot.stale(),
+              detail));
+    }
+    return load();
+  }
+
   private CatalogData toLiveCatalogData(
       List<ExtensionDto> extensions, MetadataSelection metadataSelection) {
     if (extensions.isEmpty()) {

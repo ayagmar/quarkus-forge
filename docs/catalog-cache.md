@@ -17,6 +17,10 @@ Metadata source details: `/api/streams` + `/q/openapi`.
 2. `cache`: if live load fails and cache snapshot is valid.
 3. `snapshot`: if live load fails and no valid cache exists.
 
+## Startup Behavior
+- TUI first catalog load uses cache-first when a valid cache snapshot exists, for faster startup.
+- After startup, reloads (`Ctrl+R`) use the normal `live -> cache -> snapshot` fallback order.
+
 ## UI Behavior
 - Catalog source is shown in the selection panel as `live`, `cache`, or `snapshot`.
 - Stale cache is explicitly marked as `[stale]`.

@@ -27,6 +27,7 @@ import dev.ayagmar.quarkusforge.ui.CoreTuiController;
 import dev.ayagmar.quarkusforge.ui.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.ui.UiScheduler;
 import dev.ayagmar.quarkusforge.ui.UserPreferencesStore;
+import dev.tamboui.tui.TuiConfig;
 import dev.tamboui.tui.TuiRunner;
 import java.io.IOException;
 import java.net.URI;
@@ -50,6 +51,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
@@ -77,6 +79,8 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   private static final Map<String, List<String>> BUILTIN_PRESETS = builtInPresets();
   private static final String PRESET_FAVORITES = "favorites";
   private static final Duration STARTUP_METADATA_REFRESH_TIMEOUT = Duration.ofSeconds(2);
+  private static final Duration STARTUP_SPLASH_MIN_DURATION = Duration.ofMillis(450);
+  private static final Duration TUI_TICK_RATE = Duration.ofMillis(40);
   private static final Duration DEFAULT_HEADLESS_CATALOG_TIMEOUT = Duration.ofSeconds(20);
   private static final Duration DEFAULT_HEADLESS_GENERATION_TIMEOUT = Duration.ofMinutes(2);
   private static final String HEADLESS_CATALOG_TIMEOUT_PROPERTY =
@@ -137,7 +141,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     ForgeUiState initialState =
         buildInitialState(
             requestWithResolvedStream, startupMetadataSelection.metadataCompatibility());
-    if (!initialState.canSubmit()) {
+    if (!initialState.canSubmit() && shouldBlockOnStartupValidation(dryRun)) {
       diagnostics.error(
           "cli.validation.failed", Map.of("errorCount", initialState.validation().errors().size()));
       printValidationErrors(
@@ -173,6 +177,10 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     return new CommandLine(new QuarkusForgeCli(runtimeConfig)).execute(args);
   }
 
+  static boolean shouldBlockOnStartupValidation(boolean dryRunMode) {
+    return dryRunMode;
+  }
+
   public static void main(String[] args) {
     int exitCode = runWithArgs(args);
     if (exitCode != 0) {
@@ -190,11 +198,13 @@ public final class QuarkusForgeCli implements Callable<Integer> {
         "tui.session.start",
         Map.of("smokeMode", false, "searchDebounceMs", Math.max(0, searchDebounceMs)));
     configureTerminalBackendPreference();
-    try (var tui = TuiRunner.create()) {
+    TuiConfig tuiConfig = TuiConfig.builder().tickRate(TUI_TICK_RATE).build();
+    try (var tui = TuiRunner.create(tuiConfig)) {
       QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
       CatalogDataService catalogDataService =
           new CatalogDataService(
               apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
+      AtomicBoolean firstCatalogLoad = new AtomicBoolean(true);
       ProjectArchiveService projectArchiveService =
           new ProjectArchiveService(apiClient, new SafeZipExtractor());
       CoreTuiController controller =
@@ -211,16 +221,24 @@ public final class QuarkusForgeCli implements Callable<Integer> {
                       progress ->
                           progressListener.accept(
                               switch (progress) {
-                                case DOWNLOADING_ARCHIVE -> "downloading project archive...";
-                                case EXTRACTING_ARCHIVE -> "extracting project archive...";
+                                case REQUESTING_ARCHIVE ->
+                                    CoreTuiController.GenerationProgressUpdate.requestingArchive(
+                                        "requesting project archive from Quarkus API...");
+                                case EXTRACTING_ARCHIVE ->
+                                    CoreTuiController.GenerationProgressUpdate.extractingArchive(
+                                        "extracting project archive...");
                               })),
               ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile()),
               CoreTuiController.defaultFavoritesPersistenceExecutor());
+      controller.setStartupOverlayMinDuration(STARTUP_SPLASH_MIN_DURATION);
       controller.loadExtensionCatalogAsync(
           () -> {
             diagnostics.info("catalog.load.start", Map.of("mode", "tui"));
-            return catalogDataService
-                .load()
+            CompletableFuture<CatalogData> catalogLoadFuture =
+                firstCatalogLoad.getAndSet(false)
+                    ? catalogDataService.loadForStartup()
+                    : catalogDataService.load();
+            return catalogLoadFuture
                 .handle(QuarkusForgeCli.catalogLoadDiagnostics(diagnostics));
           });
 
@@ -887,7 +905,8 @@ public final class QuarkusForgeCli implements Callable<Integer> {
             progress ->
                 System.out.println(
                     switch (progress) {
-                      case DOWNLOADING_ARCHIVE -> "downloading project archive...";
+                      case REQUESTING_ARCHIVE ->
+                          "requesting project archive from Quarkus API...";
                       case EXTRACTING_ARCHIVE -> "extracting project archive...";
                     }));
     try {

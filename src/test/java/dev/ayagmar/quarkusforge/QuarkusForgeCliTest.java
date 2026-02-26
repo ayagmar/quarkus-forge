@@ -78,6 +78,12 @@ class QuarkusForgeCliTest {
   }
 
   @Test
+  void startupValidationBlockingAppliesOnlyToDryRunMode() {
+    assertThat(QuarkusForgeCli.shouldBlockOnStartupValidation(true)).isTrue();
+    assertThat(QuarkusForgeCli.shouldBlockOnStartupValidation(false)).isFalse();
+  }
+
+  @Test
   void backendPreferenceFallsBackToJlineWhenJvmNativeAccessIsDisabled() {
     String preference = QuarkusForgeCli.defaultBackendPreference(false, false);
     assertThat(preference).isEqualTo("jline3");

@@ -2,9 +2,11 @@ package dev.ayagmar.quarkusforge.api;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.verify;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -205,6 +207,42 @@ class CatalogDataServiceTest {
     assertThat(liveData.source()).isEqualTo(CatalogSource.LIVE);
     assertThat(liveData.detailMessage()).contains("cache update skipped");
     assertThat(new CatalogSnapshotCache(cacheFile).read()).isEmpty();
+  }
+
+  @Test
+  void startupLoadUsesCacheWithoutCallingLiveEndpoints() {
+    stubCatalogEndpoints();
+    Path cacheFile = tempDir.resolve("catalog-snapshot.json");
+
+    CatalogDataService onlineService =
+        new CatalogDataService(
+            onlineClient(),
+            new CatalogSnapshotCache(
+                cacheFile,
+                ObjectMapperProvider.shared(),
+                Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
+                Duration.ofHours(6),
+                2L * 1024L * 1024L));
+    onlineService.load().join();
+
+    wireMockServer.resetRequests();
+    CatalogDataService startupService =
+        new CatalogDataService(
+            onlineClient(),
+            new CatalogSnapshotCache(
+                cacheFile,
+                ObjectMapperProvider.shared(),
+                Clock.fixed(Instant.parse("2026-02-22T01:00:00Z"), ZoneOffset.UTC),
+                Duration.ofHours(6),
+                2L * 1024L * 1024L));
+
+    CatalogData startupData = startupService.loadForStartup().join();
+
+    assertThat(startupData.source()).isEqualTo(CatalogSource.CACHE);
+    assertThat(startupData.detailMessage()).contains("startup");
+    verify(0, getRequestedFor(urlEqualTo("/api/extensions")));
+    verify(0, getRequestedFor(urlEqualTo("/api/streams")));
+    verify(0, getRequestedFor(urlEqualTo("/q/openapi")));
   }
 
   private void stubCatalogEndpoints() {
