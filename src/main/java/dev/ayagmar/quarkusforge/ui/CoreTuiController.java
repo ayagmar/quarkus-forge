@@ -166,6 +166,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   private PostGenerationExitPlan postGenerationExitPlan;
   private long startupOverlayMinDurationNanos;
   private long startupOverlayVisibleUntilNanos;
+  private boolean startupOverlayVisibleOnLastTick;
 
   private CoreTuiController(
       ForgeUiState initialState,
@@ -217,6 +218,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     postGenerationExitPlan = null;
     startupOverlayMinDurationNanos = 0L;
     startupOverlayVisibleUntilNanos = 0L;
+    startupOverlayVisibleOnLastTick = false;
     availableBuildTools = List.of();
     availableJavaVersions = List.of();
     availablePlatformStreams = List.of();
@@ -2015,7 +2017,13 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private UiAction handleTickEvent(TickEvent ignored) {
-    boolean shouldRender = extensionCatalogLoading || isStartupOverlayVisible();
+    boolean startupOverlayVisibleNow = isStartupOverlayVisible();
+    boolean shouldRender = extensionCatalogLoading || startupOverlayVisibleNow;
+    if (startupOverlayVisibleOnLastTick && !startupOverlayVisibleNow) {
+      // Force one final redraw to clear expired startup overlay without key input.
+      shouldRender = true;
+    }
+    startupOverlayVisibleOnLastTick = startupOverlayVisibleNow;
     if (asyncRepaintSignal.consume()) {
       shouldRender = true;
     }

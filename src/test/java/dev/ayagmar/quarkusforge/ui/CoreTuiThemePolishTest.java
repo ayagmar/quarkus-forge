@@ -9,6 +9,7 @@ import dev.tamboui.layout.Rect;
 import dev.tamboui.terminal.Frame;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
+import dev.tamboui.tui.event.TickEvent;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -122,6 +123,27 @@ class CoreTuiThemePolishTest {
     String rendered = renderToString(controller, 120, 32);
     assertThat(rendered).contains("Startup");
     assertThat(rendered).contains("ready            : ready");
+  }
+
+  @Test
+  void startupOverlayExpiresWithoutKeyboardInput() throws Exception {
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+    controller.setStartupOverlayMinDuration(Duration.ofMillis(5));
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                CoreTuiController.ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto(
+                            "io.quarkus:quarkus-rest", "REST", "rest", "Web", 10)))));
+    assertThat(renderToString(controller, 120, 32)).contains("Startup");
+
+    Thread.sleep(20);
+    CoreTuiController.UiAction tickAction = controller.onEvent(TickEvent.of(1, Duration.ofMillis(40)));
+    assertThat(tickAction.handled()).isTrue();
+    assertThat(renderToString(controller, 120, 32)).doesNotContain("Startup");
   }
 
   @Test
