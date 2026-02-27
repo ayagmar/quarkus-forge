@@ -1,0 +1,50 @@
+= Architecture Ownership and Module Boundaries
+
+== Purpose
+Define clear ownership boundaries for runtime modules so refactors can reduce coupling without changing external behavior contracts.
+
+== Scope Invariants
+* Keep CLI public behavior, selection policy, ID semantics, provider roots, and persistence contracts unchanged unless explicitly approved.
+* Prefer package-private helpers for extracted collaborators.
+* Keep one decisive implementation path; no long-lived dual mode.
+
+== Ownership Map
+[cols="1,2,2",options="header"]
+|===
+| Module | Primary Responsibility | Current Anchors
+
+| `dev.ayagmar.quarkusforge`
+| CLI entrypoint, argument wiring, top-level exit mapping.
+| `QuarkusForgeCli`
+
+| `dev.ayagmar.quarkusforge.domain`
+| Request/state models, validation contracts, metadata compatibility rules.
+| `ProjectRequest`, `ProjectRequestValidator`, `ForgeUiState`, `MetadataCompatibilityValidator`
+
+| `dev.ayagmar.quarkusforge.api`
+| Quarkus API integration, retry/backoff, metadata/catalog loading, cache snapshot handling.
+| `QuarkusApiClient`, `CatalogDataService`, `CatalogSnapshotCache`, DTOs
+
+| `dev.ayagmar.quarkusforge.archive`
+| Download/extract pipeline and archive safety guarantees.
+| `ProjectArchiveService`, `SafeZipExtractor`, `ArchiveSafetyPolicy`
+
+| `dev.ayagmar.quarkusforge.ui`
+| TUI state orchestration, input routing, rendering composition, preferences/favorites persistence.
+| `CoreTuiController`, `ExtensionCatalogState`, `BodyPanelRenderer`, `UserPreferencesStore`, `ExtensionFavoritesStore`
+
+| `dev.ayagmar.quarkusforge.util`
+| Narrow utility primitives reused by runtime modules.
+| `CaseInsensitiveLookup`
+|===
+
+== Boundary Rules
+* `domain` must stay framework-agnostic and avoid transport/persistence concerns.
+* `api` and `archive` are boundary adapters; keep error normalization consistent for callers.
+* `ui` may orchestrate `domain`, `api`, and `archive` services but must not duplicate their core logic.
+* Persistence files remain under `~/.quarkus-forge/` with unchanged schema unless an explicit migration is planned and tested.
+
+== Phase-Driven Ownership Targets
+* Phase 1: extract shared helpers (key matchers, throwable unwrapping, path/atomic write) and remove duplicates from source classes.
+* Phase 2: move UI routing and generation lifecycle orchestration out of `CoreTuiController`.
+* Phase 3: move workflow execution logic out of `QuarkusForgeCli` into focused services.
