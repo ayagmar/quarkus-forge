@@ -1,11 +1,12 @@
 package dev.ayagmar.quarkusforge.ui;
 
-import dev.ayagmar.quarkusforge.api.ApiErrorMessages;
 import dev.ayagmar.quarkusforge.api.BuildToolCodec;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
+import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
+import dev.ayagmar.quarkusforge.api.ThrowableUnwrapper;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.CliPrefillMapper;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
@@ -38,7 +39,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 import java.util.function.BooleanSupplier;
@@ -444,11 +444,11 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       return UiAction.handled(false);
     }
     if (focusTarget == FocusTarget.SUBMIT) {
-      if (isVimDownKey(keyEvent)) {
+      if (UiKeyMatchers.isVimDownKey(keyEvent)) {
         moveFocus(1);
         return UiAction.handled(false);
       }
-      if (isVimUpKey(keyEvent)) {
+      if (UiKeyMatchers.isVimUpKey(keyEvent)) {
         moveFocus(-1);
         return UiAction.handled(false);
       }
@@ -1161,11 +1161,11 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       statusMessage = "Command palette closed";
       return UiAction.handled(false);
     }
-    if (keyEvent.isUp() || isVimUpKey(keyEvent)) {
+    if (keyEvent.isUp() || UiKeyMatchers.isVimUpKey(keyEvent)) {
       moveCommandPaletteSelection(-1);
       return UiAction.handled(false);
     }
-    if (keyEvent.isDown() || isVimDownKey(keyEvent)) {
+    if (keyEvent.isDown() || UiKeyMatchers.isVimDownKey(keyEvent)) {
       moveCommandPaletteSelection(1);
       return UiAction.handled(false);
     }
@@ -1177,7 +1177,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       commandPaletteSelection = COMMAND_PALETTE_ENTRIES.size() - 1;
       return UiAction.handled(false);
     }
-    if (isDigitKey(keyEvent)) {
+    if (UiKeyMatchers.isDigitKey(keyEvent)) {
       int selected = Character.digit(keyEvent.character(), 10) - 1;
       if (selected >= 0 && selected < COMMAND_PALETTE_ENTRIES.size()) {
         commandPaletteSelection = selected;
@@ -1206,11 +1206,11 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       selectPostGenerationExit(PostGenerationExitAction.QUIT);
       return UiAction.handled(true);
     }
-    if (keyEvent.isUp() || isVimUpKey(keyEvent)) {
+    if (keyEvent.isUp() || UiKeyMatchers.isVimUpKey(keyEvent)) {
       movePostGenerationSelection(-1);
       return UiAction.handled(false);
     }
-    if (keyEvent.isDown() || isVimDownKey(keyEvent)) {
+    if (keyEvent.isDown() || UiKeyMatchers.isVimDownKey(keyEvent)) {
       movePostGenerationSelection(1);
       return UiAction.handled(false);
     }
@@ -1222,7 +1222,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       movePostGenerationSelection(1);
       return UiAction.handled(false);
     }
-    if (isDigitKey(keyEvent)) {
+    if (UiKeyMatchers.isDigitKey(keyEvent)) {
       int selected = Character.digit(keyEvent.character(), 10) - 1;
       if (selected >= 0 && selected < POST_GENERATION_ACTION_LABELS.size()) {
         postGenerationActionSelection = selected;
@@ -1516,13 +1516,16 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private boolean handleMetadataSelectorKey(FocusTarget target, KeyEvent keyEvent) {
-    if (keyEvent.isLeft() || isVimLeftKey(keyEvent) || keyEvent.isUp() || isVimUpKey(keyEvent)) {
+    if (keyEvent.isLeft()
+        || UiKeyMatchers.isVimLeftKey(keyEvent)
+        || keyEvent.isUp()
+        || UiKeyMatchers.isVimUpKey(keyEvent)) {
       return cycleSelector(target, -1);
     }
     if (keyEvent.isRight()
-        || isVimRightKey(keyEvent)
+        || UiKeyMatchers.isVimRightKey(keyEvent)
         || keyEvent.isDown()
-        || isVimDownKey(keyEvent)) {
+        || UiKeyMatchers.isVimDownKey(keyEvent)) {
       return cycleSelector(target, 1);
     }
     if (keyEvent.isHome()) {
@@ -1829,7 +1832,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     }
     generationFuture = null;
 
-    Throwable cause = unwrapCompletionCause(throwable);
+    Throwable cause = ThrowableUnwrapper.unwrapCompletionCause(throwable);
     if (cause == null && generatedPath != null) {
       transitionGenerationState(GenerationState.SUCCESS);
       Path normalizedPath = generatedPath.toAbsolutePath().normalize();
@@ -1863,8 +1866,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
 
     transitionGenerationState(GenerationState.ERROR);
     statusMessage = "Generation failed.";
-    errorMessage = userFriendlyError(cause);
-    verboseErrorDetails = verboseDetails(cause);
+    errorMessage = ErrorMessageMapper.userFriendlyError(cause);
+    verboseErrorDetails = ErrorMessageMapper.verboseDetails(cause);
     successHint = "";
     postGenerationMenuVisible = false;
     requestAsyncRepaint();
@@ -1945,38 +1948,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     return GenerationStateTracker.isValidTransition(currentState, targetState);
   }
 
-  private static Throwable unwrapCompletionCause(Throwable throwable) {
-    if (throwable == null) {
-      return null;
-    }
-    if (throwable instanceof CompletionException completionException
-        && completionException.getCause() != null) {
-      return completionException.getCause();
-    }
-    return throwable;
-  }
-
-  private static String userFriendlyError(Throwable throwable) {
-    return ApiErrorMessages.userFriendlyMessage(throwable);
-  }
-
-  private static String verboseDetails(Throwable throwable) {
-    if (throwable == null) {
-      return "";
-    }
-    if (throwable instanceof dev.ayagmar.quarkusforge.api.ApiHttpException apiHttpException) {
-      String body = apiHttpException.responseBody();
-      if (body == null || body.isBlank() || "<binary>".equals(body)) {
-        return "";
-      }
-      return body.strip();
-    }
-    String message = throwable.getMessage();
-    return message == null ? "" : message.strip();
-  }
-
   private static String catalogLoadFailureMessage(Throwable throwable) {
-    String message = userFriendlyError(throwable);
+    String message = ErrorMessageMapper.userFriendlyError(throwable);
     if (message.contains("no valid cache snapshot found")) {
       return "Live catalog/cache unavailable. Using bundled snapshot (Ctrl+R to retry).";
     }
@@ -2131,7 +2104,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       return;
     }
     if (throwable != null) {
-      applyCatalogLoadFailure(catalogLoadFailureMessage(unwrapCompletionCause(throwable)));
+      applyCatalogLoadFailure(
+          catalogLoadFailureMessage(ThrowableUnwrapper.unwrapCompletionCause(throwable)));
       return;
     }
     if (result == null) {
@@ -2407,11 +2381,11 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private static boolean isSectionHierarchyLeftKey(KeyEvent keyEvent) {
-    return keyEvent.isLeft() || isVimLeftKey(keyEvent);
+    return keyEvent.isLeft() || UiKeyMatchers.isVimLeftKey(keyEvent);
   }
 
   private static boolean isSectionHierarchyRightKey(KeyEvent keyEvent) {
-    return keyEvent.isRight() || isVimRightKey(keyEvent);
+    return keyEvent.isRight() || UiKeyMatchers.isVimRightKey(keyEvent);
   }
 
   private static boolean isCommandPaletteToggleKey(KeyEvent keyEvent) {
@@ -2498,37 +2472,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private static boolean isUpNavigation(KeyEvent keyEvent) {
-    return keyEvent.isUp() || isVimUpKey(keyEvent);
-  }
-
-  private static boolean isVimUpKey(KeyEvent keyEvent) {
-    return isPlainChar(keyEvent, 'k', 'K');
-  }
-
-  private static boolean isVimDownKey(KeyEvent keyEvent) {
-    return isPlainChar(keyEvent, 'j', 'J');
-  }
-
-  private static boolean isVimLeftKey(KeyEvent keyEvent) {
-    return isPlainChar(keyEvent, 'h', 'H');
-  }
-
-  private static boolean isVimRightKey(KeyEvent keyEvent) {
-    return isPlainChar(keyEvent, 'l', 'L');
-  }
-
-  private static boolean isPlainChar(KeyEvent keyEvent, char lower, char upper) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && !keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && (keyEvent.character() == lower || keyEvent.character() == upper);
-  }
-
-  private static boolean isDigitKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && !keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && Character.isDigit(keyEvent.character());
+    return keyEvent.isUp() || UiKeyMatchers.isVimUpKey(keyEvent);
   }
 
   private static boolean shouldFocusExtensionSearch(KeyEvent keyEvent, FocusTarget currentFocus) {

@@ -403,19 +403,19 @@ final class ExtensionCatalogState {
     if (navigationRowIndexes.isEmpty()) {
       return false;
     }
-    if (keyEvent.isUp() || isVimUpKey(keyEvent)) {
+    if (keyEvent.isUp() || UiKeyMatchers.isVimUpKey(keyEvent)) {
       selectPrevious(navigationRowIndexes);
       return true;
     }
-    if (keyEvent.isDown() || isVimDownKey(keyEvent)) {
+    if (keyEvent.isDown() || UiKeyMatchers.isVimDownKey(keyEvent)) {
       selectNext(navigationRowIndexes);
       return true;
     }
-    if (keyEvent.isHome() || isVimHomeKey(keyEvent)) {
+    if (keyEvent.isHome() || UiKeyMatchers.isVimHomeKey(keyEvent)) {
       selectFirst(navigationRowIndexes);
       return true;
     }
-    if (keyEvent.isEnd() || isVimEndKey(keyEvent)) {
+    if (keyEvent.isEnd() || UiKeyMatchers.isVimEndKey(keyEvent)) {
       selectLast(navigationRowIndexes);
       return true;
     }
@@ -434,29 +434,6 @@ final class ExtensionCatalogState {
       return true;
     }
     return false;
-  }
-
-  private static boolean isVimUpKey(KeyEvent keyEvent) {
-    return isPlainChar(keyEvent, 'k', 'K');
-  }
-
-  private static boolean isVimDownKey(KeyEvent keyEvent) {
-    return isPlainChar(keyEvent, 'j', 'J');
-  }
-
-  private static boolean isVimHomeKey(KeyEvent keyEvent) {
-    return isPlainChar(keyEvent, 'g', 'g');
-  }
-
-  private static boolean isVimEndKey(KeyEvent keyEvent) {
-    return isPlainChar(keyEvent, 'G', 'G');
-  }
-
-  private static boolean isPlainChar(KeyEvent keyEvent, char lower, char upper) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && !keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && (keyEvent.character() == lower || keyEvent.character() == upper);
   }
 
   private void applyFiltered(String queryText, long token, IntConsumer onFiltered) {
