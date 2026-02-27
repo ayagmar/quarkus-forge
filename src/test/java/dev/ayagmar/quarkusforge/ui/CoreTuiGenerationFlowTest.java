@@ -355,7 +355,8 @@ class CoreTuiGenerationFlowTest {
                 new CompletableFuture<>());
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
-    CoreTuiController.UiAction tickAction = controller.onEvent(TickEvent.of(1, Duration.ofMillis(40)));
+    CoreTuiController.UiAction tickAction =
+        controller.onEvent(TickEvent.of(1, Duration.ofMillis(40)));
 
     assertThat(tickAction.handled()).isTrue();
     assertThat(tickAction.shouldQuit()).isFalse();
@@ -374,7 +375,8 @@ class CoreTuiGenerationFlowTest {
     generationRunner.complete(Path.of("build/generated-project"));
     scheduler.runAll();
 
-    CoreTuiController.UiAction tickAction = controller.onEvent(TickEvent.of(2, Duration.ofMillis(40)));
+    CoreTuiController.UiAction tickAction =
+        controller.onEvent(TickEvent.of(2, Duration.ofMillis(40)));
     assertThat(tickAction.handled()).isTrue();
     assertThat(controller.statusMessage()).contains("Generation succeeded");
   }

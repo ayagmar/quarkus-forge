@@ -665,7 +665,9 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
             ? METADATA_PANEL_HEIGHT_NARROW
             : METADATA_PANEL_HEIGHT_COMPACT;
     List<Rect> bodyLayout =
-        Layout.vertical().constraints(Constraint.length(metadataHeight), Constraint.fill()).split(area);
+        Layout.vertical()
+            .constraints(Constraint.length(metadataHeight), Constraint.fill())
+            .split(area);
 
     bodyPanelRenderer.renderMetadataPanel(
         frame,
@@ -723,7 +725,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   @Override
-  public void renderCompactSelector(Frame frame, Rect area, String label, String value, FocusTarget target) {
+  public void renderCompactSelector(
+      Frame frame, Rect area, String label, String value, FocusTarget target) {
     boolean focused = focusTarget == target;
     String displayValue = value.isBlank() ? "default" : value;
 
@@ -752,7 +755,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   @Override
-  public void renderCompactText(Frame frame, Rect area, String label, String value, FocusTarget target) {
+  public void renderCompactText(
+      Frame frame, Rect area, String label, String value, FocusTarget target) {
     boolean focused = focusTarget == target;
     String displayValue = value.isBlank() ? defaultValueFor(target) : value;
 
@@ -1813,7 +1817,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       return;
     }
     generationStateTracker.updateProgress(progressUpdate);
-    String progressMessage = progressUpdate.message().isBlank() ? "working..." : progressUpdate.message();
+    String progressMessage =
+        progressUpdate.message().isBlank() ? "working..." : progressUpdate.message();
     statusMessage = "Generation in progress: " + progressMessage;
   }
 
@@ -2073,7 +2078,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     }
     if (generationStateTracker.currentState() == GenerationState.LOADING) {
       if (!generationCancelRequested) {
-        long elapsedMillis = Math.max(0L, (System.nanoTime() - generationStartedAtNanos) / 1_000_000L);
+        long elapsedMillis =
+            Math.max(0L, (System.nanoTime() - generationStartedAtNanos) / 1_000_000L);
         generationStateTracker.tick(elapsedMillis);
         statusMessage = "Generation in progress: " + generationStateTracker.progressPhase();
       }

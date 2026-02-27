@@ -70,8 +70,7 @@ final class GenerationStateTracker {
     waitingTick++;
     int frameIndex = (int) Math.floorMod(waitingTick, WAITING_FRAMES.length);
     String frame = WAITING_FRAMES[frameIndex];
-    progressPhase =
-        "waiting for Quarkus API response (" + (elapsedMillis / 1000) + "s)" + frame;
+    progressPhase = "waiting for Quarkus API response (" + (elapsedMillis / 1000) + "s)" + frame;
     progressRatio = Math.min(0.35 + (elapsedMillis / 1000.0) * 0.015, 0.74);
   }
 

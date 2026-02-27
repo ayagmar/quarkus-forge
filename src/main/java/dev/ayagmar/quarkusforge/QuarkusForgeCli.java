@@ -238,8 +238,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
                 firstCatalogLoad.getAndSet(false)
                     ? catalogDataService.loadForStartup()
                     : catalogDataService.load();
-            return catalogLoadFuture
-                .handle(QuarkusForgeCli.catalogLoadDiagnostics(diagnostics));
+            return catalogLoadFuture.handle(QuarkusForgeCli.catalogLoadDiagnostics(diagnostics));
           });
 
       tui.run(
@@ -253,7 +252,8 @@ public final class QuarkusForgeCli implements Callable<Integer> {
           },
           controller::render);
       diagnostics.info("tui.session.exit", Map.of("outcome", "completed"));
-      return new TuiSessionSummary(controller.request(), controller.postGenerationExitPlan().orElse(null));
+      return new TuiSessionSummary(
+          controller.request(), controller.postGenerationExitPlan().orElse(null));
     } catch (Exception exception) {
       diagnostics.error(
           "tui.session.failure",
@@ -308,14 +308,16 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       return;
     }
     RequestOptions defaults = defaultRequestOptions();
-    if (Objects.equals(requestOptions.groupId, defaults.groupId) && !storedPrefill.groupId().isBlank()) {
+    if (Objects.equals(requestOptions.groupId, defaults.groupId)
+        && !storedPrefill.groupId().isBlank()) {
       requestOptions.groupId = storedPrefill.groupId();
     }
     if (Objects.equals(requestOptions.artifactId, defaults.artifactId)
         && !storedPrefill.artifactId().isBlank()) {
       requestOptions.artifactId = storedPrefill.artifactId();
     }
-    if (Objects.equals(requestOptions.version, defaults.version) && !storedPrefill.version().isBlank()) {
+    if (Objects.equals(requestOptions.version, defaults.version)
+        && !storedPrefill.version().isBlank()) {
       requestOptions.version = storedPrefill.version();
     }
     if ((requestOptions.packageName == null || requestOptions.packageName.isBlank())
@@ -443,7 +445,8 @@ public final class QuarkusForgeCli implements Callable<Integer> {
 
   private static void executeShellCommand(
       String command, Path workingDirectory, DiagnosticLogger diagnostics, String actionName) {
-    ProcessBuilder processBuilder = new ProcessBuilder(shellCommandInvocation(command, isWindowsOs()));
+    ProcessBuilder processBuilder =
+        new ProcessBuilder(shellCommandInvocation(command, isWindowsOs()));
     processBuilder.directory(workingDirectory.toFile());
     processBuilder.inheritIO();
     int exitCode;
@@ -940,8 +943,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
             progress ->
                 System.out.println(
                     switch (progress) {
-                      case REQUESTING_ARCHIVE ->
-                          "requesting project archive from Quarkus API...";
+                      case REQUESTING_ARCHIVE -> "requesting project archive from Quarkus API...";
                       case EXTRACTING_ARCHIVE -> "extracting project archive...";
                     }));
     try {

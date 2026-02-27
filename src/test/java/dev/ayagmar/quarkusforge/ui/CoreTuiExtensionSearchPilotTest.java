@@ -206,7 +206,8 @@ class CoreTuiExtensionSearchPilotTest {
             List.of(new ExtensionDto("io.quarkus:quarkus-funqy", "Funqy", "funqy"))));
     scheduler.runAll();
 
-    CoreTuiController.UiAction tickAction = controller.onEvent(TickEvent.of(1, Duration.ofMillis(40)));
+    CoreTuiController.UiAction tickAction =
+        controller.onEvent(TickEvent.of(1, Duration.ofMillis(40)));
     assertThat(tickAction.handled()).isTrue();
     assertThat(controller.statusMessage()).contains("Loaded extension catalog from live API");
     assertThat(controller.filteredExtensionCount()).isEqualTo(1);

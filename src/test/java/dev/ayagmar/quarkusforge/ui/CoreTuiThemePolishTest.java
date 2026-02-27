@@ -77,9 +77,7 @@ class CoreTuiThemePolishTest {
 
     loadFuture.complete(
         CoreTuiController.ExtensionCatalogLoadResult.live(
-            List.of(
-                new ExtensionDto(
-                    "io.quarkus:quarkus-rest", "REST", "rest", "Web", 10))));
+            List.of(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 10))));
     scheduler.runAll();
     String ready = renderToString(controller, 120, 32);
     assertThat(ready).doesNotContain("Startup");
@@ -98,9 +96,7 @@ class CoreTuiThemePolishTest {
     controller.loadExtensionCatalogAsync(() -> loadFuture);
     loadFuture.complete(
         CoreTuiController.ExtensionCatalogLoadResult.live(
-            List.of(
-                new ExtensionDto(
-                    "io.quarkus:quarkus-rest", "REST", "rest", "Web", 10))));
+            List.of(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 10))));
     scheduler.runAll();
     assertThat(renderToString(controller, 120, 32)).doesNotContain("Startup");
   }
@@ -117,8 +113,7 @@ class CoreTuiThemePolishTest {
             CompletableFuture.completedFuture(
                 CoreTuiController.ExtensionCatalogLoadResult.live(
                     List.of(
-                        new ExtensionDto(
-                            "io.quarkus:quarkus-rest", "REST", "rest", "Web", 10)))));
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 10)))));
 
     String rendered = renderToString(controller, 120, 32);
     assertThat(rendered).contains("Startup");
@@ -136,12 +131,12 @@ class CoreTuiThemePolishTest {
             CompletableFuture.completedFuture(
                 CoreTuiController.ExtensionCatalogLoadResult.live(
                     List.of(
-                        new ExtensionDto(
-                            "io.quarkus:quarkus-rest", "REST", "rest", "Web", 10)))));
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 10)))));
     assertThat(renderToString(controller, 120, 32)).contains("Startup");
 
     Thread.sleep(20);
-    CoreTuiController.UiAction tickAction = controller.onEvent(TickEvent.of(1, Duration.ofMillis(40)));
+    CoreTuiController.UiAction tickAction =
+        controller.onEvent(TickEvent.of(1, Duration.ofMillis(40)));
     assertThat(tickAction.handled()).isTrue();
     assertThat(renderToString(controller, 120, 32)).doesNotContain("Startup");
   }

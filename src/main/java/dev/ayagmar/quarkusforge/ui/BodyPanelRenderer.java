@@ -68,10 +68,7 @@ final class BodyPanelRenderer {
   }
 
   private void renderMetadataPanelNarrow(
-      Frame frame,
-      Rect area,
-      MetadataPanelSnapshot snapshot,
-      CompactInputRenderer inputRenderer) {
+      Frame frame, Rect area, MetadataPanelSnapshot snapshot, CompactInputRenderer inputRenderer) {
     List<Constraint> constraints = new ArrayList<>();
     for (int i = 0; i < 8; i++) {
       constraints.add(Constraint.length(1));
@@ -95,11 +92,7 @@ final class BodyPanelRenderer {
     inputRenderer.renderCompactText(
         frame, rows.get(rowIdx++), "Version", snapshot.version(), FocusTarget.VERSION);
     inputRenderer.renderCompactText(
-        frame,
-        rows.get(rowIdx++),
-        "Package",
-        snapshot.packageName(),
-        FocusTarget.PACKAGE_NAME);
+        frame, rows.get(rowIdx++), "Package", snapshot.packageName(), FocusTarget.PACKAGE_NAME);
     inputRenderer.renderCompactSelector(
         frame, rows.get(rowIdx++), "Java", snapshot.javaVersion(), FocusTarget.JAVA_VERSION);
     inputRenderer.renderCompactText(
@@ -107,10 +100,7 @@ final class BodyPanelRenderer {
   }
 
   private void renderMetadataPanelWide(
-      Frame frame,
-      Rect area,
-      MetadataPanelSnapshot snapshot,
-      CompactInputRenderer inputRenderer) {
+      Frame frame, Rect area, MetadataPanelSnapshot snapshot, CompactInputRenderer inputRenderer) {
     List<Rect> rows =
         Layout.vertical()
             .constraints(Constraint.length(1), Constraint.length(1), Constraint.fill())
@@ -140,20 +130,12 @@ final class BodyPanelRenderer {
     inputRenderer.renderCompactSelector(
         frame, topRow.get(2), "Build", snapshot.buildTool(), FocusTarget.BUILD_TOOL);
     inputRenderer.renderCompactSelector(
-        frame,
-        topRow.get(3),
-        "Platform",
-        snapshot.platformStream(),
-        FocusTarget.PLATFORM_STREAM);
+        frame, topRow.get(3), "Platform", snapshot.platformStream(), FocusTarget.PLATFORM_STREAM);
 
     inputRenderer.renderCompactText(
         frame, bottomRow.get(0), "Version", snapshot.version(), FocusTarget.VERSION);
     inputRenderer.renderCompactText(
-        frame,
-        bottomRow.get(1),
-        "Package",
-        snapshot.packageName(),
-        FocusTarget.PACKAGE_NAME);
+        frame, bottomRow.get(1), "Package", snapshot.packageName(), FocusTarget.PACKAGE_NAME);
     inputRenderer.renderCompactSelector(
         frame, bottomRow.get(2), "Java", snapshot.javaVersion(), FocusTarget.JAVA_VERSION);
     inputRenderer.renderCompactText(
@@ -279,7 +261,11 @@ final class BodyPanelRenderer {
     }
 
     Paragraph paragraph =
-        Paragraph.builder().text("  " + hint.toString()).style(style).overflow(Overflow.ELLIPSIS).build();
+        Paragraph.builder()
+            .text("  " + hint.toString())
+            .style(style)
+            .overflow(Overflow.ELLIPSIS)
+            .build();
     frame.renderWidget(paragraph, area);
   }
 
@@ -363,9 +349,10 @@ final class BodyPanelRenderer {
     } else {
       countLabel = " (" + selectedCount + " extensions)";
     }
-    String label = focused
-        ? "  >> [ Generate Project" + countLabel + " (Enter) ] <<"
-        : "  [ Generate Project" + countLabel + " (Enter/Alt+G) ]";
+    String label =
+        focused
+            ? "  >> [ Generate Project" + countLabel + " (Enter) ] <<"
+            : "  [ Generate Project" + countLabel + " (Enter/Alt+G) ]";
     Style style =
         focused
             ? Style.EMPTY.fg(theme.color("focus")).bold().reversed()
@@ -460,8 +447,7 @@ final class BodyPanelRenderer {
     void renderCompactSelector(
         Frame frame, Rect area, String label, String value, FocusTarget target);
 
-    void renderCompactText(
-        Frame frame, Rect area, String label, String value, FocusTarget target);
+    void renderCompactText(Frame frame, Rect area, String label, String value, FocusTarget target);
   }
 
   @FunctionalInterface
