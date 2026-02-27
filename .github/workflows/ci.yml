@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: .m2/repository
+          key: maven-${{ runner.os }}-${{ hashFiles('pom.xml', '.mvn/maven.config') }}
+          restore-keys: |
+            maven-${{ runner.os }}-
+
+      - name: Spotless check
+        run: mvn -B -ntp spotless:check
+
+      - name: Checkstyle check
+        run: mvn -B -ntp checkstyle:check
+
+  tests:
+    name: Tests (${{ matrix.suite }})
+    needs: quality
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: unit
+            command: mvn -B -ntp test
+          - suite: integration
+            command: mvn -B -ntp verify -DskipTests=true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: .m2/repository
+          key: maven-${{ runner.os }}-${{ hashFiles('pom.xml', '.mvn/maven.config') }}
+          restore-keys: |
+            maven-${{ runner.os }}-
+
+      - name: Run ${{ matrix.suite }} tests
+        run: ${{ matrix.command }}
