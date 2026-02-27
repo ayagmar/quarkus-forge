@@ -372,11 +372,10 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     Path generatedProjectDir = exitPlan.projectDirectory();
 
     if (postGenerateHookCommand != null && !postGenerateHookCommand.isBlank()) {
+      String hookCommand = postGenerateHookCommand.strip();
       diagnostics.info(
-          "tui.post-hook.start",
-          Map.of("directory", generatedProjectDir.toString(), "command", postGenerateHookCommand));
-      executeShellCommand(
-          postGenerateHookCommand.strip(), generatedProjectDir, diagnostics, "post-generate-hook");
+          "tui.post-hook.start", postHookDiagnosticFields(generatedProjectDir, hookCommand));
+      executeShellCommand(hookCommand, generatedProjectDir, diagnostics, "post-generate-hook");
     }
 
     switch (exitPlan.action()) {
@@ -431,9 +430,20 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     return osName.toLowerCase(java.util.Locale.ROOT).contains("win");
   }
 
+  static Map<String, Object> postHookDiagnosticFields(Path generatedProjectDir, String command) {
+    return Map.of(
+        "directory", generatedProjectDir.toString(),
+        "command", "<redacted>",
+        "commandLength", command.length());
+  }
+
+  static List<String> shellCommandInvocation(String command, boolean windowsOs) {
+    return windowsOs ? List.of("cmd.exe", "/c", command) : List.of("sh", "-lc", command);
+  }
+
   private static void executeShellCommand(
       String command, Path workingDirectory, DiagnosticLogger diagnostics, String actionName) {
-    ProcessBuilder processBuilder = new ProcessBuilder("sh", "-lc", command);
+    ProcessBuilder processBuilder = new ProcessBuilder(shellCommandInvocation(command, isWindowsOs()));
     processBuilder.directory(workingDirectory.toFile());
     processBuilder.inheritIO();
     int exitCode;

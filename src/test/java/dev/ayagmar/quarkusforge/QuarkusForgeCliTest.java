@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 class QuarkusForgeCliTest {
@@ -99,5 +100,28 @@ class QuarkusForgeCliTest {
   void backendPreferenceKeepsPanamaFirstInNativeImageRuntime() {
     String preference = QuarkusForgeCli.defaultBackendPreference(true, false);
     assertThat(preference).isEqualTo("panama,jline3");
+  }
+
+  @Test
+  void postHookDiagnosticsRedactsRawCommand() {
+    String command = "QUARKUS_TOKEN=secret ./deploy.sh";
+    var fields = QuarkusForgeCli.postHookDiagnosticFields(Path.of("/tmp/project"), command);
+
+    assertThat(fields).containsEntry("directory", "/tmp/project");
+    assertThat(fields).containsEntry("command", "<redacted>");
+    assertThat(fields).containsEntry("commandLength", command.length());
+    assertThat(fields).doesNotContainValue(command);
+  }
+
+  @Test
+  void shellCommandInvocationUsesPosixShellForNonWindows() {
+    assertThat(QuarkusForgeCli.shellCommandInvocation("echo ok", false))
+        .containsExactly("sh", "-lc", "echo ok");
+  }
+
+  @Test
+  void shellCommandInvocationUsesCmdForWindows() {
+    assertThat(QuarkusForgeCli.shellCommandInvocation("echo ok", true))
+        .containsExactly("cmd.exe", "/c", "echo ok");
   }
 }
