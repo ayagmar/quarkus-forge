@@ -86,10 +86,11 @@ The shell keeps a stable widget tree and switches only the body split strategy b
   - Gradle: `cd <generated-path> && ./gradlew quarkusDev`
 - On success, a post-generate action menu is shown:
   1. `Open in IDE` (runs `code .` in generated directory after exit)
-  2. `Open in terminal` (prints handoff commands on exit)
+  2. `Open in terminal` (starts an interactive shell in the generated directory after exit; falls back to printing handoff commands when no TTY is available)
   3. `Generate again` (stays in TUI and resets generation state)
   4. `Quit`
-- If terminal mode is chosen, the app prints explicit handoff commands:
+- If terminal mode is chosen, the app starts an interactive shell in the generated directory.
+- When a TTY is not available, it falls back to printing explicit handoff commands:
   - `cd <generated-path>`
   - build-tool-specific dev command (`mvn quarkus:dev` or `./gradlew quarkusDev`)
 - Optional root CLI flag `--post-generate-hook "<command>"` executes the command in the generated
