@@ -3,12 +3,12 @@ package dev.ayagmar.quarkusforge.ui;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import dev.ayagmar.quarkusforge.api.AtomicFileStore;
+import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
 import dev.ayagmar.quarkusforge.api.ObjectMapperProvider;
 import java.io.IOException;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -36,8 +36,7 @@ public interface ExtensionFavoritesStore {
   }
 
   static Path defaultFile() {
-    Path home = Path.of(System.getProperty("user.home", "."));
-    return home.resolve(".quarkus-forge").resolve("favorites.json");
+    return ForgeDataPaths.favoritesFile();
   }
 
   final class InMemoryExtensionFavoritesStore implements ExtensionFavoritesStore {
@@ -148,42 +147,15 @@ public interface ExtensionFavoritesStore {
 
     private void writeState(Set<String> favoriteExtensionIds, List<String> recentExtensionIds) {
       try {
-        Path parent = file.toAbsolutePath().normalize().getParent();
-        if (parent == null) {
-          return;
-        }
-        Files.createDirectories(parent);
-        Path tempFile = Files.createTempFile(parent, "extension-favorites-", ".tmp");
-        try {
-          ObjectNode root = objectMapper.createObjectNode();
-          root.put("schemaVersion", SCHEMA_VERSION);
-          root.set(
-              "favoriteExtensionIds",
-              objectMapper.valueToTree(new TreeSet<>(favoriteExtensionIds)));
-          root.set("recentExtensionIds", objectMapper.valueToTree(recentExtensionIds));
-          Files.write(
-              tempFile,
-              objectMapper.writeValueAsBytes(root),
-              StandardOpenOption.TRUNCATE_EXISTING,
-              StandardOpenOption.WRITE);
-          moveAtomicallyWithFallback(tempFile, file);
-        } finally {
-          Files.deleteIfExists(tempFile);
-        }
+        ObjectNode root = objectMapper.createObjectNode();
+        root.put("schemaVersion", SCHEMA_VERSION);
+        root.set(
+            "favoriteExtensionIds", objectMapper.valueToTree(new TreeSet<>(favoriteExtensionIds)));
+        root.set("recentExtensionIds", objectMapper.valueToTree(recentExtensionIds));
+        AtomicFileStore.writeBytes(
+            file, objectMapper.writeValueAsBytes(root), "extension-favorites-");
       } catch (IOException ignored) {
         // Best-effort persistence only.
-      }
-    }
-
-    private static void moveAtomicallyWithFallback(Path source, Path target) throws IOException {
-      try {
-        Files.move(
-            source,
-            target,
-            java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-            java.nio.file.StandardCopyOption.ATOMIC_MOVE);
-      } catch (AtomicMoveNotSupportedException ignored) {
-        Files.move(source, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
       }
     }
   }

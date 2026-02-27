@@ -4,10 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -52,8 +50,7 @@ public final class CatalogSnapshotCache {
   }
 
   public static Path defaultCacheFile() {
-    Path home = Path.of(System.getProperty("user.home", "."));
-    return home.resolve(".quarkus-forge").resolve("catalog-snapshot.json");
+    return ForgeDataPaths.catalogSnapshotFile();
   }
 
   public CacheWriteOutcome write(MetadataDto metadata, List<ExtensionDto> extensions) {
@@ -77,15 +74,7 @@ public final class CatalogSnapshotCache {
     }
 
     try {
-      Path parent = resolvedParentDirectory();
-      Files.createDirectories(parent);
-      Path tempFile = Files.createTempFile(parent, "catalog-snapshot-", ".tmp");
-      try {
-        Files.write(tempFile, payload, StandardOpenOption.TRUNCATE_EXISTING);
-        moveAtomicallyWithFallback(tempFile, cacheFile);
-      } finally {
-        Files.deleteIfExists(tempFile);
-      }
+      AtomicFileStore.writeBytes(cacheFile, payload, "catalog-snapshot-");
       return CacheWriteOutcome.writeSucceeded();
     } catch (IOException ioException) {
       return CacheWriteOutcome.writeFailed("failed to persist cache snapshot");
@@ -171,27 +160,6 @@ public final class CatalogSnapshotCache {
       throw new ApiContractException("cache field '%s' must be a long".formatted(fieldName));
     }
     return node.longValue();
-  }
-
-  private static void moveAtomicallyWithFallback(Path source, Path target) throws IOException {
-    try {
-      Files.move(
-          source,
-          target,
-          java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-          java.nio.file.StandardCopyOption.ATOMIC_MOVE);
-    } catch (AtomicMoveNotSupportedException unsupportedException) {
-      Files.move(source, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-    }
-  }
-
-  private Path resolvedParentDirectory() throws IOException {
-    Path normalized = cacheFile.toAbsolutePath().normalize();
-    Path parent = normalized.getParent();
-    if (parent == null) {
-      throw new IOException("Cache file path has no parent directory: " + cacheFile);
-    }
-    return parent;
   }
 
   public record CachedCatalogSnapshot(
