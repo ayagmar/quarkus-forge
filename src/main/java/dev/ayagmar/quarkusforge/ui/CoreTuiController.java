@@ -350,198 +350,6 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     return uiEventRouter.routeKeyEvent(keyEvent, eventRoutingContext);
   }
 
-  private UiAction handleExtensionCancelFlow(KeyEvent keyEvent) {
-    if (shouldClearExtensionSearchOnCancel(keyEvent)) {
-      clearExtensionSearchFilter();
-      return UiAction.handled(false);
-    }
-    if (shouldDisableFavoritesFilterOnCancel(keyEvent)) {
-      toggleFavoritesOnlyFilter();
-      return UiAction.handled(false);
-    }
-    if (shouldDisableCategoryFilterOnCancel(keyEvent)) {
-      clearCategoryFilter();
-      return UiAction.handled(false);
-    }
-    if (shouldExitExtensionSearchOnCancel(keyEvent)) {
-      focusExtensionList();
-      return UiAction.handled(false);
-    }
-    return null;
-  }
-
-  private UiAction handleQuitFlow(KeyEvent keyEvent) {
-    if (!shouldQuitKeyEvent(keyEvent)) {
-      return null;
-    }
-    if (isGenerationInProgress()) {
-      requestGenerationCancellation();
-      return UiAction.handled(false);
-    }
-    cancelPendingAsyncOperations();
-    return UiAction.handled(true);
-  }
-
-  private UiAction handleWhileGenerationInProgress(KeyEvent keyEvent) {
-    if (keyEvent.isConfirm()) {
-      statusMessage = "Generation already in progress. Press Esc to cancel.";
-      return UiAction.handled(false);
-    }
-    statusMessage = "Generation in progress. Press Esc to cancel.";
-    return UiAction.handled(false);
-  }
-
-  private UiAction handleGlobalShortcutFlow(KeyEvent keyEvent) {
-    if (shouldFocusExtensionSearch(keyEvent, focusTarget)) {
-      focusExtensionSearch();
-      return UiAction.handled(false);
-    }
-    if (shouldFocusExtensionList(keyEvent)) {
-      focusExtensionList();
-      return UiAction.handled(false);
-    }
-    if (isCatalogReloadKey(keyEvent)) {
-      requestCatalogReload();
-      return UiAction.handled(false);
-    }
-    if (isFavoritesFilterToggleKey(keyEvent)) {
-      toggleFavoritesOnlyFilter();
-      return UiAction.handled(false);
-    }
-    if (isJumpToFavoriteKey(keyEvent)) {
-      jumpToFavorite();
-      return UiAction.handled(false);
-    }
-    if (isErrorDetailsToggleKey(keyEvent)) {
-      toggleErrorDetails();
-      return UiAction.handled(false);
-    }
-    return null;
-  }
-
-  private UiAction handleFocusNavigationFlow(KeyEvent keyEvent) {
-    if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && keyEvent.hasShift()) {
-      moveFocus(-1);
-      return UiAction.handled(false);
-    }
-    if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && !keyEvent.hasShift()) {
-      moveFocus(1);
-      return UiAction.handled(false);
-    }
-    if (keyEvent.isFocusNext()) {
-      moveFocus(1);
-      return UiAction.handled(false);
-    }
-    if (keyEvent.isFocusPrevious()) {
-      moveFocus(-1);
-      return UiAction.handled(false);
-    }
-    if (focusTarget == FocusTarget.SUBMIT) {
-      if (UiKeyMatchers.isVimDownKey(keyEvent)) {
-        moveFocus(1);
-        return UiAction.handled(false);
-      }
-      if (UiKeyMatchers.isVimUpKey(keyEvent)) {
-        moveFocus(-1);
-        return UiAction.handled(false);
-      }
-    }
-    return null;
-  }
-
-  private UiAction handleSubmitFlow(KeyEvent keyEvent) {
-    if (keyEvent.isConfirm() || isGenerateShortcutKey(keyEvent)) {
-      handleSubmitRequest();
-      return UiAction.handled(false);
-    }
-    return null;
-  }
-
-  private UiAction handleExtensionFocusFlow(KeyEvent keyEvent) {
-    if (focusTarget == FocusTarget.EXTENSION_SEARCH && keyEvent.isDown()) {
-      focusExtensionList();
-      return UiAction.handled(false);
-    }
-    if (focusTarget == FocusTarget.EXTENSION_LIST
-        && isUpNavigation(keyEvent)
-        && extensionCatalogState.isSelectionAtTop()) {
-      focusExtensionSearch();
-      return UiAction.handled(false);
-    }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && isSectionHierarchyLeftKey(keyEvent)) {
-      handleExtensionListHierarchyLeft();
-      return UiAction.handled(false);
-    }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && isSectionHierarchyRightKey(keyEvent)) {
-      handleExtensionListHierarchyRight();
-      return UiAction.handled(false);
-    }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && isSectionJumpDownKey(keyEvent)) {
-      jumpToAdjacentCategorySection(true);
-      return UiAction.handled(false);
-    }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && isSectionJumpUpKey(keyEvent)) {
-      jumpToAdjacentCategorySection(false);
-      return UiAction.handled(false);
-    }
-    if (focusTarget == FocusTarget.EXTENSION_LIST
-        && keyEvent.isSelect()
-        && extensionCatalogState.isCategorySectionHeaderSelected()) {
-      toggleCategoryCollapseAtSelection();
-      return UiAction.handled(false);
-    }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && isFavoriteToggleKey(keyEvent)) {
-      toggleFavoriteAtSelection();
-      return UiAction.handled(false);
-    }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && isCategoryFilterCycleKey(keyEvent)) {
-      cycleCategoryFilter();
-      return UiAction.handled(false);
-    }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && isClearSelectedExtensionsKey(keyEvent)) {
-      clearSelectedExtensions();
-      return UiAction.handled(false);
-    }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && isCategoryCollapseToggleKey(keyEvent)) {
-      toggleCategoryCollapseAtSelection();
-      return UiAction.handled(false);
-    }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && isExpandAllCategoriesKey(keyEvent)) {
-      expandAllCategories();
-      return UiAction.handled(false);
-    }
-    if (focusTarget == FocusTarget.EXTENSION_LIST
-        && extensionCatalogState.handleListKeys(
-            keyEvent, toggledName -> statusMessage = "Toggled extension: " + toggledName)) {
-      return UiAction.handled(false);
-    }
-    return null;
-  }
-
-  private UiAction handleMetadataSelectorFlow(KeyEvent keyEvent) {
-    if (isMetadataSelectorFocus(focusTarget) && handleMetadataSelectorKey(focusTarget, keyEvent)) {
-      revalidate();
-      refreshValidationFeedbackAfterEdit();
-      return UiAction.handled(false);
-    }
-    return null;
-  }
-
-  private UiAction handleTextInputFlow(KeyEvent keyEvent) {
-    if (isTextInputFocus(focusTarget)
-        && handleTextInputKey(inputStates.get(focusTarget), keyEvent)) {
-      if (focusTarget == FocusTarget.EXTENSION_SEARCH) {
-        scheduleFilteredExtensionsRefresh();
-      } else {
-        rebuildRequestFromInputs();
-        revalidate();
-        refreshValidationFeedbackAfterEdit();
-      }
-      return UiAction.handled(false);
-    }
-    return null;
-  }
-
   private final class ControllerRoutingContext implements UiEventRouter.RoutingContext {
     @Override
     public UiAction handleHelpOverlayKey(KeyEvent keyEvent) {
@@ -580,12 +388,36 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
 
     @Override
     public UiAction handleExtensionCancelFlow(KeyEvent keyEvent) {
-      return CoreTuiController.this.handleExtensionCancelFlow(keyEvent);
+      if (shouldClearExtensionSearchOnCancel(keyEvent)) {
+        clearExtensionSearchFilter();
+        return UiAction.handled(false);
+      }
+      if (shouldDisableFavoritesFilterOnCancel(keyEvent)) {
+        toggleFavoritesOnlyFilter();
+        return UiAction.handled(false);
+      }
+      if (shouldDisableCategoryFilterOnCancel(keyEvent)) {
+        clearCategoryFilter();
+        return UiAction.handled(false);
+      }
+      if (shouldExitExtensionSearchOnCancel(keyEvent)) {
+        focusExtensionList();
+        return UiAction.handled(false);
+      }
+      return null;
     }
 
     @Override
     public UiAction handleQuitFlow(KeyEvent keyEvent) {
-      return CoreTuiController.this.handleQuitFlow(keyEvent);
+      if (!shouldQuitKeyEvent(keyEvent)) {
+        return null;
+      }
+      if (isGenerationInProgress()) {
+        requestGenerationCancellation();
+        return UiAction.handled(false);
+      }
+      cancelPendingAsyncOperations();
+      return UiAction.handled(true);
     }
 
     @Override
@@ -595,37 +427,170 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
 
     @Override
     public UiAction handleWhileGenerationInProgress(KeyEvent keyEvent) {
-      return CoreTuiController.this.handleWhileGenerationInProgress(keyEvent);
+      if (keyEvent.isConfirm()) {
+        statusMessage = "Generation already in progress. Press Esc to cancel.";
+        return UiAction.handled(false);
+      }
+      statusMessage = "Generation in progress. Press Esc to cancel.";
+      return UiAction.handled(false);
     }
 
     @Override
     public UiAction handleGlobalShortcutFlow(KeyEvent keyEvent) {
-      return CoreTuiController.this.handleGlobalShortcutFlow(keyEvent);
+      if (shouldFocusExtensionSearch(keyEvent, focusTarget)) {
+        focusExtensionSearch();
+        return UiAction.handled(false);
+      }
+      if (shouldFocusExtensionList(keyEvent)) {
+        focusExtensionList();
+        return UiAction.handled(false);
+      }
+      if (isCatalogReloadKey(keyEvent)) {
+        requestCatalogReload();
+        return UiAction.handled(false);
+      }
+      if (isFavoritesFilterToggleKey(keyEvent)) {
+        toggleFavoritesOnlyFilter();
+        return UiAction.handled(false);
+      }
+      if (isJumpToFavoriteKey(keyEvent)) {
+        jumpToFavorite();
+        return UiAction.handled(false);
+      }
+      if (isErrorDetailsToggleKey(keyEvent)) {
+        toggleErrorDetails();
+        return UiAction.handled(false);
+      }
+      return null;
     }
 
     @Override
     public UiAction handleFocusNavigationFlow(KeyEvent keyEvent) {
-      return CoreTuiController.this.handleFocusNavigationFlow(keyEvent);
+      if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && keyEvent.hasShift()) {
+        moveFocus(-1);
+        return UiAction.handled(false);
+      }
+      if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && !keyEvent.hasShift()) {
+        moveFocus(1);
+        return UiAction.handled(false);
+      }
+      if (keyEvent.isFocusNext()) {
+        moveFocus(1);
+        return UiAction.handled(false);
+      }
+      if (keyEvent.isFocusPrevious()) {
+        moveFocus(-1);
+        return UiAction.handled(false);
+      }
+      if (focusTarget == FocusTarget.SUBMIT) {
+        if (UiKeyMatchers.isVimDownKey(keyEvent)) {
+          moveFocus(1);
+          return UiAction.handled(false);
+        }
+        if (UiKeyMatchers.isVimUpKey(keyEvent)) {
+          moveFocus(-1);
+          return UiAction.handled(false);
+        }
+      }
+      return null;
     }
 
     @Override
     public UiAction handleSubmitFlow(KeyEvent keyEvent) {
-      return CoreTuiController.this.handleSubmitFlow(keyEvent);
+      if (keyEvent.isConfirm() || isGenerateShortcutKey(keyEvent)) {
+        handleSubmitRequest();
+        return UiAction.handled(false);
+      }
+      return null;
     }
 
     @Override
     public UiAction handleExtensionFocusFlow(KeyEvent keyEvent) {
-      return CoreTuiController.this.handleExtensionFocusFlow(keyEvent);
+      if (focusTarget == FocusTarget.EXTENSION_SEARCH && keyEvent.isDown()) {
+        focusExtensionList();
+        return UiAction.handled(false);
+      }
+      if (focusTarget == FocusTarget.EXTENSION_LIST
+          && isUpNavigation(keyEvent)
+          && extensionCatalogState.isSelectionAtTop()) {
+        focusExtensionSearch();
+        return UiAction.handled(false);
+      }
+      if (focusTarget == FocusTarget.EXTENSION_LIST && isSectionHierarchyLeftKey(keyEvent)) {
+        handleExtensionListHierarchyLeft();
+        return UiAction.handled(false);
+      }
+      if (focusTarget == FocusTarget.EXTENSION_LIST && isSectionHierarchyRightKey(keyEvent)) {
+        handleExtensionListHierarchyRight();
+        return UiAction.handled(false);
+      }
+      if (focusTarget == FocusTarget.EXTENSION_LIST && isSectionJumpDownKey(keyEvent)) {
+        jumpToAdjacentCategorySection(true);
+        return UiAction.handled(false);
+      }
+      if (focusTarget == FocusTarget.EXTENSION_LIST && isSectionJumpUpKey(keyEvent)) {
+        jumpToAdjacentCategorySection(false);
+        return UiAction.handled(false);
+      }
+      if (focusTarget == FocusTarget.EXTENSION_LIST
+          && keyEvent.isSelect()
+          && extensionCatalogState.isCategorySectionHeaderSelected()) {
+        toggleCategoryCollapseAtSelection();
+        return UiAction.handled(false);
+      }
+      if (focusTarget == FocusTarget.EXTENSION_LIST && isFavoriteToggleKey(keyEvent)) {
+        toggleFavoriteAtSelection();
+        return UiAction.handled(false);
+      }
+      if (focusTarget == FocusTarget.EXTENSION_LIST && isCategoryFilterCycleKey(keyEvent)) {
+        cycleCategoryFilter();
+        return UiAction.handled(false);
+      }
+      if (focusTarget == FocusTarget.EXTENSION_LIST && isClearSelectedExtensionsKey(keyEvent)) {
+        clearSelectedExtensions();
+        return UiAction.handled(false);
+      }
+      if (focusTarget == FocusTarget.EXTENSION_LIST && isCategoryCollapseToggleKey(keyEvent)) {
+        toggleCategoryCollapseAtSelection();
+        return UiAction.handled(false);
+      }
+      if (focusTarget == FocusTarget.EXTENSION_LIST && isExpandAllCategoriesKey(keyEvent)) {
+        expandAllCategories();
+        return UiAction.handled(false);
+      }
+      if (focusTarget == FocusTarget.EXTENSION_LIST
+          && extensionCatalogState.handleListKeys(
+              keyEvent, toggledName -> statusMessage = "Toggled extension: " + toggledName)) {
+        return UiAction.handled(false);
+      }
+      return null;
     }
 
     @Override
     public UiAction handleMetadataSelectorFlow(KeyEvent keyEvent) {
-      return CoreTuiController.this.handleMetadataSelectorFlow(keyEvent);
+      if (isMetadataSelectorFocus(focusTarget)
+          && handleMetadataSelectorKey(focusTarget, keyEvent)) {
+        revalidate();
+        refreshValidationFeedbackAfterEdit();
+        return UiAction.handled(false);
+      }
+      return null;
     }
 
     @Override
     public UiAction handleTextInputFlow(KeyEvent keyEvent) {
-      return CoreTuiController.this.handleTextInputFlow(keyEvent);
+      if (isTextInputFocus(focusTarget)
+          && handleTextInputKey(inputStates.get(focusTarget), keyEvent)) {
+        if (focusTarget == FocusTarget.EXTENSION_SEARCH) {
+          scheduleFilteredExtensionsRefresh();
+        } else {
+          rebuildRequestFromInputs();
+          revalidate();
+          refreshValidationFeedbackAfterEdit();
+        }
+        return UiAction.handled(false);
+      }
+      return null;
     }
   }
 
