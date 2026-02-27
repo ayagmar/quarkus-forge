@@ -466,20 +466,12 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
 
     @Override
     public UiAction handleFocusNavigationFlow(KeyEvent keyEvent) {
-      if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && keyEvent.hasShift()) {
+      if (keyEvent.isFocusPrevious()) {
         moveFocus(-1);
-        return UiAction.handled(false);
-      }
-      if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && !keyEvent.hasShift()) {
-        moveFocus(1);
         return UiAction.handled(false);
       }
       if (keyEvent.isFocusNext()) {
         moveFocus(1);
-        return UiAction.handled(false);
-      }
-      if (keyEvent.isFocusPrevious()) {
-        moveFocus(-1);
         return UiAction.handled(false);
       }
       if (focusTarget == FocusTarget.SUBMIT) {
@@ -1355,11 +1347,11 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       movePostGenerationSelection(1);
       return UiAction.handled(false);
     }
-    if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && keyEvent.hasShift()) {
+    if (keyEvent.isFocusPrevious()) {
       movePostGenerationSelection(-1);
       return UiAction.handled(false);
     }
-    if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && !keyEvent.hasShift()) {
+    if (keyEvent.isFocusNext()) {
       movePostGenerationSelection(1);
       return UiAction.handled(false);
     }
@@ -2583,27 +2575,27 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private static boolean handleTextInputKey(TextInputState state, KeyEvent event) {
-    if (event.isDeleteBackward() || event.isKey(dev.tamboui.tui.event.KeyCode.BACKSPACE)) {
+    if (event.isDeleteBackward()) {
       state.deleteBackward();
       return true;
     }
-    if (event.isDeleteForward() || event.isKey(dev.tamboui.tui.event.KeyCode.DELETE)) {
+    if (event.isDeleteForward()) {
       state.deleteForward();
       return true;
     }
-    if (event.isLeft() || event.isKey(dev.tamboui.tui.event.KeyCode.LEFT)) {
+    if (event.isLeft()) {
       state.moveCursorLeft();
       return true;
     }
-    if (event.isRight() || event.isKey(dev.tamboui.tui.event.KeyCode.RIGHT)) {
+    if (event.isRight()) {
       state.moveCursorRight();
       return true;
     }
-    if (event.isHome() || event.isKey(dev.tamboui.tui.event.KeyCode.HOME)) {
+    if (event.isHome()) {
       state.moveCursorToStart();
       return true;
     }
-    if (event.isEnd() || event.isKey(dev.tamboui.tui.event.KeyCode.END)) {
+    if (event.isEnd()) {
       state.moveCursorToEnd();
       return true;
     }
