@@ -42,6 +42,9 @@ jobs:
       - name: Checkstyle check
         run: mvn -B -ntp checkstyle:check
 
+      - name: Docs build
+        run: mvn -B -ntp -Pdocs generate-resources
+
   tests:
     name: Tests (${{ matrix.suite }})
     needs: quality
