@@ -30,7 +30,6 @@ import dev.ayagmar.quarkusforge.ui.UiScheduler;
 import dev.ayagmar.quarkusforge.ui.UserPreferencesStore;
 import dev.tamboui.tui.TuiConfig;
 import dev.tamboui.tui.TuiRunner;
-import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -89,6 +88,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       "quarkus.forge.headless.catalog-timeout-ms";
   private static final String HEADLESS_GENERATION_TIMEOUT_PROPERTY =
       "quarkus.forge.headless.generation-timeout-ms";
+  private static final ShellExecutor SHELL_EXECUTOR = new ShellExecutor();
 
   @Mixin private RequestOptions requestOptions = new RequestOptions();
 
@@ -363,7 +363,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     System.out.println();
   }
 
-  private static boolean isWindowsOs() {
+  static boolean isWindowsOs() {
     String osName = System.getProperty("os.name", "");
     return osName.toLowerCase(java.util.Locale.ROOT).contains("win");
   }
@@ -376,38 +376,27 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   }
 
   static List<String> shellCommandInvocation(String command, boolean windowsOs) {
-    return windowsOs ? List.of("cmd.exe", "/c", command) : List.of("sh", "-lc", command);
+    return ShellExecutor.commandInvocation(command, windowsOs);
   }
 
   private static void executeShellCommand(
       String command, Path workingDirectory, DiagnosticLogger diagnostics, String actionName) {
-    ProcessBuilder processBuilder =
-        new ProcessBuilder(shellCommandInvocation(command, isWindowsOs()));
-    processBuilder.directory(workingDirectory.toFile());
-    processBuilder.inheritIO();
-    int exitCode;
-    try {
-      exitCode = processBuilder.start().waitFor();
-    } catch (IOException ioException) {
-      diagnostics.error(
-          "tui.post-action.failure",
-          Map.of(
-              "action", actionName, "message", ErrorMessageMapper.userFriendlyError(ioException)));
-      return;
-    } catch (InterruptedException interruptedException) {
-      Thread.currentThread().interrupt();
-      diagnostics.error(
-          "tui.post-action.failure",
-          Map.of("action", actionName, "message", "Interrupted while executing post action"));
-      return;
-    }
-    if (exitCode != 0) {
-      diagnostics.error(
-          "tui.post-action.failure",
-          Map.of("action", actionName, "message", "Command exited with status " + exitCode));
-      return;
-    }
-    diagnostics.info("tui.post-action.success", Map.of("action", actionName));
+    SHELL_EXECUTOR.execute(
+        command,
+        workingDirectory,
+        actionName,
+        new ShellExecutor.Diagnostics() {
+          @Override
+          public void success(String action) {
+            diagnostics.info("tui.post-action.success", Map.of("action", action));
+          }
+
+          @Override
+          public void error(String action, String message) {
+            diagnostics.error(
+                "tui.post-action.failure", Map.of("action", action, "message", message));
+          }
+        });
   }
 
   private static java.util.function.BiFunction<
