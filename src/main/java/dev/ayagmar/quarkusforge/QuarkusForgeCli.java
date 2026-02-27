@@ -53,6 +53,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
@@ -810,172 +811,101 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   }
 
   private Integer runHeadlessGenerate(GenerateCommand command) {
-    DiagnosticLogger diagnostics = DiagnosticLogger.create(verbose);
-    diagnostics.info(
-        "generate.start", Map.of("mode", command.dryRun || dryRun ? "dry-run" : "apply"));
+    return new HeadlessGenerationService()
+        .run(
+            command,
+            dryRun,
+            verbose,
+            new HeadlessGenerationService.Operations() {
+              @Override
+              public CatalogData loadCatalogData()
+                  throws ExecutionException, InterruptedException, TimeoutException {
+                return QuarkusForgeCli.this.loadCatalogData();
+              }
 
-    CatalogData catalogData;
-    try {
-      catalogData = loadCatalogData();
-      diagnostics.info(
-          "catalog.load.success",
-          Map.of(
-              "source", catalogData.source().label(),
-              "stale", catalogData.stale(),
-              "detail", catalogData.detailMessage()));
-    } catch (CancellationException cancellationException) {
-      diagnostics.error("catalog.load.cancelled", Map.of("phase", "before-start"));
-      System.err.println("Generation cancelled before start.");
-      return EXIT_CODE_CANCELLED;
-    } catch (InterruptedException interruptedException) {
-      Thread.currentThread().interrupt();
-      diagnostics.error("catalog.load.cancelled", Map.of("phase", "interrupted"));
-      System.err.println("Generation cancelled before start.");
-      return EXIT_CODE_CANCELLED;
-    } catch (TimeoutException timeoutException) {
-      Duration timeout = headlessCatalogTimeout();
-      diagnostics.error("catalog.load.timeout", Map.of("timeoutMs", timeout.toMillis()));
-      System.err.println(
-          "Failed to load extension catalog: request timed out after " + timeout.toMillis() + "ms");
-      return EXIT_CODE_NETWORK;
-    } catch (ExecutionException executionException) {
-      Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);
-      diagnostics.error(
-          "catalog.load.failure",
-          Map.of(
-              "causeType",
-              cause.getClass().getSimpleName(),
-              "message",
-              ErrorMessageMapper.userFriendlyError(cause)));
-      System.err.println(
-          "Failed to load extension catalog: " + ErrorMessageMapper.userFriendlyError(cause));
-      return mapHeadlessFailureToExitCode(cause);
-    }
+              @Override
+              public ProjectRequest toProjectRequest(RequestOptions options) {
+                return QuarkusForgeCli.toProjectRequest(options);
+              }
 
-    ProjectRequest request = toProjectRequest(command.requestOptions);
-    MetadataCompatibilityContext metadataCompatibility =
-        MetadataCompatibilityContext.success(catalogData.metadata());
-    ProjectRequest requestWithResolvedStream =
-        applyRecommendedPlatformStream(request, metadataCompatibility);
-    ForgeUiState validatedState =
-        buildInitialState(requestWithResolvedStream, metadataCompatibility);
-    if (!validatedState.canSubmit()) {
-      diagnostics.error(
-          "generate.validation.failed",
-          Map.of(
-              "errorCount", validatedState.validation().errors().size(),
-              "catalogSource", catalogData.source().label()));
-      printValidationErrors(
-          validatedState.validation(),
-          catalogData.source().label() + (catalogData.stale() ? " [stale]" : ""),
-          catalogData.detailMessage());
-      return EXIT_CODE_VALIDATION;
-    }
+              @Override
+              public ProjectRequest applyRecommendedPlatformStream(
+                  ProjectRequest request, MetadataCompatibilityContext metadataCompatibility) {
+                return QuarkusForgeCli.applyRecommendedPlatformStream(
+                    request, metadataCompatibility);
+              }
 
-    Set<String> knownExtensionIds = new LinkedHashSet<>();
-    for (ExtensionDto extension : catalogData.extensions()) {
-      knownExtensionIds.add(extension.id());
-    }
+              @Override
+              public ForgeUiState buildInitialState(
+                  ProjectRequest request, MetadataCompatibilityContext metadataCompatibility) {
+                return QuarkusForgeCli.buildInitialState(request, metadataCompatibility);
+              }
 
-    List<String> extensionIds;
-    try {
-      extensionIds =
-          resolveRequestedExtensions(command.extensions, command.presets, knownExtensionIds);
-    } catch (ValidationException validationException) {
-      diagnostics.error(
-          "generate.extension-validation.failed",
-          Map.of("errorCount", validationException.errors().size()));
-      printValidationErrors(
-          new ValidationReport(validationException.errors()),
-          catalogData.source().label() + (catalogData.stale() ? " [stale]" : ""),
-          catalogData.detailMessage());
-      return EXIT_CODE_VALIDATION;
-    }
+              @Override
+              public List<String> resolveRequestedExtensions(
+                  List<String> extensionInputs,
+                  List<String> presetInputs,
+                  Set<String> knownExtensionIds) {
+                return QuarkusForgeCli.this.resolveRequestedExtensions(
+                    extensionInputs, presetInputs, knownExtensionIds);
+              }
 
-    boolean dryRunRequested = command.dryRun || dryRun;
-    if (dryRunRequested) {
-      diagnostics.info(
-          "generate.dry-run.validated",
-          Map.of(
-              "extensionCount", extensionIds.size(),
-              "catalogSource", catalogData.source().label(),
-              "stale", catalogData.stale()));
-      printDryRunSummary(
-          validatedState.request(),
-          extensionIds,
-          catalogData.source().label(),
-          catalogData.stale());
-      return CommandLine.ExitCode.OK;
-    }
+              @Override
+              public void printValidationErrors(
+                  ValidationReport validation, String sourceLabel, String sourceDetail) {
+                QuarkusForgeCli.printValidationErrors(validation, sourceLabel, sourceDetail);
+              }
 
-    Path outputPath =
-        Path.of(validatedState.request().outputDirectory())
-            .resolve(validatedState.request().artifactId())
-            .normalize();
-    GenerationRequest generationRequest =
-        new GenerationRequest(
-            validatedState.request().groupId(),
-            validatedState.request().artifactId(),
-            validatedState.request().version(),
-            validatedState.request().platformStream(),
-            validatedState.request().buildTool(),
-            validatedState.request().javaVersion(),
-            extensionIds);
+              @Override
+              public void printDryRunSummary(
+                  ProjectRequest request,
+                  List<String> extensionIds,
+                  String sourceLabel,
+                  boolean stale) {
+                QuarkusForgeCli.printDryRunSummary(request, extensionIds, sourceLabel, stale);
+              }
 
+              @Override
+              public Duration headlessCatalogTimeout() {
+                return QuarkusForgeCli.headlessCatalogTimeout();
+              }
+
+              @Override
+              public Duration headlessGenerationTimeout() {
+                return QuarkusForgeCli.headlessGenerationTimeout();
+              }
+
+              @Override
+              public int mapHeadlessFailureToExitCode(Throwable throwable) {
+                return QuarkusForgeCli.mapHeadlessFailureToExitCode(throwable);
+              }
+
+              @Override
+              public CompletableFuture<Path> startGeneration(
+                  GenerationRequest generationRequest,
+                  Path outputPath,
+                  Consumer<String> progressLineConsumer) {
+                return startHeadlessGeneration(generationRequest, outputPath, progressLineConsumer);
+              }
+            });
+  }
+
+  private CompletableFuture<Path> startHeadlessGeneration(
+      GenerationRequest generationRequest, Path outputPath, Consumer<String> progressLineConsumer) {
     QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
     ProjectArchiveService archiveService =
         new ProjectArchiveService(apiClient, new SafeZipExtractor());
-    CompletableFuture<Path> generationFuture =
-        archiveService.downloadAndExtract(
-            generationRequest,
-            outputPath,
-            OverwritePolicy.FAIL_IF_EXISTS,
-            () -> Thread.currentThread().isInterrupted(),
-            progress ->
-                System.out.println(
-                    switch (progress) {
-                      case REQUESTING_ARCHIVE -> "requesting project archive from Quarkus API...";
-                      case EXTRACTING_ARCHIVE -> "extracting project archive...";
-                    }));
-    try {
-      Duration generationTimeout = headlessGenerationTimeout();
-      diagnostics.info(
-          "generate.execute.start",
-          Map.of("outputPath", outputPath.toString(), "extensionCount", extensionIds.size()));
-      Path generatedProjectRoot =
-          generationFuture.get(generationTimeout.toMillis(), TimeUnit.MILLISECONDS);
-      diagnostics.info(
-          "generate.execute.success", Map.of("projectRoot", generatedProjectRoot.toString()));
-      System.out.println(
-          "Generation succeeded: " + generatedProjectRoot.toAbsolutePath().normalize());
-      return CommandLine.ExitCode.OK;
-    } catch (CancellationException cancellationException) {
-      diagnostics.error("generate.execute.cancelled", Map.of("phase", "execution"));
-      System.err.println("Generation cancelled.");
-      return EXIT_CODE_CANCELLED;
-    } catch (InterruptedException interruptedException) {
-      Thread.currentThread().interrupt();
-      diagnostics.error("generate.execute.cancelled", Map.of("phase", "interrupted"));
-      System.err.println("Generation cancelled.");
-      return EXIT_CODE_CANCELLED;
-    } catch (TimeoutException timeoutException) {
-      generationFuture.cancel(true);
-      Duration timeout = headlessGenerationTimeout();
-      diagnostics.error("generate.execute.timeout", Map.of("timeoutMs", timeout.toMillis()));
-      System.err.println("Generation failed: request timed out after " + timeout.toMillis() + "ms");
-      return EXIT_CODE_NETWORK;
-    } catch (ExecutionException executionException) {
-      Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);
-      int exitCode = mapHeadlessFailureToExitCode(cause);
-      diagnostics.error(
-          "generate.execute.failure",
-          Map.of(
-              "causeType", cause.getClass().getSimpleName(),
-              "message", ErrorMessageMapper.userFriendlyError(cause),
-              "exitCode", exitCode));
-      System.err.println("Generation failed: " + ErrorMessageMapper.userFriendlyError(cause));
-      return exitCode;
-    }
+    return archiveService.downloadAndExtract(
+        generationRequest,
+        outputPath,
+        OverwritePolicy.FAIL_IF_EXISTS,
+        () -> Thread.currentThread().isInterrupted(),
+        progress ->
+            progressLineConsumer.accept(
+                switch (progress) {
+                  case REQUESTING_ARCHIVE -> "requesting project archive from Quarkus API...";
+                  case EXTRACTING_ARCHIVE -> "extracting project archive...";
+                }));
   }
 
   private static Duration headlessCatalogTimeout() {
@@ -1081,6 +1011,201 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     @Override
     public Integer call() {
       return rootCommand.runHeadlessGenerate(this);
+    }
+  }
+
+  static final class HeadlessGenerationService {
+    int run(GenerateCommand command, boolean globalDryRun, boolean verbose, Operations operations) {
+      DiagnosticLogger diagnostics = DiagnosticLogger.create(verbose);
+      diagnostics.info(
+          "generate.start", Map.of("mode", command.dryRun || globalDryRun ? "dry-run" : "apply"));
+
+      CatalogData catalogData;
+      try {
+        catalogData = operations.loadCatalogData();
+        diagnostics.info(
+            "catalog.load.success",
+            Map.of(
+                "source", catalogData.source().label(),
+                "stale", catalogData.stale(),
+                "detail", catalogData.detailMessage()));
+      } catch (CancellationException cancellationException) {
+        diagnostics.error("catalog.load.cancelled", Map.of("phase", "before-start"));
+        System.err.println("Generation cancelled before start.");
+        return EXIT_CODE_CANCELLED;
+      } catch (InterruptedException interruptedException) {
+        Thread.currentThread().interrupt();
+        diagnostics.error("catalog.load.cancelled", Map.of("phase", "interrupted"));
+        System.err.println("Generation cancelled before start.");
+        return EXIT_CODE_CANCELLED;
+      } catch (TimeoutException timeoutException) {
+        Duration timeout = operations.headlessCatalogTimeout();
+        diagnostics.error("catalog.load.timeout", Map.of("timeoutMs", timeout.toMillis()));
+        System.err.println(
+            "Failed to load extension catalog: request timed out after "
+                + timeout.toMillis()
+                + "ms");
+        return EXIT_CODE_NETWORK;
+      } catch (ExecutionException executionException) {
+        Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);
+        diagnostics.error(
+            "catalog.load.failure",
+            Map.of(
+                "causeType",
+                cause.getClass().getSimpleName(),
+                "message",
+                ErrorMessageMapper.userFriendlyError(cause)));
+        System.err.println(
+            "Failed to load extension catalog: " + ErrorMessageMapper.userFriendlyError(cause));
+        return operations.mapHeadlessFailureToExitCode(cause);
+      }
+
+      ProjectRequest request = operations.toProjectRequest(command.requestOptions);
+      MetadataCompatibilityContext metadataCompatibility =
+          MetadataCompatibilityContext.success(catalogData.metadata());
+      ProjectRequest requestWithResolvedStream =
+          operations.applyRecommendedPlatformStream(request, metadataCompatibility);
+      ForgeUiState validatedState =
+          operations.buildInitialState(requestWithResolvedStream, metadataCompatibility);
+      if (!validatedState.canSubmit()) {
+        diagnostics.error(
+            "generate.validation.failed",
+            Map.of(
+                "errorCount", validatedState.validation().errors().size(),
+                "catalogSource", catalogData.source().label()));
+        operations.printValidationErrors(
+            validatedState.validation(),
+            catalogData.source().label() + (catalogData.stale() ? " [stale]" : ""),
+            catalogData.detailMessage());
+        return EXIT_CODE_VALIDATION;
+      }
+
+      Set<String> knownExtensionIds = new LinkedHashSet<>();
+      for (ExtensionDto extension : catalogData.extensions()) {
+        knownExtensionIds.add(extension.id());
+      }
+
+      List<String> extensionIds;
+      try {
+        extensionIds =
+            operations.resolveRequestedExtensions(
+                command.extensions, command.presets, knownExtensionIds);
+      } catch (ValidationException validationException) {
+        diagnostics.error(
+            "generate.extension-validation.failed",
+            Map.of("errorCount", validationException.errors().size()));
+        operations.printValidationErrors(
+            new ValidationReport(validationException.errors()),
+            catalogData.source().label() + (catalogData.stale() ? " [stale]" : ""),
+            catalogData.detailMessage());
+        return EXIT_CODE_VALIDATION;
+      }
+
+      boolean dryRunRequested = command.dryRun || globalDryRun;
+      if (dryRunRequested) {
+        diagnostics.info(
+            "generate.dry-run.validated",
+            Map.of(
+                "extensionCount", extensionIds.size(),
+                "catalogSource", catalogData.source().label(),
+                "stale", catalogData.stale()));
+        operations.printDryRunSummary(
+            validatedState.request(),
+            extensionIds,
+            catalogData.source().label(),
+            catalogData.stale());
+        return CommandLine.ExitCode.OK;
+      }
+
+      Path outputPath =
+          Path.of(validatedState.request().outputDirectory())
+              .resolve(validatedState.request().artifactId())
+              .normalize();
+      GenerationRequest generationRequest =
+          new GenerationRequest(
+              validatedState.request().groupId(),
+              validatedState.request().artifactId(),
+              validatedState.request().version(),
+              validatedState.request().platformStream(),
+              validatedState.request().buildTool(),
+              validatedState.request().javaVersion(),
+              extensionIds);
+
+      CompletableFuture<Path> generationFuture =
+          operations.startGeneration(generationRequest, outputPath, System.out::println);
+      try {
+        Duration generationTimeout = operations.headlessGenerationTimeout();
+        diagnostics.info(
+            "generate.execute.start",
+            Map.of("outputPath", outputPath.toString(), "extensionCount", extensionIds.size()));
+        Path generatedProjectRoot =
+            generationFuture.get(generationTimeout.toMillis(), TimeUnit.MILLISECONDS);
+        diagnostics.info(
+            "generate.execute.success", Map.of("projectRoot", generatedProjectRoot.toString()));
+        System.out.println(
+            "Generation succeeded: " + generatedProjectRoot.toAbsolutePath().normalize());
+        return CommandLine.ExitCode.OK;
+      } catch (CancellationException cancellationException) {
+        diagnostics.error("generate.execute.cancelled", Map.of("phase", "execution"));
+        System.err.println("Generation cancelled.");
+        return EXIT_CODE_CANCELLED;
+      } catch (InterruptedException interruptedException) {
+        Thread.currentThread().interrupt();
+        diagnostics.error("generate.execute.cancelled", Map.of("phase", "interrupted"));
+        System.err.println("Generation cancelled.");
+        return EXIT_CODE_CANCELLED;
+      } catch (TimeoutException timeoutException) {
+        generationFuture.cancel(true);
+        Duration timeout = operations.headlessGenerationTimeout();
+        diagnostics.error("generate.execute.timeout", Map.of("timeoutMs", timeout.toMillis()));
+        System.err.println(
+            "Generation failed: request timed out after " + timeout.toMillis() + "ms");
+        return EXIT_CODE_NETWORK;
+      } catch (ExecutionException executionException) {
+        Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);
+        int exitCode = operations.mapHeadlessFailureToExitCode(cause);
+        diagnostics.error(
+            "generate.execute.failure",
+            Map.of(
+                "causeType", cause.getClass().getSimpleName(),
+                "message", ErrorMessageMapper.userFriendlyError(cause),
+                "exitCode", exitCode));
+        System.err.println("Generation failed: " + ErrorMessageMapper.userFriendlyError(cause));
+        return exitCode;
+      }
+    }
+
+    interface Operations {
+      CatalogData loadCatalogData()
+          throws ExecutionException, InterruptedException, TimeoutException;
+
+      ProjectRequest toProjectRequest(RequestOptions options);
+
+      ProjectRequest applyRecommendedPlatformStream(
+          ProjectRequest request, MetadataCompatibilityContext metadataCompatibility);
+
+      ForgeUiState buildInitialState(
+          ProjectRequest request, MetadataCompatibilityContext metadataCompatibility);
+
+      List<String> resolveRequestedExtensions(
+          List<String> extensionInputs, List<String> presetInputs, Set<String> knownExtensionIds);
+
+      void printValidationErrors(
+          ValidationReport validation, String sourceLabel, String sourceDetail);
+
+      void printDryRunSummary(
+          ProjectRequest request, List<String> extensionIds, String sourceLabel, boolean stale);
+
+      Duration headlessCatalogTimeout();
+
+      Duration headlessGenerationTimeout();
+
+      int mapHeadlessFailureToExitCode(Throwable throwable);
+
+      CompletableFuture<Path> startGeneration(
+          GenerationRequest generationRequest,
+          Path outputPath,
+          Consumer<String> progressLineConsumer);
     }
   }
 
