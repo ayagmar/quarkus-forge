@@ -1,0 +1,127 @@
+package dev.ayagmar.quarkusforge;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.nio.file.Path;
+import org.junit.jupiter.api.Test;
+
+class QuarkusForgeCliTest {
+  @Test
+  void helpCommandReturnsSuccessExitCode() {
+    int exitCode = QuarkusForgeCli.runWithArgs(new String[] {"--help"});
+    assertThat(exitCode).isZero();
+  }
+
+  @Test
+  void dryRunWithValidPrefillReturnsSuccess() {
+    int exitCode =
+        QuarkusForgeCli.runWithArgs(
+            new String[] {
+              "--dry-run",
+              "--group-id",
+              "com.example",
+              "--artifact-id",
+              "forge-app",
+              "--output-dir",
+              "./tmp/output"
+            });
+
+    assertThat(exitCode).isZero();
+  }
+
+  @Test
+  void dryRunWithNumericArtifactReturnsUsageCode() {
+    int exitCode =
+        QuarkusForgeCli.runWithArgs(
+            new String[] {
+              "--dry-run",
+              "--group-id",
+              "com.example",
+              "--artifact-id",
+              "123app",
+              "--output-dir",
+              "./tmp/output"
+            });
+
+    assertThat(exitCode).isEqualTo(2);
+  }
+
+  @Test
+  void dryRunWithInvalidPrefillReturnsUsageCode() {
+    int exitCode =
+        QuarkusForgeCli.runWithArgs(
+            new String[] {
+              "--dry-run", "--group-id", "1bad", "--artifact-id", "forge-app", "--output-dir", "CON"
+            });
+
+    assertThat(exitCode).isEqualTo(2);
+  }
+
+  @Test
+  void dryRunBlocksUnsupportedMetadataCombination() {
+    int exitCode =
+        QuarkusForgeCli.runWithArgs(
+            new String[] {
+              "--dry-run",
+              "--group-id",
+              "com.example",
+              "--artifact-id",
+              "forge-app",
+              "--build-tool",
+              "gradle",
+              "--java-version",
+              "11",
+              "--output-dir",
+              "./tmp/output"
+            });
+
+    assertThat(exitCode).isEqualTo(2);
+  }
+
+  @Test
+  void startupValidationBlockingAppliesOnlyToDryRunMode() {
+    assertThat(QuarkusForgeCli.shouldBlockOnStartupValidation(true)).isTrue();
+    assertThat(QuarkusForgeCli.shouldBlockOnStartupValidation(false)).isFalse();
+  }
+
+  @Test
+  void backendPreferenceFallsBackToJlineWhenJvmNativeAccessIsDisabled() {
+    String preference = QuarkusForgeCli.defaultBackendPreference(false, false);
+    assertThat(preference).isEqualTo("jline3");
+  }
+
+  @Test
+  void backendPreferenceKeepsPanamaFirstWhenNativeAccessIsEnabled() {
+    String preference = QuarkusForgeCli.defaultBackendPreference(false, true);
+    assertThat(preference).isEqualTo("panama,jline3");
+  }
+
+  @Test
+  void backendPreferenceKeepsPanamaFirstInNativeImageRuntime() {
+    String preference = QuarkusForgeCli.defaultBackendPreference(true, false);
+    assertThat(preference).isEqualTo("panama,jline3");
+  }
+
+  @Test
+  void postHookDiagnosticsRedactsRawCommand() {
+    String command = "QUARKUS_TOKEN=secret ./deploy.sh";
+    var fields = QuarkusForgeCli.postHookDiagnosticFields(Path.of("/tmp/project"), command);
+
+    assertThat(fields).containsEntry("directory", "/tmp/project");
+    assertThat(fields).containsEntry("command", "<redacted>");
+    assertThat(fields).containsEntry("commandLength", command.length());
+    assertThat(fields).doesNotContainValue(command);
+  }
+
+  @Test
+  void shellCommandInvocationUsesPosixShellForNonWindows() {
+    assertThat(QuarkusForgeCli.shellCommandInvocation("echo ok", false))
+        .containsExactly("sh", "-lc", "echo ok");
+  }
+
+  @Test
+  void shellCommandInvocationUsesCmdForWindows() {
+    assertThat(QuarkusForgeCli.shellCommandInvocation("echo ok", true))
+        .containsExactly("cmd.exe", "/c", "echo ok");
+  }
+}

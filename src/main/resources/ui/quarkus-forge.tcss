@@ -1,0 +1,11 @@
+# Quarkus Forge semantic theme tokens.
+# Format: token = color
+
+base = #10172a
+text = #eef4ff
+accent = #ff3b66
+focus = #23e5d8
+muted = #7c89a8
+success = #35d07f
+warning = #f6bf5c
+error = #ff4d6d

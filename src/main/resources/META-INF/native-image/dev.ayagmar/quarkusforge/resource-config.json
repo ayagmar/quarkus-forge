@@ -1,0 +1,15 @@
+{
+  "resources": {
+    "includes": [
+      {
+        "pattern": "metadata/.*\\.json$"
+      },
+      {
+        "pattern": "ui/.*\\.tcss$"
+      },
+      {
+        "pattern": "dev/tamboui/tui/bindings/.*\\.properties$"
+      }
+    ]
+  }
+}

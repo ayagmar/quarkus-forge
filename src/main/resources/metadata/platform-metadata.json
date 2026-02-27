@@ -1,0 +1,35 @@
+{
+  "javaVersions": ["17", "21", "25"],
+  "buildTools": ["maven", "gradle", "gradle-kotlin-dsl"],
+  "compatibility": {
+    "maven": ["17", "21", "25"],
+    "gradle": ["17", "21", "25"],
+    "gradle-kotlin-dsl": ["17", "21", "25"]
+  },
+  "platformStreams": [
+    {
+      "key": "io.quarkus.platform:3.31",
+      "platformVersion": "3.31",
+      "recommended": true,
+      "javaVersions": ["17", "21", "25"]
+    },
+    {
+      "key": "io.quarkus.platform:3.20",
+      "platformVersion": "3.20",
+      "recommended": false,
+      "javaVersions": ["17", "21"]
+    },
+    {
+      "key": "io.quarkus.platform:3.27",
+      "platformVersion": "3.27",
+      "recommended": false,
+      "javaVersions": ["17", "21"]
+    },
+    {
+      "key": "io.quarkus.platform:3.15",
+      "platformVersion": "3.15",
+      "recommended": false,
+      "javaVersions": ["17"]
+    }
+  ]
+}
