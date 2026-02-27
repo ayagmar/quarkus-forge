@@ -75,6 +75,15 @@ public final class ProjectArchiveService {
           new CancellationException("Generation cancelled before download"));
     }
 
+    if (overwritePolicy == OverwritePolicy.FAIL_IF_EXISTS && Files.exists(outputDirectory)) {
+      Path normalized = outputDirectory.toAbsolutePath().normalize();
+      return CompletableFuture.failedFuture(
+          new ArchiveException(
+              "Output directory already exists: "
+                  + normalized
+                  + ". Delete it or change Output/Artifact and retry."));
+    }
+
     final Path tempZip;
     try {
       tempZip = tempFileProvider.create();

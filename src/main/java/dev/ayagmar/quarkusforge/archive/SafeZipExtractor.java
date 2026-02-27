@@ -70,7 +70,12 @@ public final class SafeZipExtractor {
       return new ExtractionResult(
           absoluteTarget, stagedResult.entryCount(), stagedResult.extractedBytes());
     } catch (IOException ioException) {
-      throw new ArchiveException("Failed to extract ZIP archive " + zipFile, ioException);
+      String causeMessage = ioException.getMessage();
+      String detail =
+          (causeMessage == null || causeMessage.isBlank()) ? "" : ": " + causeMessage.strip();
+      throw new ArchiveException(
+          "Failed to extract ZIP archive " + zipFile + " to " + absoluteTarget + detail,
+          ioException);
     } finally {
       deleteRecursivelyQuietly(stagingRoot);
     }

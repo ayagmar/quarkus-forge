@@ -370,6 +370,15 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       return;
     }
     Path generatedProjectDir = exitPlan.projectDirectory();
+
+    if (postGenerateHookCommand != null && !postGenerateHookCommand.isBlank()) {
+      diagnostics.info(
+          "tui.post-hook.start",
+          Map.of("directory", generatedProjectDir.toString(), "command", postGenerateHookCommand));
+      executeShellCommand(
+          postGenerateHookCommand.strip(), generatedProjectDir, diagnostics, "post-generate-hook");
+    }
+
     switch (exitPlan.action()) {
       case OPEN_IDE -> {
         diagnostics.info(
@@ -381,19 +390,30 @@ public final class QuarkusForgeCli implements Callable<Integer> {
         diagnostics.info(
             "tui.post-action.start",
             Map.of("action", "open-terminal", "directory", generatedProjectDir.toString()));
-        printTerminalHandoff(generatedProjectDir, exitPlan.nextCommand());
+        openInteractiveShell(generatedProjectDir, exitPlan.nextCommand(), diagnostics);
       }
       case QUIT, GENERATE_AGAIN -> {
         // No direct action.
       }
     }
-    if (postGenerateHookCommand != null && !postGenerateHookCommand.isBlank()) {
-      diagnostics.info(
-          "tui.post-hook.start",
-          Map.of("directory", generatedProjectDir.toString(), "command", postGenerateHookCommand));
-      executeShellCommand(
-          postGenerateHookCommand.strip(), generatedProjectDir, diagnostics, "post-generate-hook");
+  }
+
+  private static void openInteractiveShell(
+      Path generatedProjectDir, String nextCommand, DiagnosticLogger diagnostics) {
+    if (System.console() == null || isWindowsOs()) {
+      printTerminalHandoff(generatedProjectDir, nextCommand);
+      return;
     }
+
+    System.out.println();
+    System.out.println("Opening shell in: " + generatedProjectDir);
+    if (nextCommand != null && !nextCommand.isBlank()) {
+      System.out.println("Tip: " + nextCommand);
+    }
+    System.out.println("(Type 'exit' to return)");
+    System.out.println();
+
+    executeShellCommand("exec ${SHELL:-sh} -i", generatedProjectDir, diagnostics, "open-terminal");
   }
 
   private static void printTerminalHandoff(Path generatedProjectDir, String nextCommand) {
@@ -404,6 +424,11 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       System.out.println("  " + nextCommand);
     }
     System.out.println();
+  }
+
+  private static boolean isWindowsOs() {
+    String osName = System.getProperty("os.name", "");
+    return osName.toLowerCase(java.util.Locale.ROOT).contains("win");
   }
 
   private static void executeShellCommand(

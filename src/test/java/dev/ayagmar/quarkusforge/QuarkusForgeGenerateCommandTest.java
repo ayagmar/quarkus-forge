@@ -263,7 +263,7 @@ class QuarkusForgeGenerateCommandTest {
             outputDir.toString());
 
     assertThat(result.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_ARCHIVE);
-    assertThat(result.standardError()).contains("Failed to extract ZIP archive");
+    assertThat(result.standardError()).contains("Output directory already exists");
   }
 
   @Test
