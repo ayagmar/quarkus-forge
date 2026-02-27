@@ -1,0 +1,22 @@
+= UI Theming
+:toc:
+
+== Define Purpose
+
+Describe terminal theme tokens and rendering expectations.
+
+== Define Inputs
+
+* Theme token definitions in UI code
+* Terminal capability constraints
+
+== Define Outputs
+
+* Token catalog (`accent`, `focus`, `error`, `muted`, `text`, `base`)
+* Semantic usage guidance
+* Fallback behavior when theme assets are unavailable
+
+== Define Failure Modes
+
+* Unreadable contrast in terminal
+* Missing fallback for limited color environments

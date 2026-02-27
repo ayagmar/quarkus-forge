@@ -1,0 +1,24 @@
+= Testing Strategy
+:toc:
+
+== Define Purpose
+
+Describe test layers, shared fixtures, and verification gates.
+
+== Define Inputs
+
+* Unit and pilot test suites
+* Shared test harnesses
+* WireMock-backed CLI integration tests
+
+== Define Outputs
+
+* Deterministic regression coverage
+* Phase completion evidence
+* Static checks and formatting compliance
+
+== Define Failure Modes
+
+* Fixture duplication drift
+* Non-deterministic asynchronous tests
+* Missing regression assertions for refactor steps

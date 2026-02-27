@@ -1,0 +1,24 @@
+= Architecture Overview
+:toc:
+
+== Define Purpose
+
+Summarize module boundaries and ownership.
+
+== Define Inputs
+
+* Runtime commands
+* Metadata and catalog sources
+* User preferences and favorites persistence
+
+== Define Outputs
+
+* Terminal UI interactions
+* Generated project archive extraction and output
+* Diagnostics and exit codes
+
+== Define Failure Modes
+
+* Metadata/catalog network failures
+* Validation failures
+* Archive/generation failures

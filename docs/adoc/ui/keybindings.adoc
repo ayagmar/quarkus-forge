@@ -1,0 +1,22 @@
+= UI Keybindings
+:toc:
+
+== Define Purpose
+
+Document keyboard actions and expected behavior parity.
+
+== Define Inputs
+
+* App bindings profile
+* Semantic actions and app-specific chords
+
+== Define Outputs
+
+* Navigation and focus shortcuts
+* Extension list and filter shortcuts
+* Submit/cancel/overlay shortcuts
+
+== Define Failure Modes
+
+* Missing shortcut coverage
+* Behavior drift between bindings and handlers
