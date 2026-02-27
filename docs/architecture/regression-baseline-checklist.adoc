@@ -1,0 +1,33 @@
+= Regression Baseline Checklist
+
+== Purpose
+Track key behavior-parity flows during refactor phases.
+
+== UI Flows
+[ ] TUI startup: root command launches shell with metadata defaults and catalog source status.
+[ ] Focus traversal: `Tab`/`Shift+Tab` order remains deterministic across metadata fields, search, list, submit.
+[ ] Search/list navigation: arrows + vim aliases (`j/k/h/l`, `g/G`) preserve list and section navigation behavior.
+[ ] Extension selection: `Space` toggles selected extension IDs; selection state survives search/filter changes.
+[ ] Favorites and filters: `f`, `Ctrl+K`, `Ctrl+J`, `v`, `x` keep existing semantics.
+[ ] Help/palette overlays: `?` and `Ctrl+P` toggle without corrupting underlying state.
+[ ] Generation submit: valid request enters generation flow and success footer includes build-tool-specific next-step hint.
+[ ] Generation cancellation: `Esc` during loading cancels generation and keeps TUI session alive.
+[ ] Generation error: normalized error message remains user-facing and actionable.
+
+== Headless CLI Flows
+[ ] `quarkus-forge generate --dry-run ...` validates request and reports resolved request without writes.
+[ ] `quarkus-forge generate ...` success returns exit code `0` and extracts under `<output-dir>/<artifact-id>`.
+[ ] Validation/input failures return exit code `2`.
+[ ] Network/API failures return exit code `3`.
+[ ] Archive/output-path failures return exit code `4`.
+[ ] Interrupted/cancelled flows return exit code `130`.
+
+== Persistence and Contract Checks
+[ ] Preferences path remains `~/.quarkus-forge/preferences.json`.
+[ ] Favorites path remains `~/.quarkus-forge/favorites.json`.
+[ ] Catalog snapshot path remains `~/.quarkus-forge/catalog-snapshot.json`.
+[ ] Extension selection semantics remain stable by extension ID (not cursor index).
+[ ] Provider fallback order remains `live -> cache -> snapshot`.
+
+== Usage
+Run this checklist at the end of each phase and record pass/fail evidence in the active phase progress notes.
