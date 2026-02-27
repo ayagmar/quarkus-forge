@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.ayagmar.quarkusforge.ui.AppKeyActions;
 import dev.tamboui.tui.bindings.Actions;
 import dev.tamboui.tui.bindings.Bindings;
 import dev.tamboui.tui.event.KeyEvent;
@@ -33,33 +34,37 @@ class QuarkusForgeCliBindingsProfileTest {
   void profilePreservesGlobalShortcutBindings() {
     Bindings bindings = QuarkusForgeCli.appBindingsProfile();
 
-    assertThat(bindings.actionFor(KeyEvent.ofChar('/'))).contains("app_focus_extension_search");
+    assertThat(bindings.actionFor(KeyEvent.ofChar('/')))
+        .contains(AppKeyActions.FOCUS_EXTENSION_SEARCH);
     assertThat(bindings.actionFor(KeyEvent.ofChar('f', KeyModifiers.CTRL)))
-        .contains("app_focus_extension_search");
+        .contains(AppKeyActions.FOCUS_EXTENSION_SEARCH);
     assertThat(bindings.actionFor(KeyEvent.ofChar('l', KeyModifiers.CTRL)))
-        .contains("app_focus_extension_list");
+        .contains(AppKeyActions.FOCUS_EXTENSION_LIST);
     assertThat(bindings.actionFor(KeyEvent.ofChar('r', KeyModifiers.CTRL)))
-        .contains("app_reload_catalog");
+        .contains(AppKeyActions.RELOAD_CATALOG);
     assertThat(bindings.actionFor(KeyEvent.ofChar('p', KeyModifiers.CTRL)))
-        .contains("app_command_palette");
+        .contains(AppKeyActions.OPEN_COMMAND_PALETTE);
     assertThat(bindings.actionFor(KeyEvent.ofChar('g', KeyModifiers.ALT)))
-        .contains("app_submit_generation");
+        .contains(AppKeyActions.SUBMIT_GENERATION);
   }
 
   @Test
   void profilePreservesExtensionShortcutBindings() {
     Bindings bindings = QuarkusForgeCli.appBindingsProfile();
 
-    assertThat(bindings.actionFor(KeyEvent.ofChar('v'))).contains("app_cycle_category_filter");
-    assertThat(bindings.actionFor(KeyEvent.ofChar('c'))).contains("app_toggle_category");
-    assertThat(bindings.actionFor(KeyEvent.ofChar('C'))).contains("app_open_all_categories");
-    assertThat(bindings.actionFor(KeyEvent.ofChar('x'))).contains("app_clear_selected_extensions");
-    assertThat(bindings.actionFor(KeyEvent.ofChar('f'))).contains("app_toggle_favorite");
+    assertThat(bindings.actionFor(KeyEvent.ofChar('v')))
+        .contains(AppKeyActions.CATEGORY_FILTER_CYCLE);
+    assertThat(bindings.actionFor(KeyEvent.ofChar('c'))).contains(AppKeyActions.TOGGLE_CATEGORY);
+    assertThat(bindings.actionFor(KeyEvent.ofChar('C')))
+        .contains(AppKeyActions.OPEN_ALL_CATEGORIES);
+    assertThat(bindings.actionFor(KeyEvent.ofChar('x')))
+        .contains(AppKeyActions.CLEAR_SELECTED_EXTENSIONS);
+    assertThat(bindings.actionFor(KeyEvent.ofChar('f'))).contains(AppKeyActions.FAVORITE_TOGGLE);
     assertThat(bindings.actionFor(KeyEvent.ofChar('k', KeyModifiers.CTRL)))
-        .contains("app_toggle_favorites_filter");
+        .contains(AppKeyActions.TOGGLE_FAVORITES_FILTER);
     assertThat(bindings.actionFor(KeyEvent.ofChar('j', KeyModifiers.CTRL)))
-        .contains("app_jump_to_favorite");
+        .contains(AppKeyActions.JUMP_TO_FAVORITE);
     assertThat(bindings.actionFor(KeyEvent.ofChar('e', KeyModifiers.CTRL)))
-        .contains("app_toggle_error_details");
+        .contains(AppKeyActions.TOGGLE_ERROR_DETAILS);
   }
 }

@@ -24,6 +24,7 @@ import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
 import dev.ayagmar.quarkusforge.domain.ValidationError;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
+import dev.ayagmar.quarkusforge.ui.AppKeyActions;
 import dev.ayagmar.quarkusforge.ui.CoreTuiController;
 import dev.ayagmar.quarkusforge.ui.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.ui.UiScheduler;
@@ -489,21 +490,6 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   }
 
   private static final class AppBindingsProfile {
-    private static final String ACTION_FOCUS_EXTENSION_SEARCH = "app_focus_extension_search";
-    private static final String ACTION_FOCUS_EXTENSION_LIST = "app_focus_extension_list";
-    private static final String ACTION_TOGGLE_FAVORITES_FILTER = "app_toggle_favorites_filter";
-    private static final String ACTION_JUMP_TO_FAVORITE = "app_jump_to_favorite";
-    private static final String ACTION_RELOAD_CATALOG = "app_reload_catalog";
-    private static final String ACTION_TOGGLE_ERROR_DETAILS = "app_toggle_error_details";
-    private static final String ACTION_CATEGORY_FILTER_CYCLE = "app_cycle_category_filter";
-    private static final String ACTION_TOGGLE_CATEGORY = "app_toggle_category";
-    private static final String ACTION_OPEN_ALL_CATEGORIES = "app_open_all_categories";
-    private static final String ACTION_CLEAR_SELECTED_EXTENSIONS = "app_clear_selected_extensions";
-    private static final String ACTION_FAVORITE_TOGGLE = "app_toggle_favorite";
-    private static final String ACTION_OPEN_HELP = "app_help";
-    private static final String ACTION_OPEN_COMMAND_PALETTE = "app_command_palette";
-    private static final String ACTION_SUBMIT_GENERATION = "app_submit_generation";
-
     private static Bindings bindings() {
       return BindingSets.standard().toBuilder()
           .bind(KeyTrigger.ch('j'), Actions.MOVE_DOWN)
@@ -512,21 +498,21 @@ public final class QuarkusForgeCli implements Callable<Integer> {
           .bind(KeyTrigger.ch('l'), Actions.MOVE_RIGHT)
           .bind(KeyTrigger.ch('g'), Actions.HOME)
           .bind(KeyTrigger.ch('G'), Actions.END)
-          .bind(KeyTrigger.ch('/'), ACTION_FOCUS_EXTENSION_SEARCH)
-          .bind(KeyTrigger.ctrl('f'), ACTION_FOCUS_EXTENSION_SEARCH)
-          .bind(KeyTrigger.ctrl('l'), ACTION_FOCUS_EXTENSION_LIST)
-          .bind(KeyTrigger.ctrl('k'), ACTION_TOGGLE_FAVORITES_FILTER)
-          .bind(KeyTrigger.ctrl('j'), ACTION_JUMP_TO_FAVORITE)
-          .bind(KeyTrigger.ctrl('r'), ACTION_RELOAD_CATALOG)
-          .bind(KeyTrigger.ctrl('e'), ACTION_TOGGLE_ERROR_DETAILS)
-          .bind(KeyTrigger.ch('v'), ACTION_CATEGORY_FILTER_CYCLE)
-          .bind(KeyTrigger.ch('c'), ACTION_TOGGLE_CATEGORY)
-          .bind(KeyTrigger.ch('C'), ACTION_OPEN_ALL_CATEGORIES)
-          .bind(KeyTrigger.ch('x'), ACTION_CLEAR_SELECTED_EXTENSIONS)
-          .bind(KeyTrigger.ch('f'), ACTION_FAVORITE_TOGGLE)
-          .bind(KeyTrigger.ch('?'), ACTION_OPEN_HELP)
-          .bind(KeyTrigger.ctrl('p'), ACTION_OPEN_COMMAND_PALETTE)
-          .bind(KeyTrigger.alt('g'), ACTION_SUBMIT_GENERATION)
+          .bind(KeyTrigger.ch('/'), AppKeyActions.FOCUS_EXTENSION_SEARCH)
+          .bind(KeyTrigger.ctrl('f'), AppKeyActions.FOCUS_EXTENSION_SEARCH)
+          .bind(KeyTrigger.ctrl('l'), AppKeyActions.FOCUS_EXTENSION_LIST)
+          .bind(KeyTrigger.ctrl('k'), AppKeyActions.TOGGLE_FAVORITES_FILTER)
+          .bind(KeyTrigger.ctrl('j'), AppKeyActions.JUMP_TO_FAVORITE)
+          .bind(KeyTrigger.ctrl('r'), AppKeyActions.RELOAD_CATALOG)
+          .bind(KeyTrigger.ctrl('e'), AppKeyActions.TOGGLE_ERROR_DETAILS)
+          .bind(KeyTrigger.ch('v'), AppKeyActions.CATEGORY_FILTER_CYCLE)
+          .bind(KeyTrigger.ch('c'), AppKeyActions.TOGGLE_CATEGORY)
+          .bind(KeyTrigger.ch('C'), AppKeyActions.OPEN_ALL_CATEGORIES)
+          .bind(KeyTrigger.ch('x'), AppKeyActions.CLEAR_SELECTED_EXTENSIONS)
+          .bind(KeyTrigger.ch('f'), AppKeyActions.FAVORITE_TOGGLE)
+          .bind(KeyTrigger.ch('?'), AppKeyActions.OPEN_HELP)
+          .bind(KeyTrigger.ctrl('p'), AppKeyActions.OPEN_COMMAND_PALETTE)
+          .bind(KeyTrigger.alt('g'), AppKeyActions.SUBMIT_GENERATION)
           .build();
     }
   }

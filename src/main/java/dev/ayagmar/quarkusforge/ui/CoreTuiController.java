@@ -2319,63 +2319,39 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private static boolean isCatalogReloadKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && keyEvent.hasCtrl()
-        && (keyEvent.character() == 'r' || keyEvent.character() == 'R');
+    return AppKeyActions.isCatalogReloadKey(keyEvent);
   }
 
   private static boolean isGenerateShortcutKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && keyEvent.hasAlt()
-        && !keyEvent.hasCtrl()
-        && (keyEvent.character() == 'g' || keyEvent.character() == 'G');
+    return AppKeyActions.isGenerateShortcutKey(keyEvent);
   }
 
   private static boolean isFavoriteToggleKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && !keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && (keyEvent.character() == 'f' || keyEvent.character() == 'F');
+    return AppKeyActions.isFavoriteToggleKey(keyEvent);
   }
 
   private static boolean isClearSelectedExtensionsKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && !keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && (keyEvent.character() == 'x' || keyEvent.character() == 'X');
+    return AppKeyActions.isClearSelectedExtensionsKey(keyEvent);
   }
 
   private static boolean isCategoryFilterCycleKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && !keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && (keyEvent.character() == 'v' || keyEvent.character() == 'V');
+    return AppKeyActions.isCategoryFilterCycleKey(keyEvent);
   }
 
   private static boolean isJumpToFavoriteKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && keyEvent.hasCtrl()
-        && (keyEvent.character() == 'j' || keyEvent.character() == 'J');
+    return AppKeyActions.isJumpToFavoriteKey(keyEvent);
   }
 
   private static boolean isFavoritesFilterToggleKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && keyEvent.hasCtrl()
-        && (keyEvent.character() == 'k' || keyEvent.character() == 'K');
+    return AppKeyActions.isFavoritesFilterToggleKey(keyEvent);
   }
 
   private static boolean isCategoryCollapseToggleKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && !keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && keyEvent.character() == 'c';
+    return AppKeyActions.isCategoryCollapseToggleKey(keyEvent);
   }
 
   private static boolean isExpandAllCategoriesKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && !keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && keyEvent.character() == 'C';
+    return AppKeyActions.isExpandAllCategoriesKey(keyEvent);
   }
 
   private static boolean isSectionJumpUpKey(KeyEvent keyEvent) {
@@ -2395,17 +2371,11 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private static boolean isCommandPaletteToggleKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && (keyEvent.character() == 'p' || keyEvent.character() == 'P');
+    return AppKeyActions.isCommandPaletteToggleKey(keyEvent);
   }
 
   private static boolean isHelpOverlayToggleKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && !keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && keyEvent.character() == '?';
+    return AppKeyActions.isHelpOverlayToggleKey(keyEvent);
   }
 
   private static boolean shouldToggleHelpOverlay(KeyEvent keyEvent, FocusTarget currentFocus) {
@@ -2472,9 +2442,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private static boolean isErrorDetailsToggleKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && keyEvent.hasCtrl()
-        && (keyEvent.character() == 'e' || keyEvent.character() == 'E');
+    return AppKeyActions.isErrorDetailsToggleKey(keyEvent);
   }
 
   private static boolean isUpNavigation(KeyEvent keyEvent) {
@@ -2482,19 +2450,14 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private static boolean shouldFocusExtensionSearch(KeyEvent keyEvent, FocusTarget currentFocus) {
-    if (keyEvent.code() != dev.tamboui.tui.event.KeyCode.CHAR) {
-      return false;
-    }
-    if (!keyEvent.hasCtrl() && !keyEvent.hasAlt() && keyEvent.character() == '/') {
+    if (AppKeyActions.isFocusExtensionSearchSlashKey(keyEvent)) {
       return !isTextInputFocus(currentFocus) && currentFocus != FocusTarget.EXTENSION_SEARCH;
     }
-    return keyEvent.hasCtrl() && (keyEvent.character() == 'f' || keyEvent.character() == 'F');
+    return AppKeyActions.isFocusExtensionSearchCtrlKey(keyEvent);
   }
 
   private static boolean shouldFocusExtensionList(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && keyEvent.hasCtrl()
-        && (keyEvent.character() == 'l' || keyEvent.character() == 'L');
+    return AppKeyActions.isFocusExtensionListKey(keyEvent);
   }
 
   private void focusExtensionSearch() {
