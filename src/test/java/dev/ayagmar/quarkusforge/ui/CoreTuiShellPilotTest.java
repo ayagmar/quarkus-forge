@@ -17,8 +17,7 @@ import org.junit.jupiter.api.Test;
 class CoreTuiShellPilotTest {
   @Test
   void focusTraversalCyclesWithTabAndShiftTab() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
 
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
 
@@ -31,8 +30,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void listNavigationAndSpaceToggleAreRoutedWhenListIsFocused() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     CoreTuiController.UiAction downAction = controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
@@ -45,8 +43,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void vimListMotionsJAndKNavigateCatalogRows() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     String firstId = controller.focusedListExtensionId();
 
@@ -60,8 +57,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void enterSubmitsWhenValidAndBlocksWhenValidationFails() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     assertThat(controller.submitRequested()).isTrue();
@@ -79,8 +75,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void altGSubmitsWithoutChangingFocusedField() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
 
     CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofChar('g', KeyModifiers.ALT));
@@ -94,8 +89,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void enterSubmitsInsteadOfTogglingWhenExtensionListIsFocused() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
@@ -107,8 +101,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void fixingInputWithoutChangingFocusClearsBlockedSubmitErrorFromFooter() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.ARTIFACT_ID);
 
     controller.onEvent(KeyEvent.ofChar('X'));
@@ -126,8 +119,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void blockedSubmitFeedbackRecoversEvenIfStatusMessageChangesBeforeFix() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.ARTIFACT_ID);
 
     controller.onEvent(KeyEvent.ofChar('X'));
@@ -144,8 +136,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void slashShortcutJumpsFocusToExtensionSearch() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.SUBMIT);
 
     controller.onEvent(KeyEvent.ofChar('/'));
@@ -156,8 +147,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void questionMarkTogglesHelpOverlay() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.SUBMIT);
 
     controller.onEvent(KeyEvent.ofChar('?'));
@@ -175,8 +165,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void questionMarkOpensHelpWhenExtensionSearchIsFocused() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
 
     controller.onEvent(KeyEvent.ofChar('?'));
@@ -187,8 +176,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void ctrlPTogglesCommandPaletteOverlay() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
 
     controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
     String opened = UiControllerTestHarness.renderToString(controller);
@@ -204,8 +192,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void commandPaletteRunsSelectedAction() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
 
     controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
@@ -219,8 +206,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void slashIsInsertedInOutputDirectoryWithoutStealingFocus() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.OUTPUT_DIR);
 
     CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofChar('/'));
@@ -233,8 +219,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void questionMarkIsInsertedInGroupIdWithoutOpeningHelp() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.GROUP_ID);
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
 
@@ -247,8 +232,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void ctrlFAndCtrlLShortcutsJumpBetweenSearchAndList() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
 
     controller.onEvent(KeyEvent.ofChar('f', KeyModifiers.CTRL));
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_SEARCH);
@@ -259,8 +243,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void submitFocusSupportsVimJkTraversal() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.SUBMIT);
 
     controller.onEvent(KeyEvent.ofChar('k'));
@@ -273,8 +256,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void searchAndListSupportDirectArrowHandoff() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
@@ -286,8 +268,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void searchInputTitleShowsLiveMatchCounters() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
 
     assertThat(UiControllerTestHarness.renderToString(controller)).contains("7 shown");
 
@@ -302,8 +283,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void escapeClearsExtensionSearchBeforeQuitWhenSearchInputIsFocused() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
     controller.onEvent(KeyEvent.ofChar('j'));
     controller.onEvent(KeyEvent.ofChar('d'));
@@ -329,8 +309,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void escapeClearsExtensionSearchBeforeQuitWhenListIsFocused() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
     controller.onEvent(KeyEvent.ofChar('j'));
     controller.onEvent(KeyEvent.ofChar('d'));
@@ -352,8 +331,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void escapeDisablesFavoritesFilterBeforeQuitWhenListIsFocused() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     controller.onEvent(KeyEvent.ofChar('k', KeyModifiers.CTRL));
@@ -372,8 +350,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void escapeClearsCategoryFilterBeforeQuitWhenListIsFocused() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
@@ -405,8 +382,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void xClearsSelectedExtensionsWhenListIsFocused() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     controller.onEvent(KeyEvent.ofChar(' '));
@@ -426,8 +402,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void vCyclesCategoryFilterAcrossVisibleCategories() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
@@ -465,8 +440,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void categoryFilterStacksWithSearchQuery() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
@@ -495,8 +469,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void collapsedCategoryStateSurvivesCategoryFilterCycle() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
@@ -527,8 +500,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void qNoLongerTriggersQuitByDefault() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.GROUP_ID);
 
     CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofChar('q'));
@@ -540,8 +512,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void ctrlCStillQuitsFromShell() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
 
     CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofChar('c', KeyModifiers.CTRL));
 
@@ -551,8 +522,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void listNavigationSkipsSectionHeadersAcrossCategoryBoundaries() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
@@ -585,8 +555,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void favoriteQuickActionsToggleJumpAndFilterRemainDeterministic() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
@@ -620,8 +589,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void categoryCloseAndOpenAllKeysWorkWhileBrowsingList() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
@@ -654,8 +622,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void leftAndRightSupportSectionHierarchyNavigation() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
@@ -693,8 +660,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void spaceOnCategoryHeaderReopensClosedCategory() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
@@ -721,8 +687,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void pageUpAndPageDownJumpBetweenCategorySections() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
@@ -756,8 +721,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void categoryCloseCanBeUndoneWithSameKeyAndListNavigationRemainsPredictable() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
@@ -791,8 +755,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void allCollapsedCategoriesStillSupportHeaderNavigationAndReopen() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
@@ -832,8 +795,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void categoryCloseFromRecentlySelectedItemDoesNotCollapseUnderlyingCategory() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     controller.onEvent(KeyEvent.ofChar(' '));
@@ -848,8 +810,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void pageUpSkipsRecentlySelectedPseudoSection() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     controller.onEvent(KeyEvent.ofChar(' '));
@@ -864,8 +825,7 @@ class CoreTuiShellPilotTest {
 
   @Test
   void metadataSelectorsCycleFromLoadedOptionsAndBlockFreeTextEdits() {
-    CoreTuiController controller =
-        CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
+    CoreTuiController controller = UiControllerTestHarness.controller();
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(

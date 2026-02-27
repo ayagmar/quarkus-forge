@@ -25,8 +25,7 @@ class CoreTuiExtensionSearchPilotTest {
   @Test
   void apiLoadedCatalogIsIndexedAndSearchable() {
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+        UiControllerTestHarness.controller(UiScheduler.immediate(), Duration.ZERO);
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
@@ -52,8 +51,7 @@ class CoreTuiExtensionSearchPilotTest {
   @Test
   void selectionByStableIdPersistsAcrossFiltering() {
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+        UiControllerTestHarness.controller(UiScheduler.immediate(), Duration.ZERO);
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
@@ -86,8 +84,7 @@ class CoreTuiExtensionSearchPilotTest {
   @Test
   void failedCatalogLoadKeepsFallbackCatalogAndShowsError() {
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+        UiControllerTestHarness.controller(UiScheduler.immediate(), Duration.ZERO);
 
     controller.loadExtensionCatalogAsync(
         () -> CompletableFuture.failedFuture(new IllegalStateException("network down")));
@@ -101,8 +98,7 @@ class CoreTuiExtensionSearchPilotTest {
   @Test
   void synchronousCatalogLoaderFailureKeepsFallbackCatalogAndShowsError() {
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+        UiControllerTestHarness.controller(UiScheduler.immediate(), Duration.ZERO);
 
     controller.loadExtensionCatalogAsync(
         () -> {
@@ -118,8 +114,7 @@ class CoreTuiExtensionSearchPilotTest {
   @Test
   void nullCatalogLoaderFutureKeepsFallbackCatalogAndShowsError() {
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+        UiControllerTestHarness.controller(UiScheduler.immediate(), Duration.ZERO);
 
     controller.loadExtensionCatalogAsync(() -> null);
 
@@ -132,8 +127,7 @@ class CoreTuiExtensionSearchPilotTest {
   @Test
   void emptyCatalogLoadKeepsFallbackCatalogAndShowsError() {
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+        UiControllerTestHarness.controller(UiScheduler.immediate(), Duration.ZERO);
 
     controller.loadExtensionCatalogAsync(
         () ->
@@ -149,8 +143,7 @@ class CoreTuiExtensionSearchPilotTest {
   @Test
   void selectionsArePrunedWhenCatalogReloadRemovesIds() {
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+        UiControllerTestHarness.controller(UiScheduler.immediate(), Duration.ZERO);
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     controller.onEvent(KeyEvent.ofChar(' '));
     assertThat(controller.selectedExtensionIds()).hasSize(1);
@@ -218,8 +211,7 @@ class CoreTuiExtensionSearchPilotTest {
   @Test
   void cachedCatalogResultShowsSourceAndStaleIndicator() {
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+        UiControllerTestHarness.controller(UiScheduler.immediate(), Duration.ZERO);
 
     controller.loadExtensionCatalogAsync(
         () ->
@@ -240,8 +232,7 @@ class CoreTuiExtensionSearchPilotTest {
   @Test
   void ctrlRReloadsCatalogWithoutRestart() {
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+        UiControllerTestHarness.controller(UiScheduler.immediate(), Duration.ZERO);
     AtomicInteger callCount = new AtomicInteger();
 
     controller.loadExtensionCatalogAsync(
@@ -275,8 +266,7 @@ class CoreTuiExtensionSearchPilotTest {
   @Test
   void failedReloadKeepsPreviouslyLoadedCatalogSourceAndItems() {
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+        UiControllerTestHarness.controller(UiScheduler.immediate(), Duration.ZERO);
 
     controller.loadExtensionCatalogAsync(
         () ->
@@ -304,8 +294,7 @@ class CoreTuiExtensionSearchPilotTest {
   @Test
   void extensionListAutoScrollKeepsDeepSelectionVisible() {
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+        UiControllerTestHarness.controller(UiScheduler.immediate(), Duration.ZERO);
     List<ExtensionDto> manyExtensions = new ArrayList<>();
     for (int i = 0; i < 120; i++) {
       String suffix = "%03d".formatted(i);
@@ -331,8 +320,7 @@ class CoreTuiExtensionSearchPilotTest {
   @Test
   void catalogUsesStableCategorySectionHeaders() {
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+        UiControllerTestHarness.controller(UiScheduler.immediate(), Duration.ZERO);
 
     controller.loadExtensionCatalogAsync(
         () ->
@@ -354,8 +342,7 @@ class CoreTuiExtensionSearchPilotTest {
   @Test
   void listOrderFollowsRankingAcrossCategories() {
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+        UiControllerTestHarness.controller(UiScheduler.immediate(), Duration.ZERO);
 
     controller.loadExtensionCatalogAsync(
         () ->
@@ -376,8 +363,7 @@ class CoreTuiExtensionSearchPilotTest {
   @Test
   void favoritingDoesNotOverrideApiOrderPrecedenceInList() {
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+        UiControllerTestHarness.controller(UiScheduler.immediate(), Duration.ZERO);
 
     controller.loadExtensionCatalogAsync(
         () ->
@@ -398,8 +384,7 @@ class CoreTuiExtensionSearchPilotTest {
   @Test
   void selectionAndFavoriteRemainStableWhenCatalogOrderChanges() {
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+        UiControllerTestHarness.controller(UiScheduler.immediate(), Duration.ZERO);
     String favoriteId = "io.quarkus:quarkus-rest";
     String otherId = "io.quarkus:quarkus-arc";
 
@@ -456,8 +441,7 @@ class CoreTuiExtensionSearchPilotTest {
   @Test
   void selectingExtensionShowsRecentlySelectedSection() {
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
+        UiControllerTestHarness.controller(UiScheduler.immediate(), Duration.ZERO);
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     controller.onEvent(KeyEvent.ofChar(' '));
 

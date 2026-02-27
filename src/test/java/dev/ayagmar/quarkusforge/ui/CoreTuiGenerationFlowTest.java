@@ -18,11 +18,8 @@ class CoreTuiGenerationFlowTest {
     UiControllerTestHarness.ControlledGenerationRunner generationRunner =
         new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(),
-            UiScheduler.immediate(),
-            Duration.ZERO,
-            generationRunner);
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
@@ -49,11 +46,8 @@ class CoreTuiGenerationFlowTest {
     UiControllerTestHarness.ControlledGenerationRunner generationRunner =
         new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(),
-            UiScheduler.immediate(),
-            Duration.ZERO,
-            generationRunner);
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     generationRunner.complete(Path.of("build/generated-project"));
@@ -73,11 +67,8 @@ class CoreTuiGenerationFlowTest {
     UiControllerTestHarness.ControlledGenerationRunner generationRunner =
         new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(),
-            UiScheduler.immediate(),
-            Duration.ZERO,
-            generationRunner);
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     generationRunner.complete(Path.of("build/generated-project"));
@@ -101,11 +92,8 @@ class CoreTuiGenerationFlowTest {
     UiControllerTestHarness.ControlledGenerationRunner generationRunner =
         new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(),
-            UiScheduler.immediate(),
-            Duration.ZERO,
-            generationRunner);
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
@@ -119,11 +107,8 @@ class CoreTuiGenerationFlowTest {
     UiControllerTestHarness.ControlledGenerationRunner generationRunner =
         new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(),
-            UiScheduler.immediate(),
-            Duration.ZERO,
-            generationRunner);
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
@@ -141,11 +126,8 @@ class CoreTuiGenerationFlowTest {
     UiControllerTestHarness.ControlledGenerationRunner generationRunner =
         new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(),
-            UiScheduler.immediate(),
-            Duration.ZERO,
-            generationRunner);
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     CoreTuiController.UiAction cancelAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
@@ -206,11 +188,8 @@ class CoreTuiGenerationFlowTest {
     UiControllerTestHarness.ControlledGenerationRunner generationRunner =
         new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(),
-            UiScheduler.immediate(),
-            Duration.ZERO,
-            generationRunner);
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     generationRunner.fail(new RuntimeException("download failed"));
@@ -228,11 +207,8 @@ class CoreTuiGenerationFlowTest {
     UiControllerTestHarness.ControlledGenerationRunner generationRunner =
         new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(),
-            UiScheduler.immediate(),
-            Duration.ZERO,
-            generationRunner);
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     generationRunner.fail(new ApiHttpException(400, "<binary>"));
@@ -328,11 +304,8 @@ class CoreTuiGenerationFlowTest {
     UiControllerTestHarness.ControlledGenerationRunner generationRunner =
         new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(),
-            UiScheduler.immediate(),
-            Duration.ZERO,
-            generationRunner);
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
@@ -403,11 +376,8 @@ class CoreTuiGenerationFlowTest {
     UiControllerTestHarness.ControlledGenerationRunner generationRunner =
         new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(),
-            UiScheduler.immediate(),
-            Duration.ZERO,
-            generationRunner);
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
