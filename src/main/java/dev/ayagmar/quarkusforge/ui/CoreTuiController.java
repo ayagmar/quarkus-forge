@@ -146,6 +146,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   private final GenerationStateTracker generationStateTracker;
   private final FooterLinesComposer footerLinesComposer;
   private final AsyncRepaintSignal asyncRepaintSignal;
+  private final UiEventRouter uiEventRouter;
+  private final UiEventRouter.RoutingContext eventRoutingContext;
   private CompletableFuture<Path> generationFuture;
   private long generationStartedAtNanos;
   private volatile boolean generationCancelRequested;
@@ -199,6 +201,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     generationStateTracker = new GenerationStateTracker();
     footerLinesComposer = new FooterLinesComposer();
     asyncRepaintSignal = new AsyncRepaintSignal();
+    uiEventRouter = new UiEventRouter();
+    eventRoutingContext = new ControllerRoutingContext();
     generationFuture = null;
     generationStartedAtNanos = 0L;
     generationCancelRequested = false;
@@ -348,27 +352,10 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     if (!(event instanceof KeyEvent keyEvent)) {
       return UiAction.ignored();
     }
-    UiAction helpOverlayAction = handleHelpOverlayKey(keyEvent);
-    if (helpOverlayAction != null) {
-      return helpOverlayAction;
-    }
-    if (shouldToggleHelpOverlay(keyEvent, focusTarget)) {
-      toggleHelpOverlay();
-      return UiAction.handled(false);
-    }
-    if (isCommandPaletteToggleKey(keyEvent)) {
-      toggleCommandPalette();
-      return UiAction.handled(false);
-    }
-    UiAction commandPaletteAction = handleCommandPaletteKey(keyEvent);
-    if (commandPaletteAction != null) {
-      return commandPaletteAction;
-    }
-    UiAction postGenerationAction = handlePostGenerationMenuKey(keyEvent);
-    if (postGenerationAction != null) {
-      return postGenerationAction;
-    }
+    return uiEventRouter.routeKeyEvent(keyEvent, eventRoutingContext);
+  }
 
+  private UiAction handleExtensionCancelFlow(KeyEvent keyEvent) {
     if (shouldClearExtensionSearchOnCancel(keyEvent)) {
       clearExtensionSearchFilter();
       return UiAction.handled(false);
@@ -385,24 +372,31 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       focusExtensionList();
       return UiAction.handled(false);
     }
+    return null;
+  }
 
-    if (shouldQuitKeyEvent(keyEvent)) {
-      if (isGenerationInProgress()) {
-        requestGenerationCancellation();
-        return UiAction.handled(false);
-      }
-      cancelPendingAsyncOperations();
-      return UiAction.handled(true);
+  private UiAction handleQuitFlow(KeyEvent keyEvent) {
+    if (!shouldQuitKeyEvent(keyEvent)) {
+      return null;
     }
-
     if (isGenerationInProgress()) {
-      if (keyEvent.isConfirm()) {
-        statusMessage = "Generation already in progress. Press Esc to cancel.";
-        return UiAction.handled(false);
-      }
-      statusMessage = "Generation in progress. Press Esc to cancel.";
+      requestGenerationCancellation();
       return UiAction.handled(false);
     }
+    cancelPendingAsyncOperations();
+    return UiAction.handled(true);
+  }
+
+  private UiAction handleWhileGenerationInProgress(KeyEvent keyEvent) {
+    if (keyEvent.isConfirm()) {
+      statusMessage = "Generation already in progress. Press Esc to cancel.";
+      return UiAction.handled(false);
+    }
+    statusMessage = "Generation in progress. Press Esc to cancel.";
+    return UiAction.handled(false);
+  }
+
+  private UiAction handleGlobalShortcutFlow(KeyEvent keyEvent) {
     if (shouldFocusExtensionSearch(keyEvent, focusTarget)) {
       focusExtensionSearch();
       return UiAction.handled(false);
@@ -427,6 +421,10 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       toggleErrorDetails();
       return UiAction.handled(false);
     }
+    return null;
+  }
+
+  private UiAction handleFocusNavigationFlow(KeyEvent keyEvent) {
     if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && keyEvent.hasShift()) {
       moveFocus(-1);
       return UiAction.handled(false);
@@ -453,12 +451,18 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
         return UiAction.handled(false);
       }
     }
+    return null;
+  }
 
+  private UiAction handleSubmitFlow(KeyEvent keyEvent) {
     if (keyEvent.isConfirm() || isGenerateShortcutKey(keyEvent)) {
       handleSubmitRequest();
       return UiAction.handled(false);
     }
+    return null;
+  }
 
+  private UiAction handleExtensionFocusFlow(KeyEvent keyEvent) {
     if (focusTarget == FocusTarget.EXTENSION_SEARCH && keyEvent.isDown()) {
       focusExtensionList();
       return UiAction.handled(false);
@@ -511,19 +515,24 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       expandAllCategories();
       return UiAction.handled(false);
     }
-
     if (focusTarget == FocusTarget.EXTENSION_LIST
         && extensionCatalogState.handleListKeys(
             keyEvent, toggledName -> statusMessage = "Toggled extension: " + toggledName)) {
       return UiAction.handled(false);
     }
+    return null;
+  }
 
+  private UiAction handleMetadataSelectorFlow(KeyEvent keyEvent) {
     if (isMetadataSelectorFocus(focusTarget) && handleMetadataSelectorKey(focusTarget, keyEvent)) {
       revalidate();
       refreshValidationFeedbackAfterEdit();
       return UiAction.handled(false);
     }
+    return null;
+  }
 
+  private UiAction handleTextInputFlow(KeyEvent keyEvent) {
     if (isTextInputFocus(focusTarget)
         && handleTextInputKey(inputStates.get(focusTarget), keyEvent)) {
       if (focusTarget == FocusTarget.EXTENSION_SEARCH) {
@@ -535,8 +544,94 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       }
       return UiAction.handled(false);
     }
+    return null;
+  }
 
-    return UiAction.ignored();
+  private final class ControllerRoutingContext implements UiEventRouter.RoutingContext {
+    @Override
+    public UiAction handleHelpOverlayKey(KeyEvent keyEvent) {
+      return CoreTuiController.this.handleHelpOverlayKey(keyEvent);
+    }
+
+    @Override
+    public boolean shouldToggleHelpOverlay(KeyEvent keyEvent) {
+      return CoreTuiController.shouldToggleHelpOverlay(keyEvent, focusTarget);
+    }
+
+    @Override
+    public void toggleHelpOverlay() {
+      CoreTuiController.this.toggleHelpOverlay();
+    }
+
+    @Override
+    public boolean isCommandPaletteToggleKey(KeyEvent keyEvent) {
+      return CoreTuiController.isCommandPaletteToggleKey(keyEvent);
+    }
+
+    @Override
+    public void toggleCommandPalette() {
+      CoreTuiController.this.toggleCommandPalette();
+    }
+
+    @Override
+    public UiAction handleCommandPaletteKey(KeyEvent keyEvent) {
+      return CoreTuiController.this.handleCommandPaletteKey(keyEvent);
+    }
+
+    @Override
+    public UiAction handlePostGenerationMenuKey(KeyEvent keyEvent) {
+      return CoreTuiController.this.handlePostGenerationMenuKey(keyEvent);
+    }
+
+    @Override
+    public UiAction handleExtensionCancelFlow(KeyEvent keyEvent) {
+      return CoreTuiController.this.handleExtensionCancelFlow(keyEvent);
+    }
+
+    @Override
+    public UiAction handleQuitFlow(KeyEvent keyEvent) {
+      return CoreTuiController.this.handleQuitFlow(keyEvent);
+    }
+
+    @Override
+    public boolean isGenerationInProgress() {
+      return CoreTuiController.this.isGenerationInProgress();
+    }
+
+    @Override
+    public UiAction handleWhileGenerationInProgress(KeyEvent keyEvent) {
+      return CoreTuiController.this.handleWhileGenerationInProgress(keyEvent);
+    }
+
+    @Override
+    public UiAction handleGlobalShortcutFlow(KeyEvent keyEvent) {
+      return CoreTuiController.this.handleGlobalShortcutFlow(keyEvent);
+    }
+
+    @Override
+    public UiAction handleFocusNavigationFlow(KeyEvent keyEvent) {
+      return CoreTuiController.this.handleFocusNavigationFlow(keyEvent);
+    }
+
+    @Override
+    public UiAction handleSubmitFlow(KeyEvent keyEvent) {
+      return CoreTuiController.this.handleSubmitFlow(keyEvent);
+    }
+
+    @Override
+    public UiAction handleExtensionFocusFlow(KeyEvent keyEvent) {
+      return CoreTuiController.this.handleExtensionFocusFlow(keyEvent);
+    }
+
+    @Override
+    public UiAction handleMetadataSelectorFlow(KeyEvent keyEvent) {
+      return CoreTuiController.this.handleMetadataSelectorFlow(keyEvent);
+    }
+
+    @Override
+    public UiAction handleTextInputFlow(KeyEvent keyEvent) {
+      return CoreTuiController.this.handleTextInputFlow(keyEvent);
+    }
   }
 
   public void setStartupOverlayMinDuration(Duration minimumDuration) {
