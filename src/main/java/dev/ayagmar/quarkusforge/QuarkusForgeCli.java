@@ -196,74 +196,8 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       RuntimeConfig runtimeConfig,
       DiagnosticLogger diagnostics)
       throws Exception {
-    diagnostics.info(
-        "tui.session.start",
-        Map.of("smokeMode", false, "searchDebounceMs", Math.max(0, searchDebounceMs)));
-    configureTerminalBackendPreference();
-    TuiConfig tuiConfig = TuiConfig.builder().tickRate(TUI_TICK_RATE).build();
-    try (var tui = TuiRunner.create(tuiConfig)) {
-      QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
-      CatalogDataService catalogDataService =
-          new CatalogDataService(
-              apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
-      AtomicBoolean firstCatalogLoad = new AtomicBoolean(true);
-      ProjectArchiveService projectArchiveService =
-          new ProjectArchiveService(apiClient, new SafeZipExtractor());
-      CoreTuiController controller =
-          CoreTuiController.from(
-              initialState,
-              UiScheduler.fromScheduledExecutor(tui.scheduler(), tui::runOnRenderThread),
-              Duration.ofMillis(Math.max(0, searchDebounceMs)),
-              (generationRequest, outputDirectory, cancelled, progressListener) ->
-                  projectArchiveService.downloadAndExtract(
-                      generationRequest,
-                      outputDirectory,
-                      OverwritePolicy.FAIL_IF_EXISTS,
-                      cancelled,
-                      progress ->
-                          progressListener.accept(
-                              switch (progress) {
-                                case REQUESTING_ARCHIVE ->
-                                    CoreTuiController.GenerationProgressUpdate.requestingArchive(
-                                        "requesting project archive from Quarkus API...");
-                                case EXTRACTING_ARCHIVE ->
-                                    CoreTuiController.GenerationProgressUpdate.extractingArchive(
-                                        "extracting project archive...");
-                              })),
-              ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile()),
-              CoreTuiController.defaultFavoritesPersistenceExecutor());
-      controller.setStartupOverlayMinDuration(STARTUP_SPLASH_MIN_DURATION);
-      controller.loadExtensionCatalogAsync(
-          () -> {
-            diagnostics.info("catalog.load.start", Map.of("mode", "tui"));
-            CompletableFuture<CatalogData> catalogLoadFuture =
-                firstCatalogLoad.getAndSet(false)
-                    ? catalogDataService.loadForStartup()
-                    : catalogDataService.load();
-            return catalogLoadFuture.handle(QuarkusForgeCli.catalogLoadDiagnostics(diagnostics));
-          });
-
-      tui.run(
-          (event, runner) -> {
-            CoreTuiController.UiAction action = controller.onEvent(event);
-            if (action.shouldQuit()) {
-              diagnostics.info("tui.session.quit.requested", Map.of("reason", "user"));
-              runner.quit();
-            }
-            return action.handled();
-          },
-          controller::render);
-      diagnostics.info("tui.session.exit", Map.of("outcome", "completed"));
-      return new TuiSessionSummary(
-          controller.request(), controller.postGenerationExitPlan().orElse(null));
-    } catch (Exception exception) {
-      diagnostics.error(
-          "tui.session.failure",
-          Map.of(
-              "causeType", exception.getClass().getSimpleName(),
-              "message", ErrorMessageMapper.userFriendlyError(exception)));
-      throw exception;
-    }
+    return new TuiBootstrapService()
+        .run(initialState, searchDebounceMs, runtimeConfig, diagnostics);
   }
 
   int runSmokeForTest(boolean verbose) {
@@ -1011,6 +945,84 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     @Override
     public Integer call() {
       return rootCommand.runHeadlessGenerate(this);
+    }
+  }
+
+  static final class TuiBootstrapService {
+    TuiSessionSummary run(
+        ForgeUiState initialState,
+        int searchDebounceMs,
+        RuntimeConfig runtimeConfig,
+        DiagnosticLogger diagnostics)
+        throws Exception {
+      diagnostics.info(
+          "tui.session.start",
+          Map.of("smokeMode", false, "searchDebounceMs", Math.max(0, searchDebounceMs)));
+      configureTerminalBackendPreference();
+      TuiConfig tuiConfig = TuiConfig.builder().tickRate(TUI_TICK_RATE).build();
+      try (var tui = TuiRunner.create(tuiConfig)) {
+        QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
+        CatalogDataService catalogDataService =
+            new CatalogDataService(
+                apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
+        AtomicBoolean firstCatalogLoad = new AtomicBoolean(true);
+        ProjectArchiveService projectArchiveService =
+            new ProjectArchiveService(apiClient, new SafeZipExtractor());
+        CoreTuiController controller =
+            CoreTuiController.from(
+                initialState,
+                UiScheduler.fromScheduledExecutor(tui.scheduler(), tui::runOnRenderThread),
+                Duration.ofMillis(Math.max(0, searchDebounceMs)),
+                (generationRequest, outputDirectory, cancelled, progressListener) ->
+                    projectArchiveService.downloadAndExtract(
+                        generationRequest,
+                        outputDirectory,
+                        OverwritePolicy.FAIL_IF_EXISTS,
+                        cancelled,
+                        progress ->
+                            progressListener.accept(
+                                switch (progress) {
+                                  case REQUESTING_ARCHIVE ->
+                                      CoreTuiController.GenerationProgressUpdate.requestingArchive(
+                                          "requesting project archive from Quarkus API...");
+                                  case EXTRACTING_ARCHIVE ->
+                                      CoreTuiController.GenerationProgressUpdate.extractingArchive(
+                                          "extracting project archive...");
+                                })),
+                ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile()),
+                CoreTuiController.defaultFavoritesPersistenceExecutor());
+        controller.setStartupOverlayMinDuration(STARTUP_SPLASH_MIN_DURATION);
+        controller.loadExtensionCatalogAsync(
+            () -> {
+              diagnostics.info("catalog.load.start", Map.of("mode", "tui"));
+              CompletableFuture<CatalogData> catalogLoadFuture =
+                  firstCatalogLoad.getAndSet(false)
+                      ? catalogDataService.loadForStartup()
+                      : catalogDataService.load();
+              return catalogLoadFuture.handle(QuarkusForgeCli.catalogLoadDiagnostics(diagnostics));
+            });
+
+        tui.run(
+            (event, runner) -> {
+              CoreTuiController.UiAction action = controller.onEvent(event);
+              if (action.shouldQuit()) {
+                diagnostics.info("tui.session.quit.requested", Map.of("reason", "user"));
+                runner.quit();
+              }
+              return action.handled();
+            },
+            controller::render);
+        diagnostics.info("tui.session.exit", Map.of("outcome", "completed"));
+        return new TuiSessionSummary(
+            controller.request(), controller.postGenerationExitPlan().orElse(null));
+      } catch (Exception exception) {
+        diagnostics.error(
+            "tui.session.failure",
+            Map.of(
+                "causeType", exception.getClass().getSimpleName(),
+                "message", ErrorMessageMapper.userFriendlyError(exception)));
+        throw exception;
+      }
     }
   }
 
