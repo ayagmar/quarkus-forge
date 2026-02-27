@@ -37,7 +37,7 @@ class FooterLinesComposerTest {
   }
 
   @Test
-  void expandedErrorDetailsAreTruncatedOnNarrowViewports() {
+  void expandedErrorDetailsAreNotViewportTruncated() {
     FooterLinesComposer.FooterSnapshot snapshot =
         snapshotBuilder()
             .activeErrorDetails("0123456789abcdefghijklmnopqrstuvwxyz")
@@ -47,7 +47,7 @@ class FooterLinesComposerTest {
     List<String> lines = composer.compose(16, snapshot);
 
     assertThat(lines).contains("Error details:");
-    assertThat(lines).anyMatch(line -> line.endsWith("..."));
+    assertThat(String.join("\n", lines)).contains("0123456789abcdefghijklmnopqrstuvwxyz");
   }
 
   @Test
@@ -138,6 +138,7 @@ class FooterLinesComposerTest {
     private boolean postGenerationMenuVisible;
     private String statusMessage = "Ready";
     private String activeErrorDetails = "";
+    private String verboseErrorDetails = "";
     private boolean showErrorDetails;
     private String successHint = "";
 
@@ -175,6 +176,7 @@ class FooterLinesComposerTest {
           postGenerationMenuVisible,
           statusMessage,
           activeErrorDetails,
+          verboseErrorDetails,
           showErrorDetails,
           successHint);
     }

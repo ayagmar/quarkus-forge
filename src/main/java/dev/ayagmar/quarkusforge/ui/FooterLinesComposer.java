@@ -5,21 +5,32 @@ import java.util.List;
 import java.util.Objects;
 
 final class FooterLinesComposer {
+  private static final int MAX_ERROR_DETAIL_CHARS = 4000;
+
   List<String> compose(int width, FooterSnapshot snapshot) {
     Objects.requireNonNull(snapshot);
     List<String> lines = new ArrayList<>();
     lines.add(statusLine(snapshot));
 
     if (!snapshot.activeErrorDetails().isBlank()) {
+      boolean hasExtraDetails =
+          !snapshot.verboseErrorDetails().isBlank()
+              && !snapshot.verboseErrorDetails().equals(snapshot.activeErrorDetails());
+      String errorLine =
+          "Error: "
+              + snapshot.activeErrorDetails()
+              + (hasExtraDetails ? " (Ctrl+E for details)" : "");
+      lines.add(errorLine);
+
       if (snapshot.showErrorDetails()) {
+        String verbose =
+            snapshot.verboseErrorDetails().isBlank()
+                ? snapshot.activeErrorDetails()
+                : snapshot.verboseErrorDetails();
         lines.add("Error details:");
-        String detail = snapshot.activeErrorDetails();
-        if (detail.length() > width) {
-          detail = detail.substring(0, Math.max(0, width - 3)) + "...";
+        for (String detailLine : splitAndCapDetails(verbose)) {
+          lines.add(detailLine);
         }
-        lines.add(detail);
-      } else {
-        lines.add("Error: " + snapshot.activeErrorDetails());
       }
     }
 
@@ -37,6 +48,25 @@ final class FooterLinesComposer {
 
   private static String statusLine(FooterSnapshot snapshot) {
     return "Status: " + snapshot.statusMessage();
+  }
+
+  private static List<String> splitAndCapDetails(String raw) {
+    String normalized = raw == null ? "" : raw;
+    if (normalized.length() > MAX_ERROR_DETAIL_CHARS) {
+      normalized = normalized.substring(0, MAX_ERROR_DETAIL_CHARS - 3) + "...";
+    }
+
+    // Keep newlines meaningful: split into lines, but avoid blank spam.
+    String[] parts = normalized.replace("\r", "").split("\n");
+    List<String> lines = new ArrayList<>();
+    for (String part : parts) {
+      String trimmed = part == null ? "" : part.strip();
+      if (trimmed.isBlank()) {
+        continue;
+      }
+      lines.add(trimmed);
+    }
+    return lines.isEmpty() ? List.of(normalized.strip()) : List.copyOf(lines);
   }
 
   private static String footerHintLine(int width, FooterSnapshot snapshot) {
@@ -83,12 +113,14 @@ final class FooterLinesComposer {
       boolean postGenerationMenuVisible,
       String statusMessage,
       String activeErrorDetails,
+      String verboseErrorDetails,
       boolean showErrorDetails,
       String successHint) {
     FooterSnapshot {
       focusTarget = Objects.requireNonNull(focusTarget);
       statusMessage = normalize(statusMessage);
       activeErrorDetails = normalize(activeErrorDetails);
+      verboseErrorDetails = normalize(verboseErrorDetails);
       successHint = normalize(successHint);
     }
 

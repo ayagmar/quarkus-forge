@@ -865,6 +865,7 @@ class CoreTuiShellPilotTest {
     assertThat(controller.statusMessage()).contains("No previous category section");
   }
 
+
   @Test
   void metadataSelectorsCycleFromLoadedOptionsAndBlockFreeTextEdits() {
     CoreTuiController controller =

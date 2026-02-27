@@ -419,14 +419,58 @@ public final class QuarkusApiClient {
         .build();
   }
 
+  private static final int MAX_ERROR_BODY_BYTES = 16 * 1024;
+
   private <T> HttpResponse<T> assertSuccessful(HttpResponse<T> response) {
     int status = response.statusCode();
     if (status < 200 || status >= 300) {
-      String responseBody =
-          response.body() instanceof String ? (String) response.body() : "<binary>";
-      throw new ApiHttpException(status, responseBody);
+      throw new ApiHttpException(status, extractErrorBody(response));
     }
     return response;
+  }
+
+  private static String extractErrorBody(HttpResponse<?> response) {
+    Object body = response.body();
+    if (body == null) {
+      return "";
+    }
+    if (body instanceof String text) {
+      return text;
+    }
+    if (body instanceof byte[] bytes) {
+      return decodeBytesAsUtf8OrBinary(bytes);
+    }
+    if (body instanceof Path path) {
+      try {
+        if (!Files.exists(path)) {
+          return "";
+        }
+        try (java.io.InputStream inputStream = Files.newInputStream(path)) {
+          byte[] bytes = inputStream.readNBytes(MAX_ERROR_BODY_BYTES);
+          return decodeBytesAsUtf8OrBinary(bytes);
+        }
+      } catch (IOException ignored) {
+        return "<binary>";
+      }
+    }
+    return "<binary>";
+  }
+
+  private static String decodeBytesAsUtf8OrBinary(byte[] bytes) {
+    if (bytes == null || bytes.length == 0) {
+      return "";
+    }
+    int length = Math.min(bytes.length, MAX_ERROR_BODY_BYTES);
+    String decoded = new String(bytes, 0, length, StandardCharsets.UTF_8);
+    if (looksBinary(decoded)) {
+      return "<binary>";
+    }
+    return decoded;
+  }
+
+  private static boolean looksBinary(String decoded) {
+    // Simple heuristic: NUL character is a strong signal the payload isn't textual.
+    return decoded.indexOf('\u0000') >= 0;
   }
 
   private static JsonNode readPayload(String payload, ObjectMapper objectMapper) {

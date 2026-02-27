@@ -642,18 +642,62 @@ final class ExtensionCatalogState {
   }
 
   private void restoreSelection(String previouslyFocusedExtensionId) {
-    if (selectableRowIndexes.isEmpty()) {
-      listState.select(allRowIndexes.isEmpty() ? null : allRowIndexes.getFirst());
+    if (allRowIndexes.isEmpty()) {
+      listState.select(null);
       return;
     }
+
+    if (selectableRowIndexes.isEmpty()) {
+      listState.select(allRowIndexes.getFirst());
+      return;
+    }
+
     if (previouslyFocusedExtensionId != null) {
       Integer restoredIndex = rowIndexByExtensionId.get(previouslyFocusedExtensionId);
       if (restoredIndex != null) {
         listState.select(restoredIndex);
         return;
       }
+
+      int firstSelectable = selectableRowIndexes.getFirst();
+      // If the previously focused extension disappeared (e.g. filters changed or its category was
+      // collapsed) and the first selectable row is far from the top, prefer selecting the first
+      // real section header instead of skipping early collapsed categories.
+      if (firstSelectable > 1) {
+        Integer firstSectionHeader = firstNonRecentSectionHeaderIndex();
+        if (firstSectionHeader != null) {
+          listState.select(firstSectionHeader);
+          return;
+        }
+      }
     }
-    listState.select(selectableRowIndexes.getFirst());
+
+    int firstSelectable = selectableRowIndexes.getFirst();
+    // If early categories are collapsed, the first selectable row can be far from the top;
+    // selecting the first section header prevents skipping the initial categories.
+    if (previouslyFocusedExtensionId == null && firstSelectable > 1) {
+      Integer firstSectionHeader = firstNonRecentSectionHeaderIndex();
+      if (firstSectionHeader != null) {
+        listState.select(firstSectionHeader);
+        return;
+      }
+    }
+
+    listState.select(firstSelectable);
+  }
+
+  private Integer firstNonRecentSectionHeaderIndex() {
+    for (int i = 0; i < filteredRows.size(); i++) {
+      ExtensionCatalogRow row = filteredRows.get(i);
+      if (!row.isSectionHeader()) {
+        continue;
+      }
+      if (RECENT_SECTION_TITLE.equals(row.label())) {
+        continue;
+      }
+      return i;
+    }
+    return null;
   }
 
   private String selectedListItemId() {

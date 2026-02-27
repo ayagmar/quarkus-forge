@@ -17,12 +17,14 @@ import dev.tamboui.widgets.list.ListWidget;
 import dev.tamboui.widgets.list.ScrollMode;
 import dev.tamboui.widgets.paragraph.Paragraph;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 final class BodyPanelRenderer {
-  private static final int NARROW_WIDTH_THRESHOLD = 100;
-  private static final String RECENT_SECTION_TITLE = "Recently Selected";
 
   private final UiTheme theme;
 
@@ -57,7 +59,7 @@ final class BodyPanelRenderer {
       return;
     }
 
-    if (inner.width() < NARROW_WIDTH_THRESHOLD || inner.height() < 2) {
+    if (area.width() < UiLayoutConstants.NARROW_WIDTH_THRESHOLD || inner.height() < 2) {
       renderMetadataPanelNarrow(frame, inner, snapshot, inputRenderer);
       return;
     }
@@ -299,19 +301,42 @@ final class BodyPanelRenderer {
       return;
     }
 
-    // Build a compact summary of selected extensions
-    StringBuilder summary = new StringBuilder("  Selected: ");
     int maxDisplay = Math.min(selectedIds.size(), 5);
-    for (int i = 0; i < maxDisplay; i++) {
-      if (i > 0) summary.append(", ");
-      String id = selectedIds.get(i);
-      // Extract short name from full ID
-      String shortName = id.contains(":") ? id.substring(id.lastIndexOf(':') + 1) : id;
-      // Remove quarkus- prefix for brevity
-      if (shortName.startsWith("quarkus-")) {
-        shortName = shortName.substring(8);
+
+    // Build a compact summary of selected extensions.
+    // Prefer human-friendly extension names from the currently visible rows.
+    Set<String> neededIds = new LinkedHashSet<>(selectedIds.subList(0, maxDisplay));
+    Map<String, String> visibleNameById = new LinkedHashMap<>();
+    for (ExtensionCatalogRow row : snapshot.filteredRows()) {
+      if (row.extension() == null) {
+        continue;
       }
-      summary.append(shortName);
+      String extensionId = row.extension().id();
+      if (!neededIds.contains(extensionId) || visibleNameById.containsKey(extensionId)) {
+        continue;
+      }
+      visibleNameById.put(extensionId, row.extension().name());
+      if (visibleNameById.size() >= neededIds.size()) {
+        break;
+      }
+    }
+
+    StringBuilder summary = new StringBuilder("  Selected: ");
+    for (int i = 0; i < maxDisplay; i++) {
+      if (i > 0) {
+        summary.append(", ");
+      }
+      String id = selectedIds.get(i);
+      String name = visibleNameById.get(id);
+      if (name == null || name.isBlank()) {
+        // Fallback: derive a readable-ish label from the id.
+        String shortName = id.contains(":") ? id.substring(id.lastIndexOf(':') + 1) : id;
+        if (shortName.startsWith("quarkus-")) {
+          shortName = shortName.substring(8);
+        }
+        name = shortName;
+      }
+      summary.append(name);
     }
     if (selectedIds.size() > maxDisplay) {
       summary.append(" +").append(selectedIds.size() - maxDisplay).append(" more");
@@ -330,7 +355,14 @@ final class BodyPanelRenderer {
   private void renderSubmitButton(Frame frame, Rect area, ExtensionsPanelSnapshot snapshot) {
     boolean focused = snapshot.submitFocused();
     int selectedCount = snapshot.selectedExtensionIds().size();
-    String countLabel = selectedCount > 0 ? " (" + selectedCount + " extensions)" : "";
+    String countLabel;
+    if (selectedCount == 0) {
+      countLabel = "";
+    } else if (selectedCount == 1) {
+      countLabel = " (1 extension)";
+    } else {
+      countLabel = " (" + selectedCount + " extensions)";
+    }
     String label = focused
         ? "  >> [ Generate Project" + countLabel + " (Enter) ] <<"
         : "  [ Generate Project" + countLabel + " (Enter/Alt+G) ]";
@@ -367,12 +399,7 @@ final class BodyPanelRenderer {
     List<SizedWidget> items = new ArrayList<>();
     for (ExtensionCatalogRow row : snapshot.filteredRows()) {
       if (row.isSectionHeader()) {
-        String headerLabel = sectionHeaderLabel(row);
-        // Make Recent section header more prominent
-        if (RECENT_SECTION_TITLE.equals(row.label())) {
-          headerLabel = "▼ " + RECENT_SECTION_TITLE;
-        }
-        items.add(ListItem.from(headerLabel).toSizedWidget());
+        items.add(ListItem.from(sectionHeaderLabel(row)).toSizedWidget());
         continue;
       }
       ExtensionCatalogItem extension = row.extension();

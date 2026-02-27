@@ -61,7 +61,6 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
           FocusTarget.EXTENSION_LIST,
           FocusTarget.SUBMIT);
 
-  private static final int NARROW_WIDTH_THRESHOLD = 100;
   private static final List<String> STARTUP_SPLASH_ART =
       List.of(
           "   ____ _   _   _    ____  _  ___   _ ____",
@@ -141,6 +140,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   private FocusTarget focusTarget;
   private String statusMessage;
   private String errorMessage;
+  private String verboseErrorDetails;
   private boolean submitRequested;
   private boolean submitBlockedByValidation;
   private final GenerationStateTracker generationStateTracker;
@@ -188,6 +188,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     focusTarget = FocusTarget.GROUP_ID;
     statusMessage = "Ready";
     errorMessage = "";
+    verboseErrorDetails = "";
     submitRequested = false;
     submitBlockedByValidation = false;
     metadataCompatibility = initialState.metadataCompatibility();
@@ -660,7 +661,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
 
   private void renderBody(Frame frame, Rect area) {
     int metadataHeight =
-        area.width() < NARROW_WIDTH_THRESHOLD
+        area.width() < UiLayoutConstants.NARROW_WIDTH_THRESHOLD
             ? METADATA_PANEL_HEIGHT_NARROW
             : METADATA_PANEL_HEIGHT_COMPACT;
     List<Rect> bodyLayout =
@@ -694,7 +695,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
         request.version(),
         request.packageName(),
         request.outputDirectory(),
-        selectorValue(FocusTarget.PLATFORM_STREAM),
+        selectorOptionLabel(
+            FocusTarget.PLATFORM_STREAM, selectorValue(FocusTarget.PLATFORM_STREAM)),
         selectorValue(FocusTarget.BUILD_TOOL),
         selectorValue(FocusTarget.JAVA_VERSION));
   }
@@ -1124,6 +1126,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
         postGenerationMenuVisible,
         statusMessage,
         activeErrorDetails(),
+        verboseErrorDetails(),
         showErrorDetails,
         successHint);
   }
@@ -1441,6 +1444,16 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   private String activeErrorDetails() {
     if (!errorMessage.isBlank()) {
       return errorMessage;
+    }
+    if (!extensionCatalogErrorMessage.isBlank()) {
+      return extensionCatalogErrorMessage;
+    }
+    return "";
+  }
+
+  private String verboseErrorDetails() {
+    if (!verboseErrorDetails.isBlank()) {
+      return verboseErrorDetails;
     }
     if (!extensionCatalogErrorMessage.isBlank()) {
       return extensionCatalogErrorMessage;
@@ -1820,6 +1833,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       lastGeneratedNextCommand = nextCommand;
       statusMessage = "Generation succeeded: " + normalizedPath;
       errorMessage = "";
+      verboseErrorDetails = "";
       successHint = "cd " + normalizedPath + " && " + nextCommand;
       postGenerationMenuVisible = true;
       postGenerationActionSelection = 0;
@@ -1835,6 +1849,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       transitionGenerationState(GenerationState.CANCELLED);
       statusMessage = "Generation cancelled. Update inputs and press Enter to retry.";
       errorMessage = "";
+      verboseErrorDetails = "";
       successHint = "";
       postGenerationMenuVisible = false;
       requestAsyncRepaint();
@@ -1844,6 +1859,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     transitionGenerationState(GenerationState.ERROR);
     statusMessage = "Generation failed.";
     errorMessage = userFriendlyError(cause);
+    verboseErrorDetails = verboseDetails(cause);
     successHint = "";
     postGenerationMenuVisible = false;
     requestAsyncRepaint();
@@ -1937,6 +1953,21 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
 
   private static String userFriendlyError(Throwable throwable) {
     return ApiErrorMessages.userFriendlyMessage(throwable);
+  }
+
+  private static String verboseDetails(Throwable throwable) {
+    if (throwable == null) {
+      return "";
+    }
+    if (throwable instanceof dev.ayagmar.quarkusforge.api.ApiHttpException apiHttpException) {
+      String body = apiHttpException.responseBody();
+      if (body == null || body.isBlank() || "<binary>".equals(body)) {
+        return "";
+      }
+      return body.strip();
+    }
+    String message = throwable.getMessage();
+    return message == null ? "" : message.strip();
   }
 
   private static String catalogLoadFailureMessage(Throwable throwable) {
@@ -2125,6 +2156,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     extensionCatalogSource = result.source().label();
     extensionCatalogStale = result.stale();
     errorMessage = "";
+    verboseErrorDetails = "";
     extensionCatalogErrorMessage = catalogPanelErrorMessage(result);
     statusMessage =
         !result.detailMessage().isBlank()
@@ -2143,6 +2175,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     extensionCatalogLoading = false;
     extensionCatalogErrorMessage = message;
     errorMessage = message;
+    verboseErrorDetails = message;
     statusMessage = catalogReloadFailureStatusMessage();
     requestAsyncRepaint();
   }
