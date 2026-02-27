@@ -5,9 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
-import dev.tamboui.buffer.Buffer;
-import dev.tamboui.layout.Rect;
-import dev.tamboui.terminal.Frame;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.KeyModifiers;
@@ -36,7 +33,7 @@ class CoreTuiShellPilotTest {
   void listNavigationAndSpaceToggleAreRoutedWhenListIsFocused() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     CoreTuiController.UiAction downAction = controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     CoreTuiController.UiAction toggleAction = controller.onEvent(KeyEvent.ofChar(' '));
@@ -50,7 +47,7 @@ class CoreTuiShellPilotTest {
   void vimListMotionsJAndKNavigateCatalogRows() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     String firstId = controller.focusedListExtensionId();
 
     controller.onEvent(KeyEvent.ofChar('j'));
@@ -70,7 +67,7 @@ class CoreTuiShellPilotTest {
     assertThat(controller.submitRequested()).isTrue();
     assertThat(controller.statusMessage()).contains("Submit requested");
 
-    moveFocusTo(controller, FocusTarget.GROUP_ID);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.GROUP_ID);
     for (int i = 0; i < 30; i++) {
       controller.onEvent(KeyEvent.ofKey(KeyCode.BACKSPACE));
     }
@@ -99,7 +96,7 @@ class CoreTuiShellPilotTest {
   void enterSubmitsInsteadOfTogglingWhenExtensionListIsFocused() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
@@ -112,44 +109,44 @@ class CoreTuiShellPilotTest {
   void fixingInputWithoutChangingFocusClearsBlockedSubmitErrorFromFooter() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.ARTIFACT_ID);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.ARTIFACT_ID);
 
     controller.onEvent(KeyEvent.ofChar('X'));
     assertThat(controller.validation().isValid()).isFalse();
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
-    assertThat(renderToString(controller)).contains("Error:");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("Error:");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.BACKSPACE));
 
     assertThat(controller.validation().isValid()).isTrue();
     assertThat(controller.statusMessage()).contains("Validation restored");
-    assertThat(renderToString(controller)).doesNotContain("Error:");
+    assertThat(UiControllerTestHarness.renderToString(controller)).doesNotContain("Error:");
   }
 
   @Test
   void blockedSubmitFeedbackRecoversEvenIfStatusMessageChangesBeforeFix() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.ARTIFACT_ID);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.ARTIFACT_ID);
 
     controller.onEvent(KeyEvent.ofChar('X'));
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
-    assertThat(renderToString(controller)).contains("Error:");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("Error:");
 
     controller.onEvent(ResizeEvent.of(90, 30));
     controller.onEvent(KeyEvent.ofKey(KeyCode.BACKSPACE));
 
     assertThat(controller.validation().isValid()).isTrue();
     assertThat(controller.statusMessage()).contains("Validation restored");
-    assertThat(renderToString(controller)).doesNotContain("Error:");
+    assertThat(UiControllerTestHarness.renderToString(controller)).doesNotContain("Error:");
   }
 
   @Test
   void slashShortcutJumpsFocusToExtensionSearch() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.SUBMIT);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.SUBMIT);
 
     controller.onEvent(KeyEvent.ofChar('/'));
 
@@ -161,17 +158,17 @@ class CoreTuiShellPilotTest {
   void questionMarkTogglesHelpOverlay() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.SUBMIT);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.SUBMIT);
 
     controller.onEvent(KeyEvent.ofChar('?'));
-    String opened = renderToString(controller);
+    String opened = UiControllerTestHarness.renderToString(controller);
     assertThat(opened).contains("Help [focus]");
     assertThat(opened).contains("Global");
     assertThat(opened).contains("Help [focus] - submit");
     assertThat(controller.helpOverlayVisible()).isTrue();
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
-    String closed = renderToString(controller);
+    String closed = UiControllerTestHarness.renderToString(controller);
     assertThat(closed).doesNotContain("Help [focus]");
     assertThat(controller.helpOverlayVisible()).isFalse();
   }
@@ -180,7 +177,7 @@ class CoreTuiShellPilotTest {
   void questionMarkOpensHelpWhenExtensionSearchIsFocused() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
 
     controller.onEvent(KeyEvent.ofChar('?'));
 
@@ -194,13 +191,13 @@ class CoreTuiShellPilotTest {
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
 
     controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
-    String opened = renderToString(controller);
+    String opened = UiControllerTestHarness.renderToString(controller);
     assertThat(opened).contains("Command Palette [focus]");
     assertThat(opened).contains("Focus extension search");
     assertThat(controller.commandPaletteVisible()).isTrue();
 
     controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
-    String closed = renderToString(controller);
+    String closed = UiControllerTestHarness.renderToString(controller);
     assertThat(closed).doesNotContain("Command Palette [focus]");
     assertThat(controller.commandPaletteVisible()).isFalse();
   }
@@ -224,7 +221,7 @@ class CoreTuiShellPilotTest {
   void slashIsInsertedInOutputDirectoryWithoutStealingFocus() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.OUTPUT_DIR);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.OUTPUT_DIR);
 
     CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofChar('/'));
 
@@ -238,7 +235,7 @@ class CoreTuiShellPilotTest {
   void questionMarkIsInsertedInGroupIdWithoutOpeningHelp() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.GROUP_ID);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.GROUP_ID);
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
 
     controller.onEvent(KeyEvent.ofChar('?'));
@@ -264,12 +261,12 @@ class CoreTuiShellPilotTest {
   void submitFocusSupportsVimJkTraversal() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.SUBMIT);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.SUBMIT);
 
     controller.onEvent(KeyEvent.ofChar('k'));
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
 
-    moveFocusTo(controller, FocusTarget.SUBMIT);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.SUBMIT);
     controller.onEvent(KeyEvent.ofChar('j'));
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
   }
@@ -278,7 +275,7 @@ class CoreTuiShellPilotTest {
   void searchAndListSupportDirectArrowHandoff() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
@@ -292,22 +289,22 @@ class CoreTuiShellPilotTest {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
 
-    assertThat(renderToString(controller)).contains("7 shown");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("7 shown");
 
-    moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
     controller.onEvent(KeyEvent.ofChar('j'));
     controller.onEvent(KeyEvent.ofChar('d'));
     controller.onEvent(KeyEvent.ofChar('b'));
     controller.onEvent(KeyEvent.ofChar('c'));
 
-    assertThat(renderToString(controller)).contains("1 shown");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("1 shown");
   }
 
   @Test
   void escapeClearsExtensionSearchBeforeQuitWhenSearchInputIsFocused() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
     controller.onEvent(KeyEvent.ofChar('j'));
     controller.onEvent(KeyEvent.ofChar('d'));
     controller.onEvent(KeyEvent.ofChar('b'));
@@ -334,12 +331,12 @@ class CoreTuiShellPilotTest {
   void escapeClearsExtensionSearchBeforeQuitWhenListIsFocused() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
     controller.onEvent(KeyEvent.ofChar('j'));
     controller.onEvent(KeyEvent.ofChar('d'));
     controller.onEvent(KeyEvent.ofChar('b'));
     controller.onEvent(KeyEvent.ofChar('c'));
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     CoreTuiController.UiAction firstEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(firstEscape.handled()).isTrue();
@@ -357,7 +354,7 @@ class CoreTuiShellPilotTest {
   void escapeDisablesFavoritesFilterBeforeQuitWhenListIsFocused() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     controller.onEvent(KeyEvent.ofChar('k', KeyModifiers.CTRL));
     assertThat(controller.favoritesOnlyFilterEnabled()).isTrue();
@@ -390,7 +387,7 @@ class CoreTuiShellPilotTest {
                             "jdbc-postgresql",
                             "Data",
                             30)))));
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     controller.onEvent(KeyEvent.ofChar('v'));
     assertThat(controller.catalogSectionHeaders()).containsExactly("Core");
@@ -410,7 +407,7 @@ class CoreTuiShellPilotTest {
   void xClearsSelectedExtensionsWhenListIsFocused() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     controller.onEvent(KeyEvent.ofChar(' '));
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
@@ -444,7 +441,7 @@ class CoreTuiShellPilotTest {
                             "jdbc-postgresql",
                             "Data",
                             30)))));
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     assertThat(controller.catalogSectionHeaders()).containsExactly("Core", "Web", "Data");
 
@@ -459,7 +456,7 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('v'));
     assertThat(controller.catalogSectionHeaders()).containsExactly("Data");
     assertThat(controller.statusMessage()).contains("Category filter: Data");
-    assertThat(renderToString(controller)).contains("Filter: Data");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("Filter: Data");
 
     controller.onEvent(KeyEvent.ofChar('v'));
     assertThat(controller.catalogSectionHeaders()).containsExactly("Core", "Web", "Data");
@@ -477,11 +474,11 @@ class CoreTuiShellPilotTest {
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20)))));
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     controller.onEvent(KeyEvent.ofChar('v'));
     assertThat(controller.catalogSectionHeaders()).containsExactly("Core");
-    assertThat(renderToString(controller)).contains("Filter: Core");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("Filter: Core");
 
     controller.onEvent(KeyEvent.ofChar('f', KeyModifiers.CTRL));
     controller.onEvent(KeyEvent.ofChar('r'));
@@ -489,7 +486,7 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('s'));
     controller.onEvent(KeyEvent.ofChar('t'));
     assertThat(controller.filteredExtensionCount()).isZero();
-    assertThat(renderToString(controller)).contains("Filter: Core");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("Filter: Core");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(controller.filteredExtensionCount()).isEqualTo(1);
@@ -513,11 +510,11 @@ class CoreTuiShellPilotTest {
                             "jdbc-postgresql",
                             "Data",
                             30)))));
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.PAGE_DOWN));
     controller.onEvent(KeyEvent.ofChar('c'));
-    assertThat(renderToString(controller)).contains("▶ Web");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("▶ Web");
 
     controller.onEvent(KeyEvent.ofChar('v'));
     controller.onEvent(KeyEvent.ofChar('v'));
@@ -525,14 +522,14 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('v'));
 
     assertThat(controller.catalogSectionHeaders()).containsExactly("Core", "Web", "Data");
-    assertThat(renderToString(controller)).contains("▶ Web ");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("▶ Web ");
   }
 
   @Test
   void qNoLongerTriggersQuitByDefault() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.GROUP_ID);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.GROUP_ID);
 
     CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofChar('q'));
 
@@ -570,7 +567,7 @@ class CoreTuiShellPilotTest {
                             "Data",
                             30)))));
 
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
@@ -605,7 +602,7 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('f'));
     assertThat(controller.favoriteExtensionCount()).isEqualTo(1);
 
-    moveFocusTo(controller, FocusTarget.GROUP_ID);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.GROUP_ID);
     controller.onEvent(KeyEvent.ofChar('k', KeyModifiers.CTRL));
     assertThat(controller.favoritesOnlyFilterEnabled()).isTrue();
     assertThat(controller.filteredExtensionCount()).isEqualTo(1);
@@ -615,7 +612,7 @@ class CoreTuiShellPilotTest {
     assertThat(controller.favoritesOnlyFilterEnabled()).isFalse();
     assertThat(controller.filteredExtensionCount()).isEqualTo(2);
 
-    moveFocusTo(controller, FocusTarget.GROUP_ID);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.GROUP_ID);
     controller.onEvent(KeyEvent.ofChar('j', KeyModifiers.CTRL));
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
     assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
@@ -639,20 +636,20 @@ class CoreTuiShellPilotTest {
                             "Data",
                             30)))));
 
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
 
     controller.onEvent(KeyEvent.ofChar('c'));
 
     assertThat(controller.focusedListExtensionId()).isEmpty();
     assertThat(controller.statusMessage()).contains("Closed category: Core");
-    assertThat(renderToString(controller)).contains("▶ Core ");
-    assertThat(renderToString(controller)).doesNotContain("CDI");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("▶ Core ");
+    assertThat(UiControllerTestHarness.renderToString(controller)).doesNotContain("CDI");
 
     controller.onEvent(KeyEvent.ofChar('C'));
 
     assertThat(controller.statusMessage()).contains("Opened 1 category");
-    assertThat(renderToString(controller)).contains("CDI");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("CDI");
   }
 
   @Test
@@ -673,7 +670,7 @@ class CoreTuiShellPilotTest {
                             "Data",
                             30)))));
 
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.LEFT));
@@ -687,11 +684,11 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('h'));
     controller.onEvent(KeyEvent.ofKey(KeyCode.LEFT));
     assertThat(controller.statusMessage()).contains("Closed category: Core");
-    assertThat(renderToString(controller)).contains("▶ Core ");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("▶ Core ");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.RIGHT));
     assertThat(controller.statusMessage()).contains("Opened category: Core");
-    assertThat(renderToString(controller)).contains("CDI");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("CDI");
   }
 
   @Test
@@ -712,14 +709,14 @@ class CoreTuiShellPilotTest {
                             "Data",
                             30)))));
 
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     controller.onEvent(KeyEvent.ofChar('c'));
-    assertThat(renderToString(controller)).contains("▶ Core ");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("▶ Core ");
 
     controller.onEvent(KeyEvent.ofChar(' '));
 
     assertThat(controller.statusMessage()).contains("Opened category: Core");
-    assertThat(renderToString(controller)).contains("CDI");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("CDI");
   }
 
   @Test
@@ -740,7 +737,7 @@ class CoreTuiShellPilotTest {
                             "Data",
                             30)))));
 
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.PAGE_DOWN));
@@ -775,18 +772,18 @@ class CoreTuiShellPilotTest {
                             "Data",
                             30)))));
 
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
 
     controller.onEvent(KeyEvent.ofChar('c'));
     assertThat(controller.statusMessage()).contains("Closed category: Core");
     assertThat(controller.focusedListExtensionId()).isEmpty();
-    assertThat(renderToString(controller)).contains("▶ Core ");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("▶ Core ");
 
     controller.onEvent(KeyEvent.ofChar('c'));
     assertThat(controller.statusMessage()).contains("Opened category: Core");
-    assertThat(renderToString(controller)).contains("CDI");
-    assertThat(renderToString(controller)).contains("▼ Core");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("CDI");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("▼ Core");
 
     controller.onEvent(KeyEvent.ofChar('j'));
     assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
@@ -810,14 +807,14 @@ class CoreTuiShellPilotTest {
                             "Data",
                             30)))));
 
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     controller.onEvent(KeyEvent.ofChar('c'));
     controller.onEvent(KeyEvent.ofChar('j'));
     controller.onEvent(KeyEvent.ofChar('c'));
     controller.onEvent(KeyEvent.ofChar('j'));
     controller.onEvent(KeyEvent.ofChar('c'));
 
-    String allCollapsed = renderToString(controller);
+    String allCollapsed = UiControllerTestHarness.renderToString(controller);
     assertThat(allCollapsed).contains("▶ Core ");
     assertThat(allCollapsed).contains("▶ Web ");
     assertThat(allCollapsed).contains("▶ Data ");
@@ -830,33 +827,33 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('c'));
 
     assertThat(controller.statusMessage()).contains("Opened category: Web");
-    assertThat(renderToString(controller)).contains("REST");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("REST");
   }
 
   @Test
   void categoryCloseFromRecentlySelectedItemDoesNotCollapseUnderlyingCategory() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     controller.onEvent(KeyEvent.ofChar(' '));
-    assertThat(renderToString(controller)).contains("Recently Selected");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("Recently Selected");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.HOME));
     controller.onEvent(KeyEvent.ofChar('c'));
 
     assertThat(controller.statusMessage()).contains("No category selected to close");
-    assertThat(renderToString(controller)).doesNotContain("▶ Core");
+    assertThat(UiControllerTestHarness.renderToString(controller)).doesNotContain("▶ Core");
   }
 
   @Test
   void pageUpSkipsRecentlySelectedPseudoSection() {
     CoreTuiController controller =
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     controller.onEvent(KeyEvent.ofChar(' '));
-    assertThat(renderToString(controller)).contains("Recently Selected");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("Recently Selected");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.LEFT));
     assertThat(controller.statusMessage()).contains("Moved to section: Core");
@@ -879,42 +876,28 @@ class CoreTuiShellPilotTest {
                     "",
                     selectorMetadata())));
 
-    moveFocusTo(controller, FocusTarget.PLATFORM_STREAM);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.PLATFORM_STREAM);
     assertThat(controller.request().platformStream()).isEqualTo("io.quarkus.platform:3.31");
     // Selector uses "Platform:" prefix in compact mode
-    assertThat(renderToString(controller)).contains("Platform:");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("Platform:");
 
     controller.onEvent(KeyEvent.ofChar('l'));
     assertThat(controller.request().platformStream()).isEqualTo("io.quarkus.platform:3.20");
     assertThat(controller.validation().isValid()).isFalse();
     assertThat(controller.validation().errors().getFirst().field()).isEqualTo("compatibility");
 
-    moveFocusTo(controller, FocusTarget.JAVA_VERSION);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.JAVA_VERSION);
     controller.onEvent(KeyEvent.ofChar('h'));
     assertThat(controller.request().javaVersion()).isEqualTo("21");
     assertThat(controller.validation().isValid()).isTrue();
 
-    moveFocusTo(controller, FocusTarget.BUILD_TOOL);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.BUILD_TOOL);
     String originalBuildTool = controller.request().buildTool();
     controller.onEvent(KeyEvent.ofChar('x'));
     assertThat(controller.request().buildTool()).isEqualTo(originalBuildTool);
 
     controller.onEvent(KeyEvent.ofChar('l'));
     assertThat(controller.request().buildTool()).isEqualTo("gradle");
-  }
-
-  private static void moveFocusTo(CoreTuiController controller, FocusTarget target) {
-    for (int i = 0; i < 20 && controller.focusTarget() != target; i++) {
-      controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
-    }
-    assertThat(controller.focusTarget()).isEqualTo(target);
-  }
-
-  private static String renderToString(CoreTuiController controller) {
-    Buffer buffer = Buffer.empty(new Rect(0, 0, 120, 32));
-    Frame frame = Frame.forTesting(buffer);
-    controller.render(frame);
-    return buffer.toAnsiStringTrimmed();
   }
 
   private static MetadataDto selectorMetadata() {

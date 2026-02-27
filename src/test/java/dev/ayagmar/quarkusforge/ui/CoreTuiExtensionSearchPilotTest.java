@@ -5,9 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
-import dev.tamboui.buffer.Buffer;
-import dev.tamboui.layout.Rect;
-import dev.tamboui.terminal.Frame;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.KeyModifiers;
@@ -43,7 +40,7 @@ class CoreTuiExtensionSearchPilotTest {
                             "JDBC PostgreSQL",
                             "jdbc-postgresql")))));
 
-    moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
     controller.onEvent(KeyEvent.ofChar('j'));
     controller.onEvent(KeyEvent.ofChar('d'));
     controller.onEvent(KeyEvent.ofChar('b'));
@@ -70,11 +67,11 @@ class CoreTuiExtensionSearchPilotTest {
                             "JDBC PostgreSQL",
                             "jdbc-postgresql")))));
 
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     controller.onEvent(KeyEvent.ofChar(' '));
     String selectedId = controller.selectedExtensionIds().getFirst();
 
-    moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
     for (char character : "jdbc".toCharArray()) {
       controller.onEvent(KeyEvent.ofChar(character));
     }
@@ -97,7 +94,8 @@ class CoreTuiExtensionSearchPilotTest {
 
     assertThat(controller.statusMessage()).isEqualTo("Using fallback extension catalog");
     assertThat(controller.filteredExtensionCount()).isEqualTo(7);
-    assertThat(renderToString(controller)).contains("Error: Catalog load failed: network down");
+    assertThat(UiControllerTestHarness.renderToString(controller))
+        .contains("Error: Catalog load failed: network down");
   }
 
   @Test
@@ -113,7 +111,8 @@ class CoreTuiExtensionSearchPilotTest {
 
     assertThat(controller.statusMessage()).isEqualTo("Using fallback extension catalog");
     assertThat(controller.filteredExtensionCount()).isEqualTo(7);
-    assertThat(renderToString(controller)).contains("Error: Catalog load failed: loader crashed");
+    assertThat(UiControllerTestHarness.renderToString(controller))
+        .contains("Error: Catalog load failed: loader crashed");
   }
 
   @Test
@@ -126,7 +125,7 @@ class CoreTuiExtensionSearchPilotTest {
 
     assertThat(controller.statusMessage()).isEqualTo("Using fallback extension catalog");
     assertThat(controller.filteredExtensionCount()).isEqualTo(7);
-    assertThat(renderToString(controller))
+    assertThat(UiControllerTestHarness.renderToString(controller))
         .contains("Error: Catalog load failed: loader returned null future");
   }
 
@@ -143,7 +142,8 @@ class CoreTuiExtensionSearchPilotTest {
 
     assertThat(controller.statusMessage()).isEqualTo("Using fallback extension catalog");
     assertThat(controller.filteredExtensionCount()).isEqualTo(7);
-    assertThat(renderToString(controller)).contains("Error: Catalog load returned no extensions");
+    assertThat(UiControllerTestHarness.renderToString(controller))
+        .contains("Error: Catalog load returned no extensions");
   }
 
   @Test
@@ -151,7 +151,7 @@ class CoreTuiExtensionSearchPilotTest {
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     controller.onEvent(KeyEvent.ofChar(' '));
     assertThat(controller.selectedExtensionIds()).hasSize(1);
 
@@ -170,7 +170,8 @@ class CoreTuiExtensionSearchPilotTest {
 
   @Test
   void asyncCatalogCompletionIsIgnoredAfterQuit() {
-    QueueingScheduler scheduler = new QueueingScheduler();
+    UiControllerTestHarness.QueueingScheduler scheduler =
+        new UiControllerTestHarness.QueueingScheduler();
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ZERO);
@@ -193,7 +194,8 @@ class CoreTuiExtensionSearchPilotTest {
 
   @Test
   void tickEventRequestsRepaintAfterAsyncCatalogCompletion() {
-    QueueingScheduler scheduler = new QueueingScheduler();
+    UiControllerTestHarness.QueueingScheduler scheduler =
+        new UiControllerTestHarness.QueueingScheduler();
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ZERO);
@@ -229,7 +231,7 @@ class CoreTuiExtensionSearchPilotTest {
                     "Live catalog unavailable (network down); using stale cached snapshot",
                     sampleMetadata())));
 
-    String rendered = renderToString(controller);
+    String rendered = UiControllerTestHarness.renderToString(controller);
     assertThat(rendered).contains("Catalog: cache [stale]");
     assertThat(rendered).doesNotContain("Catalog: cache [stale] | error:");
     assertThat(controller.statusMessage()).contains("stale cached snapshot");
@@ -287,14 +289,14 @@ class CoreTuiExtensionSearchPilotTest {
                             "jdbc-postgresql")))));
     assertThat(controller.firstFilteredExtensionId())
         .isEqualTo("io.quarkus:quarkus-jdbc-postgresql");
-    assertThat(renderToString(controller)).contains("Catalog: live");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("Catalog: live");
 
     controller.loadExtensionCatalogAsync(
         () -> CompletableFuture.failedFuture(new IllegalStateException("network down")));
 
     assertThat(controller.firstFilteredExtensionId())
         .isEqualTo("io.quarkus:quarkus-jdbc-postgresql");
-    assertThat(renderToString(controller)).contains("Catalog: live");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("Catalog: live");
     assertThat(controller.statusMessage())
         .isEqualTo("Catalog reload failed; keeping current catalog");
   }
@@ -316,12 +318,12 @@ class CoreTuiExtensionSearchPilotTest {
             CompletableFuture.completedFuture(
                 CoreTuiController.ExtensionCatalogLoadResult.live(manyExtensions)));
 
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     for (int i = 0; i < 80; i++) {
       controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     }
 
-    String rendered = renderToString(controller);
+    String rendered = UiControllerTestHarness.renderToString(controller);
     assertThat(rendered).contains("Test Extension 080");
     assertThat(rendered).doesNotContain("Test Extension 000");
   }
@@ -384,7 +386,7 @@ class CoreTuiExtensionSearchPilotTest {
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20)))));
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     controller.onEvent(KeyEvent.ofChar('f'));
     controller.onEvent(KeyEvent.ofKey(KeyCode.HOME));
@@ -404,7 +406,7 @@ class CoreTuiExtensionSearchPilotTest {
     controller.loadExtensionCatalogAsync(
         () -> CompletableFuture.completedFuture(withOrder(favoriteId, 30, otherId, 10)));
 
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     assertThat(controller.focusedListExtensionId()).isEqualTo(favoriteId);
     controller.onEvent(KeyEvent.ofChar(' '));
@@ -433,7 +435,7 @@ class CoreTuiExtensionSearchPilotTest {
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10)))));
-    moveFocusTo(firstController, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(firstController, FocusTarget.EXTENSION_LIST);
     firstController.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     firstController.onEvent(KeyEvent.ofChar('f'));
     assertThat(firstController.favoriteExtensionCount()).isEqualTo(1);
@@ -456,10 +458,10 @@ class CoreTuiExtensionSearchPilotTest {
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
-    moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     controller.onEvent(KeyEvent.ofChar(' '));
 
-    String rendered = renderToString(controller);
+    String rendered = UiControllerTestHarness.renderToString(controller);
 
     assertThat(rendered).contains("Recently Selected");
     assertThat(rendered).contains("CDI");
@@ -478,9 +480,10 @@ class CoreTuiExtensionSearchPilotTest {
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10)))));
-    moveFocusTo(firstController, FocusTarget.EXTENSION_LIST);
+    UiControllerTestHarness.moveFocusTo(firstController, FocusTarget.EXTENSION_LIST);
     firstController.onEvent(KeyEvent.ofChar(' '));
-    assertThat(renderToString(firstController)).contains("Recently Selected");
+    assertThat(UiControllerTestHarness.renderToString(firstController))
+        .contains("Recently Selected");
 
     CoreTuiController secondController = controllerWithFavoritesStore(favoritesStore);
     secondController.loadExtensionCatalogAsync(
@@ -491,22 +494,9 @@ class CoreTuiExtensionSearchPilotTest {
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10)))));
 
-    assertThat(renderToString(secondController)).contains("Recently Selected");
-    assertThat(renderToString(secondController)).contains("CDI");
-  }
-
-  private static void moveFocusTo(CoreTuiController controller, FocusTarget target) {
-    for (int i = 0; i < 20 && controller.focusTarget() != target; i++) {
-      controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
-    }
-    assertThat(controller.focusTarget()).isEqualTo(target);
-  }
-
-  private static String renderToString(CoreTuiController controller) {
-    Buffer buffer = Buffer.empty(new Rect(0, 0, 120, 32));
-    Frame frame = Frame.forTesting(buffer);
-    controller.render(frame);
-    return buffer.toAnsiStringTrimmed();
+    assertThat(UiControllerTestHarness.renderToString(secondController))
+        .contains("Recently Selected");
+    assertThat(UiControllerTestHarness.renderToString(secondController)).contains("CDI");
   }
 
   private static MetadataDto sampleMetadata() {
@@ -535,23 +525,5 @@ class CoreTuiExtensionSearchPilotTest {
             new ExtensionDto(primaryId, "REST", "rest", "Web", primaryOrder),
             new ExtensionDto(secondaryId, "CDI", "cdi", "Core", secondaryOrder));
     return CoreTuiController.ExtensionCatalogLoadResult.live(extensions);
-  }
-
-  private static final class QueueingScheduler implements UiScheduler {
-    private final List<Runnable> queuedTasks = new ArrayList<>();
-
-    @Override
-    public Cancellable schedule(Duration delay, Runnable task) {
-      queuedTasks.add(task);
-      return () -> queuedTasks.remove(task);
-    }
-
-    void runAll() {
-      List<Runnable> pending = new ArrayList<>(queuedTasks);
-      queuedTasks.clear();
-      for (Runnable runnable : pending) {
-        runnable.run();
-      }
-    }
   }
 }
