@@ -89,10 +89,12 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   private static final String HEADLESS_GENERATION_TIMEOUT_PROPERTY =
       "quarkus.forge.headless.generation-timeout-ms";
   private static final ShellExecutor SHELL_EXECUTOR = new ShellExecutor();
+  private static final TuiBootstrapService TUI_BOOTSTRAP_SERVICE = new TuiBootstrapService();
 
   @Mixin private RequestOptions requestOptions = new RequestOptions();
 
   private final RuntimeConfig runtimeConfig;
+  private final HeadlessGenerationService headlessGenerationService;
 
   @Option(
       names = "--dry-run",
@@ -124,6 +126,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
 
   QuarkusForgeCli(RuntimeConfig runtimeConfig) {
     this.runtimeConfig = Objects.requireNonNull(runtimeConfig);
+    this.headlessGenerationService = new HeadlessGenerationService();
   }
 
   @Override
@@ -196,8 +199,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       RuntimeConfig runtimeConfig,
       DiagnosticLogger diagnostics)
       throws Exception {
-    return new TuiBootstrapService()
-        .run(initialState, searchDebounceMs, runtimeConfig, diagnostics);
+    return TUI_BOOTSTRAP_SERVICE.run(initialState, searchDebounceMs, runtimeConfig, diagnostics);
   }
 
   int runSmokeForTest(boolean verbose) {
@@ -734,83 +736,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   }
 
   private Integer runHeadlessGenerate(GenerateCommand command) {
-    return new HeadlessGenerationService()
-        .run(
-            command,
-            dryRun,
-            verbose,
-            new HeadlessGenerationService.Operations() {
-              @Override
-              public CatalogData loadCatalogData()
-                  throws ExecutionException, InterruptedException, TimeoutException {
-                return QuarkusForgeCli.this.loadCatalogData();
-              }
-
-              @Override
-              public ProjectRequest toProjectRequest(RequestOptions options) {
-                return QuarkusForgeCli.toProjectRequest(options);
-              }
-
-              @Override
-              public ProjectRequest applyRecommendedPlatformStream(
-                  ProjectRequest request, MetadataCompatibilityContext metadataCompatibility) {
-                return QuarkusForgeCli.applyRecommendedPlatformStream(
-                    request, metadataCompatibility);
-              }
-
-              @Override
-              public ForgeUiState buildInitialState(
-                  ProjectRequest request, MetadataCompatibilityContext metadataCompatibility) {
-                return QuarkusForgeCli.buildInitialState(request, metadataCompatibility);
-              }
-
-              @Override
-              public List<String> resolveRequestedExtensions(
-                  List<String> extensionInputs,
-                  List<String> presetInputs,
-                  Set<String> knownExtensionIds) {
-                return QuarkusForgeCli.this.resolveRequestedExtensions(
-                    extensionInputs, presetInputs, knownExtensionIds);
-              }
-
-              @Override
-              public void printValidationErrors(
-                  ValidationReport validation, String sourceLabel, String sourceDetail) {
-                QuarkusForgeCli.printValidationErrors(validation, sourceLabel, sourceDetail);
-              }
-
-              @Override
-              public void printDryRunSummary(
-                  ProjectRequest request,
-                  List<String> extensionIds,
-                  String sourceLabel,
-                  boolean stale) {
-                QuarkusForgeCli.printDryRunSummary(request, extensionIds, sourceLabel, stale);
-              }
-
-              @Override
-              public Duration headlessCatalogTimeout() {
-                return QuarkusForgeCli.headlessCatalogTimeout();
-              }
-
-              @Override
-              public Duration headlessGenerationTimeout() {
-                return QuarkusForgeCli.headlessGenerationTimeout();
-              }
-
-              @Override
-              public int mapHeadlessFailureToExitCode(Throwable throwable) {
-                return QuarkusForgeCli.mapHeadlessFailureToExitCode(throwable);
-              }
-
-              @Override
-              public CompletableFuture<Path> startGeneration(
-                  GenerationRequest generationRequest,
-                  Path outputPath,
-                  Consumer<String> progressLineConsumer) {
-                return startHeadlessGeneration(generationRequest, outputPath, progressLineConsumer);
-              }
-            });
+    return headlessGenerationService.run(command, dryRun, verbose, new CliHeadlessOperations());
   }
 
   private CompletableFuture<Path> startHeadlessGeneration(
@@ -829,6 +755,73 @@ public final class QuarkusForgeCli implements Callable<Integer> {
                   case REQUESTING_ARCHIVE -> "requesting project archive from Quarkus API...";
                   case EXTRACTING_ARCHIVE -> "extracting project archive...";
                 }));
+  }
+
+  private final class CliHeadlessOperations implements HeadlessGenerationService.Operations {
+    @Override
+    public CatalogData loadCatalogData()
+        throws ExecutionException, InterruptedException, TimeoutException {
+      return QuarkusForgeCli.this.loadCatalogData();
+    }
+
+    @Override
+    public ProjectRequest toProjectRequest(RequestOptions options) {
+      return QuarkusForgeCli.toProjectRequest(options);
+    }
+
+    @Override
+    public ProjectRequest applyRecommendedPlatformStream(
+        ProjectRequest request, MetadataCompatibilityContext metadataCompatibility) {
+      return QuarkusForgeCli.applyRecommendedPlatformStream(request, metadataCompatibility);
+    }
+
+    @Override
+    public ForgeUiState buildInitialState(
+        ProjectRequest request, MetadataCompatibilityContext metadataCompatibility) {
+      return QuarkusForgeCli.buildInitialState(request, metadataCompatibility);
+    }
+
+    @Override
+    public List<String> resolveRequestedExtensions(
+        List<String> extensionInputs, List<String> presetInputs, Set<String> knownExtensionIds) {
+      return QuarkusForgeCli.this.resolveRequestedExtensions(
+          extensionInputs, presetInputs, knownExtensionIds);
+    }
+
+    @Override
+    public void printValidationErrors(
+        ValidationReport validation, String sourceLabel, String sourceDetail) {
+      QuarkusForgeCli.printValidationErrors(validation, sourceLabel, sourceDetail);
+    }
+
+    @Override
+    public void printDryRunSummary(
+        ProjectRequest request, List<String> extensionIds, String sourceLabel, boolean stale) {
+      QuarkusForgeCli.printDryRunSummary(request, extensionIds, sourceLabel, stale);
+    }
+
+    @Override
+    public Duration headlessCatalogTimeout() {
+      return QuarkusForgeCli.headlessCatalogTimeout();
+    }
+
+    @Override
+    public Duration headlessGenerationTimeout() {
+      return QuarkusForgeCli.headlessGenerationTimeout();
+    }
+
+    @Override
+    public int mapHeadlessFailureToExitCode(Throwable throwable) {
+      return QuarkusForgeCli.mapHeadlessFailureToExitCode(throwable);
+    }
+
+    @Override
+    public CompletableFuture<Path> startGeneration(
+        GenerationRequest generationRequest,
+        Path outputPath,
+        Consumer<String> progressLineConsumer) {
+      return startHeadlessGeneration(generationRequest, outputPath, progressLineConsumer);
+    }
   }
 
   private static Duration headlessCatalogTimeout() {
