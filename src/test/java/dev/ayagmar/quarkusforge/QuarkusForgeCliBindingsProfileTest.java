@@ -10,6 +10,14 @@ import org.junit.jupiter.api.Test;
 
 class QuarkusForgeCliBindingsProfileTest {
   @Test
+  void appTuiConfigUsesAppBindingsProfile() {
+    assertThat(QuarkusForgeCli.appTuiConfig().tickRate())
+        .isEqualTo(java.time.Duration.ofMillis(40));
+    assertThat(QuarkusForgeCli.appTuiConfig().bindings().describeBindings(Actions.MOVE_DOWN))
+        .contains("j");
+  }
+
+  @Test
   void profilePreservesNavigationBindings() {
     Bindings bindings = QuarkusForgeCli.appBindingsProfile();
 

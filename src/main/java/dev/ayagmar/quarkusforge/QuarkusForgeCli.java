@@ -464,6 +464,10 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     return AppBindingsProfile.bindings();
   }
 
+  static TuiConfig appTuiConfig() {
+    return TuiConfig.builder().tickRate(TUI_TICK_RATE).bindings(appBindingsProfile()).build();
+  }
+
   static String defaultBackendPreference(boolean nativeImageRuntime, boolean nativeAccessEnabled) {
     if (nativeImageRuntime || nativeAccessEnabled) {
       return PANAMA_BACKEND + "," + JLINE_BACKEND;
@@ -992,7 +996,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
           "tui.session.start",
           Map.of("smokeMode", false, "searchDebounceMs", Math.max(0, searchDebounceMs)));
       configureTerminalBackendPreference();
-      TuiConfig tuiConfig = TuiConfig.builder().tickRate(TUI_TICK_RATE).build();
+      TuiConfig tuiConfig = appTuiConfig();
       try (var tui = TuiRunner.create(tuiConfig)) {
         QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
         CatalogDataService catalogDataService =
