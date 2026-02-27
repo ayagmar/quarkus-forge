@@ -32,7 +32,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
@@ -309,7 +308,7 @@ public final class QuarkusApiClient {
             retryPolicy.requestTimeout().toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS)
         .handle(
             (response, throwable) -> {
-              Throwable cause = unwrapThrowable(throwable);
+              Throwable cause = ThrowableUnwrapper.unwrapCompletionCause(throwable);
               if (cause != null) {
                 return handleFailure(request, bodyHandler, attempt, cause);
               }
@@ -624,17 +623,6 @@ public final class QuarkusApiClient {
           new MetadataDto.PlatformStream(key, platformVersion, recommended, javaVersions));
     }
     return List.copyOf(platformStreams);
-  }
-
-  private static Throwable unwrapThrowable(Throwable throwable) {
-    if (throwable == null) {
-      return null;
-    }
-    if (throwable instanceof CompletionException completionException
-        && completionException.getCause() != null) {
-      return completionException.getCause();
-    }
-    return throwable;
   }
 
   private static String normalizeKey(String key) {

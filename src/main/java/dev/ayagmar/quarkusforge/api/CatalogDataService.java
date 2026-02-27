@@ -72,30 +72,30 @@ public final class CatalogDataService {
   }
 
   private MetadataSelection fallbackMetadataSelection(Throwable throwable) {
-    Throwable cause = unwrapCompletionCause(throwable);
+    Throwable cause = ThrowableUnwrapper.unwrapCompletionCause(throwable);
     try {
       MetadataDto snapshotMetadata = MetadataSnapshotLoader.loadDefault();
       return new MetadataSelection(
           snapshotMetadata,
           "Live metadata unavailable (%s); using bundled metadata snapshot"
-              .formatted(userFriendlyError(cause)));
+              .formatted(ErrorMessageMapper.simpleError(cause)));
     } catch (RuntimeException snapshotFailure) {
       throw new CompletionException(
           new ApiClientException(
               "Live metadata unavailable (%s) and bundled metadata snapshot failed"
-                  .formatted(userFriendlyError(cause)),
+                  .formatted(ErrorMessageMapper.simpleError(cause)),
               snapshotFailure));
     }
   }
 
   private CompletableFuture<CatalogData> fallbackToCache(Throwable throwable) {
-    Throwable cause = unwrapCompletionCause(throwable);
+    Throwable cause = ThrowableUnwrapper.unwrapCompletionCause(throwable);
     Optional<CatalogSnapshotCache.CachedCatalogSnapshot> cachedSnapshot = snapshotCache.read();
     if (cachedSnapshot.isPresent()) {
       CatalogSnapshotCache.CachedCatalogSnapshot snapshot = cachedSnapshot.get();
       String detail =
           "Live catalog unavailable (%s); using %scached snapshot"
-              .formatted(userFriendlyError(cause), snapshot.stale() ? "stale " : "");
+              .formatted(ErrorMessageMapper.simpleError(cause), snapshot.stale() ? "stale " : "");
       return CompletableFuture.completedFuture(
           new CatalogData(
               snapshot.metadata(),
@@ -108,24 +108,6 @@ public final class CatalogDataService {
     return CompletableFuture.failedFuture(
         new ApiClientException(
             "Live catalog unavailable and no valid cache snapshot found", cause));
-  }
-
-  private static Throwable unwrapCompletionCause(Throwable throwable) {
-    if (throwable instanceof CompletionException completionException
-        && completionException.getCause() != null) {
-      return completionException.getCause();
-    }
-    return throwable;
-  }
-
-  private static String userFriendlyError(Throwable throwable) {
-    if (throwable == null) {
-      return "unknown error";
-    }
-    if (throwable.getMessage() != null && !throwable.getMessage().isBlank()) {
-      return throwable.getMessage();
-    }
-    return throwable.getClass().getSimpleName();
   }
 
   private record MetadataSelection(MetadataDto metadata, String detailMessage) {

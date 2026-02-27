@@ -2,15 +2,16 @@ package dev.ayagmar.quarkusforge;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import dev.ayagmar.quarkusforge.api.ApiClientException;
-import dev.ayagmar.quarkusforge.api.ApiErrorMessages;
 import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogDataService;
 import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
+import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.api.ObjectMapperProvider;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
+import dev.ayagmar.quarkusforge.api.ThrowableUnwrapper;
 import dev.ayagmar.quarkusforge.archive.ArchiveException;
 import dev.ayagmar.quarkusforge.archive.OverwritePolicy;
 import dev.ayagmar.quarkusforge.archive.ProjectArchiveService;
@@ -259,7 +260,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
           "tui.session.failure",
           Map.of(
               "causeType", exception.getClass().getSimpleName(),
-              "message", userFriendlyError(exception)));
+              "message", ErrorMessageMapper.userFriendlyError(exception)));
       throw exception;
     }
   }
@@ -455,7 +456,8 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     } catch (IOException ioException) {
       diagnostics.error(
           "tui.post-action.failure",
-          Map.of("action", actionName, "message", userFriendlyError(ioException)));
+          Map.of(
+              "action", actionName, "message", ErrorMessageMapper.userFriendlyError(ioException)));
       return;
     } catch (InterruptedException interruptedException) {
       Thread.currentThread().interrupt();
@@ -487,7 +489,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
                 "detail", catalogData.detailMessage()));
         return toExtensionCatalogLoadResult(catalogData);
       }
-      Throwable cause = unwrapCompletionFailure(throwable);
+      Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(throwable);
       if (cause instanceof CancellationException) {
         diagnostics.error("catalog.load.cancelled", Map.of("mode", "tui"));
       } else {
@@ -496,7 +498,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
             Map.of(
                 "mode", "tui",
                 "causeType", cause.getClass().getSimpleName(),
-                "message", userFriendlyError(cause)));
+                "message", ErrorMessageMapper.userFriendlyError(cause)));
       }
       throw new CompletionException(cause);
     };
@@ -653,24 +655,8 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     System.out.println(" - generatedProjectDirectory: " + generatedProjectDirectory);
   }
 
-  private static String userFriendlyError(Throwable throwable) {
-    return ApiErrorMessages.userFriendlyMessage(throwable);
-  }
-
-  private static Throwable unwrapCompletionFailure(Throwable throwable) {
-    Throwable current = throwable;
-    while (current instanceof ExecutionException || current instanceof CompletionException) {
-      Throwable cause = current.getCause();
-      if (cause == null) {
-        break;
-      }
-      current = cause;
-    }
-    return current;
-  }
-
   private static int mapHeadlessFailureToExitCode(Throwable throwable) {
-    Throwable cause = unwrapCompletionFailure(throwable);
+    Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(throwable);
     if (cause instanceof CancellationException) {
       return EXIT_CODE_CANCELLED;
     }
@@ -798,10 +784,11 @@ public final class QuarkusForgeCli implements Callable<Integer> {
           Map.of("source", selection.sourceLabel(), "detail", selection.detailMessage()));
       return selection;
     } catch (ExecutionException executionException) {
-      Throwable cause = unwrapCompletionFailure(executionException);
+      Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);
       StartupMetadataSelection selection =
           snapshotFallbackSelection(
-              "Live metadata unavailable (%s)".formatted(userFriendlyError(cause)));
+              "Live metadata unavailable (%s)"
+                  .formatted(ErrorMessageMapper.userFriendlyError(cause)));
       diagnostics.error(
           "metadata.load.fallback",
           Map.of(
@@ -852,12 +839,16 @@ public final class QuarkusForgeCli implements Callable<Integer> {
           "Failed to load extension catalog: request timed out after " + timeout.toMillis() + "ms");
       return EXIT_CODE_NETWORK;
     } catch (ExecutionException executionException) {
-      Throwable cause = unwrapCompletionFailure(executionException);
+      Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);
       diagnostics.error(
           "catalog.load.failure",
           Map.of(
-              "causeType", cause.getClass().getSimpleName(), "message", userFriendlyError(cause)));
-      System.err.println("Failed to load extension catalog: " + userFriendlyError(cause));
+              "causeType",
+              cause.getClass().getSimpleName(),
+              "message",
+              ErrorMessageMapper.userFriendlyError(cause)));
+      System.err.println(
+          "Failed to load extension catalog: " + ErrorMessageMapper.userFriendlyError(cause));
       return mapHeadlessFailureToExitCode(cause);
     }
 
@@ -974,15 +965,15 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       System.err.println("Generation failed: request timed out after " + timeout.toMillis() + "ms");
       return EXIT_CODE_NETWORK;
     } catch (ExecutionException executionException) {
-      Throwable cause = unwrapCompletionFailure(executionException);
+      Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);
       int exitCode = mapHeadlessFailureToExitCode(cause);
       diagnostics.error(
           "generate.execute.failure",
           Map.of(
               "causeType", cause.getClass().getSimpleName(),
-              "message", userFriendlyError(cause),
+              "message", ErrorMessageMapper.userFriendlyError(cause),
               "exitCode", exitCode));
-      System.err.println("Generation failed: " + userFriendlyError(cause));
+      System.err.println("Generation failed: " + ErrorMessageMapper.userFriendlyError(cause));
       return exitCode;
     }
   }
