@@ -37,7 +37,6 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
@@ -148,10 +147,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   private final AsyncRepaintSignal asyncRepaintSignal;
   private final UiEventRouter uiEventRouter;
   private final UiEventRouter.RoutingContext eventRoutingContext;
-  private CompletableFuture<Path> generationFuture;
-  private long generationStartedAtNanos;
-  private volatile boolean generationCancelRequested;
-  private volatile long generationToken;
+  private final GenerationFlowCoordinator generationFlowCoordinator;
+  private final GenerationFlowCoordinator.Callbacks generationFlowCallbacks;
   private volatile long extensionCatalogLoadToken;
   private boolean extensionCatalogLoading;
   private String extensionCatalogErrorMessage;
@@ -203,10 +200,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     asyncRepaintSignal = new AsyncRepaintSignal();
     uiEventRouter = new UiEventRouter();
     eventRoutingContext = new ControllerRoutingContext();
-    generationFuture = null;
-    generationStartedAtNanos = 0L;
-    generationCancelRequested = false;
-    generationToken = 0L;
+    generationFlowCoordinator = new GenerationFlowCoordinator();
+    generationFlowCallbacks = new ControllerGenerationFlowCallbacks();
     extensionCatalogLoadToken = 0L;
     extensionCatalogLoading = false;
     extensionCatalogErrorMessage = "";
@@ -631,6 +626,92 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     @Override
     public UiAction handleTextInputFlow(KeyEvent keyEvent) {
       return CoreTuiController.this.handleTextInputFlow(keyEvent);
+    }
+  }
+
+  private final class ControllerGenerationFlowCallbacks
+      implements GenerationFlowCoordinator.Callbacks {
+    @Override
+    public void beforeGenerationStart() {
+      successHint = "";
+      postGenerationMenuVisible = false;
+      postGenerationExitPlan = null;
+      lastGeneratedProjectPath = null;
+      lastGeneratedNextCommand = "";
+      extensionCatalogState.cancelPendingAsync();
+    }
+
+    @Override
+    public boolean transitionTo(GenerationState targetState) {
+      return transitionGenerationState(targetState);
+    }
+
+    @Override
+    public GenerationState currentState() {
+      return generationStateTracker.currentState();
+    }
+
+    @Override
+    public String generationStateLabel() {
+      return CoreTuiController.this.generationStateLabel();
+    }
+
+    @Override
+    public void onSubmitIgnored(String stateLabel) {
+      statusMessage = "Submit ignored in state: " + stateLabel;
+    }
+
+    @Override
+    public void scheduleOnRenderThread(Runnable task) {
+      CoreTuiController.this.scheduleOnRenderThread(task);
+    }
+
+    @Override
+    public void onProgress(GenerationProgressUpdate progressUpdate) {
+      generationStateTracker.updateProgress(progressUpdate);
+      String progressMessage =
+          progressUpdate.message().isBlank() ? "working..." : progressUpdate.message();
+      statusMessage = "Generation in progress: " + progressMessage;
+    }
+
+    @Override
+    public void onGenerationSuccess(Path generatedPath) {
+      String nextCommand = nextStepCommand(request.buildTool());
+      lastGeneratedProjectPath = generatedPath;
+      lastGeneratedNextCommand = nextCommand;
+      statusMessage = "Generation succeeded: " + generatedPath;
+      errorMessage = "";
+      verboseErrorDetails = "";
+      successHint = "cd " + generatedPath + " && " + nextCommand;
+      postGenerationMenuVisible = true;
+      postGenerationActionSelection = 0;
+      requestAsyncRepaint();
+    }
+
+    @Override
+    public void onGenerationCancelled() {
+      statusMessage = "Generation cancelled. Update inputs and press Enter to retry.";
+      errorMessage = "";
+      verboseErrorDetails = "";
+      successHint = "";
+      postGenerationMenuVisible = false;
+      requestAsyncRepaint();
+    }
+
+    @Override
+    public void onGenerationFailed(Throwable cause) {
+      statusMessage = "Generation failed.";
+      errorMessage = ErrorMessageMapper.userFriendlyError(cause);
+      verboseErrorDetails = ErrorMessageMapper.verboseDetails(cause);
+      successHint = "";
+      postGenerationMenuVisible = false;
+      requestAsyncRepaint();
+    }
+
+    @Override
+    public void onCancellationRequested() {
+      statusMessage = "Cancellation requested. Waiting for cleanup...";
+      errorMessage = "";
     }
   }
 
@@ -1863,144 +1944,19 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private void startGenerationFlow() {
-    successHint = "";
-    postGenerationMenuVisible = false;
-    postGenerationExitPlan = null;
-    lastGeneratedProjectPath = null;
-    lastGeneratedNextCommand = "";
-    extensionCatalogState.cancelPendingAsync();
-    generationCancelRequested = false;
-    long token = ++generationToken;
-    if (!transitionGenerationState(GenerationState.LOADING)) {
-      statusMessage = "Submit ignored in state: " + generationStateLabel();
-      return;
-    }
-    generationStartedAtNanos = System.nanoTime();
-    onGenerationProgress(
-        token,
-        GenerationProgressUpdate.requestingArchive(
-            "requesting project archive from Quarkus API..."));
-
-    GenerationRequest generationRequest = toGenerationRequest();
-    Path outputDirectory = resolveGeneratedProjectDirectory();
-
-    CompletableFuture<Path> startedFuture;
-    try {
-      startedFuture =
-          projectGenerationRunner.generate(
-              generationRequest,
-              outputDirectory,
-              () -> generationCancelRequested || token != generationToken,
-              progressUpdate ->
-                  scheduleOnRenderThread(() -> onGenerationProgress(token, progressUpdate)));
-    } catch (RuntimeException runtimeException) {
-      onGenerationCompleted(token, null, runtimeException);
-      return;
-    }
-    if (startedFuture == null) {
-      onGenerationCompleted(
-          token, null, new IllegalStateException("Generation service returned null future"));
-      return;
-    }
-
-    generationFuture = startedFuture;
-    startedFuture.whenComplete(
-        (generatedPath, throwable) ->
-            scheduleOnRenderThread(() -> onGenerationCompleted(token, generatedPath, throwable)));
-  }
-
-  private void onGenerationProgress(long token, GenerationProgressUpdate progressUpdate) {
-    if (token != generationToken
-        || generationStateTracker.currentState() != GenerationState.LOADING) {
-      return;
-    }
-    generationStateTracker.updateProgress(progressUpdate);
-    String progressMessage =
-        progressUpdate.message().isBlank() ? "working..." : progressUpdate.message();
-    statusMessage = "Generation in progress: " + progressMessage;
-  }
-
-  private void onGenerationCompleted(long token, Path generatedPath, Throwable throwable) {
-    if (token != generationToken
-        || generationStateTracker.currentState() != GenerationState.LOADING) {
-      return;
-    }
-    generationFuture = null;
-
-    Throwable cause = ThrowableUnwrapper.unwrapCompletionCause(throwable);
-    if (cause == null && generatedPath != null) {
-      transitionGenerationState(GenerationState.SUCCESS);
-      Path normalizedPath = generatedPath.toAbsolutePath().normalize();
-      String nextCommand = nextStepCommand(request.buildTool());
-      lastGeneratedProjectPath = normalizedPath;
-      lastGeneratedNextCommand = nextCommand;
-      statusMessage = "Generation succeeded: " + normalizedPath;
-      errorMessage = "";
-      verboseErrorDetails = "";
-      successHint = "cd " + normalizedPath + " && " + nextCommand;
-      postGenerationMenuVisible = true;
-      postGenerationActionSelection = 0;
-      requestAsyncRepaint();
-      return;
-    }
-
-    if (cause == null) {
-      cause = new IllegalStateException("Generation finished without an output path");
-    }
-
-    if (cause instanceof CancellationException || generationCancelRequested) {
-      transitionGenerationState(GenerationState.CANCELLED);
-      statusMessage = "Generation cancelled. Update inputs and press Enter to retry.";
-      errorMessage = "";
-      verboseErrorDetails = "";
-      successHint = "";
-      postGenerationMenuVisible = false;
-      requestAsyncRepaint();
-      return;
-    }
-
-    transitionGenerationState(GenerationState.ERROR);
-    statusMessage = "Generation failed.";
-    errorMessage = ErrorMessageMapper.userFriendlyError(cause);
-    verboseErrorDetails = ErrorMessageMapper.verboseDetails(cause);
-    successHint = "";
-    postGenerationMenuVisible = false;
-    requestAsyncRepaint();
+    generationFlowCoordinator.startFlow(
+        projectGenerationRunner,
+        toGenerationRequest(),
+        resolveGeneratedProjectDirectory(),
+        generationFlowCallbacks);
   }
 
   private void reconcileGenerationCompletionIfDone() {
-    if (generationStateTracker.currentState() != GenerationState.LOADING
-        || generationFuture == null) {
-      return;
-    }
-    if (!generationFuture.isDone()) {
-      return;
-    }
-
-    Path generatedPath = null;
-    Throwable throwable = null;
-    try {
-      generatedPath = generationFuture.join();
-    } catch (RuntimeException completionFailure) {
-      throwable = completionFailure;
-    }
-    onGenerationCompleted(generationToken, generatedPath, throwable);
+    generationFlowCoordinator.reconcileCompletionIfDone(generationFlowCallbacks);
   }
 
   private void requestGenerationCancellation() {
-    if (generationStateTracker.currentState() != GenerationState.LOADING) {
-      return;
-    }
-    if (generationFuture != null && generationFuture.isDone()) {
-      reconcileGenerationCompletionIfDone();
-      return;
-    }
-    generationCancelRequested = true;
-    statusMessage = "Cancellation requested. Waiting for cleanup...";
-    errorMessage = "";
-    if (generationFuture != null) {
-      generationFuture.cancel(true);
-    }
+    generationFlowCoordinator.requestCancellation(generationFlowCallbacks);
   }
 
   private boolean isGenerationInProgress() {
@@ -2145,10 +2101,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       shouldRender = true;
     }
     if (generationStateTracker.currentState() == GenerationState.LOADING) {
-      if (!generationCancelRequested) {
-        long elapsedMillis =
-            Math.max(0L, (System.nanoTime() - generationStartedAtNanos) / 1_000_000L);
-        generationStateTracker.tick(elapsedMillis);
+      if (!generationFlowCoordinator.isCancellationRequested()) {
+        generationStateTracker.tick(generationFlowCoordinator.elapsedMillisSinceStart());
         statusMessage = "Generation in progress: " + generationStateTracker.progressPhase();
       }
       shouldRender = true;

@@ -9,13 +9,15 @@ import org.junit.jupiter.api.Test;
 class CoreTuiConcurrencyGuardTest {
   @Test
   void generationCancellationVisibilityFieldsRemainVolatile() throws Exception {
-    assertThat(isVolatileField("generationCancelRequested")).isTrue();
-    assertThat(isVolatileField("generationToken")).isTrue();
-    assertThat(isVolatileField("extensionCatalogLoadToken")).isTrue();
+    assertThat(isVolatileField(GenerationFlowCoordinator.class, "generationCancelRequested"))
+        .isTrue();
+    assertThat(isVolatileField(GenerationFlowCoordinator.class, "generationToken")).isTrue();
+    assertThat(isVolatileField(CoreTuiController.class, "extensionCatalogLoadToken")).isTrue();
   }
 
-  private static boolean isVolatileField(String fieldName) throws NoSuchFieldException {
-    Field field = CoreTuiController.class.getDeclaredField(fieldName);
+  private static boolean isVolatileField(Class<?> owner, String fieldName)
+      throws NoSuchFieldException {
+    Field field = owner.getDeclaredField(fieldName);
     return Modifier.isVolatile(field.getModifiers());
   }
 }
