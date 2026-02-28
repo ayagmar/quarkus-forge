@@ -27,7 +27,7 @@ class AtomicFileStoreTest {
   void writeBytesFallsBackWhenAtomicMoveIsNotSupported() throws Exception {
     Path target = tempDir.resolve("catalog.json");
     AtomicInteger moveCalls = new AtomicInteger();
-    AtomicFileStore.MoveOperation mover =
+    FileMoveOperation mover =
         (source, destination, options) -> {
           moveCalls.incrementAndGet();
           if (Arrays.asList(options).contains(StandardCopyOption.ATOMIC_MOVE)) {

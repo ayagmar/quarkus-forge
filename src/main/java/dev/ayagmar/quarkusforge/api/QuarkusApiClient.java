@@ -1,6 +1,6 @@
 package dev.ayagmar.quarkusforge.api;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.net.URI;
@@ -41,6 +41,9 @@ public final class QuarkusApiClient {
   private static final List<String> FALLBACK_BUILD_TOOLS =
       List.of("maven", "gradle", "gradle-kotlin-dsl");
   private static final Duration MAX_RETRY_DELAY = Duration.ofSeconds(30);
+  private static final TypeReference<List<ExtensionPayload>> EXTENSIONS_TYPE =
+      new TypeReference<>() {};
+  private static final TypeReference<List<StreamPayload>> STREAMS_TYPE = new TypeReference<>() {};
 
   private final HttpClient httpClient;
   private final ObjectMapper objectMapper;
@@ -104,26 +107,19 @@ public final class QuarkusApiClient {
   }
 
   static MetadataDto parseMetadataPayload(String payload, ObjectMapper objectMapper) {
-    JsonNode root = readPayload(payload, objectMapper);
-    if (!root.isObject()) {
-      throw new ApiContractException("Metadata payload must be a JSON object");
-    }
-
-    JsonNode javaVersionsNode = root.get("javaVersions");
-    JsonNode buildToolsNode = root.get("buildTools");
-    if (javaVersionsNode == null || !javaVersionsNode.isArray()) {
+    MetadataPayload metadataPayload = readValue(payload, objectMapper, MetadataPayload.class);
+    if (metadataPayload.javaVersions() == null) {
       throw new ApiContractException("Metadata payload is missing 'javaVersions' array");
     }
-    if (buildToolsNode == null || !buildToolsNode.isArray()) {
+    if (metadataPayload.buildTools() == null) {
       throw new ApiContractException("Metadata payload is missing 'buildTools' array");
     }
 
-    List<String> javaVersions = toStringList(javaVersionsNode, "javaVersions");
-    List<String> buildTools = toStringList(buildToolsNode, "buildTools");
+    List<String> javaVersions = copyStringList(metadataPayload.javaVersions(), "javaVersions");
+    List<String> buildTools = copyStringList(metadataPayload.buildTools(), "buildTools");
     Map<String, List<String>> compatibility =
-        parseCompatibility(root.get("compatibility"), buildTools);
-    List<MetadataDto.PlatformStream> platformStreams =
-        parsePlatformStreams(root.get("platformStreams"));
+        parseCompatibility(metadataPayload.compatibility(), buildTools);
+    List<PlatformStream> platformStreams = parsePlatformStreams(metadataPayload.platformStreams());
     return new MetadataDto(javaVersions, buildTools, compatibility, platformStreams);
   }
 
@@ -132,36 +128,33 @@ public final class QuarkusApiClient {
     return parseStreamsMetadataPayload(payload, objectMapper).javaVersions();
   }
 
-  static List<MetadataDto.PlatformStream> parsePlatformStreamsFromStreamsPayload(
+  static List<PlatformStream> parsePlatformStreamsFromStreamsPayload(
       String payload, ObjectMapper objectMapper) {
     return parseStreamsMetadataPayload(payload, objectMapper).platformStreams();
   }
 
   static StreamsMetadata parseStreamsMetadataPayload(String payload, ObjectMapper objectMapper) {
-    JsonNode root = readPayload(payload, objectMapper);
-    if (!root.isArray()) {
-      throw new ApiContractException("Streams payload must be a JSON array");
-    }
+    List<StreamPayload> streamPayloads = readValue(payload, objectMapper, STREAMS_TYPE);
 
     Set<Integer> versions = new LinkedHashSet<>();
-    List<MetadataDto.PlatformStream> platformStreams = new ArrayList<>();
-    for (JsonNode stream : root) {
-      String key = requiredText(stream, "key");
-      JsonNode javaCompatibilityNode = stream.get("javaCompatibility");
-      if (javaCompatibilityNode == null || !javaCompatibilityNode.isObject()) {
+    List<PlatformStream> platformStreams = new ArrayList<>();
+    for (StreamPayload stream : streamPayloads) {
+      String key = requiredText(stream.key(), "key");
+      JavaCompatibilityPayload javaCompatibility = stream.javaCompatibility();
+      if (javaCompatibility == null) {
         throw new ApiContractException("Stream payload is missing 'javaCompatibility' object");
       }
-      JsonNode javaVersionsNode = javaCompatibilityNode.get("versions");
-      if (javaVersionsNode == null || !javaVersionsNode.isArray()) {
+      List<Integer> javaVersionsNode = javaCompatibility.versions();
+      if (javaVersionsNode == null) {
         throw new ApiContractException("Stream payload is missing 'javaCompatibility.versions'");
       }
       List<String> streamJavaVersions = new ArrayList<>();
-      for (JsonNode version : javaVersionsNode) {
-        if (!version.canConvertToInt()) {
+      for (Integer version : javaVersionsNode) {
+        if (version == null) {
           throw new ApiContractException(
               "Stream payload field 'javaCompatibility.versions' must contain integers");
         }
-        int parsed = version.intValue();
+        int parsed = version;
         if (parsed > 0) {
           versions.add(parsed);
           streamJavaVersions.add(String.valueOf(parsed));
@@ -171,10 +164,9 @@ public final class QuarkusApiClient {
         throw new ApiContractException(
             "Stream payload 'javaCompatibility.versions' must contain at least one positive value");
       }
-      String platformVersion = optionalText(stream, "platformVersion");
-      boolean recommended = stream.path("recommended").asBoolean(false);
-      platformStreams.add(
-          new MetadataDto.PlatformStream(key, platformVersion, recommended, streamJavaVersions));
+      String platformVersion = normalizeOptionalText(stream.platformVersion());
+      boolean recommended = stream.recommended();
+      platformStreams.add(new PlatformStream(key, platformVersion, recommended, streamJavaVersions));
     }
 
     if (versions.isEmpty()) {
@@ -186,34 +178,29 @@ public final class QuarkusApiClient {
   }
 
   static List<String> parseBuildToolsFromOpenApiPayload(String payload, ObjectMapper objectMapper) {
-    JsonNode root = readPayload(payload, objectMapper);
-    if (!root.isObject()) {
-      throw new ApiContractException("OpenAPI payload must be a JSON object");
-    }
-
-    // Use direct parameter iteration to avoid brittle fixed indexing in OpenAPI parameters.
-    JsonNode parametersNode =
-        root.path("paths").path("/api/download").path("get").path("parameters");
-    if (!parametersNode.isArray()) {
+    OpenApiPayload openApiPayload = readValue(payload, objectMapper, OpenApiPayload.class);
+    OpenApiPathsPayload paths = openApiPayload.paths();
+    OpenApiPathPayload downloadPath = paths == null ? null : paths.download();
+    OpenApiGetPayload getOperation = downloadPath == null ? null : downloadPath.getOperation();
+    List<OpenApiParameterPayload> parametersNode =
+        getOperation == null ? null : getOperation.parameters();
+    if (parametersNode == null) {
       throw new ApiContractException(
           "OpenAPI payload is missing '/api/download.get.parameters' array");
     }
 
     Set<String> buildTools = new LinkedHashSet<>();
-    for (JsonNode parameter : parametersNode) {
-      if (!"b".equals(parameter.path("name").asText())) {
+    for (OpenApiParameterPayload parameter : parametersNode) {
+      if (parameter == null || !"b".equals(parameter.name())) {
         continue;
       }
-      JsonNode parameterEnum = parameter.path("schema").path("enum");
-      if (!parameterEnum.isArray()) {
-        throw new ApiContractException(
-            "OpenAPI payload is missing '/api/download' build tool enum");
+      OpenApiSchemaPayload schema = parameter.schema();
+      List<String> parameterEnum = schema == null ? null : schema.enumValues();
+      if (parameterEnum == null) {
+        throw new ApiContractException("OpenAPI payload is missing '/api/download' build tool enum");
       }
-      for (JsonNode value : parameterEnum) {
-        if (!value.isTextual()) {
-          throw new ApiContractException("OpenAPI build tool enum must contain strings");
-        }
-        String buildTool = BuildToolCodec.toUiValue(value.textValue());
+      for (String value : parameterEnum) {
+        String buildTool = BuildToolCodec.toUiValue(normalizeOptionalText(value));
         if (buildTool.isBlank()) {
           throw new ApiContractException("OpenAPI build tool enum must not contain blank values");
         }
@@ -283,18 +270,18 @@ public final class QuarkusApiClient {
   }
 
   static List<ExtensionDto> parseExtensionsPayload(String payload, ObjectMapper objectMapper) {
-    JsonNode root = readPayload(payload, objectMapper);
-    if (!root.isArray()) {
-      throw new ApiContractException("Extensions payload must be a JSON array");
-    }
+    List<ExtensionPayload> root = readValue(payload, objectMapper, EXTENSIONS_TYPE);
 
     List<ExtensionDto> extensions = new ArrayList<>();
-    for (JsonNode node : root) {
-      String id = requiredText(node, "id");
-      String name = requiredText(node, "name");
-      String shortName = resolvedShortName(node, name);
-      String category = resolvedCategory(node);
-      Integer order = optionalInt(node, "order");
+    for (ExtensionPayload node : root) {
+      if (node == null) {
+        throw new ApiContractException("Extensions payload entries must be objects");
+      }
+      String id = requiredText(node.id(), "id");
+      String name = requiredText(node.name(), "name");
+      String shortName = resolvedShortName(node.shortName(), name);
+      String category = resolvedCategory(node.category());
+      Integer order = node.order();
       extensions.add(new ExtensionDto(id, name, shortName, category, order));
     }
     return List.copyOf(extensions);
@@ -430,29 +417,25 @@ public final class QuarkusApiClient {
 
   private static String extractErrorBody(HttpResponse<?> response) {
     Object body = response.body();
-    if (body == null) {
-      return "";
-    }
-    if (body instanceof String text) {
-      return text;
-    }
-    if (body instanceof byte[] bytes) {
-      return decodeBytesAsUtf8OrBinary(bytes);
-    }
-    if (body instanceof Path path) {
-      try {
-        if (!Files.exists(path)) {
-          return "";
+    return switch (body) {
+      case null -> "";
+      case String text -> text;
+      case byte[] bytes -> decodeBytesAsUtf8OrBinary(bytes);
+      case Path path -> {
+        try {
+          if (!Files.exists(path)) {
+            yield "";
+          }
+          try (java.io.InputStream inputStream = Files.newInputStream(path)) {
+            byte[] bytes = inputStream.readNBytes(MAX_ERROR_BODY_BYTES);
+            yield decodeBytesAsUtf8OrBinary(bytes);
+          }
+        } catch (IOException ignored) {
+          yield "<binary>";
         }
-        try (java.io.InputStream inputStream = Files.newInputStream(path)) {
-          byte[] bytes = inputStream.readNBytes(MAX_ERROR_BODY_BYTES);
-          return decodeBytesAsUtf8OrBinary(bytes);
-        }
-      } catch (IOException ignored) {
-        return "<binary>";
       }
-    }
-    return "<binary>";
+      default -> "<binary>";
+    };
   }
 
   private static String decodeBytesAsUtf8OrBinary(byte[] bytes) {
@@ -472,9 +455,18 @@ public final class QuarkusApiClient {
     return decoded.indexOf('\u0000') >= 0;
   }
 
-  private static JsonNode readPayload(String payload, ObjectMapper objectMapper) {
+  private static <T> T readValue(String payload, ObjectMapper objectMapper, Class<T> valueType) {
     try {
-      return objectMapper.readTree(payload);
+      return objectMapper.readValue(payload, valueType);
+    } catch (IOException | RuntimeException ioException) {
+      throw new ApiContractException("Malformed JSON payload", ioException);
+    }
+  }
+
+  private static <T> T readValue(
+      String payload, ObjectMapper objectMapper, TypeReference<T> valueTypeRef) {
+    try {
+      return objectMapper.readValue(payload, valueTypeRef);
     } catch (IOException | RuntimeException ioException) {
       throw new ApiContractException("Malformed JSON payload", ioException);
     }
@@ -498,129 +490,103 @@ public final class QuarkusApiClient {
     }
   }
 
-  private static String requiredText(JsonNode node, String fieldName) {
-    JsonNode child = node.get(fieldName);
-    if (child == null || !child.isTextual() || child.textValue().isBlank()) {
+  private static String requiredText(String value, String fieldName) {
+    if (value == null || value.isBlank()) {
       throw new ApiContractException("Missing required contract field '" + fieldName + "'");
     }
-    return child.textValue().trim();
+    return value.trim();
   }
 
-  private static String optionalText(JsonNode node, String fieldName) {
-    JsonNode child = node.get(fieldName);
-    if (child == null || !child.isTextual()) {
-      return "";
-    }
-    return child.textValue().trim();
+  private static String normalizeOptionalText(String value) {
+    return value == null ? "" : value.trim();
   }
 
-  private static String resolvedShortName(JsonNode node, String name) {
-    String shortName = optionalText(node, "shortName");
+  private static String resolvedShortName(String value, String name) {
+    String shortName = normalizeOptionalText(value);
     if (!shortName.isBlank()) {
       return shortName;
     }
     return name;
   }
 
-  private static String resolvedCategory(JsonNode node) {
-    String category = optionalText(node, "category");
+  private static String resolvedCategory(String value) {
+    String category = normalizeOptionalText(value);
     if (!category.isBlank()) {
       return category;
     }
     return "Other";
   }
 
-  private static Integer optionalInt(JsonNode node, String fieldName) {
-    JsonNode child = node.get(fieldName);
-    if (child == null || child.isNull()) {
-      return null;
-    }
-    if (!child.canConvertToInt()) {
-      throw new ApiContractException(
-          "Contract field '" + fieldName + "' must be an integer when present");
-    }
-    return child.intValue();
-  }
-
-  private static List<String> toStringList(JsonNode node, String fieldName) {
-    List<String> values = new ArrayList<>();
-    for (JsonNode element : node) {
-      if (!element.isTextual()) {
+  private static List<String> copyStringList(List<String> values, String fieldName) {
+    List<String> valuesCopy = new ArrayList<>();
+    for (String element : Objects.requireNonNull(values)) {
+      if (element == null) {
         throw new ApiContractException("Field '" + fieldName + "' must contain only strings");
       }
-      values.add(element.textValue());
+      valuesCopy.add(element);
     }
-    return List.copyOf(values);
+    return List.copyOf(valuesCopy);
   }
 
   private static Map<String, List<String>> parseCompatibility(
-      JsonNode node, List<String> buildTools) {
+      Map<String, List<String>> compatibilityPayload, List<String> buildTools) {
     Map<String, List<String>> compatibility = new LinkedHashMap<>();
-    if (node == null || node.isNull()) {
+    if (compatibilityPayload == null) {
       return Map.of();
     }
 
-    if (!node.isObject()) {
-      throw new ApiContractException("Metadata payload field 'compatibility' must be an object");
+    Map<String, BuildToolCompatibilitySelection> compatibilityByNormalizedBuildTool =
+        new LinkedHashMap<>();
+    for (Map.Entry<String, List<String>> entry : compatibilityPayload.entrySet()) {
+      String normalizedBuildTool = normalizeKey(entry.getKey());
+      BuildToolCompatibilitySelection previous =
+          compatibilityByNormalizedBuildTool.putIfAbsent(
+              normalizedBuildTool,
+              new BuildToolCompatibilitySelection(entry.getKey(), entry.getValue()));
+      if (previous != null) {
+        throw new ApiContractException(
+            "Metadata payload compatibility contains duplicate build tool entries differing"
+                + " only by case: '"
+                + previous.key()
+                + "' and '"
+                + entry.getKey()
+                + "'");
+      }
     }
 
-    Map<String, CompatibilityEntry> compatibilityByNormalizedBuildTool = new LinkedHashMap<>();
-    node.fields()
-        .forEachRemaining(
-            entry -> {
-              String normalizedBuildTool = normalizeKey(entry.getKey());
-              CompatibilityEntry previous =
-                  compatibilityByNormalizedBuildTool.putIfAbsent(
-                      normalizedBuildTool,
-                      new CompatibilityEntry(entry.getKey(), entry.getValue()));
-              if (previous != null) {
-                throw new ApiContractException(
-                    "Metadata payload compatibility contains duplicate build tool entries differing"
-                        + " only by case: '"
-                        + previous.originalBuildTool()
-                        + "' and '"
-                        + entry.getKey()
-                        + "'");
-              }
-            });
-
     for (String buildTool : buildTools) {
-      CompatibilityEntry compatibilityEntry =
+      BuildToolCompatibilitySelection compatibilityEntry =
           compatibilityByNormalizedBuildTool.get(normalizeKey(buildTool));
-      JsonNode javaVersionsNode = compatibilityEntry == null ? null : compatibilityEntry.value();
-      if (javaVersionsNode == null || !javaVersionsNode.isArray()) {
+      List<String> javaVersions = compatibilityEntry == null ? null : compatibilityEntry.values();
+      if (javaVersions == null) {
         throw new ApiContractException(
             "Metadata payload compatibility missing build tool entry '" + buildTool + "'");
       }
-      compatibility.put(buildTool, toStringList(javaVersionsNode, "compatibility." + buildTool));
+      compatibility.put(buildTool, copyStringList(javaVersions, "compatibility." + buildTool));
     }
     return compatibility;
   }
 
-  private static List<MetadataDto.PlatformStream> parsePlatformStreams(JsonNode node) {
-    if (node == null || node.isNull()) {
+  private static List<PlatformStream> parsePlatformStreams(List<PlatformStreamPayload> node) {
+    if (node == null) {
       return List.of();
     }
-    if (!node.isArray()) {
-      throw new ApiContractException("Metadata payload field 'platformStreams' must be an array");
-    }
 
-    List<MetadataDto.PlatformStream> platformStreams = new ArrayList<>();
-    for (JsonNode platformStreamNode : node) {
-      if (!platformStreamNode.isObject()) {
+    List<PlatformStream> platformStreams = new ArrayList<>();
+    for (PlatformStreamPayload platformStreamNode : node) {
+      if (platformStreamNode == null) {
         throw new ApiContractException("Metadata platform stream entry must be an object");
       }
-      String key = requiredText(platformStreamNode, "key");
-      String platformVersion = optionalText(platformStreamNode, "platformVersion");
-      JsonNode javaVersionsNode = platformStreamNode.get("javaVersions");
-      if (javaVersionsNode == null || !javaVersionsNode.isArray()) {
+      String key = requiredText(platformStreamNode.key(), "key");
+      String platformVersion = normalizeOptionalText(platformStreamNode.platformVersion());
+      List<String> javaVersionsNode = platformStreamNode.javaVersions();
+      if (javaVersionsNode == null) {
         throw new ApiContractException(
             "Metadata platform stream entry is missing 'javaVersions' array");
       }
-      List<String> javaVersions = toStringList(javaVersionsNode, "platformStreams.javaVersions");
-      boolean recommended = platformStreamNode.path("recommended").asBoolean(false);
+      List<String> javaVersions = copyStringList(javaVersionsNode, "platformStreams.javaVersions");
       platformStreams.add(
-          new MetadataDto.PlatformStream(key, platformVersion, recommended, javaVersions));
+          new PlatformStream(key, platformVersion, platformStreamNode.recommended(), javaVersions));
     }
     return List.copyOf(platformStreams);
   }
@@ -628,14 +594,4 @@ public final class QuarkusApiClient {
   private static String normalizeKey(String key) {
     return key == null ? "" : key.trim().toLowerCase(Locale.ROOT);
   }
-
-  record StreamsMetadata(
-      List<String> javaVersions, List<MetadataDto.PlatformStream> platformStreams) {
-    StreamsMetadata {
-      javaVersions = List.copyOf(javaVersions);
-      platformStreams = List.copyOf(platformStreams);
-    }
-  }
-
-  private record CompatibilityEntry(String originalBuildTool, JsonNode value) {}
 }

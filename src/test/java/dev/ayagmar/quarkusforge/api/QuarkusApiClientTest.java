@@ -425,7 +425,7 @@ class QuarkusApiClientTest {
                     "gradle-kotlin-dsl",
                     List.of("17", "21", "25")),
                 List.of(
-                    new MetadataDto.PlatformStream(
+                    new PlatformStream(
                         "io.quarkus.platform:3.31", "3.31", true, List.of("17", "21", "25")))));
   }
 

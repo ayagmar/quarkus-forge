@@ -10,12 +10,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.Objects;
 
 public final class AtomicFileStore {
-  @FunctionalInterface
-  interface MoveOperation {
-    void move(Path source, Path target, CopyOption... options) throws IOException;
-  }
-
-  private static final MoveOperation FILE_MOVE_OPERATION = Files::move;
+  private static final FileMoveOperation FILE_MOVE_OPERATION = Files::move;
 
   private AtomicFileStore() {}
 
@@ -25,7 +20,7 @@ public final class AtomicFileStore {
   }
 
   static void writeBytes(
-      Path targetFile, byte[] payload, String tempFilePrefix, MoveOperation moveOperation)
+      Path targetFile, byte[] payload, String tempFilePrefix, FileMoveOperation moveOperation)
       throws IOException {
     Objects.requireNonNull(targetFile);
     Objects.requireNonNull(payload);
@@ -45,7 +40,7 @@ public final class AtomicFileStore {
   }
 
   private static void moveAtomicallyWithFallback(
-      Path source, Path target, MoveOperation moveOperation) throws IOException {
+      Path source, Path target, FileMoveOperation moveOperation) throws IOException {
     try {
       moveOperation.move(
           source, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);

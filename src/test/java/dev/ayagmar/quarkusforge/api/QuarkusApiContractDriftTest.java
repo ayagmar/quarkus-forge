@@ -135,12 +135,12 @@ class QuarkusApiContractDriftTest {
         ]
         """;
 
-    List<MetadataDto.PlatformStream> platformStreams =
+    List<PlatformStream> platformStreams =
         QuarkusApiClient.parsePlatformStreamsFromStreamsPayload(streamsPayload, objectMapper);
 
     assertThat(platformStreams)
         .containsExactly(
-            new MetadataDto.PlatformStream(
+            new PlatformStream(
                 "io.quarkus.platform:3.31", "3.31", true, List.of("17", "21", "25")));
   }
 

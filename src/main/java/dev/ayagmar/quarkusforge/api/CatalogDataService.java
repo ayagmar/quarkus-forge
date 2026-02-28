@@ -25,9 +25,9 @@ public final class CatalogDataService {
   }
 
   public CompletableFuture<CatalogData> loadForStartup() {
-    Optional<CatalogSnapshotCache.CachedCatalogSnapshot> cachedSnapshot = snapshotCache.read();
+    Optional<CachedCatalogSnapshot> cachedSnapshot = snapshotCache.read();
     if (cachedSnapshot.isPresent()) {
-      CatalogSnapshotCache.CachedCatalogSnapshot snapshot = cachedSnapshot.get();
+      CachedCatalogSnapshot snapshot = cachedSnapshot.get();
       String detail =
           snapshot.stale()
               ? "Loaded stale extension catalog from cache at startup (Ctrl+R to refresh live data)"
@@ -49,7 +49,7 @@ public final class CatalogDataService {
       throw new ApiContractException("Catalog load returned no extensions");
     }
 
-    CatalogSnapshotCache.CacheWriteOutcome writeOutcome =
+    CacheWriteOutcome writeOutcome =
         snapshotCache.write(metadataSelection.metadata(), extensions);
     String detailMessage = metadataSelection.detailMessage();
     if (!writeOutcome.written()) {
@@ -90,9 +90,9 @@ public final class CatalogDataService {
 
   private CompletableFuture<CatalogData> fallbackToCache(Throwable throwable) {
     Throwable cause = ThrowableUnwrapper.unwrapCompletionCause(throwable);
-    Optional<CatalogSnapshotCache.CachedCatalogSnapshot> cachedSnapshot = snapshotCache.read();
+    Optional<CachedCatalogSnapshot> cachedSnapshot = snapshotCache.read();
     if (cachedSnapshot.isPresent()) {
-      CatalogSnapshotCache.CachedCatalogSnapshot snapshot = cachedSnapshot.get();
+      CachedCatalogSnapshot snapshot = cachedSnapshot.get();
       String detail =
           "Live catalog unavailable (%s); using %scached snapshot"
               .formatted(ErrorMessageMapper.simpleError(cause), snapshot.stale() ? "stale " : "");
@@ -108,12 +108,5 @@ public final class CatalogDataService {
     return CompletableFuture.failedFuture(
         new ApiClientException(
             "Live catalog unavailable and no valid cache snapshot found", cause));
-  }
-
-  private record MetadataSelection(MetadataDto metadata, String detailMessage) {
-    private MetadataSelection {
-      metadata = Objects.requireNonNull(metadata);
-      detailMessage = detailMessage == null ? "" : detailMessage.strip();
-    }
   }
 }
