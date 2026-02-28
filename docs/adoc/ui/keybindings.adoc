@@ -3,20 +3,90 @@
 
 == Define Purpose
 
-Document keyboard actions and expected behavior parity.
+Document keyboard actions, action namespaces, and behavior parity guarantees for the TUI.
 
 == Define Inputs
 
-* App bindings profile
-* Semantic actions and app-specific chords
+* Tamboui standard actions from `BindingSets.standard()`
+* App-specific actions from `dev.ayagmar.quarkusforge.ui.AppKeyActions`
+* Focus-aware event routing in `CoreTuiController` and `UiEventRouter`
 
 == Define Outputs
 
-* Navigation and focus shortcuts
-* Extension list and filter shortcuts
-* Submit/cancel/overlay shortcuts
+* Stable keybinding map for navigation, focus, and extension workflows
+* Action-to-shortcut terminology aligned with runtime identifiers
+* Manual verification commands and parity constraints
 
 == Define Failure Modes
 
-* Missing shortcut coverage
-* Behavior drift between bindings and handlers
+* Binding and handler drift (binding exists but no effect in routed state)
+* Shortcut conflicts with text-entry behavior in extension search
+* Unclear operator expectations when help/command palette overlays are active
+
+== Configure Action Map
+
+The app merges `BindingSets.standard()` with explicit app actions in `QuarkusForgeCli.appBindingsProfile()`.
+
+[cols="1,2,2",options="header"]
+|===
+| Namespace | Action | Default triggers
+
+| Standard (`Actions`)
+| `MOVE_UP`, `MOVE_DOWN`, `MOVE_LEFT`, `MOVE_RIGHT`, `HOME`, `END`
+| Arrow keys and `j/k/h/l`, `g/G`
+
+| App (`AppKeyActions`)
+| `FOCUS_EXTENSION_SEARCH`, `FOCUS_EXTENSION_LIST`
+| `/`, `Ctrl+F`, `Ctrl+L`
+
+| App (`AppKeyActions`)
+| `TOGGLE_FAVORITES_FILTER`, `JUMP_TO_FAVORITE`, `FAVORITE_TOGGLE`
+| `Ctrl+K`, `Ctrl+J`, `f`
+
+| App (`AppKeyActions`)
+| `CATEGORY_FILTER_CYCLE`, `TOGGLE_CATEGORY`, `OPEN_ALL_CATEGORIES`
+| `v`, `c`, `C`
+
+| App (`AppKeyActions`)
+| `RELOAD_CATALOG`, `TOGGLE_ERROR_DETAILS`
+| `Ctrl+R`, `Ctrl+E`
+
+| App (`AppKeyActions`)
+| `OPEN_HELP`, `OPEN_COMMAND_PALETTE`, `SUBMIT_GENERATION`
+| `?`, `Ctrl+P`, `Alt+G`
+|===
+
+== Define Constraints
+
+* Keep semantic actions and route handlers aligned: every bound app action must be consumed by controller routing.
+* Preserve text-entry safety: plain character shortcuts (`f`, `v`, `c`, `/`) must not corrupt typed search input behavior.
+* Keep overlay precedence deterministic: help overlay and command palette consume input before base routing.
+* Preserve submit parity: both `Enter` and `Alt+G` must trigger generation when state is submittable.
+
+== Verify Shortcuts
+
+Build and run the executable:
+
+[source,bash]
+----
+mvn -q -DskipTests package
+java -jar target/quarkus-forge.jar
+----
+
+Use this manual checklist in one session:
+
+. Press `?` to open/close help overlay.
+. Press `Ctrl+P` to open command palette, then `Esc` to close it.
+. Press `/` (or `Ctrl+F`) to focus extension search, type a term, and confirm filtering.
+. Press `Ctrl+L` to return focus to extension list.
+. Press `Ctrl+K` to toggle favorites filter and `Ctrl+J` to jump to favorite.
+. Press `Ctrl+R` to reload catalog.
+. Press `Enter` and `Alt+G` from submit focus to confirm equivalent submit behavior.
+
+== Troubleshoot Drift
+
+If a shortcut appears broken:
+
+. Confirm binding exists in `QuarkusForgeCli.appBindingsProfile()`.
+. Confirm corresponding matcher/handler exists in `AppKeyActions` and controller routing.
+. Re-run parity tests and pilot suites before changing mappings.

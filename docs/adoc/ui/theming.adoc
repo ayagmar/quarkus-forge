@@ -3,20 +3,107 @@
 
 == Define Purpose
 
-Describe terminal theme tokens and rendering expectations.
+Describe semantic theme tokens, terminal contrast constraints, and deterministic fallback behavior for `UiTheme`.
 
 == Define Inputs
 
-* Theme token definitions in UI code
-* Terminal capability constraints
+* Built-in defaults in `dev.ayagmar.quarkusforge.ui.UiTheme`
+* Theme resource file `src/main/resources/ui/quarkus-forge.tcss`
+* Optional user override path from `quarkus.forge.theme` or `QUARKUS_FORGE_THEME`
 
 == Define Outputs
 
-* Token catalog (`accent`, `focus`, `error`, `muted`, `text`, `base`)
-* Semantic usage guidance
-* Fallback behavior when theme assets are unavailable
+* Stable token catalog and semantic usage
+* Override precedence and fallback rules
+* Runnable validation commands
 
 == Define Failure Modes
 
-* Unreadable contrast in terminal
-* Missing fallback for limited color environments
+* Unreadable foreground/background contrast in terminal
+* Invalid token values in theme file ignored without operator awareness
+* Missing theme resource or invalid custom path causing unexpected color fallback
+
+== Configure Token Catalog
+
+Required semantic tokens and their intended usage:
+
+[cols="1,3",options="header"]
+|===
+| Token | Usage
+
+| `base`
+| Panel and background fill (`bg`).
+
+| `text`
+| Default foreground text and final fallback color.
+
+| `accent`
+| Emphasis lines, active labels, and submit affordances.
+
+| `focus`
+| Focus highlight, cursor-adjacent affordances, selected emphasis.
+
+| `muted`
+| Secondary hints, non-critical metadata, scrollbar tracks.
+
+| `error`
+| Validation and runtime error emphasis.
+|===
+
+Additional runtime tokens currently used:
+
+* `success` for positive status emphasis.
+* `warning` for warning-state hints.
+
+== Define Contrast Constraints
+
+* Keep `text` readable against `base` under common terminal palettes.
+* Ensure `focus` and `accent` remain visually distinct from `text` and `muted`.
+* Use `error` with strong contrast for failure visibility.
+* Avoid assigning `base` and `text` to near-identical colors.
+
+== Define Fallback Behavior
+
+`UiTheme.loadDefault()` applies tokens in this order:
+
+. In-memory defaults from `UiTheme.DEFAULT_COLORS`.
+. Resource tokens from `/ui/quarkus-forge.tcss`.
+. Optional custom file from `quarkus.forge.theme` (system property) or `QUARKUS_FORGE_THEME` (environment variable).
+
+Fallback constraints:
+
+* Missing or unreadable resource/custom files do not fail startup; loaded defaults are retained.
+* Invalid token lines or invalid color values are ignored.
+* Unknown token lookup returns `text` color fallback.
+
+== Verify Theme Loading
+
+Build and generate docs/tests first:
+
+[source,bash]
+----
+mvn -q -Pdocs generate-resources
+mvn -q -DskipITs test
+----
+
+Run with custom theme override:
+
+[source,bash]
+----
+cat > /tmp/qf-theme.tcss <<'THEME'
+base = #0b1321
+text = #e2ecff
+accent = #ff6b6b
+focus = #2dd4bf
+muted = #94a3b8
+error = #fb7185
+THEME
+
+java -Dquarkus.forge.theme=/tmp/qf-theme.tcss -jar target/quarkus-forge.jar
+----
+
+== Troubleshoot Theme Issues
+
+. Confirm token names are lowercase semantic names (`base`, `text`, `accent`, `focus`, `muted`, `error`).
+. Confirm values are supported hex (`#RRGGBB`) or named color constants.
+. Remove invalid lines and rerun to verify deterministic fallback behavior.
