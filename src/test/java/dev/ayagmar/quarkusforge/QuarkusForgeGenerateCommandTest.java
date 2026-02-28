@@ -17,6 +17,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.zip.ZipEntry;
@@ -77,7 +78,8 @@ class QuarkusForgeGenerateCommandTest {
     Path generatedProject = outputDir.resolve("headless-app");
     assertThat(generatedProject.resolve("pom.xml")).exists();
     assertThat(result.standardOut()).contains("Generation succeeded");
-    verifyGenerateRequestFor("headless-app", "io.quarkus:quarkus-rest,io.quarkus:quarkus-arc");
+    verifyGenerateRequestFor(
+        "headless-app", List.of("io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc"));
   }
 
   @Test
@@ -469,7 +471,11 @@ class QuarkusForgeGenerateCommandTest {
     assertThat(generateResult.exitCode()).isZero();
     verifyGenerateRequestFor(
         "headless-app",
-        "io.quarkus:quarkus-rest,io.quarkus:quarkus-arc,io.quarkus:quarkus-jdbc-postgresql,io.quarkus:quarkus-hibernate-orm-panache");
+        List.of(
+            "io.quarkus:quarkus-rest",
+            "io.quarkus:quarkus-arc",
+            "io.quarkus:quarkus-jdbc-postgresql",
+            "io.quarkus:quarkus-hibernate-orm-panache"));
   }
 
   @Test
@@ -532,15 +538,23 @@ class QuarkusForgeGenerateCommandTest {
             .willReturn(aResponse().withStatus(200).withBody(generatedZipPayload(artifactId))));
   }
 
-  private void verifyGenerateRequestFor(String artifactId, String extensionsParam) {
+  private void verifyGenerateRequestFor(String artifactId, List<String> expectedExtensions) {
     wireMockServer.verify(
         getRequestedFor(urlPathEqualTo("/api/download"))
             .withQueryParam("g", equalTo("com.example"))
             .withQueryParam("a", equalTo(artifactId))
             .withQueryParam("v", equalTo("1.0.0-SNAPSHOT"))
             .withQueryParam("b", equalTo("MAVEN"))
-            .withQueryParam("j", equalTo("25"))
-            .withQueryParam("e", equalTo(extensionsParam)));
+            .withQueryParam("j", equalTo("25")));
+
+    List<String> requestedExtensions =
+        wireMockServer.findAll(getRequestedFor(urlPathEqualTo("/api/download"))).stream()
+            .filter(request -> "/api/download".equals(request.getUrl().split("\\?")[0]))
+            .findFirst()
+            .orElseThrow()
+            .queryParameter("e")
+            .values();
+    assertThat(requestedExtensions).containsExactlyElementsOf(expectedExtensions);
   }
 
   private static byte[] generatedZipPayload(String artifactId) throws Exception {

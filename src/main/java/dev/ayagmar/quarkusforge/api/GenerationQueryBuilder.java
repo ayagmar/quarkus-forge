@@ -13,14 +13,17 @@ public final class GenerationQueryBuilder {
     URI endpoint = downloadEndpoint(baseUri);
 
     List<GenerationQueryParameter> parameters =
-        List.of(
-            new GenerationQueryParameter("S", request.platformStream()),
-            new GenerationQueryParameter("g", request.groupId()),
-            new GenerationQueryParameter("a", request.artifactId()),
-            new GenerationQueryParameter("v", request.version()),
-            new GenerationQueryParameter("b", BuildToolCodec.toApiValue(request.buildTool())),
-            new GenerationQueryParameter("j", request.javaVersion()),
-            new GenerationQueryParameter("e", String.join(",", request.extensions())));
+        new java.util.ArrayList<>(
+            List.of(
+                new GenerationQueryParameter("S", request.platformStream()),
+                new GenerationQueryParameter("g", request.groupId()),
+                new GenerationQueryParameter("a", request.artifactId()),
+                new GenerationQueryParameter("v", request.version()),
+                new GenerationQueryParameter("b", BuildToolCodec.toApiValue(request.buildTool())),
+                new GenerationQueryParameter("j", request.javaVersion())));
+    request
+        .extensions()
+        .forEach(extension -> parameters.add(new GenerationQueryParameter("e", extension)));
 
     List<String> queryParts =
         parameters.stream()
