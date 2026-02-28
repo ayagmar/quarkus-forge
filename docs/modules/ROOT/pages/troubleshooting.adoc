@@ -1,0 +1,48 @@
+= Troubleshooting
+
+== Metadata fallback on startup
+
+Symptom: startup reports metadata fallback.
+
+Actions:
+
+. Confirm network access to Quarkus endpoints.
+. Retry to verify fallback clears.
+. Continue with snapshot defaults if offline.
+
+== Catalog load failure or timeout
+
+Symptom: extension catalog does not refresh.
+
+Actions:
+
+. Retry from TUI using `Ctrl+R`.
+. Re-run with `--verbose` to inspect diagnostics.
+. Check endpoint/network health.
+
+== Validation errors
+
+Symptom: generation is blocked before submit.
+
+Actions:
+
+. Verify Maven identifier fields (`groupId`, `artifactId`, `packageName`).
+. Confirm output directory is valid on your OS.
+. Ensure extension IDs are valid for headless mode.
+
+== Generation/extraction failure
+
+Symptom: generate fails after submit.
+
+Actions:
+
+. Check output directory permissions and conflicts.
+. Re-run with `--verbose`.
+. Review archive safety messages and retry.
+
+== Useful command
+
+[source,bash]
+----
+java -jar target/quarkus-forge.jar --verbose --dry-run
+----

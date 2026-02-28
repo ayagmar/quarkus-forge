@@ -1,0 +1,8 @@
+name: docs
+title: Quarkus Forge
+version: ~
+nav:
+  - modules/ROOT/nav.adoc
+asciidoc:
+  attributes:
+    page-pagination: ''

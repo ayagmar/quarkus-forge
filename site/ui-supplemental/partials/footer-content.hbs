@@ -1,0 +1,28 @@
+<footer class="footer">
+  <p>Quarkus Forge documentation built with Antora.</p>
+</footer>
+<script>
+  const docsThemeToggleBtn = document.getElementById('docs-theme-toggle');
+  const docsIconDark = document.getElementById('docs-theme-icon-dark');
+  const docsIconLight = document.getElementById('docs-theme-icon-light');
+
+  function updateDocsIcons() {
+    if (document.documentElement.classList.contains('dark')) {
+      docsIconLight.style.display = 'block';
+      docsIconDark.style.display = 'none';
+    } else {
+      docsIconDark.style.display = 'block';
+      docsIconLight.style.display = 'none';
+    }
+  }
+
+  if (docsThemeToggleBtn) {
+    docsThemeToggleBtn.addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      const isDark = document.documentElement.classList.contains('dark');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      updateDocsIcons();
+    });
+    updateDocsIcons();
+  }
+</script>

@@ -1,0 +1,32 @@
+site:
+  title: Quarkus Forge
+  start_page: docs::index.adoc
+
+content:
+  sources:
+    - url: ..
+      branches: HEAD
+      start_path: docs
+
+urls:
+  html_extension_style: indexify
+
+output:
+  clean: true
+  dir: build/site
+
+runtime:
+  fetch: true
+  cache_dir: .cache/antora
+
+ui:
+  bundle:
+    url: https://gitlab.com/antora/antora-ui-default/-/jobs/artifacts/HEAD/raw/build/ui-bundle.zip?job=bundle-stable
+    snapshot: true
+  supplemental_files: ./ui-supplemental
+
+antora:
+  extensions:
+    - require: '@antora/lunr-extension'
+      index_by_heading: true
+      snippet_length: 160

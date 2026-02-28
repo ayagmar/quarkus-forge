@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Outfit", "Space Grotesk", "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --color-tui-bg: #0f172a; /* slate-900 */
+  --color-tui-panel: #1e293b; /* slate-800 */
+  --color-tui-cyan: #22d3ee; /* cyan-400 */
+  --color-tui-pink: #f472b6; /* pink-400 */
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-slate-50 text-slate-800 antialiased overflow-x-hidden selection:bg-tui-cyan selection:text-zinc-950 transition-colors duration-300;
+  }
+  .dark body {
+    @apply bg-zinc-950 text-slate-300;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-white/70 backdrop-blur-xl border border-slate-200 shadow-[0_4px_30px_rgba(0,0,0,0.05)];
+  }
+  .dark .glass-panel {
+    @apply bg-zinc-900/50 border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)];
+  }
+  .text-glow {
+    text-shadow: 0 0 20px rgba(34, 211, 238, 0.2);
+  }
+  .dark .text-glow {
+    text-shadow: 0 0 20px rgba(34, 211, 238, 0.4);
+  }
+}
