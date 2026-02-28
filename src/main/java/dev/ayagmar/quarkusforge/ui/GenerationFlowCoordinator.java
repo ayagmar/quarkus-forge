@@ -20,10 +20,10 @@ final class GenerationFlowCoordinator {
   }
 
   void startFlow(
-      CoreTuiController.ProjectGenerationRunner generationRunner,
+      ProjectGenerationRunner generationRunner,
       GenerationRequest generationRequest,
       Path outputDirectory,
-      Callbacks callbacks) {
+      GenerationFlowCallbacks callbacks) {
     callbacks.beforeGenerationStart();
     generationCancelRequested = false;
     long token = ++generationToken;
@@ -35,7 +35,7 @@ final class GenerationFlowCoordinator {
     generationStartedAtNanos = System.nanoTime();
     onProgress(
         token,
-        CoreTuiController.GenerationProgressUpdate.requestingArchive(
+        GenerationProgressUpdate.requestingArchive(
             "requesting project archive from Quarkus API..."),
         callbacks);
 
@@ -70,7 +70,7 @@ final class GenerationFlowCoordinator {
                 () -> onCompleted(token, generatedPath, throwable, callbacks)));
   }
 
-  void reconcileCompletionIfDone(Callbacks callbacks) {
+  void reconcileCompletionIfDone(GenerationFlowCallbacks callbacks) {
     if (callbacks.currentState() != CoreTuiController.GenerationState.LOADING
         || generationFuture == null) {
       return;
@@ -89,7 +89,7 @@ final class GenerationFlowCoordinator {
     onCompleted(generationToken, generatedPath, throwable, callbacks);
   }
 
-  void requestCancellation(Callbacks callbacks) {
+  void requestCancellation(GenerationFlowCallbacks callbacks) {
     if (callbacks.currentState() != CoreTuiController.GenerationState.LOADING) {
       return;
     }
@@ -114,7 +114,9 @@ final class GenerationFlowCoordinator {
   }
 
   private void onProgress(
-      long token, CoreTuiController.GenerationProgressUpdate progressUpdate, Callbacks callbacks) {
+      long token,
+      GenerationProgressUpdate progressUpdate,
+      GenerationFlowCallbacks callbacks) {
     if (token != generationToken
         || callbacks.currentState() != CoreTuiController.GenerationState.LOADING) {
       return;
@@ -123,7 +125,10 @@ final class GenerationFlowCoordinator {
   }
 
   private void onCompleted(
-      long token, Path generatedPath, Throwable throwable, Callbacks callbacks) {
+      long token,
+      Path generatedPath,
+      Throwable throwable,
+      GenerationFlowCallbacks callbacks) {
     if (token != generationToken
         || callbacks.currentState() != CoreTuiController.GenerationState.LOADING) {
       return;
@@ -149,29 +154,5 @@ final class GenerationFlowCoordinator {
 
     callbacks.transitionTo(CoreTuiController.GenerationState.ERROR);
     callbacks.onGenerationFailed(cause);
-  }
-
-  interface Callbacks {
-    void beforeGenerationStart();
-
-    boolean transitionTo(CoreTuiController.GenerationState targetState);
-
-    CoreTuiController.GenerationState currentState();
-
-    String generationStateLabel();
-
-    void onSubmitIgnored(String stateLabel);
-
-    void scheduleOnRenderThread(Runnable task);
-
-    void onProgress(CoreTuiController.GenerationProgressUpdate progressUpdate);
-
-    void onGenerationSuccess(Path generatedPath);
-
-    void onGenerationCancelled();
-
-    void onGenerationFailed(Throwable cause);
-
-    void onCancellationRequested();
   }
 }

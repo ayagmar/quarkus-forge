@@ -105,7 +105,7 @@ class CoreTuiStateMachineTest {
             generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
-    CoreTuiController.UiAction cancelAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    UiAction cancelAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
 
     assertThat(cancelAction.shouldQuit()).isFalse();
     assertThat(cancelAction.handled()).isTrue();
@@ -127,29 +127,29 @@ class CoreTuiStateMachineTest {
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
-    CompletableFuture<CoreTuiController.ExtensionCatalogLoadResult> firstLoad =
+    CompletableFuture<ExtensionCatalogLoadResult> firstLoad =
         new CompletableFuture<>();
-    CompletableFuture<CoreTuiController.ExtensionCatalogLoadResult> secondLoad =
+    CompletableFuture<ExtensionCatalogLoadResult> secondLoad =
         new CompletableFuture<>();
 
     controller.loadExtensionCatalogAsync(() -> firstLoad);
     controller.loadExtensionCatalogAsync(() -> secondLoad);
 
     secondLoad.complete(
-        CoreTuiController.ExtensionCatalogLoadResult.live(
+        ExtensionCatalogLoadResult.live(
             List.of(
                 new ExtensionDto(
                     "io.quarkus:quarkus-jdbc-postgresql", "JDBC PostgreSQL", "jdbc-postgresql"))));
     assertThat(controller.firstFilteredExtensionId()).contains("jdbc-postgresql");
 
     firstLoad.complete(
-        CoreTuiController.ExtensionCatalogLoadResult.live(
+        ExtensionCatalogLoadResult.live(
             List.of(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest"))));
     assertThat(controller.firstFilteredExtensionId()).contains("jdbc-postgresql");
   }
 
   private static final class ControlledGenerationRunner
-      implements CoreTuiController.ProjectGenerationRunner {
+      implements ProjectGenerationRunner {
     private int callCount;
     private CompletableFuture<Path> future;
 
@@ -163,10 +163,10 @@ class CoreTuiStateMachineTest {
         GenerationRequest generationRequest,
         Path outputDirectory,
         BooleanSupplier cancelled,
-        Consumer<CoreTuiController.GenerationProgressUpdate> progressListener) {
+        Consumer<GenerationProgressUpdate> progressListener) {
       callCount++;
       progressListener.accept(
-          CoreTuiController.GenerationProgressUpdate.requestingArchive(
+          GenerationProgressUpdate.requestingArchive(
               "requesting project archive from Quarkus API..."));
       return future;
     }

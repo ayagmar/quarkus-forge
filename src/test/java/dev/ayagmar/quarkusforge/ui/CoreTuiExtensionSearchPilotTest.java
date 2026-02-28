@@ -29,7 +29,7 @@ class CoreTuiExtensionSearchPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest"),
                         new ExtensionDto(
@@ -55,7 +55,7 @@ class CoreTuiExtensionSearchPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest"),
                         new ExtensionDto(
@@ -132,7 +132,7 @@ class CoreTuiExtensionSearchPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(List.of())));
+                ExtensionCatalogLoadResult.live(List.of())));
 
     assertThat(controller.statusMessage()).isEqualTo("Using fallback extension catalog");
     assertThat(controller.filteredExtensionCount()).isEqualTo(7);
@@ -151,7 +151,7 @@ class CoreTuiExtensionSearchPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto(
                             "io.quarkus:quarkus-jdbc-postgresql",
@@ -168,16 +168,16 @@ class CoreTuiExtensionSearchPilotTest {
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ZERO);
-    CompletableFuture<CoreTuiController.ExtensionCatalogLoadResult> loadFuture =
+    CompletableFuture<ExtensionCatalogLoadResult> loadFuture =
         new CompletableFuture<>();
     controller.loadExtensionCatalogAsync(() -> loadFuture);
     assertThat(controller.statusMessage()).isEqualTo("Loading extension catalog...");
 
-    CoreTuiController.UiAction quitAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    UiAction quitAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(quitAction.shouldQuit()).isTrue();
 
     loadFuture.complete(
-        CoreTuiController.ExtensionCatalogLoadResult.live(
+        ExtensionCatalogLoadResult.live(
             List.of(new ExtensionDto("io.quarkus:quarkus-funqy", "Funqy", "funqy"))));
     scheduler.runAll();
 
@@ -192,16 +192,16 @@ class CoreTuiExtensionSearchPilotTest {
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ZERO);
-    CompletableFuture<CoreTuiController.ExtensionCatalogLoadResult> loadFuture =
+    CompletableFuture<ExtensionCatalogLoadResult> loadFuture =
         new CompletableFuture<>();
     controller.loadExtensionCatalogAsync(() -> loadFuture);
 
     loadFuture.complete(
-        CoreTuiController.ExtensionCatalogLoadResult.live(
+        ExtensionCatalogLoadResult.live(
             List.of(new ExtensionDto("io.quarkus:quarkus-funqy", "Funqy", "funqy"))));
     scheduler.runAll();
 
-    CoreTuiController.UiAction tickAction =
+    UiAction tickAction =
         controller.onEvent(TickEvent.of(1, Duration.ofMillis(40)));
     assertThat(tickAction.handled()).isTrue();
     assertThat(controller.statusMessage()).contains("Loaded extension catalog from live API");
@@ -216,7 +216,7 @@ class CoreTuiExtensionSearchPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                new CoreTuiController.ExtensionCatalogLoadResult(
+                new ExtensionCatalogLoadResult(
                     List.of(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest")),
                     CatalogSource.CACHE,
                     true,
@@ -242,7 +242,7 @@ class CoreTuiExtensionSearchPilotTest {
             return CompletableFuture.failedFuture(new IllegalStateException("network down"));
           }
           return CompletableFuture.completedFuture(
-              new CoreTuiController.ExtensionCatalogLoadResult(
+              new ExtensionCatalogLoadResult(
                   List.of(
                       new ExtensionDto(
                           "io.quarkus:quarkus-jdbc-postgresql",
@@ -271,7 +271,7 @@ class CoreTuiExtensionSearchPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto(
                             "io.quarkus:quarkus-jdbc-postgresql",
@@ -305,7 +305,7 @@ class CoreTuiExtensionSearchPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(manyExtensions)));
+                ExtensionCatalogLoadResult.live(manyExtensions)));
 
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     for (int i = 0; i < 80; i++) {
@@ -325,7 +325,7 @@ class CoreTuiExtensionSearchPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto(
                             "io.quarkus:quarkus-jdbc-postgresql",
@@ -347,7 +347,7 @@ class CoreTuiExtensionSearchPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto(
                             "io.quarkus:quarkus-jdbc-postgresql",
@@ -368,7 +368,7 @@ class CoreTuiExtensionSearchPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20)))));
@@ -416,7 +416,7 @@ class CoreTuiExtensionSearchPilotTest {
     firstController.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10)))));
@@ -429,7 +429,7 @@ class CoreTuiExtensionSearchPilotTest {
     secondController.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10)))));
@@ -460,7 +460,7 @@ class CoreTuiExtensionSearchPilotTest {
     firstController.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10)))));
@@ -473,7 +473,7 @@ class CoreTuiExtensionSearchPilotTest {
     secondController.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10)))));
@@ -502,12 +502,12 @@ class CoreTuiExtensionSearchPilotTest {
         Runnable::run);
   }
 
-  private static CoreTuiController.ExtensionCatalogLoadResult withOrder(
+  private static ExtensionCatalogLoadResult withOrder(
       String primaryId, Integer primaryOrder, String secondaryId, Integer secondaryOrder) {
     List<ExtensionDto> extensions =
         List.of(
             new ExtensionDto(primaryId, "REST", "rest", "Web", primaryOrder),
             new ExtensionDto(secondaryId, "CDI", "cdi", "Core", secondaryOrder));
-    return CoreTuiController.ExtensionCatalogLoadResult.live(extensions);
+    return ExtensionCatalogLoadResult.live(extensions);
   }
 }

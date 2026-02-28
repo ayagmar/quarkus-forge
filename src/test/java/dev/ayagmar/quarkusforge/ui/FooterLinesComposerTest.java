@@ -10,7 +10,7 @@ class FooterLinesComposerTest {
 
   @Test
   void generationInProgressHintUsesViewportSpecificCopy() {
-    FooterLinesComposer.FooterSnapshot snapshot =
+    FooterSnapshot snapshot =
         snapshotBuilder().generationInProgress(true).build();
 
     List<String> narrow = composer.compose(80, snapshot);
@@ -23,7 +23,7 @@ class FooterLinesComposerTest {
 
   @Test
   void expandedErrorDetailsAreIncludedWhenEnabled() {
-    FooterLinesComposer.FooterSnapshot snapshot =
+    FooterSnapshot snapshot =
         snapshotBuilder()
             .activeErrorDetails(
                 "live metadata failed because catalog endpoint did not return expected JSON payload")
@@ -38,7 +38,7 @@ class FooterLinesComposerTest {
 
   @Test
   void expandedErrorDetailsAreNotViewportTruncated() {
-    FooterLinesComposer.FooterSnapshot snapshot =
+    FooterSnapshot snapshot =
         snapshotBuilder()
             .activeErrorDetails("0123456789abcdefghijklmnopqrstuvwxyz")
             .showErrorDetails(true)
@@ -52,7 +52,7 @@ class FooterLinesComposerTest {
 
   @Test
   void defaultHintIncludesHelpAndCommandPaletteShortcuts() {
-    FooterLinesComposer.FooterSnapshot snapshot = snapshotBuilder().build();
+    FooterSnapshot snapshot = snapshotBuilder().build();
 
     List<String> lines = composer.compose(120, snapshot);
 
@@ -63,7 +63,7 @@ class FooterLinesComposerTest {
 
   @Test
   void extensionListHintIncludesSectionJumpShortcut() {
-    FooterLinesComposer.FooterSnapshot snapshot =
+    FooterSnapshot snapshot =
         snapshotBuilder().focusTarget(FocusTarget.EXTENSION_LIST).build();
 
     List<String> lines = composer.compose(120, snapshot);
@@ -76,7 +76,7 @@ class FooterLinesComposerTest {
 
   @Test
   void extensionSearchHintIncludesEscapeBehavior() {
-    FooterLinesComposer.FooterSnapshot snapshot =
+    FooterSnapshot snapshot =
         snapshotBuilder().focusTarget(FocusTarget.EXTENSION_SEARCH).build();
 
     List<String> lines = composer.compose(120, snapshot);
@@ -86,7 +86,7 @@ class FooterLinesComposerTest {
 
   @Test
   void extensionListHintIncludesEscapeClearOrQuitBehavior() {
-    FooterLinesComposer.FooterSnapshot snapshot =
+    FooterSnapshot snapshot =
         snapshotBuilder().focusTarget(FocusTarget.EXTENSION_LIST).build();
 
     List<String> lines = composer.compose(120, snapshot);
@@ -96,7 +96,7 @@ class FooterLinesComposerTest {
 
   @Test
   void nextHintIsTruncatedOnNarrowViewports() {
-    FooterLinesComposer.FooterSnapshot snapshot =
+    FooterSnapshot snapshot =
         snapshotBuilder()
             .successHint("Use generated project path with long nested segments for follow-up steps")
             .build();
@@ -108,7 +108,7 @@ class FooterLinesComposerTest {
 
   @Test
   void statusLineIsAlwaysPresent() {
-    FooterLinesComposer.FooterSnapshot snapshot = snapshotBuilder().build();
+    FooterSnapshot snapshot = snapshotBuilder().build();
 
     List<String> lines = composer.compose(120, snapshot);
 
@@ -118,7 +118,7 @@ class FooterLinesComposerTest {
 
   @Test
   void errorLineShownWhenActiveErrorExists() {
-    FooterLinesComposer.FooterSnapshot snapshot =
+    FooterSnapshot snapshot =
         snapshotBuilder().activeErrorDetails("something went wrong").build();
 
     List<String> lines = composer.compose(120, snapshot);
@@ -167,8 +167,8 @@ class FooterLinesComposerTest {
       return this;
     }
 
-    FooterLinesComposer.FooterSnapshot build() {
-      return new FooterLinesComposer.FooterSnapshot(
+    FooterSnapshot build() {
+      return new FooterSnapshot(
           generationInProgress,
           focusTarget,
           commandPaletteVisible,

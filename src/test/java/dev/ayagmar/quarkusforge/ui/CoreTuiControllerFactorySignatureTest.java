@@ -24,7 +24,7 @@ class CoreTuiControllerFactorySignatureTest {
                     ForgeUiState.class,
                     UiScheduler.class,
                     Duration.class,
-                    CoreTuiController.ProjectGenerationRunner.class))
+                    ProjectGenerationRunner.class))
         .doesNotThrowAnyException();
     assertThatCode(
             () ->
@@ -33,7 +33,7 @@ class CoreTuiControllerFactorySignatureTest {
                     ForgeUiState.class,
                     UiScheduler.class,
                     Duration.class,
-                    CoreTuiController.ProjectGenerationRunner.class,
+                    ProjectGenerationRunner.class,
                     ExtensionFavoritesStore.class,
                     Executor.class))
         .doesNotThrowAnyException();

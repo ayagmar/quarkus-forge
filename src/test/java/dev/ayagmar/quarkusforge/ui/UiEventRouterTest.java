@@ -14,11 +14,11 @@ class UiEventRouterTest {
   @Test
   void helpOverlayHandlerWinsWhenItReturnsAction() {
     TestRoutingContext context = new TestRoutingContext();
-    context.helpOverlayAction = CoreTuiController.UiAction.handled(false);
+    context.helpOverlayAction = UiAction.handled(false);
 
-    CoreTuiController.UiAction action = new UiEventRouter().routeKeyEvent(ANY_KEY, context);
+    UiAction action = new UiEventRouter().routeKeyEvent(ANY_KEY, context);
 
-    assertThat(action).isEqualTo(CoreTuiController.UiAction.handled(false));
+    assertThat(action).isEqualTo(UiAction.handled(false));
     assertThat(context.calls).containsExactly("help");
   }
 
@@ -27,9 +27,9 @@ class UiEventRouterTest {
     TestRoutingContext context = new TestRoutingContext();
     context.shouldToggleHelp = true;
 
-    CoreTuiController.UiAction action = new UiEventRouter().routeKeyEvent(ANY_KEY, context);
+    UiAction action = new UiEventRouter().routeKeyEvent(ANY_KEY, context);
 
-    assertThat(action).isEqualTo(CoreTuiController.UiAction.handled(false));
+    assertThat(action).isEqualTo(UiAction.handled(false));
     assertThat(context.helpToggled).isTrue();
     assertThat(context.calls).containsExactly("help", "shouldToggleHelp");
   }
@@ -38,11 +38,11 @@ class UiEventRouterTest {
   void routesToGenerationInProgressBranchBeforeGlobalShortcuts() {
     TestRoutingContext context = new TestRoutingContext();
     context.generationInProgress = true;
-    context.generationInProgressAction = CoreTuiController.UiAction.handled(false);
+    context.generationInProgressAction = UiAction.handled(false);
 
-    CoreTuiController.UiAction action = new UiEventRouter().routeKeyEvent(ANY_KEY, context);
+    UiAction action = new UiEventRouter().routeKeyEvent(ANY_KEY, context);
 
-    assertThat(action).isEqualTo(CoreTuiController.UiAction.handled(false));
+    assertThat(action).isEqualTo(UiAction.handled(false));
     assertThat(context.calls)
         .containsExactly(
             "help",
@@ -60,9 +60,9 @@ class UiEventRouterTest {
   void returnsIgnoredWhenNoRouteHandlesEvent() {
     TestRoutingContext context = new TestRoutingContext();
 
-    CoreTuiController.UiAction action = new UiEventRouter().routeKeyEvent(ANY_KEY, context);
+    UiAction action = new UiEventRouter().routeKeyEvent(ANY_KEY, context);
 
-    assertThat(action).isEqualTo(CoreTuiController.UiAction.ignored());
+    assertThat(action).isEqualTo(UiAction.ignored());
     assertThat(context.calls)
         .containsExactly(
             "help",
@@ -81,16 +81,16 @@ class UiEventRouterTest {
             "textInput");
   }
 
-  private static final class TestRoutingContext implements UiEventRouter.RoutingContext {
+  private static final class TestRoutingContext implements UiRoutingContext {
     private final List<String> calls = new ArrayList<>();
-    private CoreTuiController.UiAction helpOverlayAction;
+    private UiAction helpOverlayAction;
     private boolean shouldToggleHelp;
     private boolean helpToggled;
     private boolean generationInProgress;
-    private CoreTuiController.UiAction generationInProgressAction;
+    private UiAction generationInProgressAction;
 
     @Override
-    public CoreTuiController.UiAction handleHelpOverlayKey(KeyEvent keyEvent) {
+    public UiAction handleHelpOverlayKey(KeyEvent keyEvent) {
       calls.add("help");
       return helpOverlayAction;
     }
@@ -118,25 +118,25 @@ class UiEventRouterTest {
     }
 
     @Override
-    public CoreTuiController.UiAction handleCommandPaletteKey(KeyEvent keyEvent) {
+    public UiAction handleCommandPaletteKey(KeyEvent keyEvent) {
       calls.add("commandPalette");
       return null;
     }
 
     @Override
-    public CoreTuiController.UiAction handlePostGenerationMenuKey(KeyEvent keyEvent) {
+    public UiAction handlePostGenerationMenuKey(KeyEvent keyEvent) {
       calls.add("postGeneration");
       return null;
     }
 
     @Override
-    public CoreTuiController.UiAction handleExtensionCancelFlow(KeyEvent keyEvent) {
+    public UiAction handleExtensionCancelFlow(KeyEvent keyEvent) {
       calls.add("extensionCancel");
       return null;
     }
 
     @Override
-    public CoreTuiController.UiAction handleQuitFlow(KeyEvent keyEvent) {
+    public UiAction handleQuitFlow(KeyEvent keyEvent) {
       calls.add("quit");
       return null;
     }
@@ -148,43 +148,43 @@ class UiEventRouterTest {
     }
 
     @Override
-    public CoreTuiController.UiAction handleWhileGenerationInProgress(KeyEvent keyEvent) {
+    public UiAction handleWhileGenerationInProgress(KeyEvent keyEvent) {
       calls.add("generationInProgress");
       return generationInProgressAction;
     }
 
     @Override
-    public CoreTuiController.UiAction handleGlobalShortcutFlow(KeyEvent keyEvent) {
+    public UiAction handleGlobalShortcutFlow(KeyEvent keyEvent) {
       calls.add("globalShortcut");
       return null;
     }
 
     @Override
-    public CoreTuiController.UiAction handleFocusNavigationFlow(KeyEvent keyEvent) {
+    public UiAction handleFocusNavigationFlow(KeyEvent keyEvent) {
       calls.add("focusNavigation");
       return null;
     }
 
     @Override
-    public CoreTuiController.UiAction handleSubmitFlow(KeyEvent keyEvent) {
+    public UiAction handleSubmitFlow(KeyEvent keyEvent) {
       calls.add("submit");
       return null;
     }
 
     @Override
-    public CoreTuiController.UiAction handleExtensionFocusFlow(KeyEvent keyEvent) {
+    public UiAction handleExtensionFocusFlow(KeyEvent keyEvent) {
       calls.add("extensionFocus");
       return null;
     }
 
     @Override
-    public CoreTuiController.UiAction handleMetadataSelectorFlow(KeyEvent keyEvent) {
+    public UiAction handleMetadataSelectorFlow(KeyEvent keyEvent) {
       calls.add("metadata");
       return null;
     }
 
     @Override
-    public CoreTuiController.UiAction handleTextInputFlow(KeyEvent keyEvent) {
+    public UiAction handleTextInputFlow(KeyEvent keyEvent) {
       calls.add("textInput");
       return null;
     }

@@ -44,7 +44,7 @@ class CoreTuiThemePolishTest {
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ofMillis(50));
-    CompletableFuture<CoreTuiController.ExtensionCatalogLoadResult> loadFuture =
+    CompletableFuture<ExtensionCatalogLoadResult> loadFuture =
         new CompletableFuture<>();
 
     controller.loadExtensionCatalogAsync(() -> loadFuture);
@@ -66,7 +66,7 @@ class CoreTuiThemePolishTest {
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ofMillis(50));
-    CompletableFuture<CoreTuiController.ExtensionCatalogLoadResult> loadFuture =
+    CompletableFuture<ExtensionCatalogLoadResult> loadFuture =
         new CompletableFuture<>();
 
     controller.loadExtensionCatalogAsync(() -> loadFuture);
@@ -76,7 +76,7 @@ class CoreTuiThemePolishTest {
     assertThat(loading).contains("catalog load     : in progress");
 
     loadFuture.complete(
-        CoreTuiController.ExtensionCatalogLoadResult.live(
+        ExtensionCatalogLoadResult.live(
             List.of(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 10))));
     scheduler.runAll();
     String ready = renderToString(controller, 120, 32);
@@ -90,12 +90,12 @@ class CoreTuiThemePolishTest {
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ofMillis(50));
-    CompletableFuture<CoreTuiController.ExtensionCatalogLoadResult> loadFuture =
+    CompletableFuture<ExtensionCatalogLoadResult> loadFuture =
         new CompletableFuture<>();
 
     controller.loadExtensionCatalogAsync(() -> loadFuture);
     loadFuture.complete(
-        CoreTuiController.ExtensionCatalogLoadResult.live(
+        ExtensionCatalogLoadResult.live(
             List.of(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 10))));
     scheduler.runAll();
     assertThat(renderToString(controller, 120, 32)).doesNotContain("Startup");
@@ -111,7 +111,7 @@ class CoreTuiThemePolishTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 10)))));
 
@@ -129,13 +129,13 @@ class CoreTuiThemePolishTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 10)))));
     assertThat(renderToString(controller, 120, 32)).contains("Startup");
 
     Thread.sleep(20);
-    CoreTuiController.UiAction tickAction =
+    UiAction tickAction =
         controller.onEvent(TickEvent.of(1, Duration.ofMillis(40)));
     assertThat(tickAction.handled()).isTrue();
     assertThat(renderToString(controller, 120, 32)).doesNotContain("Startup");
@@ -165,7 +165,7 @@ class CoreTuiThemePolishTest {
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ofMillis(50));
-    CompletableFuture<CoreTuiController.ExtensionCatalogLoadResult> loadFuture =
+    CompletableFuture<ExtensionCatalogLoadResult> loadFuture =
         new CompletableFuture<>();
     controller.loadExtensionCatalogAsync(() -> loadFuture);
     loadFuture.completeExceptionally(
@@ -200,7 +200,7 @@ class CoreTuiThemePolishTest {
     private final List<Runnable> queuedTasks = new ArrayList<>();
 
     @Override
-    public Cancellable schedule(Duration delay, Runnable task) {
+    public UiCancellable schedule(Duration delay, Runnable task) {
       queuedTasks.add(task);
       return () -> queuedTasks.remove(task);
     }
@@ -215,7 +215,7 @@ class CoreTuiThemePolishTest {
   }
 
   private static final class ControlledGenerationRunner
-      implements CoreTuiController.ProjectGenerationRunner {
+      implements ProjectGenerationRunner {
     private final CompletableFuture<Path> future = new CompletableFuture<>();
 
     @Override
@@ -223,7 +223,7 @@ class CoreTuiThemePolishTest {
         GenerationRequest generationRequest,
         Path outputDirectory,
         BooleanSupplier cancelled,
-        Consumer<CoreTuiController.GenerationProgressUpdate> progressListener) {
+        Consumer<GenerationProgressUpdate> progressListener) {
       return future;
     }
 

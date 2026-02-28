@@ -831,39 +831,4 @@ final class ExtensionCatalogState {
                 favoritesPersistenceExecutor);
   }
 
-  record FavoriteToggleResult(boolean changed, String extensionName, boolean favoriteNow) {
-    static FavoriteToggleResult none() {
-      return new FavoriteToggleResult(false, "", false);
-    }
-  }
-
-  record JumpToFavoriteResult(boolean jumped, String extensionName) {
-    static JumpToFavoriteResult none() {
-      return new JumpToFavoriteResult(false, "");
-    }
-  }
-
-  record SectionJumpResult(boolean moved, String categoryTitle) {
-    static SectionJumpResult none() {
-      return new SectionJumpResult(false, "");
-    }
-  }
-
-  record CategoryCollapseResult(boolean changed, String categoryTitle, boolean collapsed) {
-    static CategoryCollapseResult none() {
-      return new CategoryCollapseResult(false, "", false);
-    }
-  }
-
-  record SectionFocusResult(boolean moved, String sectionTitle) {
-    static SectionFocusResult none() {
-      return new SectionFocusResult(false, "");
-    }
-  }
-
-  record CategoryFilterResult(boolean filtered, String categoryTitle, int matchCount) {
-    static CategoryFilterResult none(int matchCount) {
-      return new CategoryFilterResult(false, "", matchCount);
-    }
-  }
 }

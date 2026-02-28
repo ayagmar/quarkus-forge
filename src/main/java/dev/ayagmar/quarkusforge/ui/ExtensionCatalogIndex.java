@@ -25,7 +25,7 @@ final class ExtensionCatalogIndex {
           "io.quarkus:quarkus-oidc",
           "io.quarkus:quarkus-junit5");
 
-  private final List<IndexedItem> indexedItems;
+  private final List<IndexedCatalogItem> indexedItems;
   private final Map<String, Integer> popularBaselineById;
 
   ExtensionCatalogIndex(List<ExtensionCatalogItem> items) {
@@ -39,7 +39,7 @@ final class ExtensionCatalogIndex {
             .sorted(
                 Comparator.comparing((ExtensionCatalogItem item) -> normalize(item.name()))
                     .thenComparing(item -> normalize(item.id())))
-            .map(IndexedItem::from)
+            .map(ExtensionCatalogIndex::toIndexedItem)
             .toList();
 
     Map<String, Integer> baseline = new LinkedHashMap<>();
@@ -55,22 +55,22 @@ final class ExtensionCatalogIndex {
     if (normalizedQuery.isBlank()) {
       return indexedItems.stream()
           .sorted(emptyQueryComparator(normalizedFavorites))
-          .map(IndexedItem::item)
+          .map(IndexedCatalogItem::item)
           .toList();
     }
 
     String[] tokens = normalizedQuery.split("\\s+");
-    List<SearchResult> matches = new ArrayList<>();
-    for (IndexedItem indexedItem : indexedItems) {
+    List<ExtensionSearchResult> matches = new ArrayList<>();
+    for (IndexedCatalogItem indexedItem : indexedItems) {
       if (!matchesAllTokens(indexedItem, tokens)) {
         continue;
       }
-      matches.add(new SearchResult(indexedItem, score(indexedItem, normalizedQuery)));
+      matches.add(new ExtensionSearchResult(indexedItem, score(indexedItem, normalizedQuery)));
     }
 
-    Comparator<IndexedItem> tieBreaker = emptyQueryComparator(normalizedFavorites);
+    Comparator<IndexedCatalogItem> tieBreaker = emptyQueryComparator(normalizedFavorites);
     matches.sort(
-        Comparator.comparingInt(SearchResult::score)
+        Comparator.comparingInt(ExtensionSearchResult::score)
             .thenComparing(searchResult -> searchResult.item(), tieBreaker));
     return matches.stream().map(searchResult -> searchResult.item().item()).toList();
   }
@@ -79,21 +79,21 @@ final class ExtensionCatalogIndex {
     return indexedItems.size();
   }
 
-  private Comparator<IndexedItem> emptyQueryComparator(Set<String> normalizedFavorites) {
-    return Comparator.comparingInt(IndexedItem::apiOrderRank)
+  private Comparator<IndexedCatalogItem> emptyQueryComparator(Set<String> normalizedFavorites) {
+    return Comparator.comparingInt(IndexedCatalogItem::apiOrderRank)
         .thenComparingInt(indexedItem -> baselineRank(indexedItem, normalizedFavorites))
-        .thenComparing(IndexedItem::name)
-        .thenComparing(IndexedItem::id);
+        .thenComparing(IndexedCatalogItem::name)
+        .thenComparing(IndexedCatalogItem::id);
   }
 
-  private int baselineRank(IndexedItem indexedItem, Set<String> normalizedFavorites) {
+  private int baselineRank(IndexedCatalogItem indexedItem, Set<String> normalizedFavorites) {
     if (normalizedFavorites.contains(indexedItem.id())) {
       return BASELINE_FAVORITE_RANK;
     }
     return popularBaselineById.getOrDefault(indexedItem.id(), BASELINE_NOT_POPULAR_RANK);
   }
 
-  private static boolean matchesAllTokens(IndexedItem indexedItem, String[] tokens) {
+  private static boolean matchesAllTokens(IndexedCatalogItem indexedItem, String[] tokens) {
     for (String token : tokens) {
       boolean tokenMatches =
           indexedItem.id().contains(token)
@@ -107,7 +107,7 @@ final class ExtensionCatalogIndex {
     return true;
   }
 
-  private static int score(IndexedItem indexedItem, String query) {
+  private static int score(IndexedCatalogItem indexedItem, String query) {
     if (indexedItem.id().equals(query) || indexedItem.shortName().equals(query)) {
       return 0;
     }
@@ -135,25 +135,15 @@ final class ExtensionCatalogIndex {
     return value == null ? "" : value.toLowerCase(Locale.ROOT).trim();
   }
 
-  private record IndexedItem(
-      ExtensionCatalogItem item,
-      String id,
-      String name,
-      String shortName,
-      String category,
-      int apiOrderRank) {
-    static IndexedItem from(ExtensionCatalogItem item) {
-      Integer apiOrder = item.apiOrder();
-      int orderRank = apiOrder == null ? Integer.MAX_VALUE : apiOrder;
-      return new IndexedItem(
-          item,
-          normalize(item.id()),
-          normalize(item.name()),
-          normalize(item.shortName()),
-          normalize(item.category()),
-          orderRank);
-    }
+  private static IndexedCatalogItem toIndexedItem(ExtensionCatalogItem item) {
+    Integer apiOrder = item.apiOrder();
+    int orderRank = apiOrder == null ? Integer.MAX_VALUE : apiOrder;
+    return new IndexedCatalogItem(
+        item,
+        normalize(item.id()),
+        normalize(item.name()),
+        normalize(item.shortName()),
+        normalize(item.category()),
+        orderRank);
   }
-
-  private record SearchResult(IndexedItem item, int score) {}
 }

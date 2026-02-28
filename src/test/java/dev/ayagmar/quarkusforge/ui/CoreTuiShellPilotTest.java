@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
+import dev.ayagmar.quarkusforge.api.PlatformStream;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.KeyModifiers;
@@ -33,8 +34,8 @@ class CoreTuiShellPilotTest {
     CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
-    CoreTuiController.UiAction downAction = controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
-    CoreTuiController.UiAction toggleAction = controller.onEvent(KeyEvent.ofChar(' '));
+    UiAction downAction = controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    UiAction toggleAction = controller.onEvent(KeyEvent.ofChar(' '));
 
     assertThat(downAction.handled()).isTrue();
     assertThat(toggleAction.handled()).isTrue();
@@ -78,7 +79,7 @@ class CoreTuiShellPilotTest {
     CoreTuiController controller = UiControllerTestHarness.controller();
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
 
-    CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofChar('g', KeyModifiers.ALT));
+    UiAction action = controller.onEvent(KeyEvent.ofChar('g', KeyModifiers.ALT));
 
     assertThat(action.handled()).isTrue();
     assertThat(action.shouldQuit()).isFalse();
@@ -209,7 +210,7 @@ class CoreTuiShellPilotTest {
     CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.OUTPUT_DIR);
 
-    CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofChar('/'));
+    UiAction action = controller.onEvent(KeyEvent.ofChar('/'));
 
     assertThat(action.handled()).isTrue();
     assertThat(action.shouldQuit()).isFalse();
@@ -291,18 +292,18 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('c'));
     assertThat(controller.filteredExtensionCount()).isEqualTo(1);
 
-    CoreTuiController.UiAction firstEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    UiAction firstEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(firstEscape.handled()).isTrue();
     assertThat(firstEscape.shouldQuit()).isFalse();
     assertThat(controller.filteredExtensionCount()).isEqualTo(7);
     assertThat(controller.statusMessage()).contains("Extension search cleared");
 
-    CoreTuiController.UiAction secondEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    UiAction secondEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(secondEscape.handled()).isTrue();
     assertThat(secondEscape.shouldQuit()).isFalse();
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
 
-    CoreTuiController.UiAction thirdEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    UiAction thirdEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(thirdEscape.handled()).isTrue();
     assertThat(thirdEscape.shouldQuit()).isTrue();
   }
@@ -317,14 +318,14 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('c'));
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
-    CoreTuiController.UiAction firstEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    UiAction firstEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(firstEscape.handled()).isTrue();
     assertThat(firstEscape.shouldQuit()).isFalse();
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
     assertThat(controller.filteredExtensionCount()).isEqualTo(7);
     assertThat(controller.statusMessage()).contains("Extension search cleared");
 
-    CoreTuiController.UiAction secondEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    UiAction secondEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(secondEscape.handled()).isTrue();
     assertThat(secondEscape.shouldQuit()).isTrue();
   }
@@ -337,13 +338,13 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('k', KeyModifiers.CTRL));
     assertThat(controller.favoritesOnlyFilterEnabled()).isTrue();
 
-    CoreTuiController.UiAction firstEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    UiAction firstEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(firstEscape.handled()).isTrue();
     assertThat(firstEscape.shouldQuit()).isFalse();
     assertThat(controller.favoritesOnlyFilterEnabled()).isFalse();
     assertThat(controller.statusMessage()).contains("Favorites filter disabled");
 
-    CoreTuiController.UiAction secondEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    UiAction secondEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(secondEscape.handled()).isTrue();
     assertThat(secondEscape.shouldQuit()).isTrue();
   }
@@ -354,7 +355,7 @@ class CoreTuiShellPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
@@ -369,13 +370,13 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('v'));
     assertThat(controller.catalogSectionHeaders()).containsExactly("Core");
 
-    CoreTuiController.UiAction firstEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    UiAction firstEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(firstEscape.handled()).isTrue();
     assertThat(firstEscape.shouldQuit()).isFalse();
     assertThat(controller.catalogSectionHeaders()).containsExactly("Core", "Web", "Data");
     assertThat(controller.statusMessage()).contains("Category filter cleared");
 
-    CoreTuiController.UiAction secondEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    UiAction secondEscape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(secondEscape.handled()).isTrue();
     assertThat(secondEscape.shouldQuit()).isTrue();
   }
@@ -390,7 +391,7 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar(' '));
     assertThat(controller.selectedExtensionIds()).hasSize(2);
 
-    CoreTuiController.UiAction clearAction = controller.onEvent(KeyEvent.ofChar('x'));
+    UiAction clearAction = controller.onEvent(KeyEvent.ofChar('x'));
     assertThat(clearAction.handled()).isTrue();
     assertThat(clearAction.shouldQuit()).isFalse();
     assertThat(controller.selectedExtensionIds()).isEmpty();
@@ -406,7 +407,7 @@ class CoreTuiShellPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
@@ -444,7 +445,7 @@ class CoreTuiShellPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20)))));
@@ -473,7 +474,7 @@ class CoreTuiShellPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
@@ -503,7 +504,7 @@ class CoreTuiShellPilotTest {
     CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.GROUP_ID);
 
-    CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofChar('q'));
+    UiAction action = controller.onEvent(KeyEvent.ofChar('q'));
 
     assertThat(action.shouldQuit()).isFalse();
     assertThat(action.handled()).isTrue();
@@ -514,7 +515,7 @@ class CoreTuiShellPilotTest {
   void ctrlCStillQuitsFromShell() {
     CoreTuiController controller = UiControllerTestHarness.controller();
 
-    CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofChar('c', KeyModifiers.CTRL));
+    UiAction action = controller.onEvent(KeyEvent.ofChar('c', KeyModifiers.CTRL));
 
     assertThat(action.shouldQuit()).isTrue();
     assertThat(action.handled()).isTrue();
@@ -526,7 +527,7 @@ class CoreTuiShellPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
@@ -559,7 +560,7 @@ class CoreTuiShellPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20)))));
@@ -593,7 +594,7 @@ class CoreTuiShellPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
@@ -626,7 +627,7 @@ class CoreTuiShellPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
@@ -664,7 +665,7 @@ class CoreTuiShellPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
@@ -691,7 +692,7 @@ class CoreTuiShellPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
@@ -725,7 +726,7 @@ class CoreTuiShellPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
@@ -759,7 +760,7 @@ class CoreTuiShellPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                CoreTuiController.ExtensionCatalogLoadResult.live(
+                ExtensionCatalogLoadResult.live(
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
@@ -829,7 +830,7 @@ class CoreTuiShellPilotTest {
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
-                new CoreTuiController.ExtensionCatalogLoadResult(
+                new ExtensionCatalogLoadResult(
                     List.of(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest")),
                     CatalogSource.LIVE,
                     false,
@@ -866,9 +867,9 @@ class CoreTuiShellPilotTest {
         List.of("maven", "gradle"),
         Map.of("maven", List.of("17", "21", "25"), "gradle", List.of("21", "25")),
         List.of(
-            new MetadataDto.PlatformStream(
+            new PlatformStream(
                 "io.quarkus.platform:3.31", "3.31", true, List.of("17", "21", "25")),
-            new MetadataDto.PlatformStream(
+            new PlatformStream(
                 "io.quarkus.platform:3.20", "3.20", false, List.of("17", "21"))));
   }
 }

@@ -68,7 +68,7 @@ class CoreTuiAsyncDeterministicTest {
     for (char character : "jdbc".toCharArray()) {
       controller.onEvent(KeyEvent.ofChar(character));
     }
-    CoreTuiController.UiAction clearAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    UiAction clearAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(clearAction.handled()).isTrue();
     assertThat(clearAction.shouldQuit()).isFalse();
 
@@ -87,7 +87,7 @@ class CoreTuiAsyncDeterministicTest {
             Duration.ofMillis(120),
             (generationRequest, outputDirectory, cancelled, progressListener) -> {
               progressListener.accept(
-                  CoreTuiController.GenerationProgressUpdate.requestingArchive(
+                  GenerationProgressUpdate.requestingArchive(
                       "requesting project archive from Quarkus API..."));
               return new CompletableFuture<>();
             });
@@ -119,7 +119,7 @@ class CoreTuiAsyncDeterministicTest {
     scheduler.advanceBy(Duration.ofMillis(200));
     assertThat(controller.filteredExtensionCount()).isEqualTo(1);
 
-    CoreTuiController.UiAction escape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    UiAction escape = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(escape.handled()).isTrue();
     assertThat(escape.shouldQuit()).isFalse();
     assertThat(controller.filteredExtensionCount()).isEqualTo(7);

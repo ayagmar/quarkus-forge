@@ -52,12 +52,12 @@ class CoreTuiGenerationFlowTest {
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     generationRunner.complete(Path.of("build/generated-project"));
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
-    CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
     assertThat(action.shouldQuit()).isTrue();
     assertThat(controller.postGenerationExitPlan()).isPresent();
     assertThat(controller.postGenerationExitPlan().orElseThrow().action())
-        .isEqualTo(CoreTuiController.PostGenerationExitAction.OPEN_TERMINAL);
+        .isEqualTo(PostGenerationExitAction.OPEN_TERMINAL);
     assertThat(controller.postGenerationExitPlan().orElseThrow().projectDirectory())
         .isEqualTo(Path.of("build/generated-project").toAbsolutePath().normalize());
   }
@@ -74,7 +74,7 @@ class CoreTuiGenerationFlowTest {
     generationRunner.complete(Path.of("build/generated-project"));
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
-    CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
     assertThat(action.shouldQuit()).isFalse();
     assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
@@ -112,8 +112,8 @@ class CoreTuiGenerationFlowTest {
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
-    CoreTuiController.UiAction tabAction = controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
-    CoreTuiController.UiAction enterAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    UiAction tabAction = controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
+    UiAction enterAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
     assertThat(tabAction.handled()).isTrue();
     assertThat(tabAction.shouldQuit()).isFalse();
@@ -130,7 +130,7 @@ class CoreTuiGenerationFlowTest {
             UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
-    CoreTuiController.UiAction cancelAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    UiAction cancelAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
 
     assertThat(cancelAction.shouldQuit()).isFalse();
     assertThat(controller.statusMessage())
@@ -139,7 +139,7 @@ class CoreTuiGenerationFlowTest {
     generationRunner.fail(new CancellationException("cancelled"));
     assertThat(controller.statusMessage()).contains("Generation cancelled");
 
-    CoreTuiController.UiAction quitAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    UiAction quitAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(quitAction.shouldQuit()).isTrue();
   }
 
@@ -292,7 +292,7 @@ class CoreTuiGenerationFlowTest {
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     generationRunner.complete(Path.of("build/generated-project"));
 
-    CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
 
     assertThat(action.shouldQuit()).isTrue();
     assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.SUCCESS);
@@ -343,7 +343,7 @@ class CoreTuiGenerationFlowTest {
                 new CompletableFuture<>());
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
-    CoreTuiController.UiAction tickAction =
+    UiAction tickAction =
         controller.onEvent(TickEvent.of(1, Duration.ofMillis(40)));
 
     assertThat(tickAction.handled()).isTrue();
@@ -365,7 +365,7 @@ class CoreTuiGenerationFlowTest {
     generationRunner.complete(Path.of("build/generated-project"));
     scheduler.runAll();
 
-    CoreTuiController.UiAction tickAction =
+    UiAction tickAction =
         controller.onEvent(TickEvent.of(2, Duration.ofMillis(40)));
     assertThat(tickAction.handled()).isTrue();
     assertThat(controller.statusMessage()).contains("Generation succeeded");

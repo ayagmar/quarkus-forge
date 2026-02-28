@@ -32,7 +32,7 @@ final class UiControllerTestHarness {
   static CoreTuiController controller(
       UiScheduler scheduler,
       Duration debounceDelay,
-      CoreTuiController.ProjectGenerationRunner generationRunner) {
+      ProjectGenerationRunner generationRunner) {
     return CoreTuiController.from(
         UiTestFixtureFactory.defaultForgeUiState(), scheduler, debounceDelay, generationRunner);
   }
@@ -59,7 +59,7 @@ final class UiControllerTestHarness {
     private final List<Runnable> queuedTasks = new ArrayList<>();
 
     @Override
-    public Cancellable schedule(Duration delay, Runnable task) {
+    public UiCancellable schedule(Duration delay, Runnable task) {
       queuedTasks.add(task);
       return () -> queuedTasks.remove(task);
     }
@@ -84,7 +84,7 @@ final class UiControllerTestHarness {
     }
 
     @Override
-    public Cancellable schedule(Duration delay, Runnable task) {
+    public UiCancellable schedule(Duration delay, Runnable task) {
       ScheduledTask scheduledTask =
           new ScheduledTask(nowMillis + Math.max(0L, delay.toMillis()), sequence++, task);
       tasks.add(scheduledTask);
@@ -121,7 +121,7 @@ final class UiControllerTestHarness {
   }
 
   static final class ControlledGenerationRunner
-      implements CoreTuiController.ProjectGenerationRunner {
+      implements ProjectGenerationRunner {
     private int callCount;
     private Path lastOutputDirectory;
     private CompletableFuture<Path> future;
@@ -137,11 +137,11 @@ final class UiControllerTestHarness {
         GenerationRequest generationRequest,
         Path outputDirectory,
         BooleanSupplier cancelled,
-        Consumer<CoreTuiController.GenerationProgressUpdate> progressListener) {
+        Consumer<GenerationProgressUpdate> progressListener) {
       callCount++;
       lastOutputDirectory = outputDirectory;
       progressListener.accept(
-          CoreTuiController.GenerationProgressUpdate.requestingArchive(
+          GenerationProgressUpdate.requestingArchive(
               "requesting project archive from Quarkus API..."));
       return future;
     }

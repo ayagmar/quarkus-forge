@@ -85,7 +85,7 @@ class GenerationFlowCoordinatorTest {
         "org.acme", "demo", "1.0.0-SNAPSHOT", "", "maven", "21", List.of());
   }
 
-  private static final class ControlledRunner implements CoreTuiController.ProjectGenerationRunner {
+  private static final class ControlledRunner implements ProjectGenerationRunner {
     private CompletableFuture<Path> future;
     private int callCount;
 
@@ -94,7 +94,7 @@ class GenerationFlowCoordinatorTest {
         GenerationRequest generationRequest,
         Path outputDirectory,
         BooleanSupplier cancelled,
-        Consumer<CoreTuiController.GenerationProgressUpdate> progressListener) {
+        Consumer<GenerationProgressUpdate> progressListener) {
       callCount++;
       future = new CompletableFuture<>();
       return future;
@@ -109,7 +109,7 @@ class GenerationFlowCoordinatorTest {
     }
   }
 
-  private static final class TestCallbacks implements GenerationFlowCoordinator.Callbacks {
+  private static final class TestCallbacks implements GenerationFlowCallbacks {
     private final List<CoreTuiController.GenerationState> transitions = new ArrayList<>();
     private final List<Path> successPaths = new ArrayList<>();
     private final List<Throwable> failedCauses = new ArrayList<>();
@@ -152,7 +152,7 @@ class GenerationFlowCoordinatorTest {
     }
 
     @Override
-    public void onProgress(CoreTuiController.GenerationProgressUpdate progressUpdate) {}
+    public void onProgress(GenerationProgressUpdate progressUpdate) {}
 
     @Override
     public void onGenerationSuccess(Path generatedPath) {
