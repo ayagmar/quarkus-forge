@@ -1,6 +1,7 @@
 package dev.ayagmar.quarkusforge.domain;
 
 import dev.ayagmar.quarkusforge.api.MetadataDto;
+import dev.ayagmar.quarkusforge.api.PlatformStream;
 import dev.ayagmar.quarkusforge.util.CaseInsensitiveLookup;
 import java.util.ArrayList;
 import java.util.List;
@@ -65,7 +66,7 @@ public final class MetadataCompatibilityValidator {
     }
 
     if (!metadata.platformStreams().isEmpty()) {
-      MetadataDto.PlatformStream selectedStream = null;
+      PlatformStream selectedStream = null;
       if (platformStream != null && !platformStream.isBlank()) {
         selectedStream = metadata.findPlatformStream(platformStream);
         if (selectedStream == null) {
@@ -76,7 +77,7 @@ public final class MetadataCompatibilityValidator {
                       + platformStream
                       + "'. Allowed: "
                       + metadata.platformStreams().stream()
-                          .map(MetadataDto.PlatformStream::key)
+                          .map(PlatformStream::key)
                           .collect(Collectors.joining(", "))));
         }
       } else {

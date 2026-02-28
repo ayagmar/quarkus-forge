@@ -3,6 +3,7 @@ package dev.ayagmar.quarkusforge.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.ayagmar.quarkusforge.api.MetadataDto;
+import dev.ayagmar.quarkusforge.api.PlatformStream;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -121,7 +122,7 @@ class MetadataCompatibilityValidatorTest {
             List.of("maven"),
             Map.of("maven", List.of("21", "25")),
             List.of(
-                new MetadataDto.PlatformStream(
+                new PlatformStream(
                     "io.quarkus.platform:3.31", "3.31", true, List.of("21", "25"))));
 
     ValidationReport report = validator.validate(request, metadata);
@@ -147,9 +148,9 @@ class MetadataCompatibilityValidatorTest {
             List.of("maven"),
             Map.of("maven", List.of("17", "21", "25")),
             List.of(
-                new MetadataDto.PlatformStream(
+                new PlatformStream(
                     "io.quarkus.platform:3.31", "3.31", true, List.of("17", "21", "25")),
-                new MetadataDto.PlatformStream(
+                new PlatformStream(
                     "io.quarkus.platform:3.20", "3.20", false, List.of("17", "21"))));
 
     ValidationReport report = validator.validate(request, metadata);
