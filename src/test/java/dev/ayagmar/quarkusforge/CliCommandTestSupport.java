@@ -15,15 +15,15 @@ import java.nio.file.Path;
 final class CliCommandTestSupport {
   private CliCommandTestSupport() {}
 
-  static QuarkusForgeCli.RuntimeConfig runtimeConfig(Path tempDir, URI baseUri) {
-    return new QuarkusForgeCli.RuntimeConfig(
+  static RuntimeConfig runtimeConfig(Path tempDir, URI baseUri) {
+    return new RuntimeConfig(
         baseUri,
         tempDir.resolve("catalog-cache.json"),
         tempDir.resolve("favorites.json"),
         tempDir.resolve("preferences.json"));
   }
 
-  static CommandResult runCommand(QuarkusForgeCli.RuntimeConfig runtimeConfig, String... args) {
+  static CommandResult runCommand(RuntimeConfig runtimeConfig, String... args) {
     PrintStream originalOut = System.out;
     PrintStream originalErr = System.err;
     ByteArrayOutputStream stdout = new ByteArrayOutputStream();
@@ -42,7 +42,7 @@ final class CliCommandTestSupport {
     }
   }
 
-  static CommandResult runSmoke(QuarkusForgeCli.RuntimeConfig runtimeConfig, boolean verbose) {
+  static CommandResult runSmoke(RuntimeConfig runtimeConfig, boolean verbose) {
     PrintStream originalOut = System.out;
     PrintStream originalErr = System.err;
     ByteArrayOutputStream stdout = new ByteArrayOutputStream();

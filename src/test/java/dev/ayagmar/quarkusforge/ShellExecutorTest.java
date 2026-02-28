@@ -90,7 +90,7 @@ class ShellExecutorTest {
         .containsExactly("open-terminal:Interrupted while executing post action");
   }
 
-  private static final class CapturingDiagnostics implements ShellExecutor.Diagnostics {
+  private static final class CapturingDiagnostics implements ShellExecutorDiagnostics {
     private final List<String> successActions = new ArrayList<>();
     private final List<String> errorMessages = new ArrayList<>();
 

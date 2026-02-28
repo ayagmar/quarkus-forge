@@ -1,6 +1,5 @@
 package dev.ayagmar.quarkusforge;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import dev.ayagmar.quarkusforge.api.ApiClientException;
 import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogDataService;
@@ -9,7 +8,6 @@ import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
-import dev.ayagmar.quarkusforge.api.ObjectMapperProvider;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
 import dev.ayagmar.quarkusforge.api.ThrowableUnwrapper;
 import dev.ayagmar.quarkusforge.archive.ArchiveException;
@@ -24,31 +22,28 @@ import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
 import dev.ayagmar.quarkusforge.domain.ValidationError;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
+import dev.ayagmar.quarkusforge.diagnostics.DiagnosticField;
+import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.ui.AppKeyActions;
 import dev.ayagmar.quarkusforge.ui.CoreTuiController;
+import dev.ayagmar.quarkusforge.ui.ExtensionCatalogLoadResult;
 import dev.ayagmar.quarkusforge.ui.ExtensionFavoritesStore;
+import dev.ayagmar.quarkusforge.ui.PostGenerationExitPlan;
 import dev.ayagmar.quarkusforge.ui.UiScheduler;
 import dev.ayagmar.quarkusforge.ui.UserPreferencesStore;
 import dev.tamboui.tui.TuiConfig;
 import dev.tamboui.tui.TuiRunner;
-import dev.tamboui.tui.bindings.Actions;
-import dev.tamboui.tui.bindings.BindingSets;
 import dev.tamboui.tui.bindings.Bindings;
-import dev.tamboui.tui.bindings.KeyTrigger;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -68,7 +63,7 @@ import picocli.CommandLine.ParentCommand;
     name = "quarkus-forge",
     version = "0.1.0-SNAPSHOT",
     mixinStandardHelpOptions = true,
-    subcommands = {QuarkusForgeCli.GenerateCommand.class},
+    subcommands = {GenerateCommand.class},
     description = "Quarkus forge terminal UI")
 public final class QuarkusForgeCli implements Callable<Integer> {
   static final int EXIT_CODE_VALIDATION = 2;
@@ -85,7 +80,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   private static final Map<String, List<String>> BUILTIN_PRESETS = builtInPresets();
   private static final String PRESET_FAVORITES = "favorites";
   private static final Duration STARTUP_METADATA_REFRESH_TIMEOUT = Duration.ofSeconds(2);
-  private static final Duration STARTUP_SPLASH_MIN_DURATION = Duration.ofMillis(450);
+  static final Duration STARTUP_SPLASH_MIN_DURATION = Duration.ofMillis(450);
   private static final Duration TUI_TICK_RATE = Duration.ofMillis(40);
   private static final Duration DEFAULT_HEADLESS_CATALOG_TIMEOUT = Duration.ofSeconds(20);
   private static final Duration DEFAULT_HEADLESS_GENERATION_TIMEOUT = Duration.ofMinutes(2);
@@ -137,7 +132,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   @Override
   public Integer call() throws Exception {
     DiagnosticLogger diagnostics = DiagnosticLogger.create(verbose);
-    diagnostics.info("cli.start", Map.of("mode", dryRun ? "dry-run" : "tui"));
+    diagnostics.info("cli.start", df("mode", dryRun ? "dry-run" : "tui"));
 
     UserPreferencesStore preferencesStore =
         UserPreferencesStore.fileBacked(runtimeConfig.preferencesFile());
@@ -153,7 +148,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
             requestWithResolvedStream, startupMetadataSelection.metadataCompatibility());
     if (!initialState.canSubmit() && shouldBlockOnStartupValidation(dryRun)) {
       diagnostics.error(
-          "cli.validation.failed", Map.of("errorCount", initialState.validation().errors().size()));
+          "cli.validation.failed", df("errorCount", initialState.validation().errors().size()));
       printValidationErrors(
           initialState.validation(),
           startupMetadataSelection.sourceLabel(),
@@ -163,8 +158,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
 
     if (dryRun) {
       diagnostics.info(
-          "cli.dry-run.validated",
-          Map.of("metadataSource", startupMetadataSelection.sourceLabel()));
+          "cli.dry-run.validated", df("metadataSource", startupMetadataSelection.sourceLabel()));
       printPrefillSummary(
           initialState.request(),
           startupMetadataSelection.sourceLabel(),
@@ -172,7 +166,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       return CommandLine.ExitCode.OK;
     }
 
-    diagnostics.info("cli.tui.launch", Map.of("searchDebounceMs", searchDebounceMs));
+    diagnostics.info("cli.tui.launch", df("searchDebounceMs", searchDebounceMs));
     TuiSessionSummary summary = runTui(initialState, searchDebounceMs, runtimeConfig, diagnostics);
     preferencesStore.saveLastRequest(summary.finalRequest());
     executePostTuiActions(summary, postGenerateHookCommand, diagnostics);
@@ -209,7 +203,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
 
   int runSmokeForTest(boolean verbose) {
     DiagnosticLogger diagnostics = DiagnosticLogger.create(verbose);
-    diagnostics.info("cli.start", Map.of("mode", "smoke-test"));
+    diagnostics.info("cli.start", df("mode", "smoke-test"));
 
     ProjectRequest request = toProjectRequest(defaultRequestOptions());
     StartupMetadataSelection startupMetadataSelection = loadStartupMetadataSelection(diagnostics);
@@ -220,7 +214,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
             requestWithResolvedStream, startupMetadataSelection.metadataCompatibility());
     if (!initialState.canSubmit()) {
       diagnostics.error(
-          "cli.validation.failed", Map.of("errorCount", initialState.validation().errors().size()));
+          "cli.validation.failed", df("errorCount", initialState.validation().errors().size()));
       printValidationErrors(
           initialState.validation(),
           startupMetadataSelection.sourceLabel(),
@@ -292,25 +286,21 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       DiagnosticLogger diagnostics) {
     diagnostics.info(
         "tui.session.start",
-        Map.of(
-            "smokeMode",
-            true,
-            "searchDebounceMs",
-            Math.max(0, searchDebounceMs),
-            "mode",
-            "headless-smoke"));
+        df("smokeMode", true),
+        df("searchDebounceMs", Math.max(0, searchDebounceMs)),
+        df("mode", "headless-smoke"));
     QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
     CatalogDataService catalogDataService =
         new CatalogDataService(
             apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
-    diagnostics.info("catalog.load.start", Map.of("mode", "tui"));
+    diagnostics.info("catalog.load.start", df("mode", "tui"));
     catalogDataService.load().handle(QuarkusForgeCli.catalogLoadDiagnostics(diagnostics)).join();
-    diagnostics.info("tui.session.exit", Map.of("outcome", "completed"));
+    diagnostics.info("tui.session.exit", df("outcome", "completed"));
   }
 
   private static void executePostTuiActions(
       TuiSessionSummary summary, String postGenerateHookCommand, DiagnosticLogger diagnostics) {
-    CoreTuiController.PostGenerationExitPlan exitPlan = summary.exitPlan();
+    PostGenerationExitPlan exitPlan = summary.exitPlan();
     if (exitPlan == null || exitPlan.projectDirectory() == null) {
       return;
     }
@@ -327,13 +317,13 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       case OPEN_IDE -> {
         diagnostics.info(
             "tui.post-action.start",
-            Map.of("action", "open-ide", "directory", generatedProjectDir.toString()));
+            df("action", "open-ide"), df("directory", generatedProjectDir.toString()));
         executeShellCommand("code .", generatedProjectDir, diagnostics, "open-ide");
       }
       case OPEN_TERMINAL -> {
         diagnostics.info(
             "tui.post-action.start",
-            Map.of("action", "open-terminal", "directory", generatedProjectDir.toString()));
+            df("action", "open-terminal"), df("directory", generatedProjectDir.toString()));
         openInteractiveShell(generatedProjectDir, exitPlan.nextCommand(), diagnostics);
       }
       case QUIT, GENERATE_AGAIN -> {
@@ -375,11 +365,12 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     return osName.toLowerCase(java.util.Locale.ROOT).contains("win");
   }
 
-  static Map<String, Object> postHookDiagnosticFields(Path generatedProjectDir, String command) {
-    return Map.of(
-        "directory", generatedProjectDir.toString(),
-        "command", "<redacted>",
-        "commandLength", command.length());
+  static DiagnosticField[] postHookDiagnosticFields(Path generatedProjectDir, String command) {
+    return new DiagnosticField[] {
+      df("directory", generatedProjectDir.toString()),
+      df("command", "<redacted>"),
+      df("commandLength", command.length())
+    };
   }
 
   static List<String> shellCommandInvocation(String command, boolean windowsOs) {
@@ -392,52 +383,50 @@ public final class QuarkusForgeCli implements Callable<Integer> {
         command,
         workingDirectory,
         actionName,
-        new ShellExecutor.Diagnostics() {
+        new ShellExecutorDiagnostics() {
           @Override
           public void success(String action) {
-            diagnostics.info("tui.post-action.success", Map.of("action", action));
+            diagnostics.info("tui.post-action.success", df("action", action));
           }
 
           @Override
           public void error(String action, String message) {
             diagnostics.error(
-                "tui.post-action.failure", Map.of("action", action, "message", message));
+                "tui.post-action.failure", df("action", action), df("message", message));
           }
         });
   }
 
-  private static java.util.function.BiFunction<
-          CatalogData, Throwable, CoreTuiController.ExtensionCatalogLoadResult>
+  static java.util.function.BiFunction<
+          CatalogData, Throwable, ExtensionCatalogLoadResult>
       catalogLoadDiagnostics(DiagnosticLogger diagnostics) {
     return (catalogData, throwable) -> {
       if (throwable == null) {
         diagnostics.info(
             "catalog.load.success",
-            Map.of(
-                "mode", "tui",
-                "source", catalogData.source().label(),
-                "stale", catalogData.stale(),
-                "detail", catalogData.detailMessage()));
+            df("mode", "tui"),
+            df("source", catalogData.source().label()),
+            df("stale", catalogData.stale()),
+            df("detail", catalogData.detailMessage()));
         return toExtensionCatalogLoadResult(catalogData);
       }
       Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(throwable);
       if (cause instanceof CancellationException) {
-        diagnostics.error("catalog.load.cancelled", Map.of("mode", "tui"));
+        diagnostics.error("catalog.load.cancelled", df("mode", "tui"));
       } else {
         diagnostics.error(
             "catalog.load.failure",
-            Map.of(
-                "mode", "tui",
-                "causeType", cause.getClass().getSimpleName(),
-                "message", ErrorMessageMapper.userFriendlyError(cause)));
+            df("mode", "tui"),
+            df("causeType", cause.getClass().getSimpleName()),
+            df("message", ErrorMessageMapper.userFriendlyError(cause)));
       }
       throw new CompletionException(cause);
     };
   }
 
-  private static CoreTuiController.ExtensionCatalogLoadResult toExtensionCatalogLoadResult(
+  private static ExtensionCatalogLoadResult toExtensionCatalogLoadResult(
       CatalogData catalogData) {
-    return new CoreTuiController.ExtensionCatalogLoadResult(
+    return new ExtensionCatalogLoadResult(
         catalogData.extensions(),
         catalogData.source(),
         catalogData.stale(),
@@ -445,7 +434,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
         catalogData.metadata());
   }
 
-  private static void configureTerminalBackendPreference() {
+  static void configureTerminalBackendPreference() {
     if (isBackendPreferenceExplicitlyConfigured()) {
       return;
     }
@@ -489,35 +478,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     return "runtime".equalsIgnoreCase(System.getProperty("org.graalvm.nativeimage.imagecode"));
   }
 
-  private static final class AppBindingsProfile {
-    private static Bindings bindings() {
-      return BindingSets.standard().toBuilder()
-          .bind(KeyTrigger.ch('j'), Actions.MOVE_DOWN)
-          .bind(KeyTrigger.ch('k'), Actions.MOVE_UP)
-          .bind(KeyTrigger.ch('h'), Actions.MOVE_LEFT)
-          .bind(KeyTrigger.ch('l'), Actions.MOVE_RIGHT)
-          .bind(KeyTrigger.ch('g'), Actions.HOME)
-          .bind(KeyTrigger.ch('G'), Actions.END)
-          .bind(KeyTrigger.ch('/'), AppKeyActions.FOCUS_EXTENSION_SEARCH)
-          .bind(KeyTrigger.ctrl('f'), AppKeyActions.FOCUS_EXTENSION_SEARCH)
-          .bind(KeyTrigger.ctrl('l'), AppKeyActions.FOCUS_EXTENSION_LIST)
-          .bind(KeyTrigger.ctrl('k'), AppKeyActions.TOGGLE_FAVORITES_FILTER)
-          .bind(KeyTrigger.ctrl('j'), AppKeyActions.JUMP_TO_FAVORITE)
-          .bind(KeyTrigger.ctrl('r'), AppKeyActions.RELOAD_CATALOG)
-          .bind(KeyTrigger.ctrl('e'), AppKeyActions.TOGGLE_ERROR_DETAILS)
-          .bind(KeyTrigger.ch('v'), AppKeyActions.CATEGORY_FILTER_CYCLE)
-          .bind(KeyTrigger.ch('c'), AppKeyActions.TOGGLE_CATEGORY)
-          .bind(KeyTrigger.ch('C'), AppKeyActions.OPEN_ALL_CATEGORIES)
-          .bind(KeyTrigger.ch('x'), AppKeyActions.CLEAR_SELECTED_EXTENSIONS)
-          .bind(KeyTrigger.ch('f'), AppKeyActions.FAVORITE_TOGGLE)
-          .bind(KeyTrigger.ch('?'), AppKeyActions.OPEN_HELP)
-          .bind(KeyTrigger.ctrl('p'), AppKeyActions.OPEN_COMMAND_PALETTE)
-          .bind(KeyTrigger.alt('g'), AppKeyActions.SUBMIT_GENERATION)
-          .build();
-    }
-  }
-
-  private static ForgeUiState buildInitialState(
+  static ForgeUiState buildInitialState(
       ProjectRequest request, MetadataCompatibilityContext metadataCompatibility) {
     ValidationReport fieldValidation = new ProjectRequestValidator().validate(request);
     ValidationReport compatibilityValidation = metadataCompatibility.validate(request);
@@ -525,7 +486,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
         request, fieldValidation.merge(compatibilityValidation), metadataCompatibility);
   }
 
-  private static ProjectRequest toProjectRequest(RequestOptions options) {
+  static ProjectRequest toProjectRequest(RequestOptions options) {
     CliPrefill prefill =
         new CliPrefill(
             options.groupId,
@@ -539,7 +500,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     return CliPrefillMapper.map(prefill);
   }
 
-  private static ProjectRequest applyRecommendedPlatformStream(
+  static ProjectRequest applyRecommendedPlatformStream(
       ProjectRequest request, MetadataCompatibilityContext metadataCompatibilityContext) {
     if (!request.platformStream().isBlank()) {
       return request;
@@ -570,7 +531,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     printValidationErrors(validation, "", "");
   }
 
-  private static void printValidationErrors(
+  static void printValidationErrors(
       ValidationReport validation, String sourceLabel, String sourceDetail) {
     System.err.println("Input validation failed:");
     if (sourceLabel != null && !sourceLabel.isBlank()) {
@@ -604,7 +565,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     System.out.println(" - generatedProjectDirectory: " + generatedProjectDirectory);
   }
 
-  private static void printDryRunSummary(
+  static void printDryRunSummary(
       ProjectRequest request, List<String> extensionIds, String sourceLabel, boolean stale) {
     Path generatedProjectDirectory =
         Path.of(request.outputDirectory()).resolve(request.artifactId()).normalize();
@@ -622,29 +583,25 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     System.out.println(" - generatedProjectDirectory: " + generatedProjectDirectory);
   }
 
-  private static int mapHeadlessFailureToExitCode(Throwable throwable) {
+  static int mapHeadlessFailureToExitCode(Throwable throwable) {
     Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(throwable);
-    if (cause instanceof CancellationException) {
-      return EXIT_CODE_CANCELLED;
-    }
-    if (cause instanceof ArchiveException) {
-      return EXIT_CODE_ARCHIVE;
-    }
-    if (cause instanceof ApiClientException) {
-      return EXIT_CODE_NETWORK;
-    }
-    return EXIT_CODE_ARCHIVE;
+    return switch (cause) {
+      case CancellationException ignored -> EXIT_CODE_CANCELLED;
+      case ApiClientException ignored -> EXIT_CODE_NETWORK;
+      case ArchiveException ignored -> EXIT_CODE_ARCHIVE;
+      default -> EXIT_CODE_ARCHIVE;
+    };
   }
 
   private static Map<String, List<String>> builtInPresets() {
-    Map<String, List<String>> presets = new LinkedHashMap<>();
-    presets.put("web", List.of("io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc"));
-    presets.put(
+    return Map.of(
+        "web", List.of("io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc"),
         "data",
-        List.of("io.quarkus:quarkus-hibernate-orm-panache", "io.quarkus:quarkus-jdbc-postgresql"));
-    presets.put(
-        "messaging", List.of("io.quarkus:quarkus-messaging", "io.quarkus:quarkus-smallrye-health"));
-    return Collections.unmodifiableMap(presets);
+            List.of(
+                "io.quarkus:quarkus-hibernate-orm-panache",
+                "io.quarkus:quarkus-jdbc-postgresql"),
+        "messaging",
+            List.of("io.quarkus:quarkus-messaging", "io.quarkus:quarkus-smallrye-health"));
   }
 
   private static String normalizePresetName(String presetName) {
@@ -654,7 +611,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     return presetName.trim().toLowerCase(Locale.ROOT);
   }
 
-  private CatalogData loadCatalogData()
+  CatalogData loadCatalogData()
       throws ExecutionException, InterruptedException, TimeoutException {
     QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
     CatalogDataService catalogDataService =
@@ -670,7 +627,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     }
   }
 
-  private List<String> resolveRequestedExtensions(
+  List<String> resolveRequestedExtensions(
       List<String> extensionInputs, List<String> presetInputs, Set<String> knownExtensionIds) {
     List<ValidationError> errors = new ArrayList<>();
     LinkedHashSet<String> resolved = new LinkedHashSet<>();
@@ -729,7 +686,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
           apiClient
               .fetchMetadata()
               .get(STARTUP_METADATA_REFRESH_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-      diagnostics.info("metadata.load.success", Map.of("source", "live"));
+      diagnostics.info("metadata.load.success", df("source", "live"));
       return new StartupMetadataSelection(
           MetadataCompatibilityContext.success(metadata), "live", "");
     } catch (InterruptedException interruptedException) {
@@ -738,7 +695,8 @@ public final class QuarkusForgeCli implements Callable<Integer> {
           snapshotFallbackSelection("Live metadata refresh interrupted");
       diagnostics.error(
           "metadata.load.fallback",
-          Map.of("source", selection.sourceLabel(), "detail", selection.detailMessage()));
+          df("source", selection.sourceLabel()),
+          df("detail", selection.detailMessage()));
       return selection;
     } catch (TimeoutException timeoutException) {
       StartupMetadataSelection selection =
@@ -748,7 +706,8 @@ public final class QuarkusForgeCli implements Callable<Integer> {
                   + "ms");
       diagnostics.error(
           "metadata.load.fallback",
-          Map.of("source", selection.sourceLabel(), "detail", selection.detailMessage()));
+          df("source", selection.sourceLabel()),
+          df("detail", selection.detailMessage()));
       return selection;
     } catch (ExecutionException executionException) {
       Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);
@@ -758,10 +717,9 @@ public final class QuarkusForgeCli implements Callable<Integer> {
                   .formatted(ErrorMessageMapper.userFriendlyError(cause)));
       diagnostics.error(
           "metadata.load.fallback",
-          Map.of(
-              "source", selection.sourceLabel(),
-              "detail", selection.detailMessage(),
-              "causeType", cause.getClass().getSimpleName()));
+          df("source", selection.sourceLabel()),
+          df("detail", selection.detailMessage()),
+          df("causeType", cause.getClass().getSimpleName()));
       return selection;
     }
   }
@@ -776,11 +734,11 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     return new StartupMetadataSelection(snapshotCompatibility, "snapshot fallback", detailMessage);
   }
 
-  private Integer runHeadlessGenerate(GenerateCommand command) {
-    return headlessGenerationService.run(command, dryRun, verbose, new CliHeadlessOperations());
+  Integer runHeadlessGenerate(GenerateCommand command) {
+    return headlessGenerationService.run(command, dryRun, verbose, new CliHeadlessOperations(this));
   }
 
-  private CompletableFuture<Path> startHeadlessGeneration(
+  CompletableFuture<Path> startHeadlessGeneration(
       GenerationRequest generationRequest, Path outputPath, Consumer<String> progressLineConsumer) {
     QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
     ProjectArchiveService archiveService =
@@ -798,79 +756,12 @@ public final class QuarkusForgeCli implements Callable<Integer> {
                 }));
   }
 
-  private final class CliHeadlessOperations implements HeadlessGenerationService.Operations {
-    @Override
-    public CatalogData loadCatalogData()
-        throws ExecutionException, InterruptedException, TimeoutException {
-      return QuarkusForgeCli.this.loadCatalogData();
-    }
-
-    @Override
-    public ProjectRequest toProjectRequest(RequestOptions options) {
-      return QuarkusForgeCli.toProjectRequest(options);
-    }
-
-    @Override
-    public ProjectRequest applyRecommendedPlatformStream(
-        ProjectRequest request, MetadataCompatibilityContext metadataCompatibility) {
-      return QuarkusForgeCli.applyRecommendedPlatformStream(request, metadataCompatibility);
-    }
-
-    @Override
-    public ForgeUiState buildInitialState(
-        ProjectRequest request, MetadataCompatibilityContext metadataCompatibility) {
-      return QuarkusForgeCli.buildInitialState(request, metadataCompatibility);
-    }
-
-    @Override
-    public List<String> resolveRequestedExtensions(
-        List<String> extensionInputs, List<String> presetInputs, Set<String> knownExtensionIds) {
-      return QuarkusForgeCli.this.resolveRequestedExtensions(
-          extensionInputs, presetInputs, knownExtensionIds);
-    }
-
-    @Override
-    public void printValidationErrors(
-        ValidationReport validation, String sourceLabel, String sourceDetail) {
-      QuarkusForgeCli.printValidationErrors(validation, sourceLabel, sourceDetail);
-    }
-
-    @Override
-    public void printDryRunSummary(
-        ProjectRequest request, List<String> extensionIds, String sourceLabel, boolean stale) {
-      QuarkusForgeCli.printDryRunSummary(request, extensionIds, sourceLabel, stale);
-    }
-
-    @Override
-    public Duration headlessCatalogTimeout() {
-      return QuarkusForgeCli.headlessCatalogTimeout();
-    }
-
-    @Override
-    public Duration headlessGenerationTimeout() {
-      return QuarkusForgeCli.headlessGenerationTimeout();
-    }
-
-    @Override
-    public int mapHeadlessFailureToExitCode(Throwable throwable) {
-      return QuarkusForgeCli.mapHeadlessFailureToExitCode(throwable);
-    }
-
-    @Override
-    public CompletableFuture<Path> startGeneration(
-        GenerationRequest generationRequest,
-        Path outputPath,
-        Consumer<String> progressLineConsumer) {
-      return startHeadlessGeneration(generationRequest, outputPath, progressLineConsumer);
-    }
-  }
-
-  private static Duration headlessCatalogTimeout() {
+  static Duration headlessCatalogTimeout() {
     return durationFromProperty(
         HEADLESS_CATALOG_TIMEOUT_PROPERTY, DEFAULT_HEADLESS_CATALOG_TIMEOUT);
   }
 
-  private static Duration headlessGenerationTimeout() {
+  static Duration headlessGenerationTimeout() {
     return durationFromProperty(
         HEADLESS_GENERATION_TIMEOUT_PROPERTY, DEFAULT_HEADLESS_GENERATION_TIMEOUT);
   }
@@ -891,451 +782,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     }
   }
 
-  static final class RequestOptions {
-    @Option(
-        names = {"-g", "--group-id"},
-        defaultValue = "org.acme",
-        description = "Maven group id")
-    private String groupId;
-
-    @Option(
-        names = {"-a", "--artifact-id"},
-        defaultValue = "quarkus-app",
-        description = "Maven artifact id")
-    private String artifactId;
-
-    @Option(
-        names = {"-v", "--project-version"},
-        defaultValue = "1.0.0-SNAPSHOT",
-        description = "Project version")
-    private String version;
-
-    @Option(
-        names = {"-p", "--package-name"},
-        description = "Base package name (defaults from group/artifact)")
-    private String packageName;
-
-    @Option(
-        names = {"-o", "--output-dir"},
-        defaultValue = ".",
-        description =
-            "Output parent directory (project path resolves to <output-dir>/<artifact-id>)")
-    private String outputDirectory;
-
-    @Option(
-        names = {"-S", "--platform-stream"},
-        defaultValue = "",
-        description = "Quarkus platform stream key (metadata-driven, optional)")
-    private String platformStream;
-
-    @Option(
-        names = {"-b", "--build-tool"},
-        defaultValue = "maven",
-        description = "Build tool (metadata-driven)")
-    private String buildTool;
-
-    @Option(
-        names = {"-j", "--java-version"},
-        defaultValue = "25",
-        description = "Java version for generated project (metadata-driven)")
-    private String javaVersion;
-  }
-
-  @Command(name = "generate", description = "Generate a Quarkus project without starting the TUI")
-  static final class GenerateCommand implements Callable<Integer> {
-    @ParentCommand private QuarkusForgeCli rootCommand;
-
-    @Mixin private RequestOptions requestOptions = new RequestOptions();
-
-    @Option(
-        names = {"-e", "--extension"},
-        split = ",",
-        description = "Extension id to include (repeatable and comma-separated)")
-    private List<String> extensions = new ArrayList<>();
-
-    @Option(
-        names = "--preset",
-        split = ",",
-        description = "Extension preset(s): web, data, messaging, favorites")
-    private List<String> presets = new ArrayList<>();
-
-    @Option(
-        names = "--dry-run",
-        defaultValue = "false",
-        description = "Validate full generation request without writing files")
-    private boolean dryRun;
-
-    @Override
-    public Integer call() {
-      return rootCommand.runHeadlessGenerate(this);
-    }
-  }
-
-  static final class TuiBootstrapService {
-    TuiSessionSummary run(
-        ForgeUiState initialState,
-        int searchDebounceMs,
-        RuntimeConfig runtimeConfig,
-        DiagnosticLogger diagnostics)
-        throws Exception {
-      diagnostics.info(
-          "tui.session.start",
-          Map.of("smokeMode", false, "searchDebounceMs", Math.max(0, searchDebounceMs)));
-      configureTerminalBackendPreference();
-      TuiConfig tuiConfig = appTuiConfig();
-      try (var tui = TuiRunner.create(tuiConfig)) {
-        QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
-        CatalogDataService catalogDataService =
-            new CatalogDataService(
-                apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
-        AtomicBoolean firstCatalogLoad = new AtomicBoolean(true);
-        ProjectArchiveService projectArchiveService =
-            new ProjectArchiveService(apiClient, new SafeZipExtractor());
-        CoreTuiController controller =
-            CoreTuiController.from(
-                initialState,
-                UiScheduler.fromScheduledExecutor(tui.scheduler(), tui::runOnRenderThread),
-                Duration.ofMillis(Math.max(0, searchDebounceMs)),
-                (generationRequest, outputDirectory, cancelled, progressListener) ->
-                    projectArchiveService.downloadAndExtract(
-                        generationRequest,
-                        outputDirectory,
-                        OverwritePolicy.FAIL_IF_EXISTS,
-                        cancelled,
-                        progress ->
-                            progressListener.accept(
-                                switch (progress) {
-                                  case REQUESTING_ARCHIVE ->
-                                      CoreTuiController.GenerationProgressUpdate.requestingArchive(
-                                          "requesting project archive from Quarkus API...");
-                                  case EXTRACTING_ARCHIVE ->
-                                      CoreTuiController.GenerationProgressUpdate.extractingArchive(
-                                          "extracting project archive...");
-                                })),
-                ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile()),
-                CoreTuiController.defaultFavoritesPersistenceExecutor());
-        controller.setStartupOverlayMinDuration(STARTUP_SPLASH_MIN_DURATION);
-        controller.loadExtensionCatalogAsync(
-            () -> {
-              diagnostics.info("catalog.load.start", Map.of("mode", "tui"));
-              CompletableFuture<CatalogData> catalogLoadFuture =
-                  firstCatalogLoad.getAndSet(false)
-                      ? catalogDataService.loadForStartup()
-                      : catalogDataService.load();
-              return catalogLoadFuture.handle(QuarkusForgeCli.catalogLoadDiagnostics(diagnostics));
-            });
-
-        tui.run(
-            (event, runner) -> {
-              CoreTuiController.UiAction action = controller.onEvent(event);
-              if (action.shouldQuit()) {
-                diagnostics.info("tui.session.quit.requested", Map.of("reason", "user"));
-                runner.quit();
-              }
-              return action.handled();
-            },
-            controller::render);
-        diagnostics.info("tui.session.exit", Map.of("outcome", "completed"));
-        return new TuiSessionSummary(
-            controller.request(), controller.postGenerationExitPlan().orElse(null));
-      } catch (Exception exception) {
-        diagnostics.error(
-            "tui.session.failure",
-            Map.of(
-                "causeType", exception.getClass().getSimpleName(),
-                "message", ErrorMessageMapper.userFriendlyError(exception)));
-        throw exception;
-      }
-    }
-  }
-
-  static final class HeadlessGenerationService {
-    int run(GenerateCommand command, boolean globalDryRun, boolean verbose, Operations operations) {
-      DiagnosticLogger diagnostics = DiagnosticLogger.create(verbose);
-      diagnostics.info(
-          "generate.start", Map.of("mode", command.dryRun || globalDryRun ? "dry-run" : "apply"));
-
-      CatalogData catalogData;
-      try {
-        catalogData = operations.loadCatalogData();
-        diagnostics.info(
-            "catalog.load.success",
-            Map.of(
-                "source", catalogData.source().label(),
-                "stale", catalogData.stale(),
-                "detail", catalogData.detailMessage()));
-      } catch (CancellationException cancellationException) {
-        diagnostics.error("catalog.load.cancelled", Map.of("phase", "before-start"));
-        System.err.println("Generation cancelled before start.");
-        return EXIT_CODE_CANCELLED;
-      } catch (InterruptedException interruptedException) {
-        Thread.currentThread().interrupt();
-        diagnostics.error("catalog.load.cancelled", Map.of("phase", "interrupted"));
-        System.err.println("Generation cancelled before start.");
-        return EXIT_CODE_CANCELLED;
-      } catch (TimeoutException timeoutException) {
-        Duration timeout = operations.headlessCatalogTimeout();
-        diagnostics.error("catalog.load.timeout", Map.of("timeoutMs", timeout.toMillis()));
-        System.err.println(
-            "Failed to load extension catalog: request timed out after "
-                + timeout.toMillis()
-                + "ms");
-        return EXIT_CODE_NETWORK;
-      } catch (ExecutionException executionException) {
-        Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);
-        diagnostics.error(
-            "catalog.load.failure",
-            Map.of(
-                "causeType",
-                cause.getClass().getSimpleName(),
-                "message",
-                ErrorMessageMapper.userFriendlyError(cause)));
-        System.err.println(
-            "Failed to load extension catalog: " + ErrorMessageMapper.userFriendlyError(cause));
-        return operations.mapHeadlessFailureToExitCode(cause);
-      }
-
-      ProjectRequest request = operations.toProjectRequest(command.requestOptions);
-      MetadataCompatibilityContext metadataCompatibility =
-          MetadataCompatibilityContext.success(catalogData.metadata());
-      ProjectRequest requestWithResolvedStream =
-          operations.applyRecommendedPlatformStream(request, metadataCompatibility);
-      ForgeUiState validatedState =
-          operations.buildInitialState(requestWithResolvedStream, metadataCompatibility);
-      if (!validatedState.canSubmit()) {
-        diagnostics.error(
-            "generate.validation.failed",
-            Map.of(
-                "errorCount", validatedState.validation().errors().size(),
-                "catalogSource", catalogData.source().label()));
-        operations.printValidationErrors(
-            validatedState.validation(),
-            catalogData.source().label() + (catalogData.stale() ? " [stale]" : ""),
-            catalogData.detailMessage());
-        return EXIT_CODE_VALIDATION;
-      }
-
-      Set<String> knownExtensionIds = new LinkedHashSet<>();
-      for (ExtensionDto extension : catalogData.extensions()) {
-        knownExtensionIds.add(extension.id());
-      }
-
-      List<String> extensionIds;
-      try {
-        extensionIds =
-            operations.resolveRequestedExtensions(
-                command.extensions, command.presets, knownExtensionIds);
-      } catch (ValidationException validationException) {
-        diagnostics.error(
-            "generate.extension-validation.failed",
-            Map.of("errorCount", validationException.errors().size()));
-        operations.printValidationErrors(
-            new ValidationReport(validationException.errors()),
-            catalogData.source().label() + (catalogData.stale() ? " [stale]" : ""),
-            catalogData.detailMessage());
-        return EXIT_CODE_VALIDATION;
-      }
-
-      boolean dryRunRequested = command.dryRun || globalDryRun;
-      if (dryRunRequested) {
-        diagnostics.info(
-            "generate.dry-run.validated",
-            Map.of(
-                "extensionCount", extensionIds.size(),
-                "catalogSource", catalogData.source().label(),
-                "stale", catalogData.stale()));
-        operations.printDryRunSummary(
-            validatedState.request(),
-            extensionIds,
-            catalogData.source().label(),
-            catalogData.stale());
-        return CommandLine.ExitCode.OK;
-      }
-
-      Path outputPath =
-          Path.of(validatedState.request().outputDirectory())
-              .resolve(validatedState.request().artifactId())
-              .normalize();
-      GenerationRequest generationRequest =
-          new GenerationRequest(
-              validatedState.request().groupId(),
-              validatedState.request().artifactId(),
-              validatedState.request().version(),
-              validatedState.request().platformStream(),
-              validatedState.request().buildTool(),
-              validatedState.request().javaVersion(),
-              extensionIds);
-
-      CompletableFuture<Path> generationFuture =
-          operations.startGeneration(generationRequest, outputPath, System.out::println);
-      try {
-        Duration generationTimeout = operations.headlessGenerationTimeout();
-        diagnostics.info(
-            "generate.execute.start",
-            Map.of("outputPath", outputPath.toString(), "extensionCount", extensionIds.size()));
-        Path generatedProjectRoot =
-            generationFuture.get(generationTimeout.toMillis(), TimeUnit.MILLISECONDS);
-        diagnostics.info(
-            "generate.execute.success", Map.of("projectRoot", generatedProjectRoot.toString()));
-        System.out.println(
-            "Generation succeeded: " + generatedProjectRoot.toAbsolutePath().normalize());
-        return CommandLine.ExitCode.OK;
-      } catch (CancellationException cancellationException) {
-        diagnostics.error("generate.execute.cancelled", Map.of("phase", "execution"));
-        System.err.println("Generation cancelled.");
-        return EXIT_CODE_CANCELLED;
-      } catch (InterruptedException interruptedException) {
-        Thread.currentThread().interrupt();
-        diagnostics.error("generate.execute.cancelled", Map.of("phase", "interrupted"));
-        System.err.println("Generation cancelled.");
-        return EXIT_CODE_CANCELLED;
-      } catch (TimeoutException timeoutException) {
-        generationFuture.cancel(true);
-        Duration timeout = operations.headlessGenerationTimeout();
-        diagnostics.error("generate.execute.timeout", Map.of("timeoutMs", timeout.toMillis()));
-        System.err.println(
-            "Generation failed: request timed out after " + timeout.toMillis() + "ms");
-        return EXIT_CODE_NETWORK;
-      } catch (ExecutionException executionException) {
-        Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);
-        int exitCode = operations.mapHeadlessFailureToExitCode(cause);
-        diagnostics.error(
-            "generate.execute.failure",
-            Map.of(
-                "causeType", cause.getClass().getSimpleName(),
-                "message", ErrorMessageMapper.userFriendlyError(cause),
-                "exitCode", exitCode));
-        System.err.println("Generation failed: " + ErrorMessageMapper.userFriendlyError(cause));
-        return exitCode;
-      }
-    }
-
-    interface Operations {
-      CatalogData loadCatalogData()
-          throws ExecutionException, InterruptedException, TimeoutException;
-
-      ProjectRequest toProjectRequest(RequestOptions options);
-
-      ProjectRequest applyRecommendedPlatformStream(
-          ProjectRequest request, MetadataCompatibilityContext metadataCompatibility);
-
-      ForgeUiState buildInitialState(
-          ProjectRequest request, MetadataCompatibilityContext metadataCompatibility);
-
-      List<String> resolveRequestedExtensions(
-          List<String> extensionInputs, List<String> presetInputs, Set<String> knownExtensionIds);
-
-      void printValidationErrors(
-          ValidationReport validation, String sourceLabel, String sourceDetail);
-
-      void printDryRunSummary(
-          ProjectRequest request, List<String> extensionIds, String sourceLabel, boolean stale);
-
-      Duration headlessCatalogTimeout();
-
-      Duration headlessGenerationTimeout();
-
-      int mapHeadlessFailureToExitCode(Throwable throwable);
-
-      CompletableFuture<Path> startGeneration(
-          GenerationRequest generationRequest,
-          Path outputPath,
-          Consumer<String> progressLineConsumer);
-    }
-  }
-
-  record RuntimeConfig(
-      URI apiBaseUri, Path catalogCacheFile, Path favoritesFile, Path preferencesFile) {
-    RuntimeConfig {
-      Objects.requireNonNull(apiBaseUri);
-      Objects.requireNonNull(catalogCacheFile);
-      Objects.requireNonNull(favoritesFile);
-      Objects.requireNonNull(preferencesFile);
-    }
-
-    static RuntimeConfig defaults() {
-      return new RuntimeConfig(
-          URI.create("https://code.quarkus.io"),
-          CatalogSnapshotCache.defaultCacheFile(),
-          ExtensionFavoritesStore.defaultFile(),
-          UserPreferencesStore.defaultFile());
-    }
-  }
-
-  private record TuiSessionSummary(
-      ProjectRequest finalRequest, CoreTuiController.PostGenerationExitPlan exitPlan) {
-    private TuiSessionSummary {
-      Objects.requireNonNull(finalRequest);
-    }
-  }
-
-  private static final class ValidationException extends RuntimeException {
-    private final List<ValidationError> errors;
-
-    private ValidationException(List<ValidationError> errors) {
-      this.errors = List.copyOf(errors);
-    }
-
-    private List<ValidationError> errors() {
-      return errors;
-    }
-  }
-
-  private record StartupMetadataSelection(
-      MetadataCompatibilityContext metadataCompatibility,
-      String sourceLabel,
-      String detailMessage) {
-    private StartupMetadataSelection {
-      Objects.requireNonNull(metadataCompatibility);
-      sourceLabel = sourceLabel == null ? "" : sourceLabel.strip();
-      detailMessage = detailMessage == null ? "" : detailMessage.strip();
-    }
-  }
-
-  private static final class DiagnosticLogger {
-    private final boolean enabled;
-    private final String traceId;
-
-    private DiagnosticLogger(boolean enabled, String traceId) {
-      this.enabled = enabled;
-      this.traceId = traceId;
-    }
-
-    static DiagnosticLogger create(boolean enabled) {
-      if (!enabled) {
-        return new DiagnosticLogger(false, "");
-      }
-      return new DiagnosticLogger(true, UUID.randomUUID().toString());
-    }
-
-    private void info(String event, Map<String, Object> fields) {
-      log("INFO", event, fields);
-    }
-
-    private void error(String event, Map<String, Object> fields) {
-      log("ERROR", event, fields);
-    }
-
-    private void log(String level, String event, Map<String, Object> fields) {
-      if (!enabled) {
-        return;
-      }
-      Map<String, Object> payload = new LinkedHashMap<>();
-      payload.put("ts", Instant.now().toString());
-      payload.put("level", level);
-      payload.put("event", event);
-      payload.put("traceId", traceId);
-      payload.putAll(fields);
-      try {
-        System.err.println(ObjectMapperProvider.shared().writeValueAsString(payload));
-      } catch (JsonProcessingException jsonProcessingException) {
-        System.err.println(
-            "{\"event\":\"diagnostic.encoding.failure\",\"traceId\":\""
-                + traceId
-                + "\",\"message\":\""
-                + jsonProcessingException.getMessage().replace("\"", "'")
-                + "\"}");
-      }
-    }
+  private static DiagnosticField df(String name, Object value) {
+    return DiagnosticField.of(name, value);
   }
 }

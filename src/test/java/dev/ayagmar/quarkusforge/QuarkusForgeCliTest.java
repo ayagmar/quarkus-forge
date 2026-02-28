@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.ayagmar.quarkusforge.diagnostics.DiagnosticField;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
@@ -106,11 +107,13 @@ class QuarkusForgeCliTest {
   void postHookDiagnosticsRedactsRawCommand() {
     String command = "QUARKUS_TOKEN=secret ./deploy.sh";
     var fields = QuarkusForgeCli.postHookDiagnosticFields(Path.of("/tmp/project"), command);
+    var valuesByName = java.util.Arrays.stream(fields).collect(java.util.stream.Collectors.toMap(
+        DiagnosticField::name, DiagnosticField::value));
 
-    assertThat(fields).containsEntry("directory", "/tmp/project");
-    assertThat(fields).containsEntry("command", "<redacted>");
-    assertThat(fields).containsEntry("commandLength", command.length());
-    assertThat(fields).doesNotContainValue(command);
+    assertThat(valuesByName).containsEntry("directory", "/tmp/project");
+    assertThat(valuesByName).containsEntry("command", "<redacted>");
+    assertThat(valuesByName).containsEntry("commandLength", command.length());
+    assertThat(valuesByName).doesNotContainValue(command);
   }
 
   @Test

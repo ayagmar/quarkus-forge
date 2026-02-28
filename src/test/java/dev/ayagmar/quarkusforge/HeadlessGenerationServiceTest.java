@@ -7,6 +7,7 @@ import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
+import dev.ayagmar.quarkusforge.api.PlatformStream;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
 import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
@@ -29,8 +30,8 @@ class HeadlessGenerationServiceTest {
     TestOperations operations = new TestOperations();
 
     int exitCode =
-        new QuarkusForgeCli.HeadlessGenerationService()
-            .run(new QuarkusForgeCli.GenerateCommand(), true, false, operations);
+        new HeadlessGenerationService()
+            .run(new GenerateCommand(), true, false, operations);
 
     assertThat(exitCode).isEqualTo(CommandLine.ExitCode.OK);
     assertThat(operations.printDryRunSummaryCalls).isEqualTo(1);
@@ -44,8 +45,8 @@ class HeadlessGenerationServiceTest {
     operations.generationFuture = new CompletableFuture<>();
 
     int exitCode =
-        new QuarkusForgeCli.HeadlessGenerationService()
-            .run(new QuarkusForgeCli.GenerateCommand(), false, false, operations);
+        new HeadlessGenerationService()
+            .run(new GenerateCommand(), false, false, operations);
 
     assertThat(exitCode).isEqualTo(QuarkusForgeCli.EXIT_CODE_NETWORK);
     assertThat(operations.startGenerationCalls).isEqualTo(1);
@@ -58,8 +59,8 @@ class HeadlessGenerationServiceTest {
     operations.catalogLoadTimeout = new TimeoutException("timeout");
 
     int exitCode =
-        new QuarkusForgeCli.HeadlessGenerationService()
-            .run(new QuarkusForgeCli.GenerateCommand(), false, false, operations);
+        new HeadlessGenerationService()
+            .run(new GenerateCommand(), false, false, operations);
 
     assertThat(exitCode).isEqualTo(QuarkusForgeCli.EXIT_CODE_NETWORK);
     assertThat(operations.startGenerationCalls).isZero();
@@ -67,14 +68,14 @@ class HeadlessGenerationServiceTest {
   }
 
   private static final class TestOperations
-      implements QuarkusForgeCli.HeadlessGenerationService.Operations {
+      implements HeadlessGenerationOperations {
     private final MetadataDto metadata =
         new MetadataDto(
             List.of("21"),
             List.of("maven"),
             Map.of(),
             List.of(
-                new MetadataDto.PlatformStream(
+                new PlatformStream(
                     "io.quarkus.platform:3.31", "3.31", true, List.of("21"))));
     private final CatalogData catalogData =
         new CatalogData(
@@ -117,7 +118,7 @@ class HeadlessGenerationServiceTest {
     }
 
     @Override
-    public ProjectRequest toProjectRequest(QuarkusForgeCli.RequestOptions options) {
+    public ProjectRequest toProjectRequest(RequestOptions options) {
       return request;
     }
 

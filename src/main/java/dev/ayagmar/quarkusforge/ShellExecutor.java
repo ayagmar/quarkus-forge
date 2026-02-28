@@ -8,18 +8,19 @@ import java.util.function.BooleanSupplier;
 
 final class ShellExecutor {
   private final BooleanSupplier windowsOs;
-  private final ProcessRunner processRunner;
+  private final ShellProcessRunner processRunner;
 
   ShellExecutor() {
     this(QuarkusForgeCli::isWindowsOs, ShellExecutor::runWithProcessBuilder);
   }
 
-  ShellExecutor(BooleanSupplier windowsOs, ProcessRunner processRunner) {
+  ShellExecutor(BooleanSupplier windowsOs, ShellProcessRunner processRunner) {
     this.windowsOs = windowsOs;
     this.processRunner = processRunner;
   }
 
-  void execute(String command, Path workingDirectory, String actionName, Diagnostics diagnostics) {
+  void execute(
+      String command, Path workingDirectory, String actionName, ShellExecutorDiagnostics diagnostics) {
     int exitCode;
     try {
       List<String> invocation = commandInvocation(command, windowsOs.getAsBoolean());
@@ -50,17 +51,5 @@ final class ShellExecutor {
     processBuilder.directory(workingDirectory.toFile());
     processBuilder.inheritIO();
     return processBuilder.start().waitFor();
-  }
-
-  interface Diagnostics {
-    void success(String actionName);
-
-    void error(String actionName, String message);
-  }
-
-  @FunctionalInterface
-  interface ProcessRunner {
-    int run(List<String> invocation, Path workingDirectory)
-        throws IOException, InterruptedException;
   }
 }

@@ -34,7 +34,7 @@ class QuarkusForgeCliStartupMetadataTest {
   @Test
   void dryRunUsesLiveMetadataForInitialValidationWhenAvailable() {
     CliCommandTestSupport.stubLiveMetadataWithMavenOnly();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
+    RuntimeConfig runtimeConfig =
         runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
     CliCommandTestSupport.CommandResult result =
@@ -56,7 +56,7 @@ class QuarkusForgeCliStartupMetadataTest {
   @Test
   void verboseDryRunEmitsMetadataLoadDiagnostics() {
     CliCommandTestSupport.stubLiveMetadataWithMavenOnly();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
+    RuntimeConfig runtimeConfig =
         runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
     CliCommandTestSupport.CommandResult result =
@@ -78,7 +78,7 @@ class QuarkusForgeCliStartupMetadataTest {
   void verboseSmokeModeEmitsTuiCatalogDiagnostics() {
     CliCommandTestSupport.stubLiveMetadataWithMavenOnly();
     CliCommandTestSupport.stubSingleRestExtensionCatalog();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
+    RuntimeConfig runtimeConfig =
         runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
     CliCommandTestSupport.CommandResult result = runSmoke(runtimeConfig, true);
@@ -96,7 +96,7 @@ class QuarkusForgeCliStartupMetadataTest {
   void smokeModeWithoutInteractiveConsoleAvoidsTerminalEscapeOutput() {
     CliCommandTestSupport.stubLiveMetadataWithMavenOnly();
     CliCommandTestSupport.stubSingleRestExtensionCatalog();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
+    RuntimeConfig runtimeConfig =
         runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
     CliCommandTestSupport.CommandResult result = runSmoke(runtimeConfig, true);
@@ -109,7 +109,7 @@ class QuarkusForgeCliStartupMetadataTest {
   @Test
   void dryRunUsesRecommendedPlatformStreamWhenOptionIsOmitted() {
     CliCommandTestSupport.stubLiveMetadataWithMavenOnly();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
+    RuntimeConfig runtimeConfig =
         runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
     CliCommandTestSupport.CommandResult result =
@@ -124,7 +124,7 @@ class QuarkusForgeCliStartupMetadataTest {
   @Test
   void dryRunFallsBackToSnapshotWhenLiveMetadataIsUnavailable() {
     CliCommandTestSupport.stubStreamsUnavailable();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
+    RuntimeConfig runtimeConfig =
         runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
     CliCommandTestSupport.CommandResult result =
@@ -148,7 +148,7 @@ class QuarkusForgeCliStartupMetadataTest {
   @Test
   void fallbackMetadataSelectionKeepsValidationDeterministicAfterLiveFailure() {
     CliCommandTestSupport.stubStreamsUnavailable();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
+    RuntimeConfig runtimeConfig =
         runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
     CliCommandTestSupport.CommandResult result =
@@ -175,7 +175,7 @@ class QuarkusForgeCliStartupMetadataTest {
   @Test
   void dryRunIgnoresStoredTuiPreferences() throws Exception {
     CliCommandTestSupport.stubLiveMetadataWithMavenOnly();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
+    RuntimeConfig runtimeConfig =
         runtimeConfig(URI.create(wireMockServer.baseUrl()));
     Files.writeString(
         tempDir.resolve("preferences.json"),
@@ -200,17 +200,17 @@ class QuarkusForgeCliStartupMetadataTest {
     assertThat(result.standardError()).doesNotContain("unsupported build tool 'gradle'");
   }
 
-  private QuarkusForgeCli.RuntimeConfig runtimeConfig(URI baseUri) {
+  private RuntimeConfig runtimeConfig(URI baseUri) {
     return CliCommandTestSupport.runtimeConfig(tempDir, baseUri);
   }
 
   private CliCommandTestSupport.CommandResult runCommand(
-      QuarkusForgeCli.RuntimeConfig runtimeConfig, String... args) {
+      RuntimeConfig runtimeConfig, String... args) {
     return CliCommandTestSupport.runCommand(runtimeConfig, args);
   }
 
   private CliCommandTestSupport.CommandResult runSmoke(
-      QuarkusForgeCli.RuntimeConfig runtimeConfig, boolean verbose) {
+      RuntimeConfig runtimeConfig, boolean verbose) {
     return CliCommandTestSupport.runSmoke(runtimeConfig, verbose);
   }
 }
