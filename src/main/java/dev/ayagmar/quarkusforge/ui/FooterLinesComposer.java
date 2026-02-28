@@ -104,5 +104,4 @@ final class FooterLinesComposer {
     }
     return "Tab/Shift+Tab: focus | Enter/Alt+G: submit | /: search | ?: help | Ctrl+P: commands | Esc: quit";
   }
-
 }

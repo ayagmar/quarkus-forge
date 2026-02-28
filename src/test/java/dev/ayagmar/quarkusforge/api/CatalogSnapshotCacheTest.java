@@ -28,8 +28,7 @@ class CatalogSnapshotCacheTest {
             Duration.ofHours(6),
             2L * 1024L * 1024L);
 
-    CacheWriteOutcome writeOutcome =
-        cache.write(sampleMetadata(), sampleExtensions());
+    CacheWriteOutcome writeOutcome = cache.write(sampleMetadata(), sampleExtensions());
 
     assertThat(writeOutcome.written()).isTrue();
     CachedCatalogSnapshot snapshot = cache.read().orElseThrow();
@@ -128,8 +127,7 @@ class CatalogSnapshotCacheTest {
             Duration.ofHours(6),
             128L);
 
-    CacheWriteOutcome outcome =
-        cache.write(sampleMetadata(), sampleExtensions());
+    CacheWriteOutcome outcome = cache.write(sampleMetadata(), sampleExtensions());
 
     assertThat(outcome.written()).isFalse();
     assertThat(outcome.rejected()).isTrue();
@@ -156,8 +154,7 @@ class CatalogSnapshotCacheTest {
             Duration.ofHours(6),
             2L * 1024L * 1024L);
 
-    CacheWriteOutcome outcome =
-        cache.write(sampleMetadata(), sampleExtensions());
+    CacheWriteOutcome outcome = cache.write(sampleMetadata(), sampleExtensions());
 
     assertThat(outcome.written()).isFalse();
     assertThat(outcome.rejected()).isFalse();

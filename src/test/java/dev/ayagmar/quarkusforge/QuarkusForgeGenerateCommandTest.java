@@ -55,8 +55,7 @@ class QuarkusForgeGenerateCommandTest {
   void headlessGenerateCreatesProjectWithMultipleExtensions() throws Exception {
     stubCatalogEndpoints();
     stubDownloadEndpoint("headless-app");
-    RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
     Path outputDir = tempDir.resolve("output");
 
     CliCommandTestSupport.CommandResult result =
@@ -85,8 +84,7 @@ class QuarkusForgeGenerateCommandTest {
   void headlessGeneratePassesPlatformStreamWhenProvided() throws Exception {
     stubCatalogEndpoints();
     stubDownloadEndpoint("headless-app");
-    RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
     Path outputDir = tempDir.resolve("output-platform");
 
     CliCommandTestSupport.CommandResult result =
@@ -112,8 +110,7 @@ class QuarkusForgeGenerateCommandTest {
   void headlessGenerateUsesRecommendedPlatformStreamWhenOptionIsOmitted() throws Exception {
     stubCatalogEndpoints();
     stubDownloadEndpoint("headless-app");
-    RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
     Path outputDir = tempDir.resolve("output-default-stream");
 
     CliCommandTestSupport.CommandResult result =
@@ -136,8 +133,7 @@ class QuarkusForgeGenerateCommandTest {
   @Test
   void invalidPlatformStreamBlocksBeforeDownloadRequest() {
     stubCatalogEndpoints();
-    RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
     CliCommandTestSupport.CommandResult result =
         runCommand(
@@ -159,8 +155,7 @@ class QuarkusForgeGenerateCommandTest {
   @Test
   void invalidExtensionIdReturnsValidationExitCode() {
     stubCatalogEndpoints();
-    RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
     CliCommandTestSupport.CommandResult result =
         runCommand(
@@ -201,8 +196,7 @@ class QuarkusForgeGenerateCommandTest {
   @Test
   void verboseDryRunEmitsGenerateLifecycleDiagnostics() {
     stubCatalogEndpoints();
-    RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
     CliCommandTestSupport.CommandResult result =
         runCommand(
@@ -245,8 +239,7 @@ class QuarkusForgeGenerateCommandTest {
   void outputConflictReturnsArchiveExitCode() throws Exception {
     stubCatalogEndpoints();
     stubDownloadEndpoint("headless-app");
-    RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
     Path outputDir = tempDir.resolve("output");
     Files.createDirectories(outputDir.resolve("headless-app"));
 
@@ -269,8 +262,7 @@ class QuarkusForgeGenerateCommandTest {
   void downloadHttpFailureReturnsNetworkExitCode() {
     stubCatalogEndpoints();
     stubFor(get(urlPathEqualTo("/api/download")).willReturn(aResponse().withStatus(503)));
-    RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
     CliCommandTestSupport.CommandResult result =
         runCommand(
@@ -335,8 +327,7 @@ class QuarkusForgeGenerateCommandTest {
                           }
                         }
                         """)));
-    RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
     CliCommandTestSupport.CommandResult result =
         withSystemProperty(
@@ -367,8 +358,7 @@ class QuarkusForgeGenerateCommandTest {
                     .withFixedDelay(500)
                     .withHeader("Content-Type", "application/zip")
                     .withBody(new byte[] {80, 75, 3, 4})));
-    RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
     CliCommandTestSupport.CommandResult result =
         withSystemProperty(
@@ -390,8 +380,7 @@ class QuarkusForgeGenerateCommandTest {
   @Test
   void dryRunSupportsBuiltInAndFavoritesPresetsWithoutGeneratingFiles() throws Exception {
     stubCatalogEndpoints();
-    RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
     ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile())
         .saveFavoriteExtensionIds(Set.of("io.quarkus:quarkus-jdbc-postgresql"));
     Path outputDir = tempDir.resolve("dry-run-output");
@@ -430,8 +419,7 @@ class QuarkusForgeGenerateCommandTest {
   void dryRunAndGenerateShareExtensionResolutionOrder() throws Exception {
     stubCatalogEndpoints();
     stubDownloadEndpoint("headless-app");
-    RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
     ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile())
         .saveFavoriteExtensionIds(Set.of("io.quarkus:quarkus-jdbc-postgresql"));
     Path outputDir = tempDir.resolve("parity-output");
@@ -487,8 +475,7 @@ class QuarkusForgeGenerateCommandTest {
   @Test
   void rootDryRunFlagBeforeGenerateSubcommandStillPreventsProjectGeneration() throws Exception {
     stubCatalogEndpoints();
-    RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
     Path outputDir = tempDir.resolve("root-dry-run-output");
 
     CliCommandTestSupport.CommandResult result =

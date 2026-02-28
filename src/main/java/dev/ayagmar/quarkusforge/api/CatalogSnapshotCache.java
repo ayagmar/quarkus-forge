@@ -90,7 +90,8 @@ public final class CatalogSnapshotCache {
         return Optional.empty();
       }
 
-      CatalogSnapshotPayload payload = objectMapper.readValue(cacheFile.toFile(), CatalogSnapshotPayload.class);
+      CatalogSnapshotPayload payload =
+          objectMapper.readValue(cacheFile.toFile(), CatalogSnapshotPayload.class);
       int schemaVersion = payload.schemaVersion();
       if (schemaVersion != SCHEMA_VERSION) {
         return Optional.empty();
@@ -130,5 +131,4 @@ public final class CatalogSnapshotCache {
             SCHEMA_VERSION, clock.instant().toEpochMilli(), metadata, List.copyOf(extensions));
     return objectMapper.writeValueAsBytes(payload);
   }
-
 }

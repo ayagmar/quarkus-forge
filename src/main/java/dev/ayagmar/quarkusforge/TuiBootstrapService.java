@@ -5,7 +5,6 @@ import static dev.ayagmar.quarkusforge.diagnostics.DiagnosticField.of;
 import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogDataService;
 import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
-import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
 import dev.ayagmar.quarkusforge.archive.OverwritePolicy;
 import dev.ayagmar.quarkusforge.archive.ProjectArchiveService;
@@ -39,7 +38,8 @@ final class TuiBootstrapService {
     try (var tui = TuiRunner.create(tuiConfig)) {
       QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
       CatalogDataService catalogDataService =
-          new CatalogDataService(apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
+          new CatalogDataService(
+              apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
       AtomicBoolean firstCatalogLoad = new AtomicBoolean(true);
       ProjectArchiveService projectArchiveService =
           new ProjectArchiveService(apiClient, new SafeZipExtractor());
@@ -94,7 +94,9 @@ final class TuiBootstrapService {
       diagnostics.error(
           "tui.session.failure",
           of("causeType", exception.getClass().getSimpleName()),
-          of("message", dev.ayagmar.quarkusforge.api.ErrorMessageMapper.userFriendlyError(exception)));
+          of(
+              "message",
+              dev.ayagmar.quarkusforge.api.ErrorMessageMapper.userFriendlyError(exception)));
       throw exception;
     }
   }

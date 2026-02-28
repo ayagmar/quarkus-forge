@@ -7,7 +7,8 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.util.Objects;
 
-record RuntimeConfig(URI apiBaseUri, Path catalogCacheFile, Path favoritesFile, Path preferencesFile) {
+record RuntimeConfig(
+    URI apiBaseUri, Path catalogCacheFile, Path favoritesFile, Path preferencesFile) {
   RuntimeConfig {
     Objects.requireNonNull(apiBaseUri);
     Objects.requireNonNull(catalogCacheFile);

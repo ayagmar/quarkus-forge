@@ -44,8 +44,7 @@ class CoreTuiThemePolishTest {
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ofMillis(50));
-    CompletableFuture<ExtensionCatalogLoadResult> loadFuture =
-        new CompletableFuture<>();
+    CompletableFuture<ExtensionCatalogLoadResult> loadFuture = new CompletableFuture<>();
 
     controller.loadExtensionCatalogAsync(() -> loadFuture);
     assertThat(renderToString(controller, 120, 32)).contains("Extensions [loading]");
@@ -66,8 +65,7 @@ class CoreTuiThemePolishTest {
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ofMillis(50));
-    CompletableFuture<ExtensionCatalogLoadResult> loadFuture =
-        new CompletableFuture<>();
+    CompletableFuture<ExtensionCatalogLoadResult> loadFuture = new CompletableFuture<>();
 
     controller.loadExtensionCatalogAsync(() -> loadFuture);
     String loading = renderToString(controller, 120, 32);
@@ -90,8 +88,7 @@ class CoreTuiThemePolishTest {
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ofMillis(50));
-    CompletableFuture<ExtensionCatalogLoadResult> loadFuture =
-        new CompletableFuture<>();
+    CompletableFuture<ExtensionCatalogLoadResult> loadFuture = new CompletableFuture<>();
 
     controller.loadExtensionCatalogAsync(() -> loadFuture);
     loadFuture.complete(
@@ -135,8 +132,7 @@ class CoreTuiThemePolishTest {
     assertThat(renderToString(controller, 120, 32)).contains("Startup");
 
     Thread.sleep(20);
-    UiAction tickAction =
-        controller.onEvent(TickEvent.of(1, Duration.ofMillis(40)));
+    UiAction tickAction = controller.onEvent(TickEvent.of(1, Duration.ofMillis(40)));
     assertThat(tickAction.handled()).isTrue();
     assertThat(renderToString(controller, 120, 32)).doesNotContain("Startup");
   }
@@ -165,8 +161,7 @@ class CoreTuiThemePolishTest {
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ofMillis(50));
-    CompletableFuture<ExtensionCatalogLoadResult> loadFuture =
-        new CompletableFuture<>();
+    CompletableFuture<ExtensionCatalogLoadResult> loadFuture = new CompletableFuture<>();
     controller.loadExtensionCatalogAsync(() -> loadFuture);
     loadFuture.completeExceptionally(
         new IllegalStateException(
@@ -214,8 +209,7 @@ class CoreTuiThemePolishTest {
     }
   }
 
-  private static final class ControlledGenerationRunner
-      implements ProjectGenerationRunner {
+  private static final class ControlledGenerationRunner implements ProjectGenerationRunner {
     private final CompletableFuture<Path> future = new CompletableFuture<>();
 
     @Override

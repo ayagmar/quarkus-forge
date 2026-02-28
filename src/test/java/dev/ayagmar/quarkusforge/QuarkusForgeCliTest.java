@@ -107,8 +107,10 @@ class QuarkusForgeCliTest {
   void postHookDiagnosticsRedactsRawCommand() {
     String command = "QUARKUS_TOKEN=secret ./deploy.sh";
     var fields = QuarkusForgeCli.postHookDiagnosticFields(Path.of("/tmp/project"), command);
-    var valuesByName = java.util.Arrays.stream(fields).collect(java.util.stream.Collectors.toMap(
-        DiagnosticField::name, DiagnosticField::value));
+    var valuesByName =
+        java.util.Arrays.stream(fields)
+            .collect(
+                java.util.stream.Collectors.toMap(DiagnosticField::name, DiagnosticField::value));
 
     assertThat(valuesByName).containsEntry("directory", "/tmp/project");
     assertThat(valuesByName).containsEntry("command", "<redacted>");

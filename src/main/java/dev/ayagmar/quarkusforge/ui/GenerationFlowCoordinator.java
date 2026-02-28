@@ -114,9 +114,7 @@ final class GenerationFlowCoordinator {
   }
 
   private void onProgress(
-      long token,
-      GenerationProgressUpdate progressUpdate,
-      GenerationFlowCallbacks callbacks) {
+      long token, GenerationProgressUpdate progressUpdate, GenerationFlowCallbacks callbacks) {
     if (token != generationToken
         || callbacks.currentState() != CoreTuiController.GenerationState.LOADING) {
       return;
@@ -125,10 +123,7 @@ final class GenerationFlowCoordinator {
   }
 
   private void onCompleted(
-      long token,
-      Path generatedPath,
-      Throwable throwable,
-      GenerationFlowCallbacks callbacks) {
+      long token, Path generatedPath, Throwable throwable, GenerationFlowCallbacks callbacks) {
     if (token != generationToken
         || callbacks.currentState() != CoreTuiController.GenerationState.LOADING) {
       return;

@@ -41,7 +41,5 @@ interface HeadlessGenerationOperations {
   int mapHeadlessFailureToExitCode(Throwable throwable);
 
   CompletableFuture<Path> startGeneration(
-      GenerationRequest generationRequest,
-      Path outputPath,
-      Consumer<String> progressLineConsumer);
+      GenerationRequest generationRequest, Path outputPath, Consumer<String> progressLineConsumer);
 }

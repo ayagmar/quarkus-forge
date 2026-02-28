@@ -130,9 +130,7 @@ class CoreTuiExtensionSearchPilotTest {
         UiControllerTestHarness.controller(UiScheduler.immediate(), Duration.ZERO);
 
     controller.loadExtensionCatalogAsync(
-        () ->
-            CompletableFuture.completedFuture(
-                ExtensionCatalogLoadResult.live(List.of())));
+        () -> CompletableFuture.completedFuture(ExtensionCatalogLoadResult.live(List.of())));
 
     assertThat(controller.statusMessage()).isEqualTo("Using fallback extension catalog");
     assertThat(controller.filteredExtensionCount()).isEqualTo(7);
@@ -168,8 +166,7 @@ class CoreTuiExtensionSearchPilotTest {
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ZERO);
-    CompletableFuture<ExtensionCatalogLoadResult> loadFuture =
-        new CompletableFuture<>();
+    CompletableFuture<ExtensionCatalogLoadResult> loadFuture = new CompletableFuture<>();
     controller.loadExtensionCatalogAsync(() -> loadFuture);
     assertThat(controller.statusMessage()).isEqualTo("Loading extension catalog...");
 
@@ -192,8 +189,7 @@ class CoreTuiExtensionSearchPilotTest {
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ZERO);
-    CompletableFuture<ExtensionCatalogLoadResult> loadFuture =
-        new CompletableFuture<>();
+    CompletableFuture<ExtensionCatalogLoadResult> loadFuture = new CompletableFuture<>();
     controller.loadExtensionCatalogAsync(() -> loadFuture);
 
     loadFuture.complete(
@@ -201,8 +197,7 @@ class CoreTuiExtensionSearchPilotTest {
             List.of(new ExtensionDto("io.quarkus:quarkus-funqy", "Funqy", "funqy"))));
     scheduler.runAll();
 
-    UiAction tickAction =
-        controller.onEvent(TickEvent.of(1, Duration.ofMillis(40)));
+    UiAction tickAction = controller.onEvent(TickEvent.of(1, Duration.ofMillis(40)));
     assertThat(tickAction.handled()).isTrue();
     assertThat(controller.statusMessage()).contains("Loaded extension catalog from live API");
     assertThat(controller.filteredExtensionCount()).isEqualTo(1);
@@ -303,9 +298,7 @@ class CoreTuiExtensionSearchPilotTest {
               "io.quarkus:quarkus-test-" + suffix, "Test Extension " + suffix, "test-" + suffix));
     }
     controller.loadExtensionCatalogAsync(
-        () ->
-            CompletableFuture.completedFuture(
-                ExtensionCatalogLoadResult.live(manyExtensions)));
+        () -> CompletableFuture.completedFuture(ExtensionCatalogLoadResult.live(manyExtensions)));
 
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     for (int i = 0; i < 80; i++) {

@@ -30,9 +30,7 @@ final class UiControllerTestHarness {
   }
 
   static CoreTuiController controller(
-      UiScheduler scheduler,
-      Duration debounceDelay,
-      ProjectGenerationRunner generationRunner) {
+      UiScheduler scheduler, Duration debounceDelay, ProjectGenerationRunner generationRunner) {
     return CoreTuiController.from(
         UiTestFixtureFactory.defaultForgeUiState(), scheduler, debounceDelay, generationRunner);
   }
@@ -120,8 +118,7 @@ final class UiControllerTestHarness {
     }
   }
 
-  static final class ControlledGenerationRunner
-      implements ProjectGenerationRunner {
+  static final class ControlledGenerationRunner implements ProjectGenerationRunner {
     private int callCount;
     private Path lastOutputDirectory;
     private CompletableFuture<Path> future;

@@ -49,8 +49,7 @@ public final class CatalogDataService {
       throw new ApiContractException("Catalog load returned no extensions");
     }
 
-    CacheWriteOutcome writeOutcome =
-        snapshotCache.write(metadataSelection.metadata(), extensions);
+    CacheWriteOutcome writeOutcome = snapshotCache.write(metadataSelection.metadata(), extensions);
     String detailMessage = metadataSelection.detailMessage();
     if (!writeOutcome.written()) {
       String cacheWriteDetail =

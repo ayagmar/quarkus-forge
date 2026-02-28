@@ -136,5 +136,4 @@ final class ZipCentralDirectoryReader {
             | ((bytes[offset + 2] & 0xFF) << 16)
             | ((bytes[offset + 3] & 0xFF) << 24));
   }
-
 }

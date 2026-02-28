@@ -3,7 +3,6 @@ package dev.ayagmar.quarkusforge.ui;
 import dev.ayagmar.quarkusforge.api.BuildToolCodec;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
-import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.api.PlatformStream;
@@ -41,8 +40,6 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
-import java.util.function.BooleanSupplier;
-import java.util.function.Consumer;
 
 public final class CoreTuiController
     implements CompactInputRenderer, UiRoutingContext, GenerationFlowCallbacks {
@@ -537,7 +534,8 @@ public final class CoreTuiController
 
   @Override
   public UiAction handleTextInputFlow(KeyEvent keyEvent) {
-    if (isTextInputFocus(focusTarget) && handleTextInputKey(inputStates.get(focusTarget), keyEvent)) {
+    if (isTextInputFocus(focusTarget)
+        && handleTextInputKey(inputStates.get(focusTarget), keyEvent)) {
       if (focusTarget == FocusTarget.EXTENSION_SEARCH) {
         scheduleFilteredExtensionsRefresh();
       } else {
@@ -578,7 +576,8 @@ public final class CoreTuiController
   @Override
   public void onProgress(GenerationProgressUpdate progressUpdate) {
     generationStateTracker.updateProgress(progressUpdate);
-    String progressMessage = progressUpdate.message().isBlank() ? "working..." : progressUpdate.message();
+    String progressMessage =
+        progressUpdate.message().isBlank() ? "working..." : progressUpdate.message();
     statusMessage = "Generation in progress: " + progressMessage;
   }
 
@@ -2186,8 +2185,7 @@ public final class CoreTuiController
   }
 
   private void jumpToAdjacentCategorySection(boolean forward) {
-    SectionJumpResult jumpResult =
-        extensionCatalogState.jumpToAdjacentSection(forward);
+    SectionJumpResult jumpResult = extensionCatalogState.jumpToAdjacentSection(forward);
     if (!jumpResult.moved()) {
       statusMessage = forward ? "No next category section" : "No previous category section";
       return;
@@ -2196,8 +2194,7 @@ public final class CoreTuiController
   }
 
   private void handleExtensionListHierarchyLeft() {
-    SectionFocusResult parentSectionResult =
-        extensionCatalogState.focusParentSectionHeader();
+    SectionFocusResult parentSectionResult = extensionCatalogState.focusParentSectionHeader();
     if (parentSectionResult.moved()) {
       statusMessage = "Moved to section: " + parentSectionResult.sectionTitle();
       return;
@@ -2209,8 +2206,7 @@ public final class CoreTuiController
   }
 
   private void handleExtensionListHierarchyRight() {
-    SectionFocusResult childResult =
-        extensionCatalogState.focusFirstVisibleItemInSelectedSection();
+    SectionFocusResult childResult = extensionCatalogState.focusFirstVisibleItemInSelectedSection();
     if (childResult.moved()) {
       statusMessage = "Moved to first item in section: " + childResult.sectionTitle();
       return;
@@ -2463,5 +2459,4 @@ public final class CoreTuiController
     }
     return false;
   }
-
 }

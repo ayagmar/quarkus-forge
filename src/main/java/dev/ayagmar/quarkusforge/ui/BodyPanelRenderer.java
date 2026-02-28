@@ -442,5 +442,4 @@ final class BodyPanelRenderer {
     String suffix = row.collapsed() ? " (" + row.hiddenCount() + " hidden)" : "";
     return prefix + row.label() + suffix;
   }
-
 }

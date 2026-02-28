@@ -122,8 +122,7 @@ class MetadataCompatibilityValidatorTest {
             List.of("maven"),
             Map.of("maven", List.of("21", "25")),
             List.of(
-                new PlatformStream(
-                    "io.quarkus.platform:3.31", "3.31", true, List.of("21", "25"))));
+                new PlatformStream("io.quarkus.platform:3.31", "3.31", true, List.of("21", "25"))));
 
     ValidationReport report = validator.validate(request, metadata);
 

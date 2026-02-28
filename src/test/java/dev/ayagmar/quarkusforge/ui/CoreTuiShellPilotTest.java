@@ -867,9 +867,7 @@ class CoreTuiShellPilotTest {
         List.of("maven", "gradle"),
         Map.of("maven", List.of("17", "21", "25"), "gradle", List.of("21", "25")),
         List.of(
-            new PlatformStream(
-                "io.quarkus.platform:3.31", "3.31", true, List.of("17", "21", "25")),
-            new PlatformStream(
-                "io.quarkus.platform:3.20", "3.20", false, List.of("17", "21"))));
+            new PlatformStream("io.quarkus.platform:3.31", "3.31", true, List.of("17", "21", "25")),
+            new PlatformStream("io.quarkus.platform:3.20", "3.20", false, List.of("17", "21"))));
   }
 }

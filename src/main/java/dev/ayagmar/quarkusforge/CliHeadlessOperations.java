@@ -23,7 +23,8 @@ final class CliHeadlessOperations implements HeadlessGenerationOperations {
   }
 
   @Override
-  public CatalogData loadCatalogData() throws ExecutionException, InterruptedException, TimeoutException {
+  public CatalogData loadCatalogData()
+      throws ExecutionException, InterruptedException, TimeoutException {
     return cli.loadCatalogData();
   }
 
@@ -51,7 +52,8 @@ final class CliHeadlessOperations implements HeadlessGenerationOperations {
   }
 
   @Override
-  public void printValidationErrors(ValidationReport validation, String sourceLabel, String sourceDetail) {
+  public void printValidationErrors(
+      ValidationReport validation, String sourceLabel, String sourceDetail) {
     QuarkusForgeCli.printValidationErrors(validation, sourceLabel, sourceDetail);
   }
 

@@ -5,7 +5,6 @@ import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogDataService;
 import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
 import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
-import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
@@ -14,6 +13,8 @@ import dev.ayagmar.quarkusforge.archive.ArchiveException;
 import dev.ayagmar.quarkusforge.archive.OverwritePolicy;
 import dev.ayagmar.quarkusforge.archive.ProjectArchiveService;
 import dev.ayagmar.quarkusforge.archive.SafeZipExtractor;
+import dev.ayagmar.quarkusforge.diagnostics.DiagnosticField;
+import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.CliPrefillMapper;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
@@ -22,19 +23,12 @@ import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
 import dev.ayagmar.quarkusforge.domain.ValidationError;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
-import dev.ayagmar.quarkusforge.diagnostics.DiagnosticField;
-import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
-import dev.ayagmar.quarkusforge.ui.AppKeyActions;
-import dev.ayagmar.quarkusforge.ui.CoreTuiController;
 import dev.ayagmar.quarkusforge.ui.ExtensionCatalogLoadResult;
 import dev.ayagmar.quarkusforge.ui.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.ui.PostGenerationExitPlan;
-import dev.ayagmar.quarkusforge.ui.UiScheduler;
 import dev.ayagmar.quarkusforge.ui.UserPreferencesStore;
 import dev.tamboui.tui.TuiConfig;
-import dev.tamboui.tui.TuiRunner;
 import dev.tamboui.tui.bindings.Bindings;
-import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -51,13 +45,11 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.ParentCommand;
 
 @Command(
     name = "quarkus-forge",
@@ -317,13 +309,15 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       case OPEN_IDE -> {
         diagnostics.info(
             "tui.post-action.start",
-            df("action", "open-ide"), df("directory", generatedProjectDir.toString()));
+            df("action", "open-ide"),
+            df("directory", generatedProjectDir.toString()));
         executeShellCommand("code .", generatedProjectDir, diagnostics, "open-ide");
       }
       case OPEN_TERMINAL -> {
         diagnostics.info(
             "tui.post-action.start",
-            df("action", "open-terminal"), df("directory", generatedProjectDir.toString()));
+            df("action", "open-terminal"),
+            df("directory", generatedProjectDir.toString()));
         openInteractiveShell(generatedProjectDir, exitPlan.nextCommand(), diagnostics);
       }
       case QUIT, GENERATE_AGAIN -> {
@@ -397,8 +391,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
         });
   }
 
-  static java.util.function.BiFunction<
-          CatalogData, Throwable, ExtensionCatalogLoadResult>
+  static java.util.function.BiFunction<CatalogData, Throwable, ExtensionCatalogLoadResult>
       catalogLoadDiagnostics(DiagnosticLogger diagnostics) {
     return (catalogData, throwable) -> {
       if (throwable == null) {
@@ -424,8 +417,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     };
   }
 
-  private static ExtensionCatalogLoadResult toExtensionCatalogLoadResult(
-      CatalogData catalogData) {
+  private static ExtensionCatalogLoadResult toExtensionCatalogLoadResult(CatalogData catalogData) {
     return new ExtensionCatalogLoadResult(
         catalogData.extensions(),
         catalogData.source(),
@@ -598,10 +590,8 @@ public final class QuarkusForgeCli implements Callable<Integer> {
         "web", List.of("io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc"),
         "data",
             List.of(
-                "io.quarkus:quarkus-hibernate-orm-panache",
-                "io.quarkus:quarkus-jdbc-postgresql"),
-        "messaging",
-            List.of("io.quarkus:quarkus-messaging", "io.quarkus:quarkus-smallrye-health"));
+                "io.quarkus:quarkus-hibernate-orm-panache", "io.quarkus:quarkus-jdbc-postgresql"),
+        "messaging", List.of("io.quarkus:quarkus-messaging", "io.quarkus:quarkus-smallrye-health"));
   }
 
   private static String normalizePresetName(String presetName) {
@@ -611,8 +601,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     return presetName.trim().toLowerCase(Locale.ROOT);
   }
 
-  CatalogData loadCatalogData()
-      throws ExecutionException, InterruptedException, TimeoutException {
+  CatalogData loadCatalogData() throws ExecutionException, InterruptedException, TimeoutException {
     QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
     CatalogDataService catalogDataService =
         new CatalogDataService(

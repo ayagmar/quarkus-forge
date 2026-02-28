@@ -10,8 +10,7 @@ class FooterLinesComposerTest {
 
   @Test
   void generationInProgressHintUsesViewportSpecificCopy() {
-    FooterSnapshot snapshot =
-        snapshotBuilder().generationInProgress(true).build();
+    FooterSnapshot snapshot = snapshotBuilder().generationInProgress(true).build();
 
     List<String> narrow = composer.compose(80, snapshot);
     List<String> wide = composer.compose(120, snapshot);
@@ -63,8 +62,7 @@ class FooterLinesComposerTest {
 
   @Test
   void extensionListHintIncludesSectionJumpShortcut() {
-    FooterSnapshot snapshot =
-        snapshotBuilder().focusTarget(FocusTarget.EXTENSION_LIST).build();
+    FooterSnapshot snapshot = snapshotBuilder().focusTarget(FocusTarget.EXTENSION_LIST).build();
 
     List<String> lines = composer.compose(120, snapshot);
 
@@ -76,8 +74,7 @@ class FooterLinesComposerTest {
 
   @Test
   void extensionSearchHintIncludesEscapeBehavior() {
-    FooterSnapshot snapshot =
-        snapshotBuilder().focusTarget(FocusTarget.EXTENSION_SEARCH).build();
+    FooterSnapshot snapshot = snapshotBuilder().focusTarget(FocusTarget.EXTENSION_SEARCH).build();
 
     List<String> lines = composer.compose(120, snapshot);
 
@@ -86,8 +83,7 @@ class FooterLinesComposerTest {
 
   @Test
   void extensionListHintIncludesEscapeClearOrQuitBehavior() {
-    FooterSnapshot snapshot =
-        snapshotBuilder().focusTarget(FocusTarget.EXTENSION_LIST).build();
+    FooterSnapshot snapshot = snapshotBuilder().focusTarget(FocusTarget.EXTENSION_LIST).build();
 
     List<String> lines = composer.compose(120, snapshot);
 
@@ -118,8 +114,7 @@ class FooterLinesComposerTest {
 
   @Test
   void errorLineShownWhenActiveErrorExists() {
-    FooterSnapshot snapshot =
-        snapshotBuilder().activeErrorDetails("something went wrong").build();
+    FooterSnapshot snapshot = snapshotBuilder().activeErrorDetails("something went wrong").build();
 
     List<String> lines = composer.compose(120, snapshot);
 

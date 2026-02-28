@@ -20,7 +20,10 @@ final class ShellExecutor {
   }
 
   void execute(
-      String command, Path workingDirectory, String actionName, ShellExecutorDiagnostics diagnostics) {
+      String command,
+      Path workingDirectory,
+      String actionName,
+      ShellExecutorDiagnostics diagnostics) {
     int exitCode;
     try {
       List<String> invocation = commandInvocation(command, windowsOs.getAsBoolean());

@@ -166,7 +166,8 @@ public final class QuarkusApiClient {
       }
       String platformVersion = normalizeOptionalText(stream.platformVersion());
       boolean recommended = stream.recommended();
-      platformStreams.add(new PlatformStream(key, platformVersion, recommended, streamJavaVersions));
+      platformStreams.add(
+          new PlatformStream(key, platformVersion, recommended, streamJavaVersions));
     }
 
     if (versions.isEmpty()) {
@@ -197,7 +198,8 @@ public final class QuarkusApiClient {
       OpenApiSchemaPayload schema = parameter.schema();
       List<String> parameterEnum = schema == null ? null : schema.enumValues();
       if (parameterEnum == null) {
-        throw new ApiContractException("OpenAPI payload is missing '/api/download' build tool enum");
+        throw new ApiContractException(
+            "OpenAPI payload is missing '/api/download' build tool enum");
       }
       for (String value : parameterEnum) {
         String buildTool = BuildToolCodec.toUiValue(normalizeOptionalText(value));

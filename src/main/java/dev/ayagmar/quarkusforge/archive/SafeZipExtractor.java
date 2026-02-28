@@ -289,7 +289,6 @@ public final class SafeZipExtractor {
     return new CopyResult(copied, totalExtractedBytes);
   }
 
-
   static String normalizeEntryName(String rawName) {
     if (rawName == null || rawName.isBlank()) {
       throw new ArchiveException("ZIP entry name must not be blank");

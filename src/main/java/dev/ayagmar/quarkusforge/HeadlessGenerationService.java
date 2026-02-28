@@ -31,8 +31,7 @@ final class HeadlessGenerationService {
       HeadlessGenerationOperations operations) {
     DiagnosticLogger diagnostics = DiagnosticLogger.create(verbose);
     diagnostics.info(
-        "generate.start",
-        df("mode", command.dryRun || globalDryRun ? "dry-run" : "apply"));
+        "generate.start", df("mode", command.dryRun || globalDryRun ? "dry-run" : "apply"));
 
     CatalogData catalogData;
     try {
@@ -147,8 +146,10 @@ final class HeadlessGenerationService {
           df("extensionCount", extensionIds.size()));
       Path generatedProjectRoot =
           generationFuture.get(generationTimeout.toMillis(), TimeUnit.MILLISECONDS);
-      diagnostics.info("generate.execute.success", df("projectRoot", generatedProjectRoot.toString()));
-      System.out.println("Generation succeeded: " + generatedProjectRoot.toAbsolutePath().normalize());
+      diagnostics.info(
+          "generate.execute.success", df("projectRoot", generatedProjectRoot.toString()));
+      System.out.println(
+          "Generation succeeded: " + generatedProjectRoot.toAbsolutePath().normalize());
       return CommandLine.ExitCode.OK;
     } catch (CancellationException cancellationException) {
       diagnostics.error("generate.execute.cancelled", df("phase", "execution"));

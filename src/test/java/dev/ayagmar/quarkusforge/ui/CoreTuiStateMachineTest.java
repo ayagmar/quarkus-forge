@@ -127,10 +127,8 @@ class CoreTuiStateMachineTest {
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
-    CompletableFuture<ExtensionCatalogLoadResult> firstLoad =
-        new CompletableFuture<>();
-    CompletableFuture<ExtensionCatalogLoadResult> secondLoad =
-        new CompletableFuture<>();
+    CompletableFuture<ExtensionCatalogLoadResult> firstLoad = new CompletableFuture<>();
+    CompletableFuture<ExtensionCatalogLoadResult> secondLoad = new CompletableFuture<>();
 
     controller.loadExtensionCatalogAsync(() -> firstLoad);
     controller.loadExtensionCatalogAsync(() -> secondLoad);
@@ -148,8 +146,7 @@ class CoreTuiStateMachineTest {
     assertThat(controller.firstFilteredExtensionId()).contains("jdbc-postgresql");
   }
 
-  private static final class ControlledGenerationRunner
-      implements ProjectGenerationRunner {
+  private static final class ControlledGenerationRunner implements ProjectGenerationRunner {
     private int callCount;
     private CompletableFuture<Path> future;
 

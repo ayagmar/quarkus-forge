@@ -830,5 +830,4 @@ final class ExtensionCatalogState {
                 },
                 favoritesPersistenceExecutor);
   }
-
 }
