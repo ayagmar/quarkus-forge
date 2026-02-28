@@ -1,0 +1,47 @@
+= Diagnostics Policy
+:toc:
+
+== Purpose
+Define structured diagnostics expectations for `--verbose` mode and ensure event output consistency.
+
+== Output Contract
+* Default mode: human-oriented output only.
+* Verbose mode (`--verbose`): JSON-line diagnostics on `stderr` with stable core fields:
+  ** `event`
+  ** `level`
+  ** `traceId`
+  ** `timestamp`
+
+== Core Event Coverage
+[cols="2,3",options="header"]
+|===
+| Flow | Required event families
+
+| CLI startup and validation
+| `cli.start`, `cli.validation.failed`, `cli.dry-run.validated`
+
+| Metadata and catalog load
+| `metadata.load.success`, `metadata.load.fallback`, `catalog.load.start`, `catalog.load.success`, `catalog.load.failure`, `catalog.load.timeout`, `catalog.load.cancelled`
+
+| TUI session
+| `cli.tui.launch`, `tui.session.start`, `tui.session.exit`, `tui.session.failure`, `tui.session.quit.requested`
+
+| Generation execution
+| `generate.execute.start`, `generate.execute.success`, `generate.execute.failure`, `generate.execute.timeout`, `generate.execute.cancelled`
+
+| Post-generation actions
+| `tui.post-hook.start`, `tui.post-action.start`, `tui.post-action.success`, `tui.post-action.failure`
+|===
+
+== Consistency Rules
+* Event names are stable lowercase dot-separated identifiers.
+* Errors must emit actionable messages and preserve exit-code contract context.
+* Fallback transitions must emit explicit source/phase fields when applicable.
+* JSON encoding failures must emit `diagnostic.encoding.failure` and remain non-fatal.
+
+== Verification Commands
+[source,bash]
+----
+mvn -q -DskipITs -Dtest=QuarkusForgeGenerateCommandTest,QuarkusForgeCliTest,QuarkusForgeCliStartupMetadataTest test
+mvn -q -DskipITs test
+----

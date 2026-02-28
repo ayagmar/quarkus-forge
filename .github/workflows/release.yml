@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: .m2/repository
+          key: maven-${{ runner.os }}-${{ hashFiles('pom.xml', '.mvn/maven.config') }}
+          restore-keys: |
+            maven-${{ runner.os }}-
+
+      - name: Build docs
+        run: mvn -B -ntp -Pdocs generate-resources
+
+      - name: Run tests
+        run: mvn -B -ntp test
+
+      - name: Style and static checks
+        run: mvn -B -ntp spotless:check checkstyle:check
+
+  package-jvm:
+    needs: quality-gates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: .m2/repository
+          key: maven-${{ runner.os }}-${{ hashFiles('pom.xml', '.mvn/maven.config') }}
+          restore-keys: |
+            maven-${{ runner.os }}-
+
+      - name: Package JVM artifact
+        run: mvn -B -ntp -DskipTests package
+
+      - name: Upload JVM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: quarkus-forge-jvm
+          path: target/quarkus-forge.jar
