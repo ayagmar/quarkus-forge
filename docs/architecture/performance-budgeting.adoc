@@ -1,0 +1,59 @@
+= Performance Budget and Baseline
+:toc:
+
+== Purpose
+Define measurable runtime budgets and record an initial baseline for high-impact interactive and generation paths.
+
+== Measurement Notes
+* Baseline date: 2026-02-28.
+* Environment: local developer machine, Maven test execution.
+* `/usr/bin/time` is unavailable in this environment; shell timing fallback values were used.
+* Numbers below are baseline references, not release SLAs.
+
+== Runtime Budgets
+[cols="2,1,2",options="header"]
+|===
+| Path | Budget | Intent
+
+| UI interaction path (routing/filter/render pilot suite)
+| <= 4.0s per targeted pilot batch
+| Keep keyboard interactions responsive under deterministic pilot test load.
+
+| Headless generation path (CLI/service targeted suite)
+| <= 8.0s per targeted batch
+| Keep validation/load/generation orchestration responsive for scripted usage.
+
+| Archive extraction stress path (large archive targeted test)
+| <= 6.0s total test runtime
+| Keep large extraction flow within practical execution bounds without memory spikes.
+|===
+
+== Baseline Evidence
+Commands and captured timings:
+
+[source,bash]
+----
+mvn -q -DskipITs -Dtest=CoreTuiShellPilotTest,CoreTuiExtensionSearchPilotTest,CoreTuiGenerationFlowTest test
+# baseline.ui_pilots_seconds=2.811
+
+mvn -q -DskipITs -Dtest=QuarkusForgeGenerateCommandTest,HeadlessGenerationServiceTest test
+# baseline.cli_headless_seconds=6.591
+
+mvn -q -DskipITs -Dtest=SafeZipExtractorLargeArchiveTest test
+# baseline.archive_large_extract_seconds=4.439
+----
+
+== Bottleneck Decision
+No immediate bottleneck exceeded the initial budget thresholds in this baseline pass.
+
+Decision for this step:
+
+* Do not implement optimization changes yet.
+* Revisit optimization only when a measured path exceeds budget or regresses relative to this baseline.
+
+== Next Measurement Trigger
+Run this baseline set again when any of the following changes occur:
+
+. Event routing or rendering logic changes in `CoreTuiController`/`UiEventRouter`.
+. Catalog filtering/search behavior changes in `ExtensionCatalogState`/`ExtensionCatalogIndex`.
+. Generation/download/extraction flow changes in `HeadlessGenerationService` or archive services.
