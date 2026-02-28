@@ -289,7 +289,6 @@ public final class SafeZipExtractor {
     return new CopyResult(copied, totalExtractedBytes);
   }
 
-  private record CopyResult(long entryBytes, long totalExtractedBytes) {}
 
   static String normalizeEntryName(String rawName) {
     if (rawName == null || rawName.isBlank()) {
@@ -372,6 +371,4 @@ public final class SafeZipExtractor {
       // Best-effort cleanup path.
     }
   }
-
-  public record ExtractionResult(Path extractedRoot, int entryCount, long extractedBytes) {}
 }

@@ -108,7 +108,7 @@ public final class ProjectArchiveService {
                         throw new CancellationException("Generation cancelled before extraction");
                       }
                       progressListener.accept(ProgressStep.EXTRACTING_ARCHIVE);
-                      SafeZipExtractor.ExtractionResult result =
+                      ExtractionResult result =
                           zipExtractor.extract(archivePath, outputDirectory, overwritePolicy);
                       if (cancelled.getAsBoolean()) {
                         throw new CancellationException("Generation cancelled during extraction");
@@ -127,10 +127,5 @@ public final class ProjectArchiveService {
   public enum ProgressStep {
     REQUESTING_ARCHIVE,
     EXTRACTING_ARCHIVE
-  }
-
-  @FunctionalInterface
-  interface TempFileProvider {
-    Path create() throws IOException;
   }
 }

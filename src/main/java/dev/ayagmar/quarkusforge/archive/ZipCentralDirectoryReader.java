@@ -137,5 +137,4 @@ final class ZipCentralDirectoryReader {
             | ((bytes[offset + 3] & 0xFF) << 24));
   }
 
-  private record Eocd(int entries, long centralDirectorySize, long centralDirectoryOffset) {}
 }
