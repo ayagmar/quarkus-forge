@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - "v*"
+      - 'v*'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -25,7 +25,14 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "25"
+          java-version: '25'
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: site/package-lock.json
 
       - name: Cache Maven repository
         uses: actions/cache@v4
@@ -36,7 +43,7 @@ jobs:
             maven-${{ runner.os }}-
 
       - name: Build docs
-        run: mvn -B -ntp -Pdocs generate-resources
+        run: npm ci --prefix site && npm run docs:build --prefix site
 
       - name: Run tests
         run: mvn -B -ntp test
@@ -56,7 +63,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "25"
+          java-version: '25'
 
       - name: Cache Maven repository
         uses: actions/cache@v4
@@ -69,8 +76,124 @@ jobs:
       - name: Package JVM artifact
         run: mvn -B -ntp -DskipTests package
 
+      - name: Rename JVM artifact
+        run: cp target/quarkus-forge.jar target/quarkus-forge-jvm.jar
+
       - name: Upload JVM artifact
         uses: actions/upload-artifact@v4
         with:
           name: quarkus-forge-jvm
-          path: target/quarkus-forge.jar
+          path: target/quarkus-forge-jvm.jar
+
+  package-native:
+    needs: quality-gates
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x86_64
+            ext: ''
+          - os: macos-latest
+            platform: macos-aarch64
+            ext: ''
+          - os: windows-latest
+            platform: windows-x86_64
+            ext: '.exe'
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up GraalVM 25
+        uses: graalvm/setup-graalvm@v1
+        with:
+          distribution: graalvm
+          java-version: '25'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Visual Studio Build Tools
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: .m2/repository
+          key: maven-${{ runner.os }}-${{ hashFiles('pom.xml', '.mvn/maven.config') }}
+          restore-keys: |
+            maven-${{ runner.os }}-
+
+      - name: Build native artifact
+        run: mvn -B -ntp -Pnative -Dnative.skip=false -DskipTests package
+
+      - name: Rename native artifact
+        shell: bash
+        run: |
+          cp target/quarkus-forge${{ matrix.ext }} target/quarkus-forge-${{ matrix.platform }}${{ matrix.ext }}
+
+      - name: Make native artifact executable
+        if: runner.os != 'Windows'
+        run: chmod +x target/quarkus-forge-${{ matrix.platform }}${{ matrix.ext }}
+
+      - name: Upload native artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: quarkus-forge-native-${{ matrix.platform }}
+          path: target/quarkus-forge-${{ matrix.platform }}${{ matrix.ext }}
+
+  package-jbang-catalog:
+    needs: quality-gates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate JBang catalog
+        env:
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          mkdir -p dist
+          cat > dist/jbang-catalog.json <<EOF
+          {
+            "aliases": {
+              "quarkus-forge": {
+                "script-ref": "https://github.com/${REPO}/releases/download/${TAG}/quarkus-forge-jvm.jar",
+                "description": "Keyboard-first Quarkus project generator TUI",
+                "java-options": [
+                  "--enable-native-access=ALL-UNNAMED"
+                ]
+              }
+            }
+          }
+          EOF
+
+      - name: Upload JBang catalog
+        uses: actions/upload-artifact@v4
+        with:
+          name: quarkus-forge-jbang-catalog
+          path: dist/jbang-catalog.json
+
+  publish-release:
+    needs:
+      - package-jvm
+      - package-native
+      - package-jbang-catalog
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Make native artifacts executable
+        run: chmod +x artifacts/quarkus-forge-linux-* artifacts/quarkus-forge-macos-* || true
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
