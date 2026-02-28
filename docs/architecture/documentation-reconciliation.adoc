@@ -1,0 +1,50 @@
+= Documentation Reconciliation Record
+:toc:
+
+== Purpose
+Record the post-refactor documentation reconciliation pass against current runtime behavior.
+
+== Reconciled Areas
+[cols="2,2,1",options="header"]
+|===
+| Area | Primary docs | Status
+
+| CLI and headless behavior
+| `docs/cli-generate.md`, `docs/adoc/cli/headless-mode.adoc`
+| Reconciled
+
+| TUI shell and keybindings
+| `docs/ui-shell.md`, `docs/adoc/ui/keybindings.adoc`
+| Reconciled
+
+| Theme tokens and fallback behavior
+| `docs/ui-theme.md`, `docs/adoc/ui/theming.adoc`
+| Reconciled
+
+| Architecture and phase gates
+| `docs/architecture/*`, `docs/adoc/architecture/*`
+| Reconciled
+
+| Docs site entrypoint
+| `docs/site/index.html`, generated `target/docs/*`
+| Reconciled
+|===
+
+== Runtime-Alignment Checks
+
+* Exit code mapping remains documented as `0/2/3/4/130` for headless flow outcomes.
+* Catalog/metadata fallback semantics remain documented as `live -> cache -> snapshot`.
+* Keybinding docs use runtime terms (`Actions`, `AppKeyActions`, `TuiConfig` profile).
+* Theming docs capture semantic token catalog and fallback precedence from `UiTheme`.
+* Archive safety decision and platform validation constraints are documented under `docs/architecture/`.
+
+== Verification Commands
+[source,bash]
+----
+mvn -q -Pdocs generate-resources
+mvn -q -DskipITs test
+mvn -q spotless:check checkstyle:check
+----
+
+== Outcome
+Documentation is aligned with the current runtime contracts and refactor outputs for the completed phases.
