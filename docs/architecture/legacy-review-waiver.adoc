@@ -1,0 +1,23 @@
+= Legacy Fresh-Eyes Review Waiver Record
+:toc:
+
+== Purpose
+Record explicit waiver status for legacy post-hoc review logs that were not preserved in committed tracker artifacts.
+
+== Waiver Scope
+This waiver applies to carried legacy tracker obligations originating from deleted planning trackers (`docs/ai/progress.md`, `docs/ai/progress_review.md`, `docs/ai/scratch/BACKLOG.md`).
+
+== Rationale
+* Legacy review logs are not available in committed repository history for direct reconciliation.
+* Reconstructing exact historical review artifacts from deleted trackers would be speculative.
+* A forward quality gate was added to prevent this gap recurring (`docs/architecture/regression-baseline-checklist.adoc`, section `Legacy Review Closure Gate`).
+
+== Waiver Decision
+* Post-hoc review log recreation is intentionally skipped for historical entries covered by the deleted trackers.
+* This waiver is accepted only for that historical gap and does not apply to future phases.
+
+== Forward Policy
+* For future completed phases, either:
+  ** run post-hoc read-only review and record findings, or
+  ** record explicit waiver with rationale.
+* Phase completion must be blocked until one of the above is recorded.
