@@ -31,3 +31,8 @@ Track key behavior-parity flows during refactor phases.
 
 == Usage
 Run this checklist at the end of each phase and record pass/fail evidence in the active phase progress notes.
+
+== Legacy Review Closure Gate
+[ ] For completed legacy issues without review logs, run a post-hoc read-only review and record findings.
+[ ] If a post-hoc review is intentionally skipped, record an explicit waiver with rationale.
+[ ] Do not mark a phase complete until one of the two items above is recorded for each carried legacy issue.
