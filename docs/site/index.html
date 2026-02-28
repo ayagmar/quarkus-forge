@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quarkus Forge Docs</title>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --panel: #111827;
+        --text: #e5e7eb;
+        --muted: #94a3b8;
+        --accent: #22d3ee;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top right, #1e293b, #0f172a 45%);
+        color: var(--text);
+      }
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 2rem 1rem 3rem;
+      }
+      h1,
+      h2 {
+        margin: 0 0 0.75rem;
+      }
+      p {
+        color: var(--muted);
+      }
+      .grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      }
+      .card {
+        background: color-mix(in srgb, var(--panel) 86%, #000 14%);
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 1rem;
+      }
+      ul {
+        margin: 0;
+        padding-left: 1.1rem;
+      }
+      li + li {
+        margin-top: 0.4rem;
+      }
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      a:hover,
+      a:focus-visible {
+        text-decoration: underline;
+      }
+      code {
+        color: #cbd5e1;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Quarkus Forge Documentation</h1>
+      <p>
+        Landing shell for generated AsciiDoc output and operational quickstarts.
+      </p>
+
+      <div class="grid">
+        <section class="card" aria-labelledby="generated-docs">
+          <h2 id="generated-docs">Generated AsciiDoc</h2>
+          <ul>
+            <li><a href="../../target/docs/index.html">Documentation index</a></li>
+            <li>
+              <a href="../../target/docs/architecture/overview.html">Architecture overview</a>
+            </li>
+            <li>
+              <a href="../../target/docs/architecture/refactor-roadmap.html">Refactor roadmap</a>
+            </li>
+            <li><a href="../../target/docs/ui/keybindings.html">UI keybindings</a></li>
+            <li><a href="../../target/docs/ui/theming.html">UI theming</a></li>
+            <li><a href="../../target/docs/cli/headless-mode.html">CLI headless mode</a></li>
+            <li><a href="../../target/docs/testing/strategy.html">Testing strategy</a></li>
+          </ul>
+        </section>
+
+        <section class="card" aria-labelledby="quickstarts">
+          <h2 id="quickstarts">Quickstarts</h2>
+          <ul>
+            <li><a href="../bootstrap.md">Bootstrap and runtime setup</a></li>
+            <li><a href="../ui-shell.md">Core TUI shell usage</a></li>
+            <li><a href="../cli-generate.md">Headless generate command</a></li>
+            <li><a href="../catalog-cache.md">Catalog cache behavior</a></li>
+          </ul>
+        </section>
+      </div>
+
+      <section class="card" aria-labelledby="build-docs" style="margin-top: 1rem">
+        <h2 id="build-docs">Build Docs Locally</h2>
+        <p>Generate AsciiDoc HTML under <code>target/docs</code>:</p>
+        <pre><code>mvn -q -Pdocs generate-resources</code></pre>
+      </section>
+    </main>
+  </body>
+</html>
