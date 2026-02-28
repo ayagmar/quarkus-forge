@@ -2,12 +2,10 @@
 :toc:
 :toclevels: 2
 
-This documentation set is scaffolded from the deep refactor plan.
+End-user documentation for Quarkus Forge usage and operation.
 
 == Modules
 
-* xref:architecture/overview.adoc[Architecture Overview]
-* xref:architecture/refactor-roadmap.adoc[Refactor Roadmap]
 * xref:ui/keybindings.adoc[UI Keybindings]
 * xref:ui/theming.adoc[UI Theming]
 * xref:cli/headless-mode.adoc[CLI Headless Mode]
