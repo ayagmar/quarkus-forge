@@ -30,9 +30,7 @@ import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.ResizeEvent;
 import dev.tamboui.tui.event.TickEvent;
 import dev.tamboui.widgets.block.Block;
-import dev.tamboui.widgets.block.BorderType;
 import dev.tamboui.widgets.block.Borders;
-import dev.tamboui.widgets.gauge.LineGauge;
 import dev.tamboui.widgets.input.TextInputState;
 import dev.tamboui.widgets.paragraph.Paragraph;
 import java.nio.file.Path;
@@ -502,11 +500,13 @@ public final class CoreTuiController
       focusExtensionSearch();
       return UiAction.handled(false);
     }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && (keyEvent.isLeft() || UiKeyMatchers.isVimLeftKey(keyEvent))) {
+    if (focusTarget == FocusTarget.EXTENSION_LIST
+        && (keyEvent.isLeft() || UiKeyMatchers.isVimLeftKey(keyEvent))) {
       handleExtensionListHierarchyLeft();
       return UiAction.handled(false);
     }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && (keyEvent.isRight() || UiKeyMatchers.isVimRightKey(keyEvent))) {
+    if (focusTarget == FocusTarget.EXTENSION_LIST
+        && (keyEvent.isRight() || UiKeyMatchers.isVimRightKey(keyEvent))) {
       handleExtensionListHierarchyRight();
       return UiAction.handled(false);
     }
@@ -528,23 +528,28 @@ public final class CoreTuiController
       toggleFavoriteAtSelection();
       return UiAction.handled(false);
     }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && AppKeyActions.isCategoryFilterCycleKey(keyEvent)) {
+    if (focusTarget == FocusTarget.EXTENSION_LIST
+        && AppKeyActions.isCategoryFilterCycleKey(keyEvent)) {
       cycleCategoryFilter();
       return UiAction.handled(false);
     }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && AppKeyActions.isPresetFilterCycleKey(keyEvent)) {
+    if (focusTarget == FocusTarget.EXTENSION_LIST
+        && AppKeyActions.isPresetFilterCycleKey(keyEvent)) {
       cyclePresetFilter();
       return UiAction.handled(false);
     }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && AppKeyActions.isClearSelectedExtensionsKey(keyEvent)) {
+    if (focusTarget == FocusTarget.EXTENSION_LIST
+        && AppKeyActions.isClearSelectedExtensionsKey(keyEvent)) {
       clearSelectedExtensions();
       return UiAction.handled(false);
     }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && AppKeyActions.isCategoryCollapseToggleKey(keyEvent)) {
+    if (focusTarget == FocusTarget.EXTENSION_LIST
+        && AppKeyActions.isCategoryCollapseToggleKey(keyEvent)) {
       toggleCategoryCollapseAtSelection();
       return UiAction.handled(false);
     }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && AppKeyActions.isExpandAllCategoriesKey(keyEvent)) {
+    if (focusTarget == FocusTarget.EXTENSION_LIST
+        && AppKeyActions.isExpandAllCategoriesKey(keyEvent)) {
       expandAllCategories();
       return UiAction.handled(false);
     }
@@ -949,42 +954,8 @@ public final class CoreTuiController
   }
 
   private void renderCommandPalette(Frame frame, Rect viewport) {
-    if (viewport.width() < 28 || viewport.height() < 10) {
-      return;
-    }
-    List<String> lines = new ArrayList<>();
-    for (int i = 0; i < COMMAND_PALETTE_ENTRIES.size(); i++) {
-      CommandPaletteEntry entry = COMMAND_PALETTE_ENTRIES.get(i);
-      String prefix = i == commandPaletteSelection ? "> " : "  ";
-      lines.add(prefix + (i + 1) + ". " + entry.label() + " [" + entry.shortcut() + "]");
-    }
-    lines.add("");
-    lines.add("Enter: run | 1-9: quick run | Up/Down: navigate | Esc or Ctrl+P: close");
-
-    int maxLineLength = lines.stream().mapToInt(String::length).max().orElse(40);
-    int width = Math.min(Math.max(56, maxLineLength + 4), viewport.width() - 2);
-    int height = Math.min(lines.size() + 2, viewport.height() - 2);
-    Rect overlayArea =
-        new Rect(
-            viewport.x() + Math.max(0, (viewport.width() - width) / 2),
-            viewport.y() + Math.max(0, (viewport.height() - height) / 2),
-            width,
-            height);
-
-    Paragraph palette =
-        Paragraph.builder()
-            .text(String.join("\n", lines))
-            .style(Style.EMPTY.fg(theme.color("text")).bg(theme.color("base")))
-            .overflow(Overflow.ELLIPSIS)
-            .block(
-                Block.builder()
-                    .title("Command Palette [focus]")
-                    .borders(Borders.ALL)
-                    .borderType(BorderType.ROUNDED)
-                    .borderStyle(Style.EMPTY.fg(theme.color("focus")).bold())
-                    .build())
-            .build();
-    frame.renderWidget(palette, overlayArea);
+    OverlayRenderer.renderCommandPalette(
+        frame, viewport, theme, COMMAND_PALETTE_ENTRIES, commandPaletteSelection);
   }
 
   private boolean isGenerationActive() {
@@ -993,105 +964,17 @@ public final class CoreTuiController
   }
 
   private void renderGenerationOverlay(Frame frame, Rect viewport) {
-    if (viewport.width() < 30 || viewport.height() < 8) {
-      return;
-    }
-    int width = Math.min(60, viewport.width() - 4);
-    int height = 7;
-    Rect overlayArea =
-        new Rect(
-            viewport.x() + Math.max(0, (viewport.width() - width) / 2),
-            viewport.y() + Math.max(0, (viewport.height() - height) / 2),
-            width,
-            height);
-
-    double ratio = generationStateTracker.progressRatio();
-    String phase = generationStateTracker.progressPhase();
-    int percent = (int) (ratio * 100);
-    String percentLabel = percent + "%";
-
-    Block overlayBlock =
-        Block.builder()
-            .title("Generating Project (" + percentLabel + ")")
-            .borders(Borders.ALL)
-            .borderType(BorderType.ROUNDED)
-            .borderStyle(Style.EMPTY.fg(theme.color("accent")).bold())
-            .build();
-
-    Rect inner = overlayBlock.inner(overlayArea);
-    frame.renderWidget(overlayBlock, overlayArea);
-
-    if (inner.isEmpty() || inner.height() < 4) {
-      return;
-    }
-
-    List<Rect> rows =
-        Layout.vertical()
-            .constraints(
-                Constraint.length(1), Constraint.length(1), Constraint.length(1), Constraint.fill())
-            .split(inner);
-
-    Paragraph phaseLine =
-        Paragraph.builder()
-            .text("  " + phase)
-            .style(Style.EMPTY.fg(theme.color("text")).bg(theme.color("base")))
-            .overflow(Overflow.ELLIPSIS)
-            .build();
-    frame.renderWidget(phaseLine, rows.get(0));
-
-    LineGauge gauge =
-        LineGauge.builder()
-            .ratio(ratio)
-            .label("  ")
-            .lineSet(LineGauge.THICK)
-            .filledStyle(Style.EMPTY.fg(theme.color("accent")))
-            .unfilledStyle(Style.EMPTY.fg(theme.color("muted")))
-            .style(Style.EMPTY.bg(theme.color("base")))
-            .build();
-    frame.renderWidget(gauge, rows.get(1));
-
-    Paragraph emptyLine =
-        Paragraph.builder().text("").style(Style.EMPTY.bg(theme.color("base"))).build();
-    frame.renderWidget(emptyLine, rows.get(2));
-
-    Paragraph hintLine =
-        Paragraph.builder()
-            .text("  Esc: cancel")
-            .style(Style.EMPTY.fg(theme.color("muted")).bg(theme.color("base")))
-            .overflow(Overflow.ELLIPSIS)
-            .build();
-    frame.renderWidget(hintLine, rows.get(3));
+    OverlayRenderer.renderGenerationOverlay(
+        frame,
+        viewport,
+        theme,
+        generationStateTracker.progressRatio(),
+        generationStateTracker.progressPhase());
   }
 
   private void renderHelpOverlay(Frame frame, Rect viewport) {
-    if (viewport.width() < 36 || viewport.height() < 12) {
-      return;
-    }
-    List<String> helpLines = helpOverlayLines();
-    int maxLineLength = helpLines.stream().mapToInt(String::length).max().orElse(40);
-    int width = Math.min(Math.max(68, maxLineLength + 4), viewport.width() - 2);
-    int height = Math.min(helpLines.size() + 2, viewport.height() - 2);
-    Rect overlayArea =
-        new Rect(
-            viewport.x() + Math.max(0, (viewport.width() - width) / 2),
-            viewport.y() + Math.max(0, (viewport.height() - height) / 2),
-            width,
-            height);
-
-    Paragraph helpOverlay =
-        Paragraph.builder()
-            .text(String.join("\n", helpLines))
-            .style(Style.EMPTY.fg(theme.color("text")).bg(theme.color("base")))
-            .overflow(Overflow.ELLIPSIS)
-            .block(
-                Block.builder()
-                    .title(helpOverlayTitle())
-                    .borders(Borders.ALL)
-                    .borderType(BorderType.ROUNDED)
-                    .borderStyle(Style.EMPTY.fg(theme.color("focus")).bold())
-                    .build())
-            .build();
-    frame.renderWidget(helpOverlay, overlayArea);
+    OverlayRenderer.renderHelpOverlay(
+        frame, viewport, theme, helpOverlayLines(), helpOverlayTitle());
   }
 
   private List<String> helpOverlayLines() {
@@ -1168,34 +1051,7 @@ public final class CoreTuiController
   }
 
   private void renderStartupStatusOverlay(Frame frame, Rect viewport) {
-    if (viewport.width() < 44 || viewport.height() < 12) {
-      return;
-    }
-    List<String> lines = startupStatusLines();
-    int maxLineLength = lines.stream().mapToInt(String::length).max().orElse(40);
-    int width = Math.min(Math.max(64, maxLineLength + 4), viewport.width() - 2);
-    int height = Math.min(lines.size() + 2, viewport.height() - 2);
-    Rect overlayArea =
-        new Rect(
-            viewport.x() + Math.max(0, (viewport.width() - width) / 2),
-            viewport.y() + Math.max(0, (viewport.height() - height) / 2),
-            width,
-            height);
-
-    Paragraph overlay =
-        Paragraph.builder()
-            .text(String.join("\n", lines))
-            .style(Style.EMPTY.fg(theme.color("text")).bg(theme.color("base")))
-            .overflow(Overflow.ELLIPSIS)
-            .block(
-                Block.builder()
-                    .title("Startup")
-                    .borders(Borders.ALL)
-                    .borderType(BorderType.ROUNDED)
-                    .borderStyle(Style.EMPTY.fg(theme.color("accent")).bold())
-                    .build())
-            .build();
-    frame.renderWidget(overlay, overlayArea);
+    OverlayRenderer.renderStartupOverlay(frame, viewport, theme, startupStatusLines());
   }
 
   private List<String> startupStatusLines() {
@@ -1217,82 +1073,12 @@ public final class CoreTuiController
 
   private void renderPostGenerationOverlay(Frame frame, Rect viewport) {
     if (githubVisibilityMenuVisible) {
-      renderGitHubVisibilityOverlay(frame, viewport);
+      OverlayRenderer.renderGitHubVisibilityOverlay(
+          frame, viewport, theme, GITHUB_VISIBILITY_LABELS, githubVisibilitySelection);
       return;
     }
-    if (viewport.width() < 36 || viewport.height() < 10) {
-      return;
-    }
-    List<String> lines = new ArrayList<>();
-    for (int i = 0; i < POST_GENERATION_ACTION_LABELS.size(); i++) {
-      String prefix = i == postGenerationActionSelection ? "> " : "  ";
-      lines.add(prefix + (i + 1) + ". " + POST_GENERATION_ACTION_LABELS.get(i));
-    }
-    lines.add("");
-    lines.add("Enter: select | Up/Down or j/k: navigate | Esc: quit");
-
-    int maxLineLength = lines.stream().mapToInt(String::length).max().orElse(40);
-    int width = Math.min(Math.max(58, maxLineLength + 4), viewport.width() - 2);
-    int height = Math.min(lines.size() + 2, viewport.height() - 2);
-    Rect overlayArea =
-        new Rect(
-            viewport.x() + Math.max(0, (viewport.width() - width) / 2),
-            viewport.y() + Math.max(0, (viewport.height() - height) / 2),
-            width,
-            height);
-
-    Paragraph overlay =
-        Paragraph.builder()
-            .text(String.join("\n", lines))
-            .style(Style.EMPTY.fg(theme.color("text")).bg(theme.color("base")))
-            .overflow(Overflow.ELLIPSIS)
-            .block(
-                Block.builder()
-                    .title("Project Generated [focus]")
-                    .borders(Borders.ALL)
-                    .borderType(BorderType.ROUNDED)
-                    .borderStyle(Style.EMPTY.fg(theme.color("focus")).bold())
-                    .build())
-            .build();
-    frame.renderWidget(overlay, overlayArea);
-  }
-
-  private void renderGitHubVisibilityOverlay(Frame frame, Rect viewport) {
-    if (viewport.width() < 44 || viewport.height() < 10) {
-      return;
-    }
-    List<String> lines = new ArrayList<>();
-    for (int index = 0; index < GITHUB_VISIBILITY_LABELS.size(); index++) {
-      String prefix = index == githubVisibilitySelection ? "> " : "  ";
-      lines.add(prefix + (index + 1) + ". " + GITHUB_VISIBILITY_LABELS.get(index));
-    }
-    lines.add("");
-    lines.add("Enter: confirm | Up/Down or j/k: navigate | Esc: back");
-
-    int maxLineLength = lines.stream().mapToInt(String::length).max().orElse(50);
-    int width = Math.min(Math.max(66, maxLineLength + 4), viewport.width() - 2);
-    int height = Math.min(lines.size() + 2, viewport.height() - 2);
-    Rect overlayArea =
-        new Rect(
-            viewport.x() + Math.max(0, (viewport.width() - width) / 2),
-            viewport.y() + Math.max(0, (viewport.height() - height) / 2),
-            width,
-            height);
-
-    Paragraph overlay =
-        Paragraph.builder()
-            .text(String.join("\n", lines))
-            .style(Style.EMPTY.fg(theme.color("text")).bg(theme.color("base")))
-            .overflow(Overflow.ELLIPSIS)
-            .block(
-                Block.builder()
-                    .title("Publish to GitHub [focus]")
-                    .borders(Borders.ALL)
-                    .borderType(BorderType.ROUNDED)
-                    .borderStyle(Style.EMPTY.fg(theme.color("focus")).bold())
-                    .build())
-            .build();
-    frame.renderWidget(overlay, overlayArea);
+    OverlayRenderer.renderPostGenerationOverlay(
+        frame, viewport, theme, POST_GENERATION_ACTION_LABELS, postGenerationActionSelection);
   }
 
   private FooterSnapshot footerSnapshot() {
@@ -2488,52 +2274,47 @@ public final class CoreTuiController
   }
 
   private static boolean isCatalogReloadKey(KeyEvent keyEvent) {
-    return AppKeyActions.AppKeyActions.isCatalogReloadKey(keyEvent);
+    return AppKeyActions.isCatalogReloadKey(keyEvent);
   }
 
   private static boolean isGenerateShortcutKey(KeyEvent keyEvent) {
-    return AppKeyActions.AppKeyActions.isGenerateShortcutKey(keyEvent);
+    return AppKeyActions.isGenerateShortcutKey(keyEvent);
   }
 
   private static boolean isFavoriteToggleKey(KeyEvent keyEvent) {
-    return AppKeyActions.AppKeyActions.isFavoriteToggleKey(keyEvent);
+    return AppKeyActions.isFavoriteToggleKey(keyEvent);
   }
 
   private static boolean isClearSelectedExtensionsKey(KeyEvent keyEvent) {
-    return AppKeyActions.AppKeyActions.isClearSelectedExtensionsKey(keyEvent);
+    return AppKeyActions.isClearSelectedExtensionsKey(keyEvent);
   }
 
   private static boolean isCategoryFilterCycleKey(KeyEvent keyEvent) {
-    return AppKeyActions.AppKeyActions.isCategoryFilterCycleKey(keyEvent);
+    return AppKeyActions.isCategoryFilterCycleKey(keyEvent);
   }
 
   private static boolean isJumpToFavoriteKey(KeyEvent keyEvent) {
-    return AppKeyActions.AppKeyActions.isJumpToFavoriteKey(keyEvent);
+    return AppKeyActions.isJumpToFavoriteKey(keyEvent);
   }
 
   private static boolean isFavoritesFilterToggleKey(KeyEvent keyEvent) {
-    return AppKeyActions.AppKeyActions.isFavoritesFilterToggleKey(keyEvent);
+    return AppKeyActions.isFavoritesFilterToggleKey(keyEvent);
   }
 
   private static boolean isPresetFilterCycleKey(KeyEvent keyEvent) {
-    return AppKeyActions.AppKeyActions.isPresetFilterCycleKey(keyEvent);
+    return AppKeyActions.isPresetFilterCycleKey(keyEvent);
   }
 
   private static boolean isCategoryCollapseToggleKey(KeyEvent keyEvent) {
-    return AppKeyActions.AppKeyActions.isCategoryCollapseToggleKey(keyEvent);
+    return AppKeyActions.isCategoryCollapseToggleKey(keyEvent);
   }
 
   private static boolean isExpandAllCategoriesKey(KeyEvent keyEvent) {
-    return AppKeyActions.AppKeyActions.isExpandAllCategoriesKey(keyEvent);
+    return AppKeyActions.isExpandAllCategoriesKey(keyEvent);
   }
 
-
-
-
-
-
   private static boolean isHelpOverlayToggleKey(KeyEvent keyEvent) {
-    return AppKeyActions.AppKeyActions.isHelpOverlayToggleKey(keyEvent);
+    return AppKeyActions.isHelpOverlayToggleKey(keyEvent);
   }
 
   private static boolean shouldToggleHelpOverlay(KeyEvent keyEvent, FocusTarget currentFocus) {
@@ -2545,7 +2326,6 @@ public final class CoreTuiController
     }
     return !isTextInputFocus(currentFocus);
   }
-
 
   private boolean shouldClearExtensionSearchOnCancel(KeyEvent keyEvent) {
     if (!keyEvent.isCancel() || isGenerationInProgress()) {
@@ -2616,7 +2396,7 @@ public final class CoreTuiController
   }
 
   private static boolean isErrorDetailsToggleKey(KeyEvent keyEvent) {
-    return AppKeyActions.AppKeyActions.isErrorDetailsToggleKey(keyEvent);
+    return AppKeyActions.isErrorDetailsToggleKey(keyEvent);
   }
 
   private static boolean isUpNavigation(KeyEvent keyEvent) {

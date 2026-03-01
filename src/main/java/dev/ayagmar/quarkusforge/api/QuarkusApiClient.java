@@ -82,8 +82,7 @@ public final class QuarkusApiClient {
     CompletableFuture<StreamsMetadata> streamsMetadataFuture =
         sendWithRetry(streamsRequest, BodyHandlers.ofString(StandardCharsets.UTF_8), 1)
             .thenApply(this::assertSuccessful)
-            .thenApply(
-                response -> ApiPayloadParser.parseStreamsMetadataPayload(response.body()));
+            .thenApply(response -> ApiPayloadParser.parseStreamsMetadataPayload(response.body()));
 
     CompletableFuture<List<String>> buildToolsFuture =
         sendWithRetry(openApiRequest, BodyHandlers.ofString(StandardCharsets.UTF_8), 1)
