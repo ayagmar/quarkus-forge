@@ -24,25 +24,14 @@ final class CliCommandTestSupport {
   }
 
   static CommandResult runCommand(RuntimeConfig runtimeConfig, String... args) {
-    PrintStream originalOut = System.out;
-    PrintStream originalErr = System.err;
-    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
-    ByteArrayOutputStream stderr = new ByteArrayOutputStream();
-    try {
-      System.setOut(new PrintStream(stdout, true, StandardCharsets.UTF_8));
-      System.setErr(new PrintStream(stderr, true, StandardCharsets.UTF_8));
-      int exitCode = QuarkusForgeCli.runWithArgs(args, runtimeConfig);
-      return new CommandResult(
-          exitCode,
-          stdout.toString(StandardCharsets.UTF_8),
-          stderr.toString(StandardCharsets.UTF_8));
-    } finally {
-      System.setOut(originalOut);
-      System.setErr(originalErr);
-    }
+    return captureCommandOutput(() -> QuarkusForgeCli.runWithArgs(args, runtimeConfig));
   }
 
   static CommandResult runSmoke(RuntimeConfig runtimeConfig, boolean verbose) {
+    return captureCommandOutput(() -> new QuarkusForgeCli(runtimeConfig).runSmokeForTest(verbose));
+  }
+
+  private static CommandResult captureCommandOutput(java.util.concurrent.Callable<Integer> action) {
     PrintStream originalOut = System.out;
     PrintStream originalErr = System.err;
     ByteArrayOutputStream stdout = new ByteArrayOutputStream();
@@ -50,11 +39,13 @@ final class CliCommandTestSupport {
     try {
       System.setOut(new PrintStream(stdout, true, StandardCharsets.UTF_8));
       System.setErr(new PrintStream(stderr, true, StandardCharsets.UTF_8));
-      int exitCode = new QuarkusForgeCli(runtimeConfig).runSmokeForTest(verbose);
+      int exitCode = action.call();
       return new CommandResult(
           exitCode,
           stdout.toString(StandardCharsets.UTF_8),
           stderr.toString(StandardCharsets.UTF_8));
+    } catch (Exception exception) {
+      throw new RuntimeException(exception);
     } finally {
       System.setOut(originalOut);
       System.setErr(originalErr);
