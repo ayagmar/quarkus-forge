@@ -1,68 +1,323 @@
 = Architecture & Internals
 :navtitle: Architecture
+:toc: left
+:toclevels: 3
 
-Quarkus Forge separates core logic, TUI rendering, API transport, and archive processing into focused modules with clear boundaries.
+Quarkus Forge follows a layered architecture that separates HTTP transport, JSON parsing, domain logic, UI state management, and rendering into focused modules.
 
-== Module Structure
+== High-Level Architecture
 
-=== API Layer (`api/`)
+....
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Entry Points                                │
+│                                                                     │
+│    QuarkusForgeCli ────────────── HeadlessGenerationService         │
+│         │                              │                            │
+│         ▼                              ▼                            │
+│    TuiBootstrapService           ProjectRequestValidator            │
+│         │                              │                            │
+│         ▼                              │                            │
+│    CoreTuiController                   │                            │
+│         │                              │                            │
+├─────────┼──────────────────────────────┼────────────────────────────┤
+│         │         API Layer            │                            │
+│         ▼                              ▼                            │
+│    QuarkusApiClient ───────► ApiPayloadParser                       │
+│         │                       │                                   │
+│         │                       ▼                                   │
+│         │                  JsonFieldReader                          │
+│         │                                                           │
+│         ▼                                                           │
+│    CatalogSnapshotCache ◄──── CatalogDataService                   │
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                       Archive Layer                                 │
+│                                                                     │
+│    ProjectArchiveService ───► SafeZipExtractor                      │
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                    Post-Generation Actions                          │
+│                                                                     │
+│    PostTuiActionExecutor ───► ShellExecutor                         │
+│         │                                                           │
+│         ├── Open IDE (code <path>)                                  │
+│         ├── Open Terminal (interactive shell)                        │
+│         └── Publish to GitHub (gh repo create)                      │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+....
 
-Handles communication with `code.quarkus.io`:
+== UI Layer Design
 
-* **`QuarkusApiClient`** — Async HTTP transport with configurable retry/backoff. Responsible only for sending requests and receiving responses.
-* **`ApiPayloadParser`** — Stateless JSON deserialization for all API payload types (extensions, metadata, streams, presets, OpenAPI build tools). Separated from transport for testability.
-* **`JsonFieldReader`** — Shared JSON field reading utilities (`readString`, `readInt`, `readStringList`, etc.) used across all store and parser classes.
-* **`CatalogSnapshotCache`** — Local file-based catalog snapshot with schema versioning and freshness tracking.
-* **`CatalogDataService`** — Orchestrates live fetch → cache fallback → bundled snapshot resolution.
+The TUI layer uses an immediate-mode rendering architecture built on the https://github.com/ayagmar/tamboui[TamboUI] framework.
 
-=== Domain Layer (`domain/`)
+=== Component Decomposition
 
-Pure logic with no I/O dependencies:
+....
+CoreTuiController (State Machine)
+    │
+    ├── UiEventRouter           Routes keyboard events through priority chain
+    │       │
+    │       ├── Overlay handlers (command palette, help, post-gen menu)
+    │       ├── Cancel flow (filter unwind priority chain)
+    │       ├── Global shortcuts
+    │       ├── Focus navigation
+    │       └── Input handling
+    │
+    ├── Rendering
+    │       ├── OverlayRenderer          Stateless overlay rendering
+    │       ├── BodyPanelRenderer        Layout: metadata + extensions panels
+    │       └── FooterLinesComposer      Status bar composition
+    │
+    ├── State Managers
+    │       ├── PostGenerationMenuState  Post-gen menu state machine
+    │       ├── MetadataSelectorManager  Platform/build/java selectors
+    │       ├── ExtensionCatalogState    Search, filter, favorites, presets
+    │       ├── CatalogLoadState         Sealed type: Loading → Loaded | Failed
+    │       ├── StartupOverlayTracker    Startup overlay timing
+    │       └── GenerationStateTracker   Generation progress tracking
+    │
+    └── Extracted Helpers
+            ├── ExtensionInteractionHandler  Bridge to catalog interactions
+            ├── CatalogRowBuilder            Pure function: row building
+            ├── UiTextConstants              UI text content
+            └── GenerationFlowCoordinator    Async generation lifecycle
+....
 
-* **`ProjectRequest`** — Immutable value object representing a generation configuration.
-* **`ProjectRequestValidator`** — Validates project metadata fields (group ID, artifact ID, version, etc.).
-* **`MetadataCompatibilityContext`** — Enforces metadata-driven compatibility constraints between build tools, Java versions, and platform streams.
-* **`CliPrefillMapper`** — Maps CLI option values and user input into normalized `ProjectRequest` instances.
+=== State Machine: Generation Flow
 
-=== UI Layer (`ui/`)
+....
+         ┌──────┐
+         │ IDLE │◄────────────────────────────────────┐
+         └──┬───┘                                     │
+            │ Enter / Alt+G                           │
+            ▼                                         │
+      ┌───────────┐                                   │
+      │ VALIDATING│──── validation fails ────► ERROR ─┘
+      └─────┬─────┘                                   │
+            │ validation passes                       │
+            ▼                                         │
+       ┌─────────┐                                    │
+       │ LOADING  │──── Esc / Ctrl+C ───► CANCELLED ──┘
+       └────┬─────┘                                   │
+            │ download complete                       │
+            ▼                                         │
+       ┌─────────┐                                    │
+       │ SUCCESS  │──── "Generate Again" ─────────────┘
+       └─────────┘
+            │
+            ▼
+     Post-Generation Menu
+            │
+            ├── Export recipe/lock
+            ├── Publish to GitHub ──► Visibility sub-menu
+            ├── Open IDE
+            ├── Open Terminal
+            └── Quit
+....
 
-TUI rendering and interaction, built on the https://github.com/ayagmar/tamboui[TamboUI] framework:
+=== State Machine: Catalog Loading
 
-* **`CoreTuiController`** — Central state machine managing focus routing, keybindings, generation flow, and rendering orchestration.
-* **`OverlayRenderer`** — Stateless rendering for modal overlays (command palette, help, generation progress, post-generation menus, startup splash).
-* **`MetadataSelectorManager`** — Encapsulates metadata selector state: option resolution from API metadata, cycling, edge selection, and inline radio-button label generation.
-* **`UiTextConstants`** — UI text content (help lines, splash art, command palette entries, action labels) separated from controller logic.
-* **`ExtensionCatalogState`** — Extension catalog interaction state: search, filtering, favorites, presets, category collapse, and list navigation.
-* **`UiEventRouter`** — Dispatches keyboard events through a priority chain of handlers (overlays → cancel flows → shortcuts → focus navigation → input).
-* **`BodyPanelRenderer`** / **`FooterLinesComposer`** — Layout-specific rendering helpers.
+....
+      ┌─────────────┐
+      │   Initial    │   CatalogLoadState.initial()
+      │ Loaded(snap) │   Loaded("snapshot", false, false)
+      └──────┬───────┘
+             │ loadExtensionCatalogAsync()
+             ▼
+      ┌─────────────┐
+      │   Loading    │   Loading(previous=Initial)
+      │  (previous)  │
+      └──────┬───────┘
+             │
+        ┌────┴────┐
+        │         │
+        ▼         ▼
+   ┌─────────┐  ┌────────┐
+   │  Loaded  │  │ Failed │   If previous was Loaded(live),
+   │  (live)  │  │        │   stays as Loaded (keeps catalog)
+   └─────────┘  └────────┘
+        │
+        │ reload requested
+        ▼
+   ┌─────────────┐
+   │   Loading    │   Loading(previous=Loaded(live))
+   │  (previous)  │
+   └──────┬───────┘
+          │
+     ┌────┴────┐
+     │         │
+     ▼         ▼
+ ┌─────────┐ ┌──────────────┐
+ │  Loaded  │ │ Previous     │   Reload failure preserves
+ │  (new)   │ │ Loaded(live) │   previously loaded catalog
+ └─────────┘ └──────────────┘
+....
 
-=== CLI Layer (root package)
+=== Extension Cancel Flow (Esc Priority Chain)
 
-Entry points and orchestration:
+When the user presses `Esc` in the extension search or list, the TUI unwinds filters in priority order:
 
-* **`QuarkusForgeCli`** — Picocli `@Command` entry point. Bootstraps the TUI or dispatches to headless generation.
-* **`HeadlessGenerationService`** — Non-interactive generation engine for CI/scripting use cases.
-* **`PostTuiActionExecutor`** — Executes post-generation shell actions (IDE open, GitHub publish via `gh`, interactive terminal handoff).
-* **`ForgeRecipeLockStore`** — Reads and writes `Forgefile` (recipe) and `forge.lock` (deterministic lock) files.
+....
+ Esc pressed in extension search/list
+      │
+      ├──[1] Search text not empty? ──► Clear search
+      │
+      ├──[2] Favorites filter on? ──► Disable favorites filter
+      │
+      ├──[3] Preset filter active? ──► Clear preset filter
+      │
+      ├──[4] Category filter active? ──► Clear category filter
+      │
+      ├──[5] In search field? ──► Focus extension list
+      │
+      └──[6] None of the above ──► Fall through to quit flow
+....
 
-=== Archive Layer (`archive/`)
+== API Layer Design
 
-* **`SafeZipExtractor`** — Hardened ZIP extraction with protections against Zip-Bomb (size limits, entry count caps) and Zip-Slip (path traversal) attacks.
-* **`ProjectArchiveService`** — Orchestrates archive download, extraction, progress reporting, and cancellation.
+=== Transport vs Parsing Separation
 
-== Data Flow
+....
+                    HTTP Request
+                         │
+                         ▼
+              ┌──────────────────┐
+              │ QuarkusApiClient │    Transport only:
+              │                  │    - Retry with backoff
+              │  fetchExtensions │    - Timeout management
+              │  fetchMetadata   │    - HTTP status handling
+              │  downloadZip     │    - Cancellation support
+              └────────┬─────────┘
+                       │ raw JSON string
+                       ▼
+              ┌──────────────────┐
+              │ ApiPayloadParser │    Pure parsing:
+              │                  │    - Extension deserialization
+              │  parseExtensions │    - Metadata extraction
+              │  parseMetadata   │    - Stream/preset parsing
+              │  parseBuildTools │    - OpenAPI contract reading
+              └────────┬─────────┘
+                       │
+                       ▼
+              ┌──────────────────┐
+              │  JsonFieldReader │    Shared JSON helpers:
+              │                  │    - readString, readInt
+              │                  │    - readStringList
+              │                  │    - readNestedObject
+              └──────────────────┘
+....
 
-1. The user initiates project creation via the TUI or headless CLI.
-2. A `ProjectRequest` is populated from user input, CLI options, or a `Forgefile` recipe.
-3. The request is validated by `ProjectRequestValidator` and `MetadataCompatibilityContext`.
-4. `QuarkusApiClient` sends the generation request; `ApiPayloadParser` deserializes the response.
-5. `SafeZipExtractor` scaffolds the project securely in the target directory.
-6. Post-generation actions (IDE, GitHub, terminal) are executed by `PostTuiActionExecutor`.
+=== Catalog Freshness Strategy
+
+....
+  Application Start
+       │
+       ▼
+  Load metadata (sync) ─── success ──► MetadataCompatibilityContext
+       │                                  │
+       │ failure                          │ constrains build tool ↔ Java version
+       ▼                                  │
+  Bundled snapshot fallback               ▼
+       │                            Load extensions (async)
+       │                                  │
+       │                          ┌───────┴───────┐
+       │                          │               │
+       │                     Live API         Cache fallback
+       │                          │               │
+       │                          ▼               ▼
+       │                     CatalogSnapshotCache
+       │                     (save for offline use)
+       │                          │
+       ▼                          ▼
+  TUI renders immediately    Catalog replaces default
+  with default extensions    extensions when ready
+....
+
+== Domain Layer
+
+....
+┌─────────────────────────────────────────────────────────┐
+│                    Domain Model                         │
+│                                                         │
+│  ProjectRequest (immutable value object)                │
+│    ├── groupId, artifactId, version                     │
+│    ├── packageName, outputDirectory                     │
+│    ├── platformStream, buildTool, javaVersion           │
+│    └── extensions (list of IDs)                         │
+│                                                         │
+│  ProjectRequestValidator                                │
+│    └── validates field formats (Maven coordinates, etc) │
+│                                                         │
+│  MetadataCompatibilityContext                           │
+│    └── enforces build tool ↔ Java version constraints   │
+│                                                         │
+│  CliPrefillMapper                                       │
+│    └── maps CLI --options to ProjectRequest fields      │
+│                                                         │
+│  ForgeRecipeLockStore                                   │
+│    ├── Forgefile (recipe) read/write                    │
+│    └── forge.lock (deterministic lock) read/write       │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+....
+
+== Archive Layer
+
+....
+  ZIP Download
+       │
+       ▼
+  ProjectArchiveService
+       │
+       ├── Progress reporting (bytes received)
+       ├── Cancellation check (per entry)
+       │
+       ▼
+  SafeZipExtractor
+       │
+       ├── Zip-Slip protection (path traversal)
+       │     └── canonical path must be under target dir
+       │
+       ├── Zip-Bomb protection
+       │     ├── Max total extracted size
+       │     ├── Max entry count
+       │     └── Compression ratio check
+       │
+       └── Root directory normalization
+             └── strips single root folder if present
+....
 
 == Design Principles
 
-* **Single Responsibility**: Each class has one clear reason to change.
-* **Stateless rendering**: `OverlayRenderer` and `BodyPanelRenderer` take snapshot data — no side effects.
-* **Transport vs. parsing**: `QuarkusApiClient` handles HTTP; `ApiPayloadParser` handles JSON.
-* **DRY**: `JsonFieldReader` eliminates duplicated JSON helpers across 5+ classes.
-* **Testability**: 452 unit tests with deterministic async harnesses for TUI state machine testing.
+[cols="1,3"]
+|===
+| Principle | Application
+
+| *Single Responsibility*
+| Each class has one reason to change. `QuarkusApiClient` handles HTTP; `ApiPayloadParser` handles JSON; `OverlayRenderer` handles overlay rendering.
+
+| *Sealed Types*
+| `CatalogLoadState` (Loading/Loaded/Failed) and `MenuKeyResult` (Handled/Quit/ExportRecipe/GenerateAgain) make state transitions explicit and exhaustive.
+
+| *Immutable Snapshots*
+| `MetadataPanelSnapshot`, `ExtensionsPanelSnapshot`, `FooterSnapshot` are immutable records passed to renderers — no side effects.
+
+| *DRY*
+| `JsonFieldReader` deduplicates JSON helpers across 5+ classes. `renderCompactField` consolidates two near-identical rendering methods.
+
+| *Derived State Elimination*
+| `successHint` is computed from `PostGenerationMenuState` rather than stored as a separate mutable field.
+
+| *Encapsulation*
+| `PostGenerationMenuState`, `StartupOverlayTracker`, `MetadataSelectorManager` each own their state and expose it through focused APIs.
+|===
+
+== Testing Strategy
+
+* **452 unit tests** with deterministic async harnesses for TUI state machine testing
+* **2 integration tests** using WireMock for API contract verification
+* Async TUI tests use `UiScheduler.immediate()` and `Duration.ZERO` debounce for deterministic behavior
+* Property-based tests for ZIP extraction edge cases
+
+See xref:reference/testing-strategy.adoc[Testing Strategy] for details.
