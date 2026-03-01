@@ -6,13 +6,17 @@ import dev.ayagmar.quarkusforge.api.ApiHttpException;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.TickEvent;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class CoreTuiGenerationFlowTest {
+  @TempDir Path tempDir;
+
   @Test
   void successfulGenerationShowsNextStepHintAndLocksInteractiveInputs() {
     UiControllerTestHarness.ControlledGenerationRunner generationRunner =
@@ -52,6 +56,7 @@ class CoreTuiGenerationFlowTest {
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     generationRunner.complete(Path.of("build/generated-project"));
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
     assertThat(action.shouldQuit()).isTrue();
@@ -74,6 +79,7 @@ class CoreTuiGenerationFlowTest {
     generationRunner.complete(Path.of("build/generated-project"));
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
     assertThat(action.shouldQuit()).isFalse();
@@ -85,6 +91,40 @@ class CoreTuiGenerationFlowTest {
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     assertThat(generationRunner.callCount()).isEqualTo(2);
+  }
+
+  @Test
+  void postGenerationMenuCanWriteLockAndStayOpen() throws Exception {
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
+    Path generated = tempDir.resolve("generated-project");
+    Files.createDirectories(generated);
+    CoreTuiController controller =
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    generationRunner.complete(generated);
+    UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    assertThat(action.shouldQuit()).isFalse();
+    assertThat(controller.postGenerationExitPlan()).isEmpty();
+    assertThat(generated.resolve("forge.lock")).exists();
+  }
+
+  @Test
+  void extensionSearchAcceptsJCharacter() {
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
+    CoreTuiController controller =
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
+
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
+    controller.onEvent(KeyEvent.ofChar('j'));
+
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_SEARCH);
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34)).contains("Search: [ j");
   }
 
   @Test

@@ -148,31 +148,53 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Generate JBang catalog
         env:
           TAG: ${{ github.ref_name }}
           REPO: ${{ github.repository }}
         run: |
           mkdir -p dist
-          cat > dist/jbang-catalog.json <<EOF
-          {
-            "aliases": {
-              "quarkus-forge": {
-                "script-ref": "https://github.com/${REPO}/releases/download/${TAG}/quarkus-forge-jvm.jar",
-                "description": "Keyboard-first Quarkus project generator TUI",
-                "java-options": [
-                  "--enable-native-access=ALL-UNNAMED"
-                ]
-              }
-            }
-          }
-          EOF
+          cp jbang-catalog.json dist/jbang-catalog.json
+          sed -i "s#github.com/[^/]*/[^/]*/releases/latest/download/#github.com/${REPO}/releases/download/${TAG}/#g" dist/jbang-catalog.json
+
+      - name: Prepare org-level JBang catalog
+        run: cp jbang-catalog.json dist/jbang-catalog-org.json
 
       - name: Upload JBang catalog
         uses: actions/upload-artifact@v4
         with:
           name: quarkus-forge-jbang-catalog
           path: dist/jbang-catalog.json
+
+      - name: Upload org-level JBang catalog
+        uses: actions/upload-artifact@v4
+        with:
+          name: quarkus-forge-jbang-catalog-org
+          path: dist/jbang-catalog-org.json
+
+      - name: Publish org-level catalog repository
+        if: startsWith(github.ref, 'refs/tags/v') && secrets.JBANG_CATALOG_PUSH_TOKEN != ''
+        env:
+          TOKEN: ${{ secrets.JBANG_CATALOG_PUSH_TOKEN }}
+          CATALOG_REPO: ayagmar/jbang-catalog
+          TAG: ${{ github.ref_name }}
+        run: |
+          rm -rf .tmp-jbang-catalog
+          git clone "https://x-access-token:${TOKEN}@github.com/${CATALOG_REPO}.git" .tmp-jbang-catalog
+          cp dist/jbang-catalog-org.json .tmp-jbang-catalog/jbang-catalog.json
+          cd .tmp-jbang-catalog
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "No catalog changes to publish."
+            exit 0
+          fi
+          git add jbang-catalog.json
+          git commit -m "Update quarkus-forge alias for ${TAG}"
+          git push
 
   publish-release:
     needs:
@@ -183,6 +205,11 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
@@ -192,8 +219,12 @@ jobs:
       - name: Make native artifacts executable
         run: chmod +x artifacts/quarkus-forge-linux-* artifacts/quarkus-forge-macos-* || true
 
-      - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
+      - name: Derive release version from git tag
+        run: echo "JRELEASER_PROJECT_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Publish GitHub release with JReleaser
+        uses: jreleaser/release-action@v2
         with:
-          files: artifacts/*
-          generate_release_notes: true
+          arguments: full-release
+        env:
+          JRELEASER_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

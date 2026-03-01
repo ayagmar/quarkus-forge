@@ -7,6 +7,7 @@ public final class AppKeyActions {
   public static final String FOCUS_EXTENSION_SEARCH = "app_focus_extension_search";
   public static final String FOCUS_EXTENSION_LIST = "app_focus_extension_list";
   public static final String TOGGLE_FAVORITES_FILTER = "app_toggle_favorites_filter";
+  public static final String CYCLE_PRESET_FILTER = "app_cycle_preset_filter";
   public static final String JUMP_TO_FAVORITE = "app_jump_to_favorite";
   public static final String RELOAD_CATALOG = "app_reload_catalog";
   public static final String TOGGLE_ERROR_DETAILS = "app_toggle_error_details";
@@ -48,6 +49,10 @@ public final class AppKeyActions {
 
   static boolean isFavoritesFilterToggleKey(KeyEvent keyEvent) {
     return hasAction(keyEvent, TOGGLE_FAVORITES_FILTER) || isCtrlChar(keyEvent, 'k', 'K');
+  }
+
+  static boolean isPresetFilterCycleKey(KeyEvent keyEvent) {
+    return hasAction(keyEvent, CYCLE_PRESET_FILTER) || isCtrlChar(keyEvent, 'y', 'Y');
   }
 
   static boolean isCategoryCollapseToggleKey(KeyEvent keyEvent) {

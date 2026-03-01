@@ -1,0 +1,11 @@
+{
+  "aliases": {
+    "quarkus-forge": {
+      "script-ref": "https://github.com/ayagmar/quarkus-forge/releases/latest/download/quarkus-forge-jvm.jar",
+      "description": "Keyboard-first Quarkus project generator TUI",
+      "java-options": [
+        "--enable-native-access=ALL-UNNAMED"
+      ]
+    }
+  }
+}

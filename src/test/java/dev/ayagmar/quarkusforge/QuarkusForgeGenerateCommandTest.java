@@ -505,6 +505,103 @@ class QuarkusForgeGenerateCommandTest {
         .doesNotThrowAnyException();
   }
 
+  @Test
+  void dryRunCanLoadRecipeAndWriteRecipeAndLock() throws Exception {
+    stubCatalogEndpoints();
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    Path recipePath = tempDir.resolve("Forgefile");
+    Path writtenRecipe = tempDir.resolve("written-forgefile.json");
+    Path writtenLock = tempDir.resolve("forge.lock");
+    Files.writeString(
+        recipePath,
+        """
+        {
+          "groupId": "com.example",
+          "artifactId": "recipe-app",
+          "version": "1.0.0-SNAPSHOT",
+          "outputDirectory": ".",
+          "buildTool": "maven",
+          "javaVersion": "25",
+          "presets": ["web"],
+          "extensions": ["io.quarkus:quarkus-hibernate-orm-panache"]
+        }
+        """);
+
+    CliCommandTestSupport.CommandResult result =
+        runCommand(
+            runtimeConfig,
+            "generate",
+            "--dry-run",
+            "--recipe",
+            recipePath.toString(),
+            "--write-recipe",
+            writtenRecipe.toString(),
+            "--write-lock",
+            writtenLock.toString());
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(Files.readString(writtenRecipe))
+        .contains("\"artifactId\" : \"recipe-app\"")
+        .contains("\"presets\" : [ \"web\" ]");
+    assertThat(Files.readString(writtenLock))
+        .contains("\"javaVersion\" : \"25\"")
+        .contains("io.quarkus:quarkus-rest")
+        .contains("io.quarkus:quarkus-hibernate-orm-panache");
+  }
+
+  @Test
+  void lockDriftBlocksUntilRefreshLockIsProvided() throws Exception {
+    stubCatalogEndpoints();
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    Path lockPath = tempDir.resolve("forge.lock");
+    Files.writeString(
+        lockPath,
+        """
+        {
+          "platformStream": "io.quarkus.platform:3.31",
+          "buildTool": "maven",
+          "javaVersion": "21",
+          "presets": ["web"],
+          "extensions": ["io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc"]
+        }
+        """);
+
+    CliCommandTestSupport.CommandResult driftResult =
+        runCommand(
+            runtimeConfig,
+            "generate",
+            "--dry-run",
+            "--group-id",
+            "com.example",
+            "--artifact-id",
+            "headless-app",
+            "--preset",
+            "web",
+            "--lock",
+            lockPath.toString());
+
+    assertThat(driftResult.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_VALIDATION);
+    assertThat(driftResult.standardError()).contains("javaVersion drift");
+
+    CliCommandTestSupport.CommandResult refreshResult =
+        runCommand(
+            runtimeConfig,
+            "generate",
+            "--dry-run",
+            "--group-id",
+            "com.example",
+            "--artifact-id",
+            "headless-app",
+            "--preset",
+            "web",
+            "--lock",
+            lockPath.toString(),
+            "--refresh-lock");
+
+    assertThat(refreshResult.exitCode()).isZero();
+    assertThat(Files.readString(lockPath)).contains("\"javaVersion\" : \"25\"");
+  }
+
   private RuntimeConfig runtimeConfig(URI baseUri) {
     return CliCommandTestSupport.runtimeConfig(tempDir, baseUri);
   }
@@ -527,6 +624,28 @@ class QuarkusForgeGenerateCommandTest {
                       {"id":"io.quarkus:quarkus-hibernate-orm-panache","name":"Hibernate ORM Panache","shortName":"hibernate-orm-panache"},
                       {"id":"io.quarkus:quarkus-messaging","name":"Messaging","shortName":"messaging"},
                       {"id":"io.quarkus:quarkus-smallrye-health","name":"SmallRye Health","shortName":"health"}
+                    ]
+                    """)));
+    stubFor(
+        get(urlPathEqualTo("/api/presets"))
+            .willReturn(
+                okJson(
+                    """
+                    [
+                      {"key":"web","extensions":["io.quarkus:quarkus-rest","io.quarkus:quarkus-arc"]},
+                      {"key":"data","extensions":["io.quarkus:quarkus-hibernate-orm-panache","io.quarkus:quarkus-jdbc-postgresql"]},
+                      {"key":"messaging","extensions":["io.quarkus:quarkus-messaging","io.quarkus:quarkus-smallrye-health"]}
+                    ]
+                    """)));
+    stubFor(
+        get(urlPathEqualTo("/api/presets/stream/io.quarkus.platform%3A3.31"))
+            .willReturn(
+                okJson(
+                    """
+                    [
+                      {"key":"web","extensions":["io.quarkus:quarkus-rest","io.quarkus:quarkus-arc"]},
+                      {"key":"data","extensions":["io.quarkus:quarkus-hibernate-orm-panache","io.quarkus:quarkus-jdbc-postgresql"]},
+                      {"key":"messaging","extensions":["io.quarkus:quarkus-messaging","io.quarkus:quarkus-smallrye-health"]}
                     ]
                     """)));
     CliCommandTestSupport.stubLiveMetadataWithAllBuildTools();

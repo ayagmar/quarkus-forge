@@ -21,6 +21,7 @@ final class AppBindingsProfile {
         .bind(KeyTrigger.ctrl('f'), AppKeyActions.FOCUS_EXTENSION_SEARCH)
         .bind(KeyTrigger.ctrl('l'), AppKeyActions.FOCUS_EXTENSION_LIST)
         .bind(KeyTrigger.ctrl('k'), AppKeyActions.TOGGLE_FAVORITES_FILTER)
+        .bind(KeyTrigger.ctrl('y'), AppKeyActions.CYCLE_PRESET_FILTER)
         .bind(KeyTrigger.ctrl('j'), AppKeyActions.JUMP_TO_FAVORITE)
         .bind(KeyTrigger.ctrl('r'), AppKeyActions.RELOAD_CATALOG)
         .bind(KeyTrigger.ctrl('e'), AppKeyActions.TOGGLE_ERROR_DETAILS)

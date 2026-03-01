@@ -227,6 +227,9 @@ final class BodyPanelRenderer {
     if (snapshot.favoritesOnlyFilterEnabled()) {
       title.append(" [fav]");
     }
+    if (!snapshot.activePresetFilterName().isBlank()) {
+      title.append(" [preset:").append(snapshot.activePresetFilterName()).append("]");
+    }
     if (!snapshot.activeCategoryFilterTitle().isBlank()) {
       title.append(" [").append(snapshot.activeCategoryFilterTitle()).append("]");
     }
@@ -245,6 +248,9 @@ final class BodyPanelRenderer {
       int total = snapshot.totalCatalogExtensionCount();
       if (!snapshot.activeCategoryFilterTitle().isBlank()) {
         hint.append("Filter: ").append(snapshot.activeCategoryFilterTitle());
+        hint.append(" | ").append(filtered).append(" of ").append(total);
+      } else if (!snapshot.activePresetFilterName().isBlank()) {
+        hint.append("Preset: ").append(snapshot.activePresetFilterName());
         hint.append(" | ").append(filtered).append(" of ").append(total);
       } else {
         hint.append(catalogSourceLabel(snapshot));

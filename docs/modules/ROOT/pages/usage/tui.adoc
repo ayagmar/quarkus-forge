@@ -33,5 +33,6 @@ java -jar target/quarkus-forge.jar
 == Submit and Exit
 
 * `Enter` or `Alt+G`: generate project.
+* After success, use the post-generation menu to optionally write `forge.lock` in the generated project directory, then continue with IDE/terminal actions.
 * `Esc`: clear active search/filter context first, then exit.
 * `Ctrl+C`: quit immediately.

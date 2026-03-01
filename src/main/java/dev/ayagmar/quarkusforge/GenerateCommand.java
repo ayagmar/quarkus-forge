@@ -23,8 +23,26 @@ public final class GenerateCommand implements Callable<Integer> {
   @Option(
       names = "--preset",
       split = ",",
-      description = "Extension preset(s): web, data, messaging, favorites")
+      description = "Extension preset(s) from code.quarkus.io plus favorites")
   List<String> presets = new ArrayList<>();
+
+  @Option(names = "--recipe", description = "Path to Forge recipe file (example: Forgefile)")
+  String recipeFile;
+
+  @Option(names = "--write-recipe", description = "Write effective recipe to this path")
+  String writeRecipeFile;
+
+  @Option(names = "--lock", description = "Path to lock file (example: forge.lock)")
+  String lockFile;
+
+  @Option(names = "--write-lock", description = "Write lock file to this path")
+  String writeLockFile;
+
+  @Option(
+      names = "--refresh-lock",
+      defaultValue = "false",
+      description = "Allow lock drift and rewrite lock (requires --lock or --write-lock)")
+  boolean refreshLock;
 
   @Option(
       names = "--dry-run",

@@ -15,5 +15,6 @@ Quarkus Forge is a keyboard-first terminal UI and headless CLI to generate Quark
 
 * Guided TUI with fast extension search and selection.
 * Headless command for CI and scripts.
+* Recipe + lock support for deterministic, reviewable generation workflows.
 * Safe archive extraction and deterministic fallback behavior for metadata/catalog loading.
 * Configurable theming for terminal readability.

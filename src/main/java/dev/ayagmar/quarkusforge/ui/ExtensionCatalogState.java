@@ -47,6 +47,7 @@ final class ExtensionCatalogState {
   private final ExtensionFavoritesStore favoritesStore;
   private final Executor favoritesPersistenceExecutor;
   private final Set<String> collapsedCategoryTitles;
+  private Map<String, List<String>> presetExtensionsByName;
   private ExtensionCatalogIndex catalogIndex;
   private List<ExtensionCatalogItem> filteredExtensions;
   private List<ExtensionCatalogRow> filteredRows;
@@ -56,6 +57,7 @@ final class ExtensionCatalogState {
   private String currentQuery;
   private boolean favoritesOnlyFilterEnabled;
   private String activeCategoryFilterTitle;
+  private String activePresetFilterName;
   private CompletableFuture<Void> preferencePersistenceChain;
 
   ExtensionCatalogState(UiScheduler scheduler, Duration debounceDelay, String initialQuery) {
@@ -79,6 +81,7 @@ final class ExtensionCatalogState {
     searchDebouncer = new Debouncer(scheduler, debounceDelay);
     searchResultGate = new LatestResultGate();
     collapsedCategoryTitles = new LinkedHashSet<>();
+    presetExtensionsByName = Map.of();
     catalogIndex = new ExtensionCatalogIndex(DEFAULT_EXTENSIONS);
     filteredExtensions = List.of();
     filteredRows = List.of();
@@ -88,6 +91,7 @@ final class ExtensionCatalogState {
     currentQuery = initialQuery == null ? "" : initialQuery;
     favoritesOnlyFilterEnabled = false;
     activeCategoryFilterTitle = "";
+    activePresetFilterName = "";
     preferencePersistenceChain = CompletableFuture.completedFuture(null);
     applyFiltered(currentQuery, searchResultGate.nextToken(), ignored -> {});
   }
@@ -132,6 +136,52 @@ final class ExtensionCatalogState {
       return false;
     }
     activeCategoryFilterTitle = "";
+    applyFiltered(currentQuery, searchResultGate.nextToken(), onFiltered);
+    return true;
+  }
+
+  void setPresetExtensionsByName(Map<String, List<String>> presetMap, IntConsumer onFiltered) {
+    Objects.requireNonNull(onFiltered);
+    presetExtensionsByName = normalizePresetMap(presetMap);
+    if (!activePresetFilterName.isBlank()
+        && !presetExtensionsByName.containsKey(activePresetFilterName)) {
+      activePresetFilterName = "";
+    }
+    applyFiltered(currentQuery, searchResultGate.nextToken(), onFiltered);
+  }
+
+  PresetFilterResult cyclePresetFilter(IntConsumer onFiltered) {
+    Objects.requireNonNull(onFiltered);
+    List<String> presets = availablePresetNames();
+    if (presets.isEmpty()) {
+      activePresetFilterName = "";
+      applyFiltered(currentQuery, searchResultGate.nextToken(), onFiltered);
+      return PresetFilterResult.none(filteredExtensions.size());
+    }
+
+    if (activePresetFilterName.isBlank()) {
+      activePresetFilterName = presets.getFirst();
+    } else {
+      int index = presets.indexOf(activePresetFilterName);
+      if (index < 0 || index >= presets.size() - 1) {
+        activePresetFilterName = "";
+      } else {
+        activePresetFilterName = presets.get(index + 1);
+      }
+    }
+    applyFiltered(currentQuery, searchResultGate.nextToken(), onFiltered);
+    if (activePresetFilterName.isBlank()) {
+      return PresetFilterResult.none(filteredExtensions.size());
+    }
+    return new PresetFilterResult(true, activePresetFilterName, filteredExtensions.size());
+  }
+
+  boolean clearPresetFilter(IntConsumer onFiltered) {
+    Objects.requireNonNull(onFiltered);
+    if (activePresetFilterName.isBlank()) {
+      return false;
+    }
+    activePresetFilterName = "";
     applyFiltered(currentQuery, searchResultGate.nextToken(), onFiltered);
     return true;
   }
@@ -313,6 +363,10 @@ final class ExtensionCatalogState {
     return activeCategoryFilterTitle;
   }
 
+  String activePresetFilterName() {
+    return activePresetFilterName;
+  }
+
   boolean isSelectionAtTop() {
     Integer selected = listState.selected();
     List<Integer> navigationRowIndexes = navigationRowIndexes(selected);
@@ -449,6 +503,13 @@ final class ExtensionCatalogState {
       rankedResults =
           rankedResults.stream().filter(item -> favoriteExtensionIds.contains(item.id())).toList();
     }
+    if (!activePresetFilterName.isBlank()) {
+      List<String> presetExtensions = presetExtensionsByName.get(activePresetFilterName);
+      Set<String> allowedIds =
+          new LinkedHashSet<>(presetExtensions == null ? List.of() : presetExtensions);
+      rankedResults =
+          rankedResults.stream().filter(item -> allowedIds.contains(item.id())).toList();
+    }
 
     Set<String> availableCategoryTitles = new LinkedHashSet<>(filterableCategoryTitles());
     if (!activeCategoryFilterTitle.isBlank()
@@ -477,6 +538,13 @@ final class ExtensionCatalogState {
     if (favoritesOnlyFilterEnabled) {
       rankedResults =
           rankedResults.stream().filter(item -> favoriteExtensionIds.contains(item.id())).toList();
+    }
+    if (!activePresetFilterName.isBlank()) {
+      List<String> presetExtensions = presetExtensionsByName.get(activePresetFilterName);
+      Set<String> allowedIds =
+          new LinkedHashSet<>(presetExtensions == null ? List.of() : presetExtensions);
+      rankedResults =
+          rankedResults.stream().filter(item -> allowedIds.contains(item.id())).toList();
     }
     return List.copyOf(availableCategoryTitles(rankedResults));
   }
@@ -530,7 +598,10 @@ final class ExtensionCatalogState {
 
   private void prependRecentRows(
       List<ExtensionCatalogRow> rows, List<ExtensionCatalogItem> rankedItems) {
-    if (!currentQuery.isBlank() || favoritesOnlyFilterEnabled || recentExtensionIds.isEmpty()) {
+    if (!currentQuery.isBlank()
+        || favoritesOnlyFilterEnabled
+        || !activePresetFilterName.isBlank()
+        || recentExtensionIds.isEmpty()) {
       return;
     }
     List<ExtensionCatalogItem> recentItems = resolveRecentItems(rankedItems);
@@ -576,6 +647,32 @@ final class ExtensionCatalogState {
       case "other" -> "Other";
       default -> titleCase(rawCategory);
     };
+  }
+
+  private static Map<String, List<String>> normalizePresetMap(Map<String, List<String>> presetMap) {
+    if (presetMap == null || presetMap.isEmpty()) {
+      return Map.of();
+    }
+    LinkedHashMap<String, List<String>> normalized = new LinkedHashMap<>();
+    for (Map.Entry<String, List<String>> entry : presetMap.entrySet()) {
+      if (entry.getKey() == null || entry.getKey().isBlank()) {
+        continue;
+      }
+      String key = entry.getKey().trim().toLowerCase(Locale.ROOT);
+      List<String> extensions =
+          entry.getValue() == null ? List.of() : List.copyOf(entry.getValue());
+      normalized.put(key, extensions);
+    }
+    return Map.copyOf(normalized);
+  }
+
+  private List<String> availablePresetNames() {
+    if (presetExtensionsByName.isEmpty()) {
+      return List.of();
+    }
+    List<String> names = new ArrayList<>(presetExtensionsByName.keySet());
+    names.sort(String::compareTo);
+    return List.copyOf(names);
   }
 
   private static String titleCase(String value) {

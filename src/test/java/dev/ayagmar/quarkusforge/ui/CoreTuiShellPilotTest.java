@@ -256,6 +256,35 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void vimCharsAreInsertedAsTextAcrossAllTextInputs() {
+    CoreTuiController controller = UiControllerTestHarness.controller();
+    List<FocusTarget> textInputs =
+        List.of(
+            FocusTarget.GROUP_ID,
+            FocusTarget.ARTIFACT_ID,
+            FocusTarget.VERSION,
+            FocusTarget.PACKAGE_NAME,
+            FocusTarget.OUTPUT_DIR,
+            FocusTarget.EXTENSION_SEARCH);
+    List<Character> vimChars = List.of('h', 'j', 'k', 'l', 'g', 'G');
+
+    for (FocusTarget target : textInputs) {
+      UiControllerTestHarness.moveFocusTo(controller, target);
+      for (char character : vimChars) {
+        controller.onEvent(KeyEvent.ofChar(character));
+      }
+    }
+
+    assertThat(controller.request().groupId()).endsWith("hjklgG");
+    assertThat(controller.request().artifactId()).endsWith("hjklgG");
+    assertThat(controller.request().version()).endsWith("hjklgG");
+    assertThat(controller.request().packageName()).endsWith("hjklgG");
+    assertThat(controller.request().outputDirectory()).endsWith("hjklgG");
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .contains("Search: [ hjklgG");
+  }
+
+  @Test
   void searchAndListSupportDirectArrowHandoff() {
     CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
@@ -859,6 +888,36 @@ class CoreTuiShellPilotTest {
 
     controller.onEvent(KeyEvent.ofChar('l'));
     assertThat(controller.request().buildTool()).isEqualTo("gradle");
+  }
+
+  @Test
+  void ctrlYCyclesPresetFilterFromApiPresets() {
+    CoreTuiController controller = UiControllerTestHarness.controller();
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                new ExtensionCatalogLoadResult(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest"),
+                        new ExtensionDto("io.quarkus:quarkus-jdbc-postgresql", "JDBC", "jdbc")),
+                    CatalogSource.LIVE,
+                    false,
+                    "",
+                    null,
+                    Map.of(
+                        "web", List.of("io.quarkus:quarkus-rest"),
+                        "data", List.of("io.quarkus:quarkus-jdbc-postgresql")))));
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+
+    controller.onEvent(KeyEvent.ofChar('y', KeyModifiers.CTRL));
+    assertThat(controller.statusMessage()).contains("Preset filter:");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("[preset:");
+
+    controller.onEvent(KeyEvent.ofChar('y', KeyModifiers.CTRL));
+    assertThat(controller.statusMessage()).contains("Preset filter:");
+
+    controller.onEvent(KeyEvent.ofChar('y', KeyModifiers.CTRL));
+    assertThat(controller.statusMessage()).isEqualTo("Preset filter disabled");
   }
 
   private static MetadataDto selectorMetadata() {

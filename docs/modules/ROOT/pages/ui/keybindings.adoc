@@ -24,6 +24,7 @@
 * `f`: favorite focused extension.
 * `Ctrl+J`: jump to next favorite.
 * `Ctrl+K`: toggle favorites-only filter.
+* `Ctrl+Y`: cycle preset-only filter (presets loaded from `code.quarkus.io`).
 
 == Global Actions
 

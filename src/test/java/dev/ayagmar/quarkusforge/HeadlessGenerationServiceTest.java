@@ -130,8 +130,16 @@ class HeadlessGenerationServiceTest {
 
     @Override
     public List<String> resolveRequestedExtensions(
-        List<String> extensionInputs, List<String> presetInputs, Set<String> knownExtensionIds) {
+        List<String> extensionInputs,
+        List<String> presetInputs,
+        Set<String> knownExtensionIds,
+        Map<String, List<String>> presetExtensionsByName) {
       return List.of("io.quarkus:quarkus-rest");
+    }
+
+    @Override
+    public Map<String, List<String>> loadBuiltInPresets(String platformStream) {
+      return Map.of("web", List.of("io.quarkus:quarkus-rest"));
     }
 
     @Override

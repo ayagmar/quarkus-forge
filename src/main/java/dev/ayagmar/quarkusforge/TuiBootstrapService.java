@@ -12,6 +12,7 @@ import dev.ayagmar.quarkusforge.archive.SafeZipExtractor;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
 import dev.ayagmar.quarkusforge.ui.CoreTuiController;
+import dev.ayagmar.quarkusforge.ui.ExtensionCatalogLoadResult;
 import dev.ayagmar.quarkusforge.ui.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.ui.GenerationProgressUpdate;
 import dev.ayagmar.quarkusforge.ui.PostGenerationExitPlan;
@@ -19,6 +20,8 @@ import dev.ayagmar.quarkusforge.ui.UiAction;
 import dev.ayagmar.quarkusforge.ui.UiScheduler;
 import dev.tamboui.tui.TuiConfig;
 import dev.tamboui.tui.TuiRunner;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -70,11 +73,41 @@ final class TuiBootstrapService {
       controller.loadExtensionCatalogAsync(
           () -> {
             diagnostics.info("catalog.load.start", of("mode", "tui"));
+            String presetStreamKey = initialState.request().platformStream();
             CompletableFuture<CatalogData> catalogLoadFuture =
                 firstCatalogLoad.getAndSet(false)
                     ? catalogDataService.loadForStartup()
                     : catalogDataService.load();
-            return catalogLoadFuture.handle(QuarkusForgeCli.catalogLoadDiagnostics(diagnostics));
+            return catalogLoadFuture
+                .handle(QuarkusForgeCli.catalogLoadDiagnostics(diagnostics))
+                .thenCompose(
+                    loadResult ->
+                        apiClient
+                            .fetchPresets(presetStreamKey)
+                            .handle(
+                                (presets, throwable) -> {
+                                  if (throwable != null) {
+                                    diagnostics.error(
+                                        "preset.load.failure",
+                                        of("mode", "tui"),
+                                        of("message", throwable.getClass().getSimpleName()));
+                                    return Map.<String, List<String>>of();
+                                  }
+                                  diagnostics.info(
+                                      "preset.load.success",
+                                      of("mode", "tui"),
+                                      of("presetCount", presets.size()));
+                                  return presets;
+                                })
+                            .thenApply(
+                                presets ->
+                                    new ExtensionCatalogLoadResult(
+                                        loadResult.extensions(),
+                                        loadResult.source(),
+                                        loadResult.stale(),
+                                        loadResult.detailMessage(),
+                                        loadResult.metadata(),
+                                        presets)));
           });
 
       tui.run(

@@ -9,6 +9,7 @@ import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -47,8 +48,18 @@ final class CliHeadlessOperations implements HeadlessGenerationOperations {
 
   @Override
   public List<String> resolveRequestedExtensions(
-      List<String> extensionInputs, List<String> presetInputs, Set<String> knownExtensionIds) {
-    return cli.resolveRequestedExtensions(extensionInputs, presetInputs, knownExtensionIds);
+      List<String> extensionInputs,
+      List<String> presetInputs,
+      Set<String> knownExtensionIds,
+      Map<String, List<String>> presetExtensionsByName) {
+    return cli.resolveRequestedExtensions(
+        extensionInputs, presetInputs, knownExtensionIds, presetExtensionsByName);
+  }
+
+  @Override
+  public Map<String, List<String>> loadBuiltInPresets(String platformStream)
+      throws ExecutionException, InterruptedException, TimeoutException {
+    return cli.loadBuiltInPresets(platformStream);
   }
 
   @Override

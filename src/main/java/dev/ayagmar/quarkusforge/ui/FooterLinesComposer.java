@@ -89,15 +89,15 @@ final class FooterLinesComposer {
       if (width >= 100) {
         return "Up/Down/Home/End or j/k: list nav | Space: toggle | f: fav"
             + " | PgUp/PgDn: category jump | Left/Right or h/l: section hierarchy"
-            + " | v: category filter | c/C: close/open | X: clear selected"
+            + " | v: category filter | Ctrl+Y: preset filter | c/C: close/open | X: clear selected"
             + " | Esc: clear filters/quit | ?: help";
       }
       return "Up/Down or j/k: nav | Space: toggle | PgUp/PgDn: category"
-          + " | v: filter | X: clear selected | Esc: clear filters/quit | ?: help";
+          + " | v: category | Ctrl+Y: preset | X: clear selected | Esc: clear filters/quit | ?: help";
     }
     if (snapshot.focusTarget() == FocusTarget.EXTENSION_SEARCH) {
       return "Type: search | Down: list | Esc: clear filters or return to list"
-          + " | Ctrl+K: favorites | Ctrl+R: reload | ?: help";
+          + " | Ctrl+K: favorites | Ctrl+Y: presets | Ctrl+R: reload | ?: help";
     }
     if (snapshot.focusTarget() == FocusTarget.SUBMIT) {
       return "Enter/Alt+G: submit | Tab: focus | j/k: move | Ctrl+E: errors | ?: help | Esc: quit";

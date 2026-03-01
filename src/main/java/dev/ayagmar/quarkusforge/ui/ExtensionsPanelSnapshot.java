@@ -15,6 +15,7 @@ record ExtensionsPanelSnapshot(
     boolean catalogStale,
     boolean favoritesOnlyFilterEnabled,
     int favoriteCount,
+    String activePresetFilterName,
     String activeCategoryFilterTitle,
     int filteredExtensionCount,
     int totalCatalogExtensionCount,
@@ -25,6 +26,7 @@ record ExtensionsPanelSnapshot(
     title = Objects.requireNonNull(title);
     catalogErrorMessage = catalogErrorMessage == null ? "" : catalogErrorMessage;
     catalogSource = catalogSource == null ? "" : catalogSource;
+    activePresetFilterName = activePresetFilterName == null ? "" : activePresetFilterName;
     activeCategoryFilterTitle = activeCategoryFilterTitle == null ? "" : activeCategoryFilterTitle;
     filteredExtensionCount = Math.max(0, filteredExtensionCount);
     totalCatalogExtensionCount = Math.max(0, totalCatalogExtensionCount);

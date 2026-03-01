@@ -27,11 +27,35 @@ Headless mode (automation/CI):
 
 [source,bash]
 ----
+
+Deterministic replay with recipe + lock:
+
+[source,bash]
+----
+java -jar target/quarkus-forge.jar generate --recipe Forgefile --lock forge.lock
+----
 java -jar target/quarkus-forge.jar generate \
   --group-id org.acme \
   --artifact-id demo \
   --build-tool maven \
   --java-version 25
+----
+
+== Install With JBang
+
+Run directly from the org catalog:
+
+[source,bash]
+----
+jbang quarkus-forge@ayagmar
+----
+
+Install as a local command:
+
+[source,bash]
+----
+jbang app install --name quarkus-forge quarkus-forge@ayagmar
+quarkus-forge
 ----
 
 == Next Steps
