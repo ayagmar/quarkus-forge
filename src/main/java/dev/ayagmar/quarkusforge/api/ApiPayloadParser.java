@@ -157,7 +157,10 @@ public final class ApiPayloadParser {
       String shortName = resolvedShortName(readText(node, "shortName"), name);
       String category = resolvedCategory(readText(node, "category"));
       Integer order = readInteger(node, "order");
-      extensions.add(new ExtensionDto(id, name, shortName, category, order));
+      String description = readText(node, "description");
+      extensions.add(
+          new ExtensionDto(
+              id, name, shortName, category, order, description == null ? "" : description));
     }
     return List.copyOf(extensions);
   }

@@ -180,6 +180,8 @@ final class BodyPanelRenderer {
     boolean showSearchInput = snapshot.searchFocused();
     boolean hasSelected = !snapshot.selectedExtensionIds().isEmpty();
     boolean showSubmitButton = true;
+    boolean showDescription =
+        snapshot.listFocused() && !snapshot.focusedExtensionDescription().isBlank();
 
     List<Constraint> sectionConstraints = new ArrayList<>();
     sectionConstraints.add(Constraint.length(1)); // Search hint
@@ -190,6 +192,9 @@ final class BodyPanelRenderer {
       sectionConstraints.add(Constraint.length(1)); // Selected extensions summary
     }
     sectionConstraints.add(Constraint.fill()); // Extension list
+    if (showDescription) {
+      sectionConstraints.add(Constraint.length(1)); // Extension description
+    }
     if (showSubmitButton) {
       sectionConstraints.add(Constraint.length(1)); // Submit button
     }
@@ -205,6 +210,9 @@ final class BodyPanelRenderer {
     }
     renderExtensionList(
         frame, sections.get(idx++), snapshot, listState, selectedLookup, favoriteLookup);
+    if (showDescription) {
+      renderExtensionDescription(frame, sections.get(idx++), snapshot);
+    }
     if (showSubmitButton) {
       renderSubmitButton(frame, sections.get(idx), snapshot);
     }
@@ -342,6 +350,22 @@ final class BodyPanelRenderer {
         Paragraph.builder()
             .text(summary.toString())
             .style(Style.EMPTY.fg(theme.color("accent")).bold())
+            .overflow(Overflow.ELLIPSIS)
+            .build();
+    frame.renderWidget(paragraph, area);
+  }
+
+  private void renderExtensionDescription(
+      Frame frame, Rect area, ExtensionsPanelSnapshot snapshot) {
+    String description = snapshot.focusedExtensionDescription();
+    int maxLen = Math.max(10, area.width() - 4);
+    if (description.length() > maxLen) {
+      description = description.substring(0, maxLen - 3) + "...";
+    }
+    Paragraph paragraph =
+        Paragraph.builder()
+            .text("  " + description)
+            .style(Style.EMPTY.fg(theme.color("muted")).italic())
             .overflow(Overflow.ELLIPSIS)
             .build();
     frame.renderWidget(paragraph, area);

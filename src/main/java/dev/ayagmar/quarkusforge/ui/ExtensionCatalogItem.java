@@ -4,16 +4,27 @@ import java.util.Locale;
 import java.util.Objects;
 
 public record ExtensionCatalogItem(
-    String id, String name, String shortName, String category, Integer apiOrder) {
+    String id,
+    String name,
+    String shortName,
+    String category,
+    Integer apiOrder,
+    String description) {
   public ExtensionCatalogItem {
     id = requireValue(id, "id");
     name = requireValue(name, "name");
     shortName = requireValue(shortName, "shortName");
     category = normalizeCategory(category);
+    description = description == null ? "" : description.trim();
   }
 
   public ExtensionCatalogItem(String id, String name, String shortName) {
-    this(id, name, shortName, "Other", null);
+    this(id, name, shortName, "Other", null, "");
+  }
+
+  public ExtensionCatalogItem(
+      String id, String name, String shortName, String category, Integer apiOrder) {
+    this(id, name, shortName, category, apiOrder, "");
   }
 
   String categoryKey() {

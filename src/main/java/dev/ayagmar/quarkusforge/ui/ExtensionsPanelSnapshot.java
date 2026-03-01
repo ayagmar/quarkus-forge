@@ -21,7 +21,8 @@ record ExtensionsPanelSnapshot(
     int totalCatalogExtensionCount,
     List<ExtensionCatalogRow> filteredRows,
     List<String> selectedExtensionIds,
-    String searchQuery) {
+    String searchQuery,
+    String focusedExtensionDescription) {
   ExtensionsPanelSnapshot {
     title = Objects.requireNonNull(title);
     catalogErrorMessage = catalogErrorMessage == null ? "" : catalogErrorMessage;
@@ -33,5 +34,7 @@ record ExtensionsPanelSnapshot(
     filteredRows = List.copyOf(Objects.requireNonNull(filteredRows));
     selectedExtensionIds = List.copyOf(Objects.requireNonNull(selectedExtensionIds));
     searchQuery = searchQuery == null ? "" : searchQuery;
+    focusedExtensionDescription =
+        focusedExtensionDescription == null ? "" : focusedExtensionDescription;
   }
 }

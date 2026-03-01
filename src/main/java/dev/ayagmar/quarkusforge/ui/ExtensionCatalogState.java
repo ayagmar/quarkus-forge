@@ -353,6 +353,11 @@ final class ExtensionCatalogState {
     return selected == null ? "" : selected.id();
   }
 
+  String focusedExtensionDescription() {
+    ExtensionCatalogItem selected = selectedListItem();
+    return selected == null ? "" : selected.description();
+  }
+
   boolean favoritesOnlyFilterEnabled() {
     return favoritesOnlyFilterEnabled;
   }

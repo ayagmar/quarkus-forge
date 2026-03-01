@@ -732,7 +732,8 @@ public final class CoreTuiController
         extensionCatalogState.totalCatalogExtensionCount(),
         extensionCatalogState.filteredRows(),
         extensionCatalogState.selectedExtensionIds(),
-        inputStates.get(FocusTarget.EXTENSION_SEARCH).text());
+        inputStates.get(FocusTarget.EXTENSION_SEARCH).text(),
+        extensionCatalogState.focusedExtensionDescription());
   }
 
   @Override
@@ -1670,7 +1671,8 @@ public final class CoreTuiController
                         extension.name(),
                         extension.shortName(),
                         extension.category(),
-                        extension.order()))
+                        extension.order(),
+                        extension.description()))
             .toList();
     if (items.isEmpty()) {
       applyCatalogLoadFailure("Catalog load returned no extensions");
