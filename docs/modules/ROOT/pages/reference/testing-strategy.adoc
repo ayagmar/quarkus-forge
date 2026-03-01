@@ -2,9 +2,33 @@
 
 == Test Layers
 
-* Unit tests for parsing, validation, and state transitions.
-* Integration tests for API and generation flows.
-* Pilot and regression checks for TUI/CLI behavior.
+* **Unit tests** (516+): parsing, validation, state machines, and extracted class behavior.
+* **Integration tests** (2): WireMock-based API contract verification and E2E generation.
+* **Deterministic async harnesses**: TUI state machine tests use `UiScheduler.immediate()` and `Duration.ZERO` debounce.
+* **Property-based tests**: ZIP extraction edge cases (path traversal, large archives).
+
+== Dedicated Test Suites for Extracted Classes
+
+[cols="1,1,2"]
+|===
+| Class | Tests | Coverage
+
+| `PostGenerationMenuState`
+| 26
+| State transitions, key handling, sealed `MenuKeyResult` dispatch
+
+| `MetadataSelectorManager`
+| 18
+| Selector sync, option cycling, boundary conditions
+
+| `CatalogRowBuilder`
+| 16
+| Section headers, favorites, recents, deduplication
+
+| `StartupOverlayTracker`
+| 8
+| Duration tracking, visibility state, timing edge cases
+|===
 
 == Core Verification Commands
 
@@ -15,6 +39,11 @@ mvn -q checkstyle:check
 mvn -q test
 mvn -q verify -DskipTests=true
 ----
+
+== Platform Independence
+
+* Path assertions use `Path.toString()` instead of hard-coded forward slashes.
+* Temp directories use `@TempDir` for cross-platform cleanup.
 
 == Docs Verification
 

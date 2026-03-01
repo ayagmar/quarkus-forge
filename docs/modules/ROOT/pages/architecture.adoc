@@ -14,12 +14,16 @@ Quarkus Forge follows a layered architecture that separates HTTP transport, JSON
 │    QuarkusForgeCli ────────────── HeadlessGenerationService         │
 │         │                              │                            │
 │         ▼                              ▼                            │
-│    TuiBootstrapService           ProjectRequestValidator            │
-│         │                              │                            │
-│         ▼                              │                            │
-│    CoreTuiController                   │                            │
-│         │                              │                            │
-├─────────┼──────────────────────────────┼────────────────────────────┤
+│    TuiBootstrapService      ProjectRequestFactory                   │
+│         │                         │                                 │
+│         ▼                         │                                 │
+│    CoreTuiController              │                                 │
+│         │                         │                                 │
+│         │                  HeadlessCatalogClient                     │
+│         │                  HeadlessOutputPrinter                     │
+│         │                  HeadlessTimeouts                          │
+│         │                                                           │
+├─────────┼───────────────────────────────────────────────────────────┤
 │         │         API Layer            │                            │
 │         ▼                              ▼                            │
 │    QuarkusApiClient ───────► ApiPayloadParser                       │
@@ -110,7 +114,7 @@ CoreTuiController (State Machine)
             ▼
      Post-Generation Menu
             │
-            ├── Export recipe/lock
+            ├── Export Forgefile
             ├── Publish to GitHub ──► Visibility sub-menu
             ├── Open IDE
             ├── Open Terminal
@@ -247,6 +251,12 @@ When the user presses `Esc` in the extension search or list, the TUI unwinds fil
 │    ├── platformStream, buildTool, javaVersion           │
 │    └── extensions (list of IDs)                         │
 │                                                         │
+│  ProjectRequestFactory                                  │
+│    ├── fromOptions: RequestOptions → ProjectRequest     │
+│    ├── buildInitialState: validates + creates ForgeUiSt │
+│    ├── applyRecommendedPlatformStream                   │
+│    └── mapFailureToExitCode                             │
+│                                                         │
 │  ProjectRequestValidator                                │
 │    └── validates field formats (Maven coordinates, etc) │
 │                                                         │
@@ -256,9 +266,9 @@ When the user presses `Esc` in the extension search or list, the TUI unwinds fil
 │  CliPrefillMapper                                       │
 │    └── maps CLI --options to ProjectRequest fields      │
 │                                                         │
-│  ForgeRecipeLockStore                                   │
-│    ├── Forgefile (recipe) read/write                    │
-│    └── forge.lock (deterministic lock) read/write       │
+│  Forgefile + ForgefileLock                              │
+│    ├── Unified template with optional locked section    │
+│    └── ForgefileStore: read/write JSON persistence      │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 ....

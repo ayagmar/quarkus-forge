@@ -7,32 +7,62 @@ Quarkus Forge uses two storage scopes with different purposes.
 This directory stores user-specific runtime data:
 
 * `catalog-snapshot.json`: last known extension catalog snapshot (offline/stale fallback).
-* `preferences.json`: saved user preferences.
-* `favorites.json`: extension favorites used by the TUI and presets.
-* `recipes/`: reusable Forge recipes for cross-project reuse.
+* `preferences.json`: saved user preferences (last platform, build tool, java version, etc.).
+* `favorites.json`: extension favorites used by the TUI and the `favorites` preset.
+* `recipes/`: shareable Forgefile templates for cross-project reuse.
 
 These files are machine-local and should not be committed to project repositories.
 
-== 2) Recipe and Lock Files
+== 2) The Forgefile
 
-`Forgefile` and `forge.lock` have different purposes:
+A `Forgefile` is a single JSON file that serves as both a project template and a deterministic lock:
 
-* `Forgefile`: recipe input for repeatable generation intent.
-* `forge.lock`: locked platform/build/java/extension resolution.
+[source,json]
+----
+{
+  "groupId": "com.acme",
+  "artifactId": "my-service",
+  "version": "1.0.0-SNAPSHOT",
+  "buildTool": "maven",
+  "javaVersion": "25",
+  "extensions": ["io.quarkus:quarkus-rest"],
+  "presets": ["web"],
+  "locked": {
+    "platformStream": "io.quarkus.platform:3.31",
+    "buildTool": "maven",
+    "javaVersion": "25",
+    "extensions": ["io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc"],
+    "presets": ["web"]
+  }
+}
+----
 
-Recommended placement:
+* **Top-level fields**: human intent — what you want to generate.
+* **`locked` section** (optional): exact resolved values for deterministic builds.
 
-* Reusable recipes: store under `~/.quarkus-forge/recipes/`.
-* Project-specific recipe/lock for strict reproducibility: keep in the project repository/CI assets.
+=== When to use the locked section
+
+* **CI pipelines**: ensure identical project generation across environments.
+* **Team sharing**: lock exact versions so everyone generates the same project.
+* **Drift detection**: `--lock-check` verifies no unintended changes.
+
+=== Recommended placement
+
+* Reusable templates: store under `~/.quarkus-forge/recipes/`.
+* Project-specific Forgefile for strict reproducibility: keep in the project repository root.
 
 == CLI Resolution Rules
 
-`generate --recipe` behavior:
+`generate --from` behavior:
 
 * If the provided path exists locally, it is used directly.
 * If local path is missing, Forge resolves it from `~/.quarkus-forge/recipes/`.
 
-`generate --write-recipe` behavior:
+`generate --save-as` behavior:
 
 * If a full/relative path is provided (for example `./Forgefile`), Forge writes there.
 * If a simple name is provided (for example `starter.json`), Forge writes to `~/.quarkus-forge/recipes/starter.json`.
+
+== TUI Export
+
+After generating a project in the TUI, the "Export Forgefile" post-generation action writes a complete Forgefile (with locked section) to the generated project directory.
