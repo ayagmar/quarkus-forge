@@ -20,6 +20,9 @@ final class PostTuiActionExecutor {
 
   void execute(
       TuiSessionSummary summary, String postGenerateHookCommand, DiagnosticLogger diagnostics) {
+    if (summary == null) {
+      return;
+    }
     PostGenerationExitPlan exitPlan = summary.exitPlan();
     if (exitPlan == null || exitPlan.projectDirectory() == null) {
       return;

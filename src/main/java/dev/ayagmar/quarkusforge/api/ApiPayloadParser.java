@@ -81,7 +81,7 @@ public final class ApiPayloadParser {
       }
 
       String platformVersion = normalizeOptionalText(readText(stream, "platformVersion"));
-      boolean recommended = Boolean.TRUE.equals(readBoolean(stream, "recommended"));
+      boolean recommended = Boolean.TRUE.equals(JsonFieldReader.readBoolean(stream, "recommended"));
       platformStreams.add(
           new PlatformStream(key, platformVersion, recommended, streamJavaVersions));
     }
@@ -200,17 +200,6 @@ public final class ApiPayloadParser {
 
   static String readText(Map<String, Object> source, String fieldName) {
     return JsonFieldReader.readString(source, fieldName);
-  }
-
-  static Boolean readBoolean(Map<String, Object> source, String fieldName) {
-    Object value = source.get(fieldName);
-    if (value == null) {
-      return null;
-    }
-    if (value instanceof Boolean booleanValue) {
-      return booleanValue;
-    }
-    throw new ApiContractException("Malformed JSON payload");
   }
 
   static Integer readInteger(Map<String, Object> source, String fieldName) {
@@ -387,7 +376,7 @@ public final class ApiPayloadParser {
             "Metadata platform stream entry is missing 'javaVersions' array");
       }
       List<String> javaVersions = copyStringList(javaVersionsNode, "platformStreams.javaVersions");
-      boolean recommended = Boolean.TRUE.equals(readBoolean(stream, "recommended"));
+      boolean recommended = Boolean.TRUE.equals(JsonFieldReader.readBoolean(stream, "recommended"));
       platformStreams.add(new PlatformStream(key, platformVersion, recommended, javaVersions));
     }
     return List.copyOf(platformStreams);

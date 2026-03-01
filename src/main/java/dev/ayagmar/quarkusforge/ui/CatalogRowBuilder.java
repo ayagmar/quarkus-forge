@@ -1,6 +1,7 @@
 package dev.ayagmar.quarkusforge.ui;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -119,8 +120,12 @@ final class CatalogRowBuilder {
     for (ExtensionCatalogItem item : items) {
       byId.put(item.id(), item);
     }
+    Set<String> seen = new HashSet<>();
     List<ExtensionCatalogItem> recent = new ArrayList<>();
     for (String recentId : recentExtensionIds) {
+      if (!seen.add(recentId)) {
+        continue;
+      }
       ExtensionCatalogItem item = byId.get(recentId);
       if (item != null) {
         recent.add(item);

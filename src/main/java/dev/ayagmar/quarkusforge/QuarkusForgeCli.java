@@ -629,19 +629,24 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
     ProjectArchiveService archiveService =
         new ProjectArchiveService(apiClient, new SafeZipExtractor());
-    return archiveService
-        .downloadAndExtract(
-            generationRequest,
-            outputPath,
-            OverwritePolicy.FAIL_IF_EXISTS,
-            () -> Thread.currentThread().isInterrupted(),
-            progress ->
-                progressLineConsumer.accept(
-                    switch (progress) {
-                      case REQUESTING_ARCHIVE -> "requesting project archive from Quarkus API...";
-                      case EXTRACTING_ARCHIVE -> "extracting project archive...";
-                    }))
-        .whenComplete((ignored, throwable) -> apiClient.close());
+    try {
+      return archiveService
+          .downloadAndExtract(
+              generationRequest,
+              outputPath,
+              OverwritePolicy.FAIL_IF_EXISTS,
+              () -> Thread.currentThread().isInterrupted(),
+              progress ->
+                  progressLineConsumer.accept(
+                      switch (progress) {
+                        case REQUESTING_ARCHIVE -> "requesting project archive from Quarkus API...";
+                        case EXTRACTING_ARCHIVE -> "extracting project archive...";
+                      }))
+          .whenComplete((ignored, throwable) -> apiClient.close());
+    } catch (RuntimeException e) {
+      apiClient.close();
+      throw e;
+    }
   }
 
   static Duration headlessCatalogTimeout() {

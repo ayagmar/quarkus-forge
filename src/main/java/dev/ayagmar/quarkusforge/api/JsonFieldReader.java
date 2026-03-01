@@ -97,7 +97,7 @@ public final class JsonFieldReader {
       }
       object.put(key, entry.getValue());
     }
-    return object;
+    return Map.copyOf(object);
   }
 
   public static List<Object> readArray(Map<String, Object> source, String fieldName) {
@@ -108,7 +108,18 @@ public final class JsonFieldReader {
     if (!(value instanceof List<?> rawArray)) {
       throw new ApiContractException("Malformed JSON payload");
     }
-    return new ArrayList<>(rawArray);
+    return List.copyOf(rawArray);
+  }
+
+  public static Boolean readBoolean(Map<String, Object> source, String fieldName) {
+    Object value = source.get(fieldName);
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof Boolean booleanValue) {
+      return booleanValue;
+    }
+    throw new ApiContractException("Malformed JSON payload");
   }
 
   private static int toExactInt(Number number) {
