@@ -1,5 +1,7 @@
 project:
   name: quarkus-forge
+  authors:
+    - ayagmar
   versionPattern: CUSTOM
   stereotype: CLI
   description: Keyboard-first Quarkus project generator TUI
@@ -41,4 +43,3 @@ distributions:
       - path: artifacts/quarkus-forge-macos-aarch64
       - path: artifacts/quarkus-forge-windows-x86_64.exe
       - path: artifacts/jbang-catalog.json
-      - path: artifacts/jbang-catalog-org.json
