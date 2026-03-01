@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticField;
 import java.nio.file.Path;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class QuarkusForgeCliTest {
@@ -128,5 +129,11 @@ class QuarkusForgeCliTest {
   void shellCommandInvocationUsesCmdForWindows() {
     assertThat(ShellExecutor.commandInvocation("echo ok", true))
         .containsExactly("cmd.exe", "/c", "echo ok");
+  }
+
+  @Test
+  void isCommandAvailableReturnsFalseForMissingBinary() {
+    String missing = "missing-" + UUID.randomUUID();
+    assertThat(QuarkusForgeCli.isCommandAvailable(missing)).isFalse();
   }
 }

@@ -312,6 +312,22 @@ public final class QuarkusForgeCli implements Callable<Integer> {
             df("directory", generatedProjectDir.toString()));
         executeShellCommand("code .", generatedProjectDir, diagnostics, "open-ide");
       }
+      case PUBLISH_GITHUB -> {
+        diagnostics.info(
+            "tui.post-action.start",
+            df("action", "publish-github"),
+            df("directory", generatedProjectDir.toString()));
+        if (!isCommandAvailable("gh")) {
+          String message =
+              "Publish to GitHub requires GitHub CLI ('gh') on PATH. Install it and rerun.";
+          diagnostics.error(
+              "tui.post-action.failure", df("action", "publish-github"), df("message", message));
+          System.err.println(message);
+          break;
+        }
+        executeShellCommand(
+            "gh repo create --source . --push", generatedProjectDir, diagnostics, "publish-github");
+      }
       case OPEN_TERMINAL -> {
         diagnostics.info(
             "tui.post-action.start",
@@ -359,6 +375,44 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   static boolean isWindowsOs() {
     String osName = System.getProperty("os.name", "");
     return osName.toLowerCase(java.util.Locale.ROOT).contains("win");
+  }
+
+  static boolean isCommandAvailable(String command) {
+    if (command == null || command.isBlank()) {
+      return false;
+    }
+    String path = System.getenv("PATH");
+    if (path == null || path.isBlank()) {
+      return false;
+    }
+
+    String executable = command.strip();
+    String[] pathEntries = path.split(java.io.File.pathSeparator);
+    boolean windows = isWindowsOs();
+    for (String pathEntry : pathEntries) {
+      if (pathEntry == null || pathEntry.isBlank()) {
+        continue;
+      }
+      java.nio.file.Path directory = java.nio.file.Path.of(pathEntry);
+      if (isExecutableFile(directory.resolve(executable), windows)) {
+        return true;
+      }
+      if (windows) {
+        if (isExecutableFile(directory.resolve(executable + ".exe"), true)
+            || isExecutableFile(directory.resolve(executable + ".cmd"), true)
+            || isExecutableFile(directory.resolve(executable + ".bat"), true)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private static boolean isExecutableFile(java.nio.file.Path path, boolean windows) {
+    if (!java.nio.file.Files.isRegularFile(path)) {
+      return false;
+    }
+    return windows || java.nio.file.Files.isExecutable(path);
   }
 
   static DiagnosticField[] postHookDiagnosticFields(Path generatedProjectDir, String command) {

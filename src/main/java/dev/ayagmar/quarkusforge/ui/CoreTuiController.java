@@ -94,7 +94,13 @@ public final class CoreTuiController
           new CommandPaletteEntry(
               "Toggle error details", "Ctrl+E", CommandPaletteAction.TOGGLE_ERROR_DETAILS));
   private static final List<String> POST_GENERATION_ACTION_LABELS =
-      List.of("Write forge.lock", "Open in IDE", "Open in terminal", "Generate again", "Quit");
+      List.of(
+          "Write forge.lock",
+          "Publish to GitHub (requires gh)",
+          "Open in IDE",
+          "Open in terminal",
+          "Generate again",
+          "Quit");
   private static final String FORGE_LOCK_FILE_NAME = "forge.lock";
   private static final List<String> GLOBAL_HELP_LINES =
       List.of(
@@ -1352,9 +1358,10 @@ public final class CoreTuiController
     PostGenerationExitAction action =
         switch (postGenerationActionSelection) {
           case 0 -> PostGenerationExitAction.EXPORT_RECIPE_LOCK;
-          case 1 -> PostGenerationExitAction.OPEN_IDE;
-          case 2 -> PostGenerationExitAction.OPEN_TERMINAL;
-          case 3 -> PostGenerationExitAction.GENERATE_AGAIN;
+          case 1 -> PostGenerationExitAction.PUBLISH_GITHUB;
+          case 2 -> PostGenerationExitAction.OPEN_IDE;
+          case 3 -> PostGenerationExitAction.OPEN_TERMINAL;
+          case 4 -> PostGenerationExitAction.GENERATE_AGAIN;
           default -> PostGenerationExitAction.QUIT;
         };
     if (action == PostGenerationExitAction.EXPORT_RECIPE_LOCK) {

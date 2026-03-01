@@ -57,6 +57,7 @@ class CoreTuiGenerationFlowTest {
     generationRunner.complete(Path.of("build/generated-project"));
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
     assertThat(action.shouldQuit()).isTrue();
@@ -77,6 +78,7 @@ class CoreTuiGenerationFlowTest {
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     generationRunner.complete(Path.of("build/generated-project"));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
@@ -110,6 +112,27 @@ class CoreTuiGenerationFlowTest {
     assertThat(action.shouldQuit()).isFalse();
     assertThat(controller.postGenerationExitPlan()).isEmpty();
     assertThat(generated.resolve("forge.lock")).exists();
+  }
+
+  @Test
+  void postGenerationMenuCanSelectPublishToGithubExitPlan() {
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
+    CoreTuiController controller =
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    generationRunner.complete(Path.of("build/generated-project"));
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .contains("Publish to GitHub (requires gh)");
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    assertThat(action.shouldQuit()).isTrue();
+    assertThat(controller.postGenerationExitPlan()).isPresent();
+    assertThat(controller.postGenerationExitPlan().orElseThrow().action())
+        .isEqualTo(PostGenerationExitAction.PUBLISH_GITHUB);
   }
 
   @Test
