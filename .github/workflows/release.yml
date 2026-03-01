@@ -126,7 +126,7 @@ jobs:
             maven-${{ runner.os }}-
 
       - name: Build native artifact
-        run: mvn -B -ntp -Pnative -Dnative.skip=false -DskipTests package
+        run: mvn -B -ntp -Pnative "-Dnative.skip=false" "-DskipTests" package
 
       - name: Rename native artifact
         shell: bash
@@ -161,7 +161,7 @@ jobs:
           sed -i "s#github.com/[^/]*/[^/]*/releases/latest/download/#github.com/${REPO}/releases/download/${TAG}/#g" dist/jbang-catalog.json
 
       - name: Prepare org-level JBang catalog
-        run: cp jbang-catalog.json dist/jbang-catalog-org.json
+        run: cp dist/jbang-catalog.json dist/jbang-catalog-org.json
 
       - name: Upload JBang catalog
         uses: actions/upload-artifact@v4
