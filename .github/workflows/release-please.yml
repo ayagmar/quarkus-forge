@@ -58,17 +58,16 @@ jobs:
         id: release
         uses: googleapis/release-please-action@v4
         with:
-          token: ${{ github.token }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           target-branch: master
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           release-as: ${{ steps.version.outputs.release_as }}
-          skip-github-release: true
 
       - name: Auto-merge release-please PR
         if: steps.release.outputs.prs_created == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           PRS_JSON: ${{ steps.release.outputs.prs }}
         run: |
           set -euo pipefail
@@ -76,26 +75,6 @@ jobs:
             echo "No release PR payload to merge."
             exit 0
           fi
-
-          git fetch origin master --tags
           echo "$PRS_JSON" | jq -r '.[].number' | while read -r pr_number; do
-            gh pr merge "$pr_number" --repo ayagmar/quarkus-forge --squash --delete-branch
-
-            pr_json="$(gh pr view "$pr_number" --repo ayagmar/quarkus-forge --json title,mergeCommit)"
-            version="$(echo "$pr_json" | jq -r '.title | capture("release (?<v>[0-9]+\\.[0-9]+\\.[0-9]+)") | .v')"
-            sha="$(echo "$pr_json" | jq -r '.mergeCommit.oid')"
-            tag="v${version}"
-
-            if [ -z "$version" ] || [ "$version" = "null" ] || [ -z "$sha" ] || [ "$sha" = "null" ]; then
-              echo "Unable to derive release tag for PR #$pr_number"
-              exit 1
-            fi
-
-            if git ls-remote --tags origin "refs/tags/${tag}" | grep -q "${tag}"; then
-              echo "Tag ${tag} already exists on origin."
-              continue
-            fi
-
-            git tag -a "${tag}" "${sha}" -m "Release ${tag}"
-            git push origin "${tag}"
+            gh pr merge "$pr_number" --repo ayagmar/quarkus-forge --auto --squash --delete-branch
           done
