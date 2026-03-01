@@ -4,7 +4,7 @@
 
   <groupId>dev.ayagmar</groupId>
   <artifactId>quarkus-forge</artifactId>
-  <version>0.1.1-SNAPSHOT</version>
+  <version>0.1.1</version>
   <name>quarkus-forge</name>
   <description>Keyboard-first Quarkus project generator TUI</description>
 
