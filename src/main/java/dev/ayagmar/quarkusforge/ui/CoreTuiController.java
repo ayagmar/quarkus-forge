@@ -374,7 +374,7 @@ public final class CoreTuiController
 
   @Override
   public boolean isCommandPaletteToggleKey(KeyEvent keyEvent) {
-    return CoreTuiController.isCommandPaletteToggleShortcutKey(keyEvent);
+    return AppKeyActions.isCommandPaletteToggleKey(keyEvent);
   }
 
   @Override
@@ -404,7 +404,7 @@ public final class CoreTuiController
 
   @Override
   public UiAction handleQuitFlow(KeyEvent keyEvent) {
-    if (!shouldQuitKeyEvent(keyEvent)) {
+    if (!(keyEvent.isCancel() || keyEvent.isCtrlC())) {
       return null;
     }
     if (isGenerationInProgress()) {
@@ -435,23 +435,23 @@ public final class CoreTuiController
       focusExtensionList();
       return UiAction.handled(false);
     }
-    if (isCatalogReloadKey(keyEvent)) {
+    if (AppKeyActions.isCatalogReloadKey(keyEvent)) {
       requestCatalogReload();
       return UiAction.handled(false);
     }
-    if (isFavoritesFilterToggleKey(keyEvent)) {
+    if (AppKeyActions.isFavoritesFilterToggleKey(keyEvent)) {
       toggleFavoritesOnlyFilter();
       return UiAction.handled(false);
     }
-    if (isPresetFilterCycleKey(keyEvent)) {
+    if (AppKeyActions.isPresetFilterCycleKey(keyEvent)) {
       cyclePresetFilter();
       return UiAction.handled(false);
     }
-    if (isJumpToFavoriteKey(keyEvent)) {
+    if (AppKeyActions.isJumpToFavoriteKey(keyEvent)) {
       jumpToFavorite();
       return UiAction.handled(false);
     }
-    if (isErrorDetailsToggleKey(keyEvent)) {
+    if (AppKeyActions.isErrorDetailsToggleKey(keyEvent)) {
       toggleErrorDetails();
       return UiAction.handled(false);
     }
@@ -483,7 +483,7 @@ public final class CoreTuiController
 
   @Override
   public UiAction handleSubmitFlow(KeyEvent keyEvent) {
-    if (keyEvent.isConfirm() || isGenerateShortcutKey(keyEvent)) {
+    if (keyEvent.isConfirm() || AppKeyActions.isGenerateShortcutKey(keyEvent)) {
       handleSubmitRequest();
       return UiAction.handled(false);
     }
@@ -502,19 +502,19 @@ public final class CoreTuiController
       focusExtensionSearch();
       return UiAction.handled(false);
     }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && isSectionHierarchyLeftKey(keyEvent)) {
+    if (focusTarget == FocusTarget.EXTENSION_LIST && (keyEvent.isLeft() || UiKeyMatchers.isVimLeftKey(keyEvent))) {
       handleExtensionListHierarchyLeft();
       return UiAction.handled(false);
     }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && isSectionHierarchyRightKey(keyEvent)) {
+    if (focusTarget == FocusTarget.EXTENSION_LIST && (keyEvent.isRight() || UiKeyMatchers.isVimRightKey(keyEvent))) {
       handleExtensionListHierarchyRight();
       return UiAction.handled(false);
     }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && isSectionJumpDownKey(keyEvent)) {
+    if (focusTarget == FocusTarget.EXTENSION_LIST && keyEvent.isPageDown()) {
       jumpToAdjacentCategorySection(true);
       return UiAction.handled(false);
     }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && isSectionJumpUpKey(keyEvent)) {
+    if (focusTarget == FocusTarget.EXTENSION_LIST && keyEvent.isPageUp()) {
       jumpToAdjacentCategorySection(false);
       return UiAction.handled(false);
     }
@@ -524,27 +524,27 @@ public final class CoreTuiController
       toggleCategoryCollapseAtSelection();
       return UiAction.handled(false);
     }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && isFavoriteToggleKey(keyEvent)) {
+    if (focusTarget == FocusTarget.EXTENSION_LIST && AppKeyActions.isFavoriteToggleKey(keyEvent)) {
       toggleFavoriteAtSelection();
       return UiAction.handled(false);
     }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && isCategoryFilterCycleKey(keyEvent)) {
+    if (focusTarget == FocusTarget.EXTENSION_LIST && AppKeyActions.isCategoryFilterCycleKey(keyEvent)) {
       cycleCategoryFilter();
       return UiAction.handled(false);
     }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && isPresetFilterCycleKey(keyEvent)) {
+    if (focusTarget == FocusTarget.EXTENSION_LIST && AppKeyActions.isPresetFilterCycleKey(keyEvent)) {
       cyclePresetFilter();
       return UiAction.handled(false);
     }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && isClearSelectedExtensionsKey(keyEvent)) {
+    if (focusTarget == FocusTarget.EXTENSION_LIST && AppKeyActions.isClearSelectedExtensionsKey(keyEvent)) {
       clearSelectedExtensions();
       return UiAction.handled(false);
     }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && isCategoryCollapseToggleKey(keyEvent)) {
+    if (focusTarget == FocusTarget.EXTENSION_LIST && AppKeyActions.isCategoryCollapseToggleKey(keyEvent)) {
       toggleCategoryCollapseAtSelection();
       return UiAction.handled(false);
     }
-    if (focusTarget == FocusTarget.EXTENSION_LIST && isExpandAllCategoriesKey(keyEvent)) {
+    if (focusTarget == FocusTarget.EXTENSION_LIST && AppKeyActions.isExpandAllCategoriesKey(keyEvent)) {
       expandAllCategories();
       return UiAction.handled(false);
     }
@@ -1668,7 +1668,7 @@ public final class CoreTuiController
       cancelPendingAsyncOperations();
       return UiAction.handled(true);
     }
-    if (keyEvent.isCancel() || isHelpOverlayToggleKey(keyEvent)) {
+    if (keyEvent.isCancel() || AppKeyActions.isHelpOverlayToggleKey(keyEvent)) {
       closeHelpOverlay();
       statusMessage = "Help closed";
       return UiAction.handled(false);
@@ -2488,71 +2488,56 @@ public final class CoreTuiController
   }
 
   private static boolean isCatalogReloadKey(KeyEvent keyEvent) {
-    return AppKeyActions.isCatalogReloadKey(keyEvent);
+    return AppKeyActions.AppKeyActions.isCatalogReloadKey(keyEvent);
   }
 
   private static boolean isGenerateShortcutKey(KeyEvent keyEvent) {
-    return AppKeyActions.isGenerateShortcutKey(keyEvent);
+    return AppKeyActions.AppKeyActions.isGenerateShortcutKey(keyEvent);
   }
 
   private static boolean isFavoriteToggleKey(KeyEvent keyEvent) {
-    return AppKeyActions.isFavoriteToggleKey(keyEvent);
+    return AppKeyActions.AppKeyActions.isFavoriteToggleKey(keyEvent);
   }
 
   private static boolean isClearSelectedExtensionsKey(KeyEvent keyEvent) {
-    return AppKeyActions.isClearSelectedExtensionsKey(keyEvent);
+    return AppKeyActions.AppKeyActions.isClearSelectedExtensionsKey(keyEvent);
   }
 
   private static boolean isCategoryFilterCycleKey(KeyEvent keyEvent) {
-    return AppKeyActions.isCategoryFilterCycleKey(keyEvent);
+    return AppKeyActions.AppKeyActions.isCategoryFilterCycleKey(keyEvent);
   }
 
   private static boolean isJumpToFavoriteKey(KeyEvent keyEvent) {
-    return AppKeyActions.isJumpToFavoriteKey(keyEvent);
+    return AppKeyActions.AppKeyActions.isJumpToFavoriteKey(keyEvent);
   }
 
   private static boolean isFavoritesFilterToggleKey(KeyEvent keyEvent) {
-    return AppKeyActions.isFavoritesFilterToggleKey(keyEvent);
+    return AppKeyActions.AppKeyActions.isFavoritesFilterToggleKey(keyEvent);
   }
 
   private static boolean isPresetFilterCycleKey(KeyEvent keyEvent) {
-    return AppKeyActions.isPresetFilterCycleKey(keyEvent);
+    return AppKeyActions.AppKeyActions.isPresetFilterCycleKey(keyEvent);
   }
 
   private static boolean isCategoryCollapseToggleKey(KeyEvent keyEvent) {
-    return AppKeyActions.isCategoryCollapseToggleKey(keyEvent);
+    return AppKeyActions.AppKeyActions.isCategoryCollapseToggleKey(keyEvent);
   }
 
   private static boolean isExpandAllCategoriesKey(KeyEvent keyEvent) {
-    return AppKeyActions.isExpandAllCategoriesKey(keyEvent);
+    return AppKeyActions.AppKeyActions.isExpandAllCategoriesKey(keyEvent);
   }
 
-  private static boolean isSectionJumpUpKey(KeyEvent keyEvent) {
-    return keyEvent.isPageUp();
-  }
 
-  private static boolean isSectionJumpDownKey(KeyEvent keyEvent) {
-    return keyEvent.isPageDown();
-  }
 
-  private static boolean isSectionHierarchyLeftKey(KeyEvent keyEvent) {
-    return keyEvent.isLeft() || UiKeyMatchers.isVimLeftKey(keyEvent);
-  }
 
-  private static boolean isSectionHierarchyRightKey(KeyEvent keyEvent) {
-    return keyEvent.isRight() || UiKeyMatchers.isVimRightKey(keyEvent);
-  }
 
-  private static boolean isCommandPaletteToggleShortcutKey(KeyEvent keyEvent) {
-    return AppKeyActions.isCommandPaletteToggleKey(keyEvent);
-  }
 
   private static boolean isHelpOverlayToggleKey(KeyEvent keyEvent) {
-    return AppKeyActions.isHelpOverlayToggleKey(keyEvent);
+    return AppKeyActions.AppKeyActions.isHelpOverlayToggleKey(keyEvent);
   }
 
   private static boolean shouldToggleHelpOverlay(KeyEvent keyEvent, FocusTarget currentFocus) {
-    if (!isHelpOverlayToggleKey(keyEvent)) {
+    if (!AppKeyActions.isHelpOverlayToggleKey(keyEvent)) {
       return false;
     }
     if (currentFocus == FocusTarget.EXTENSION_SEARCH) {
@@ -2561,9 +2546,6 @@ public final class CoreTuiController
     return !isTextInputFocus(currentFocus);
   }
 
-  private static boolean shouldQuitKeyEvent(KeyEvent keyEvent) {
-    return keyEvent.isCancel() || keyEvent.isCtrlC();
-  }
 
   private boolean shouldClearExtensionSearchOnCancel(KeyEvent keyEvent) {
     if (!keyEvent.isCancel() || isGenerationInProgress()) {
@@ -2634,7 +2616,7 @@ public final class CoreTuiController
   }
 
   private static boolean isErrorDetailsToggleKey(KeyEvent keyEvent) {
-    return AppKeyActions.isErrorDetailsToggleKey(keyEvent);
+    return AppKeyActions.AppKeyActions.isErrorDetailsToggleKey(keyEvent);
   }
 
   private static boolean isUpNavigation(KeyEvent keyEvent) {
