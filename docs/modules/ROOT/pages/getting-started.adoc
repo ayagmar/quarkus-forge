@@ -27,18 +27,31 @@ Headless mode (automation/CI):
 
 [source,bash]
 ----
-
-Deterministic replay with recipe + lock:
-
-[source,bash]
-----
-java -jar target/quarkus-forge.jar generate --recipe Forgefile --lock forge.lock
-----
 java -jar target/quarkus-forge.jar generate \
   --group-id org.acme \
   --artifact-id demo \
   --build-tool maven \
   --java-version 25
+----
+
+Deterministic replay with recipe + lock:
+
+[source,bash]
+----
+java -jar target/quarkus-forge.jar generate --recipe starter.json
+----
+
+Save a reusable recipe in the machine-local recipes library:
+
+[source,bash]
+----
+java -jar target/quarkus-forge.jar generate \
+  --dry-run \
+  --group-id org.acme \
+  --artifact-id demo \
+  --build-tool maven \
+  --java-version 25 \
+  --write-recipe starter.json
 ----
 
 == Install With JBang
@@ -62,6 +75,7 @@ quarkus-forge
 
 * xref:usage/tui.adoc[TUI usage guide]
 * xref:cli/headless-mode.adoc[CLI headless guide]
+* xref:reference/forge-files-and-state.adoc[Forge files and state]
 * xref:ui/keybindings.adoc[Keybindings]
 * xref:ui/theming.adoc[Theming]
 * xref:troubleshooting.adoc[Troubleshooting]

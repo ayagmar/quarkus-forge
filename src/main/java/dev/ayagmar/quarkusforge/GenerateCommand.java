@@ -26,10 +26,18 @@ public final class GenerateCommand implements Callable<Integer> {
       description = "Extension preset(s) from code.quarkus.io plus favorites")
   List<String> presets = new ArrayList<>();
 
-  @Option(names = "--recipe", description = "Path to Forge recipe file (example: Forgefile)")
+  @Option(
+      names = "--recipe",
+      description =
+          "Path or recipe name for Forge recipe file. "
+              + "If local path is missing, resolves from ~/.quarkus-forge/recipes")
   String recipeFile;
 
-  @Option(names = "--write-recipe", description = "Write effective recipe to this path")
+  @Option(
+      names = "--write-recipe",
+      description =
+          "Write effective recipe to this path. "
+              + "Simple names are written under ~/.quarkus-forge/recipes")
   String writeRecipeFile;
 
   @Option(names = "--lock", description = "Path to lock file (example: forge.lock)")

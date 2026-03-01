@@ -3,6 +3,7 @@ package dev.ayagmar.quarkusforge.ui;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.ayagmar.quarkusforge.api.ApiHttpException;
+import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.TickEvent;
@@ -97,21 +98,32 @@ class CoreTuiGenerationFlowTest {
 
   @Test
   void postGenerationMenuCanWriteLockAndStayOpen() throws Exception {
-    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
-        new UiControllerTestHarness.ControlledGenerationRunner();
-    Path generated = tempDir.resolve("generated-project");
-    Files.createDirectories(generated);
-    CoreTuiController controller =
-        UiControllerTestHarness.controller(
-            UiScheduler.immediate(), Duration.ZERO, generationRunner);
+    withSystemProperty(
+        "user.home",
+        tempDir.toString(),
+        () -> {
+          UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+              new UiControllerTestHarness.ControlledGenerationRunner();
+          Path generated = tempDir.resolve("generated-project");
+          try {
+            Files.createDirectories(generated);
+          } catch (java.io.IOException ioException) {
+            throw new RuntimeException(ioException);
+          }
+          CoreTuiController controller =
+              UiControllerTestHarness.controller(
+                  UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
-    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
-    generationRunner.complete(generated);
-    UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+          controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+          generationRunner.complete(generated);
+          UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
-    assertThat(action.shouldQuit()).isFalse();
-    assertThat(controller.postGenerationExitPlan()).isEmpty();
-    assertThat(generated.resolve("forge.lock")).exists();
+          assertThat(action.shouldQuit()).isFalse();
+          assertThat(controller.postGenerationExitPlan()).isEmpty();
+          assertThat(generated.resolve("forge.lock")).exists();
+          assertThat(ForgeDataPaths.recipesRoot().resolve("forge-app").resolve("Forgefile"))
+              .exists();
+        });
   }
 
   @Test
@@ -321,6 +333,20 @@ class CoreTuiGenerationFlowTest {
     assertThat(controller.statusMessage()).contains("Generation failed");
     assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
         .contains("Error: Generation service returned null future");
+  }
+
+  private static void withSystemProperty(String key, String value, Runnable runnable) {
+    String previous = System.getProperty(key);
+    try {
+      System.setProperty(key, value);
+      runnable.run();
+    } finally {
+      if (previous == null) {
+        System.clearProperty(key);
+      } else {
+        System.setProperty(key, previous);
+      }
+    }
   }
 
   @Test

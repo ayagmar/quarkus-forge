@@ -9,6 +9,7 @@ Quarkus Forge is a keyboard-first terminal UI and headless CLI to generate Quark
 * xref:usage/tui.adoc[Use the TUI effectively]
 * xref:ui/keybindings.adoc[Use the TUI with keyboard shortcuts]
 * xref:cli/headless-mode.adoc[Generate projects non-interactively]
+* xref:reference/forge-files-and-state.adoc[Understand Forge files and state]
 * xref:troubleshooting.adoc[Fix common issues]
 
 == Core Capabilities

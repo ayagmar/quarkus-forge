@@ -22,4 +22,8 @@ public final class ForgeDataPaths {
   public static Path favoritesFile() {
     return appDataRoot().resolve("favorites.json");
   }
+
+  public static Path recipesRoot() {
+    return appDataRoot().resolve("recipes");
+  }
 }

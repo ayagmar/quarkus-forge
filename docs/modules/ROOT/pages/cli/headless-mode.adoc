@@ -33,26 +33,6 @@ Use extensions and preset together:
 
 [source,bash]
 ----
-
-Recipe + lock replay:
-
-[source,bash]
-----
-java -jar target/quarkus-forge.jar generate \
-  --recipe Forgefile \
-  --lock forge.lock
-----
-
-Refresh lock after intentional changes:
-
-[source,bash]
-----
-java -jar target/quarkus-forge.jar generate \
-  --recipe Forgefile \
-  --lock forge.lock \
-  --refresh-lock \
-  --dry-run
-----
 java -jar target/quarkus-forge.jar generate \
   --group-id org.acme \
   --artifact-id demo \
@@ -60,6 +40,46 @@ java -jar target/quarkus-forge.jar generate \
   --java-version 25 \
   --preset web \
   --extension io.quarkus:quarkus-smallrye-health
+----
+
+Recipe + lock replay:
+
+[source,bash]
+----
+java -jar target/quarkus-forge.jar generate \
+  --recipe ./Forgefile \
+  --lock forge.lock
+----
+
+Save a reusable recipe by name into `~/.quarkus-forge/recipes`:
+
+[source,bash]
+----
+java -jar target/quarkus-forge.jar generate \
+  --dry-run \
+  --group-id org.acme \
+  --artifact-id demo \
+  --build-tool maven \
+  --java-version 25 \
+  --write-recipe starter.json
+----
+
+Reuse that recipe later by name:
+
+[source,bash]
+----
+java -jar target/quarkus-forge.jar generate --recipe starter.json
+----
+
+Refresh lock after intentional changes:
+
+[source,bash]
+----
+java -jar target/quarkus-forge.jar generate \
+  --recipe ./Forgefile \
+  --lock forge.lock \
+  --refresh-lock \
+  --dry-run
 ----
 
 == Key Flags
@@ -86,4 +106,6 @@ java -jar target/quarkus-forge.jar generate \
 * Extension IDs are validated against the loaded catalog.
 * When `--recipe` is set, request metadata fields come from the recipe file; CLI `--preset` and `--extension` are appended.
 * A provided lock file enforces deterministic platform/build/java/preset/extension resolution unless `--refresh-lock` is set.
+* `--recipe <name>` falls back to `~/.quarkus-forge/recipes/<name>` when no local file exists.
+* `--write-recipe <name>` writes to `~/.quarkus-forge/recipes/<name>` when `<name>` has no path separators.
 * Source mode is surfaced in diagnostics (`live`, `cache`, `snapshot`).

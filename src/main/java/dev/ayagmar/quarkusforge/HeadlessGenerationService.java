@@ -3,6 +3,7 @@ package dev.ayagmar.quarkusforge;
 import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
+import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.ThrowableUnwrapper;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticField;
@@ -12,6 +13,7 @@ import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ValidationError;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -246,7 +248,7 @@ final class HeadlessGenerationService {
     ForgeLock lock = null;
 
     if (command.recipeFile != null && !command.recipeFile.isBlank()) {
-      Path recipePath = Path.of(command.recipeFile).toAbsolutePath().normalize();
+      Path recipePath = resolveRecipeReadPath(command.recipeFile);
       ForgeRecipe recipe = ForgeRecipeLockStore.loadRecipe(recipePath);
       requestOptions = recipe.toRequestOptions();
       presetInputs = new ArrayList<>(recipe.presets());
@@ -271,7 +273,7 @@ final class HeadlessGenerationService {
         List.copyOf(extensionInputs),
         lock,
         command.refreshLock,
-        normalizedPathOrNull(command.writeRecipeFile),
+        recipeWritePathOrNull(command.writeRecipeFile),
         normalizedPathOrNull(command.lockFile),
         normalizedPathOrNull(command.writeLockFile));
   }
@@ -382,6 +384,26 @@ final class HeadlessGenerationService {
       return null;
     }
     return Path.of(pathValue).toAbsolutePath().normalize();
+  }
+
+  private static Path resolveRecipeReadPath(String recipeReference) {
+    Path requestedPath = Path.of(recipeReference);
+    Path localPath = requestedPath.toAbsolutePath().normalize();
+    if (requestedPath.isAbsolute() || Files.exists(localPath)) {
+      return localPath;
+    }
+    return ForgeDataPaths.recipesRoot().resolve(requestedPath).toAbsolutePath().normalize();
+  }
+
+  private static Path recipeWritePathOrNull(String pathValue) {
+    if (pathValue == null || pathValue.isBlank()) {
+      return null;
+    }
+    Path requestedPath = Path.of(pathValue);
+    if (requestedPath.isAbsolute() || requestedPath.getParent() != null) {
+      return requestedPath.toAbsolutePath().normalize();
+    }
+    return ForgeDataPaths.recipesRoot().resolve(requestedPath).toAbsolutePath().normalize();
   }
 
   private record EffectiveGenerateInputs(

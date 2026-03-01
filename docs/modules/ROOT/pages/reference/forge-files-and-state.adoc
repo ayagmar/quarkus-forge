@@ -1,0 +1,38 @@
+= Forge Files and State
+
+Quarkus Forge uses two storage scopes with different purposes.
+
+== 1) Machine-Local App Data (`~/.quarkus-forge/`)
+
+This directory stores user-specific runtime data:
+
+* `catalog-snapshot.json`: last known extension catalog snapshot (offline/stale fallback).
+* `preferences.json`: saved user preferences.
+* `favorites.json`: extension favorites used by the TUI and presets.
+* `recipes/`: reusable Forge recipes for cross-project reuse.
+
+These files are machine-local and should not be committed to project repositories.
+
+== 2) Recipe and Lock Files
+
+`Forgefile` and `forge.lock` have different purposes:
+
+* `Forgefile`: recipe input for repeatable generation intent.
+* `forge.lock`: locked platform/build/java/extension resolution.
+
+Recommended placement:
+
+* Reusable recipes: store under `~/.quarkus-forge/recipes/`.
+* Project-specific recipe/lock for strict reproducibility: keep in the project repository/CI assets.
+
+== CLI Resolution Rules
+
+`generate --recipe` behavior:
+
+* If the provided path exists locally, it is used directly.
+* If local path is missing, Forge resolves it from `~/.quarkus-forge/recipes/`.
+
+`generate --write-recipe` behavior:
+
+* If a full/relative path is provided (for example `./Forgefile`), Forge writes there.
+* If a simple name is provided (for example `starter.json`), Forge writes to `~/.quarkus-forge/recipes/starter.json`.

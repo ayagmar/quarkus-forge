@@ -81,6 +81,25 @@ java -jar target/quarkus-forge.jar generate \
   --dry-run
 ```
 
+## Where Files Live
+
+Quarkus Forge uses two storage scopes:
+
+- **Machine-local app state:** `~/.quarkus-forge/`
+  - `catalog-snapshot.json` (catalog cache/snapshot)
+  - `preferences.json` (user preferences)
+  - `favorites.json` (favorite extensions)
+  - `recipes/` (reusable Forge recipes)
+- **Project/workflow files:** usually `forge.lock`, and optionally project-local `Forgefile`
+  - Keep lock files with the repository/workflow for strict reproducibility in CI.
+  - Reusable templates can live in `~/.quarkus-forge/recipes/` and be referenced by name.
+
+Recipe path UX:
+
+- `--recipe <name>`: uses local file if found; otherwise resolves `~/.quarkus-forge/recipes/<name>`.
+- `--write-recipe <name>`: writes to `~/.quarkus-forge/recipes/<name>` when `<name>` is just a filename.
+- Use `./Forgefile` when you explicitly want a project-local file path.
+
 ## Verification Loop (For Contributors)
 
 Before submitting changes, run:
@@ -98,3 +117,4 @@ npm run docs:linkcheck --prefix site
 - Antora docs source: `docs/`
 - Site build scripts: `site/`
 - Local docs guide: `site/README.md`
+- Forge files/state reference: `docs/modules/ROOT/pages/reference/forge-files-and-state.adoc`

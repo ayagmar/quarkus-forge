@@ -1,10 +1,12 @@
 package dev.ayagmar.quarkusforge.ui;
 
 import dev.ayagmar.quarkusforge.ForgeLock;
+import dev.ayagmar.quarkusforge.ForgeRecipe;
 import dev.ayagmar.quarkusforge.ForgeRecipeLockStore;
 import dev.ayagmar.quarkusforge.api.BuildToolCodec;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
+import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.api.PlatformStream;
@@ -95,7 +97,7 @@ public final class CoreTuiController
               "Toggle error details", "Ctrl+E", CommandPaletteAction.TOGGLE_ERROR_DETAILS));
   private static final List<String> POST_GENERATION_ACTION_LABELS =
       List.of(
-          "Write forge.lock",
+          "Export Forgefile + forge.lock",
           "Publish to GitHub (requires gh)",
           "Open in IDE",
           "Open in terminal",
@@ -104,6 +106,7 @@ public final class CoreTuiController
   private static final List<String> GITHUB_VISIBILITY_LABELS =
       List.of("Private repo", "Public repo", "Internal repo (GitHub Enterprise)");
   private static final String FORGE_LOCK_FILE_NAME = "forge.lock";
+  private static final String FORGE_RECIPE_FILE_NAME = "Forgefile";
   private static final List<String> GLOBAL_HELP_LINES =
       List.of(
           "Global",
@@ -1485,7 +1488,7 @@ public final class CoreTuiController
           default -> PostGenerationExitAction.QUIT;
         };
     if (action == PostGenerationExitAction.EXPORT_RECIPE_LOCK) {
-      writeLockFile();
+      exportRecipeAndLockFiles();
       return UiAction.handled(false);
     }
     if (action == PostGenerationExitAction.PUBLISH_GITHUB) {
@@ -1512,10 +1515,10 @@ public final class CoreTuiController
     return UiAction.handled(true);
   }
 
-  private void writeLockFile() {
+  private void exportRecipeAndLockFiles() {
     Path generatedProjectPath = lastGeneratedProjectPath;
     if (generatedProjectPath == null) {
-      statusMessage = "Cannot write forge.lock: no generated project path";
+      statusMessage = "Cannot export files: no generated project path";
       return;
     }
     try {
@@ -1529,9 +1532,28 @@ public final class CoreTuiController
               List.of(),
               selectedExtensions);
       ForgeRecipeLockStore.writeLock(lockPath, lock);
-      statusMessage = "Wrote " + lockPath.getFileName() + " in " + generatedProjectPath;
+      Path recipePath =
+          ForgeDataPaths.recipesRoot().resolve(request.artifactId()).resolve(FORGE_RECIPE_FILE_NAME);
+      ForgeRecipe recipe =
+          new ForgeRecipe(
+              request.groupId(),
+              request.artifactId(),
+              request.version(),
+              request.packageName(),
+              request.outputDirectory(),
+              request.platformStream(),
+              request.buildTool(),
+              request.javaVersion(),
+              List.of(),
+              selectedExtensions);
+      ForgeRecipeLockStore.writeRecipe(recipePath, recipe);
+      statusMessage =
+          "Exported forge.lock in "
+              + generatedProjectPath
+              + " and Forgefile in "
+              + recipePath.getParent();
     } catch (RuntimeException runtimeException) {
-      statusMessage = "Failed to write forge.lock: " + runtimeException.getMessage();
+      statusMessage = "Failed to export Forgefile/forge.lock: " + runtimeException.getMessage();
     }
   }
 

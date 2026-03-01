@@ -11,6 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
+import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
 import dev.ayagmar.quarkusforge.ui.ExtensionFavoritesStore;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
@@ -547,6 +548,77 @@ class QuarkusForgeGenerateCommandTest {
         .contains("\"javaVersion\" : \"25\"")
         .contains("io.quarkus:quarkus-rest")
         .contains("io.quarkus:quarkus-hibernate-orm-panache");
+  }
+
+  @Test
+  void dryRunCanLoadRecipeByNameFromDefaultRecipesDirectory() throws Exception {
+    stubCatalogEndpoints();
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
+
+    CliCommandTestSupport.CommandResult result =
+        withSystemProperty(
+            "user.home",
+            tempDir.toString(),
+            () -> {
+              Path recipePath = ForgeDataPaths.recipesRoot().resolve("starter.json");
+              assertThatCode(
+                      () ->
+                          {
+                            Files.createDirectories(recipePath.getParent());
+                            Files.writeString(
+                                recipePath,
+                                """
+                                {
+                                  "groupId": "com.example",
+                                  "artifactId": "recipe-app",
+                                  "version": "1.0.0-SNAPSHOT",
+                                  "outputDirectory": ".",
+                                  "buildTool": "maven",
+                                  "javaVersion": "25",
+                                  "presets": ["web"],
+                                  "extensions": ["io.quarkus:quarkus-hibernate-orm-panache"]
+                                }
+                                """);
+                          })
+                  .doesNotThrowAnyException();
+
+              return runCommand(
+                  runtimeConfig,
+                  "generate",
+                  "--dry-run",
+                  "--recipe",
+                  "starter.json",
+                  "--write-lock",
+                  tempDir.resolve("generated.lock").toString());
+            });
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(result.standardOut()).contains(" - artifactId: recipe-app");
+  }
+
+  @Test
+  void writeRecipeWithSimpleNameUsesDefaultRecipesDirectory() {
+    stubCatalogEndpoints();
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
+
+    CliCommandTestSupport.CommandResult result =
+        withSystemProperty(
+            "user.home",
+            tempDir.toString(),
+            () ->
+                runCommand(
+                    runtimeConfig,
+                    "generate",
+                    "--dry-run",
+                    "--group-id",
+                    "com.example",
+                    "--artifact-id",
+                    "headless-app",
+                    "--write-recipe",
+                    "team-web.json"));
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(Files.exists(tempDir.resolve(".quarkus-forge/recipes/team-web.json"))).isTrue();
   }
 
   @Test
