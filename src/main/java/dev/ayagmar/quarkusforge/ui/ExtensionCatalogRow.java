@@ -3,17 +3,26 @@ package dev.ayagmar.quarkusforge.ui;
 import java.util.Objects;
 
 record ExtensionCatalogRow(
-    String label, ExtensionCatalogItem extension, boolean collapsed, int hiddenCount) {
+    String label,
+    ExtensionCatalogItem extension,
+    boolean collapsed,
+    int hiddenCount,
+    int totalCount) {
   static ExtensionCatalogRow section(String label) {
-    return section(label, false, 0);
+    return section(label, false, 0, 0);
   }
 
   static ExtensionCatalogRow section(String label, boolean collapsed, int hiddenCount) {
-    return new ExtensionCatalogRow(label, null, collapsed, hiddenCount);
+    return section(label, collapsed, hiddenCount, hiddenCount);
+  }
+
+  static ExtensionCatalogRow section(
+      String label, boolean collapsed, int hiddenCount, int totalCount) {
+    return new ExtensionCatalogRow(label, null, collapsed, hiddenCount, totalCount);
   }
 
   static ExtensionCatalogRow item(ExtensionCatalogItem extension) {
-    return new ExtensionCatalogRow(extension.name(), extension, false, 0);
+    return new ExtensionCatalogRow(extension.name(), extension, false, 0, 0);
   }
 
   ExtensionCatalogRow {
@@ -27,7 +36,7 @@ record ExtensionCatalogRow(
     if (extension != null && (collapsed || hiddenCount > 0)) {
       throw new IllegalArgumentException("Item rows must not carry collapsed metadata");
     }
-    if (extension == null && !collapsed && hiddenCount > 0) {
+    if (extension == null && !collapsed && hiddenCount > 0 && totalCount == 0) {
       throw new IllegalArgumentException("Visible section headers must not carry hidden counts");
     }
   }

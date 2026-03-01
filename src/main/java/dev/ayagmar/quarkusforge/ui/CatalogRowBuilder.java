@@ -153,8 +153,9 @@ final class CatalogRowBuilder {
       String title = resolveCategoryTitle(item.categoryKey(), item.category());
       if (!title.equals(previousTitle)) {
         collapsed = collapsedCategories.contains(title);
-        int hiddenCount = collapsed ? categoryItemCount.getOrDefault(title, 0) : 0;
-        rows.add(ExtensionCatalogRow.section(title, collapsed, hiddenCount));
+        int totalCount = categoryItemCount.getOrDefault(title, 0);
+        int hiddenCount = collapsed ? totalCount : 0;
+        rows.add(ExtensionCatalogRow.section(title, collapsed, hiddenCount, totalCount));
         previousTitle = title;
       }
       if (!collapsed) {

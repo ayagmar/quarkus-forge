@@ -757,7 +757,9 @@ public final class CoreTuiController
       FocusTarget target,
       String focusSuffix) {
     boolean focused = focusTarget == target;
-    int maxValueLen = Math.max(8, area.width() - label.length() - 5);
+    String errorHint = validationErrorHint(target);
+    int reservedForError = errorHint.isEmpty() ? 0 : errorHint.length() + 1;
+    int maxValueLen = Math.max(8, area.width() - label.length() - 5 - reservedForError);
     if (displayValue.length() > maxValueLen) {
       displayValue = displayValue.substring(0, maxValueLen - 2) + "..";
     }
@@ -765,6 +767,9 @@ public final class CoreTuiController
     String line = String.format("  %s: %s", label, displayValue);
     if (focused) {
       line = "  " + label + ": [" + displayValue + focusSuffix;
+    }
+    if (!errorHint.isEmpty()) {
+      line = line + " " + errorHint;
     }
 
     Style style = Style.EMPTY.fg(focused ? theme.color("focus") : theme.color("text"));
@@ -1270,6 +1275,18 @@ public final class CoreTuiController
     String fieldName = focusTargetName(target);
     return validation.errors().stream()
         .anyMatch(error -> error.field().equalsIgnoreCase(fieldName));
+  }
+
+  private String validationErrorHint(FocusTarget target) {
+    if (!hasValidationErrorFor(target)) {
+      return "";
+    }
+    String fieldName = focusTargetName(target);
+    return validation.errors().stream()
+        .filter(error -> error.field().equalsIgnoreCase(fieldName))
+        .findFirst()
+        .map(error -> "⚠ " + error.message())
+        .orElse("");
   }
 
   private String activeErrorDetails() {

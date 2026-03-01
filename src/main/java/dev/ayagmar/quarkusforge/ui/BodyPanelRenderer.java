@@ -277,7 +277,10 @@ final class BodyPanelRenderer {
 
   private void renderSearchInput(Frame frame, Rect area, ExtensionsPanelSnapshot snapshot) {
     String query = snapshot.searchQuery();
-    String display = "  Search: [ " + query + "_ ]  (Esc to clear)";
+    int filtered = snapshot.filteredExtensionCount();
+    int total = snapshot.totalCatalogExtensionCount();
+    String matchInfo = query.isBlank() ? "" : "  " + filtered + "/" + total + " matches";
+    String display = "  Search: [ " + query + "_ ]" + matchInfo + "  (Esc to clear)";
     Paragraph paragraph =
         Paragraph.builder()
             .text(display)
@@ -445,7 +448,14 @@ final class BodyPanelRenderer {
 
   private static String sectionHeaderLabel(ExtensionCatalogRow row) {
     String prefix = row.collapsed() ? "▶ " : "▼ ";
-    String suffix = row.collapsed() ? " (" + row.hiddenCount() + " hidden)" : "";
+    String suffix;
+    if (row.collapsed()) {
+      suffix = " (" + row.hiddenCount() + " hidden)";
+    } else if (row.totalCount() > 0) {
+      suffix = " (" + row.totalCount() + ")";
+    } else {
+      suffix = "";
+    }
     return prefix + row.label() + suffix;
   }
 }

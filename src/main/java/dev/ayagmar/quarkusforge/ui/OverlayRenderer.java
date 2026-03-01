@@ -95,6 +95,8 @@ final class OverlayRenderer {
         frame, viewport, theme, lines, "Publish to GitHub [focus]", 66, true);
   }
 
+  private static final String[] SPINNER_FRAMES = {"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"};
+
   static void renderGenerationOverlay(
       Frame frame, Rect viewport, UiTheme theme, double progressRatio, String progressPhase) {
     if (viewport.width() < 30 || viewport.height() < 8) {
@@ -128,9 +130,11 @@ final class OverlayRenderer {
                 Constraint.length(1), Constraint.length(1), Constraint.length(1), Constraint.fill())
             .split(inner);
 
+    String spinner =
+        SPINNER_FRAMES[(int) ((System.nanoTime() / 100_000_000L) % SPINNER_FRAMES.length)];
     Paragraph phaseLine =
         Paragraph.builder()
-            .text("  " + progressPhase)
+            .text("  " + spinner + " " + progressPhase)
             .style(Style.EMPTY.fg(theme.color("text")).bg(theme.color("base")))
             .overflow(Overflow.ELLIPSIS)
             .build();
