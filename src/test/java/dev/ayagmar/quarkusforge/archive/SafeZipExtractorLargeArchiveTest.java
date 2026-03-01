@@ -30,8 +30,7 @@ class SafeZipExtractorLargeArchiveTest {
             new ArchiveSafetyPolicy(10_000, 256L * 1024L * 1024L, 500.0d, 1L * 1024L * 1024L));
     Path output = tempDir.resolve("generated-project");
 
-    SafeZipExtractor.ExtractionResult result =
-        extractor.extract(zipPath, output, OverwritePolicy.FAIL_IF_EXISTS);
+    ExtractionResult result = extractor.extract(zipPath, output, OverwritePolicy.FAIL_IF_EXISTS);
     long heapAfter = usedHeap();
     long heapDelta = heapAfter - heapBefore;
 

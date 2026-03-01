@@ -227,6 +227,9 @@ final class BodyPanelRenderer {
     if (snapshot.favoritesOnlyFilterEnabled()) {
       title.append(" [fav]");
     }
+    if (!snapshot.activePresetFilterName().isBlank()) {
+      title.append(" [preset:").append(snapshot.activePresetFilterName()).append("]");
+    }
     if (!snapshot.activeCategoryFilterTitle().isBlank()) {
       title.append(" [").append(snapshot.activeCategoryFilterTitle()).append("]");
     }
@@ -245,6 +248,9 @@ final class BodyPanelRenderer {
       int total = snapshot.totalCatalogExtensionCount();
       if (!snapshot.activeCategoryFilterTitle().isBlank()) {
         hint.append("Filter: ").append(snapshot.activeCategoryFilterTitle());
+        hint.append(" | ").append(filtered).append(" of ").append(total);
+      } else if (!snapshot.activePresetFilterName().isBlank()) {
+        hint.append("Preset: ").append(snapshot.activePresetFilterName());
         hint.append(" | ").append(filtered).append(" of ").append(total);
       } else {
         hint.append(catalogSourceLabel(snapshot));
@@ -441,84 +447,5 @@ final class BodyPanelRenderer {
     String prefix = row.collapsed() ? "▶ " : "▼ ";
     String suffix = row.collapsed() ? " (" + row.hiddenCount() + " hidden)" : "";
     return prefix + row.label() + suffix;
-  }
-
-  interface CompactInputRenderer {
-    void renderCompactSelector(
-        Frame frame, Rect area, String label, String value, FocusTarget target);
-
-    void renderCompactText(Frame frame, Rect area, String label, String value, FocusTarget target);
-  }
-
-  @FunctionalInterface
-  interface PanelTitleFormatter {
-    String format(String baseTitle, boolean focused);
-  }
-
-  @FunctionalInterface
-  interface PanelBorderStyleResolver {
-    Style resolve(boolean focused, boolean hasError, boolean isLoading);
-  }
-
-  @FunctionalInterface
-  interface ExtensionFlagLookup {
-    boolean matches(String extensionId);
-  }
-
-  record MetadataPanelSnapshot(
-      String title,
-      boolean focused,
-      boolean invalid,
-      String groupId,
-      String artifactId,
-      String version,
-      String packageName,
-      String outputDir,
-      String platformStream,
-      String buildTool,
-      String javaVersion) {
-    MetadataPanelSnapshot {
-      title = Objects.requireNonNull(title);
-      groupId = groupId == null ? "" : groupId;
-      artifactId = artifactId == null ? "" : artifactId;
-      version = version == null ? "" : version;
-      packageName = packageName == null ? "" : packageName;
-      outputDir = outputDir == null ? "" : outputDir;
-      platformStream = platformStream == null ? "" : platformStream;
-      buildTool = buildTool == null ? "" : buildTool;
-      javaVersion = javaVersion == null ? "" : javaVersion;
-    }
-  }
-
-  record ExtensionsPanelSnapshot(
-      String title,
-      boolean panelFocused,
-      boolean listFocused,
-      boolean submitFocused,
-      boolean searchFocused,
-      boolean loading,
-      String catalogErrorMessage,
-      String catalogSource,
-      boolean catalogStale,
-      boolean favoritesOnlyFilterEnabled,
-      int favoriteCount,
-      String activeCategoryFilterTitle,
-      int filteredExtensionCount,
-      int totalCatalogExtensionCount,
-      List<ExtensionCatalogRow> filteredRows,
-      List<String> selectedExtensionIds,
-      String searchQuery) {
-    ExtensionsPanelSnapshot {
-      title = Objects.requireNonNull(title);
-      catalogErrorMessage = catalogErrorMessage == null ? "" : catalogErrorMessage;
-      catalogSource = catalogSource == null ? "" : catalogSource;
-      activeCategoryFilterTitle =
-          activeCategoryFilterTitle == null ? "" : activeCategoryFilterTitle;
-      filteredExtensionCount = Math.max(0, filteredExtensionCount);
-      totalCatalogExtensionCount = Math.max(0, totalCatalogExtensionCount);
-      filteredRows = List.copyOf(Objects.requireNonNull(filteredRows));
-      selectedExtensionIds = List.copyOf(Objects.requireNonNull(selectedExtensionIds));
-      searchQuery = searchQuery == null ? "" : searchQuery;
-    }
   }
 }

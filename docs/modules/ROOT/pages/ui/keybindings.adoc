@@ -1,0 +1,36 @@
+= TUI Keybindings
+
+== Navigation
+
+* `Tab` / `Shift+Tab`: move focus across form, search, list, and submit.
+* `Up` / `Down` (or `j` / `k`): list navigation.
+* `Left` / `Right` (or `h` / `l`): navigate category hierarchy.
+* `Home` / `End`: first/last row.
+* `PgUp` / `PgDn`: previous/next category.
+
+== Focus and Search
+
+* `/` or `Ctrl+F`: focus extension search.
+* `Ctrl+L`: focus extension list.
+* `Esc`: clear search/filter context first, then exit.
+
+== Selection and Filters
+
+* `Space`: toggle extension selection.
+* `v`: cycle category filter.
+* `c`: toggle current category.
+* `C`: open all categories.
+* `x`: clear selected extensions.
+* `f`: favorite focused extension.
+* `Ctrl+J`: jump to next favorite.
+* `Ctrl+K`: toggle favorites-only filter.
+* `Ctrl+Y`: cycle preset-only filter (presets loaded from `code.quarkus.io`).
+
+== Global Actions
+
+* `?`: open help overlay.
+* `Ctrl+P`: open command palette.
+* `Ctrl+R`: reload catalog.
+* `Ctrl+E`: toggle expanded error details.
+* `Enter` or `Alt+G`: submit generation.
+* `Ctrl+C`: quit.

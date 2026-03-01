@@ -2,8 +2,7 @@ package dev.ayagmar.quarkusforge.api;
 
 public enum CatalogSource {
   LIVE("live"),
-  CACHE("cache"),
-  SNAPSHOT("snapshot");
+  CACHE("cache");
 
   private final String label;
 

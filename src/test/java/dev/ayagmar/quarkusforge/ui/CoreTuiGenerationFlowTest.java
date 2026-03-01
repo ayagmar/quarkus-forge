@@ -3,33 +3,27 @@ package dev.ayagmar.quarkusforge.ui;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.ayagmar.quarkusforge.api.ApiHttpException;
-import dev.ayagmar.quarkusforge.api.GenerationRequest;
-import dev.tamboui.buffer.Buffer;
-import dev.tamboui.layout.Rect;
-import dev.tamboui.terminal.Frame;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.TickEvent;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BooleanSupplier;
-import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class CoreTuiGenerationFlowTest {
+  @TempDir Path tempDir;
+
   @Test
   void successfulGenerationShowsNextStepHintAndLocksInteractiveInputs() {
-    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(),
-            UiScheduler.immediate(),
-            Duration.ZERO,
-            generationRunner);
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
@@ -44,53 +38,57 @@ class CoreTuiGenerationFlowTest {
     generationRunner.complete(Path.of("build/generated-project"));
 
     assertThat(controller.statusMessage()).contains("Generation succeeded");
-    assertThat(renderToString(controller)).contains("Next: cd");
-    assertThat(renderToString(controller)).contains("mvn quarkus:dev");
-    assertThat(renderToString(controller)).contains("Project Generated [focus]");
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34)).contains("Next: cd");
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .contains("mvn quarkus:dev");
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .contains("Project Generated [focus]");
   }
 
   @Test
   void postGenerationMenuOpenInTerminalQuitsWithExitPlan() {
-    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(),
-            UiScheduler.immediate(),
-            Duration.ZERO,
-            generationRunner);
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     generationRunner.complete(Path.of("build/generated-project"));
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
-    CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
     assertThat(action.shouldQuit()).isTrue();
     assertThat(controller.postGenerationExitPlan()).isPresent();
     assertThat(controller.postGenerationExitPlan().orElseThrow().action())
-        .isEqualTo(CoreTuiController.PostGenerationExitAction.OPEN_TERMINAL);
+        .isEqualTo(PostGenerationExitAction.OPEN_TERMINAL);
     assertThat(controller.postGenerationExitPlan().orElseThrow().projectDirectory())
         .isEqualTo(Path.of("build/generated-project").toAbsolutePath().normalize());
   }
 
   @Test
   void postGenerationMenuGenerateAgainStaysInTuiAndAllowsResubmit() {
-    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(),
-            UiScheduler.immediate(),
-            Duration.ZERO,
-            generationRunner);
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     generationRunner.complete(Path.of("build/generated-project"));
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
-    CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
     assertThat(action.shouldQuit()).isFalse();
-    assertThat(renderToString(controller)).doesNotContain("Project Generated [focus]");
-    assertThat(renderToString(controller)).doesNotContain("Next: ");
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .doesNotContain("Project Generated [focus]");
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .doesNotContain("Next: ");
     assertThat(controller.statusMessage()).isEqualTo("Ready for next generation");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
@@ -98,14 +96,67 @@ class CoreTuiGenerationFlowTest {
   }
 
   @Test
-  void duplicateSubmitIsIgnoredWhileGenerationIsRunning() {
-    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+  void postGenerationMenuCanWriteLockAndStayOpen() throws Exception {
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
+    Path generated = tempDir.resolve("generated-project");
+    Files.createDirectories(generated);
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(),
-            UiScheduler.immediate(),
-            Duration.ZERO,
-            generationRunner);
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    generationRunner.complete(generated);
+    UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    assertThat(action.shouldQuit()).isFalse();
+    assertThat(controller.postGenerationExitPlan()).isEmpty();
+    assertThat(generated.resolve("forge.lock")).exists();
+  }
+
+  @Test
+  void postGenerationMenuCanSelectPublishToGithubExitPlan() {
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
+    CoreTuiController controller =
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    generationRunner.complete(Path.of("build/generated-project"));
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .contains("Publish to GitHub (requires gh)");
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    assertThat(action.shouldQuit()).isTrue();
+    assertThat(controller.postGenerationExitPlan()).isPresent();
+    assertThat(controller.postGenerationExitPlan().orElseThrow().action())
+        .isEqualTo(PostGenerationExitAction.PUBLISH_GITHUB);
+  }
+
+  @Test
+  void extensionSearchAcceptsJCharacter() {
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
+    CoreTuiController controller =
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
+
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
+    controller.onEvent(KeyEvent.ofChar('j'));
+
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_SEARCH);
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34)).contains("Search: [ j");
+  }
+
+  @Test
+  void duplicateSubmitIsIgnoredWhileGenerationIsRunning() {
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
+    CoreTuiController controller =
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
@@ -116,18 +167,16 @@ class CoreTuiGenerationFlowTest {
 
   @Test
   void generationLockConsumesKeysWithoutTriggeringQuit() {
-    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(),
-            UiScheduler.immediate(),
-            Duration.ZERO,
-            generationRunner);
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
-    CoreTuiController.UiAction tabAction = controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
-    CoreTuiController.UiAction enterAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    UiAction tabAction = controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
+    UiAction enterAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
     assertThat(tabAction.handled()).isTrue();
     assertThat(tabAction.shouldQuit()).isFalse();
@@ -137,16 +186,14 @@ class CoreTuiGenerationFlowTest {
 
   @Test
   void escapeCancelsActiveGenerationWithoutImmediateQuit() {
-    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(),
-            UiScheduler.immediate(),
-            Duration.ZERO,
-            generationRunner);
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
-    CoreTuiController.UiAction cancelAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    UiAction cancelAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
 
     assertThat(cancelAction.shouldQuit()).isFalse();
     assertThat(controller.statusMessage())
@@ -155,13 +202,14 @@ class CoreTuiGenerationFlowTest {
     generationRunner.fail(new CancellationException("cancelled"));
     assertThat(controller.statusMessage()).contains("Generation cancelled");
 
-    CoreTuiController.UiAction quitAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    UiAction quitAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(quitAction.shouldQuit()).isTrue();
   }
 
   @Test
   void successfulGradleGenerationShowsGradleNextStepHint() {
-    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState("gradle"),
@@ -172,13 +220,16 @@ class CoreTuiGenerationFlowTest {
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     generationRunner.complete(Path.of("build/generated-project"));
 
-    assertThat(renderToString(controller)).contains("./gradlew quarkusDev");
-    assertThat(renderToString(controller)).doesNotContain("mvn quarkus:dev");
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .contains("./gradlew quarkusDev");
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .doesNotContain("mvn quarkus:dev");
   }
 
   @Test
   void successfulGradleKotlinDslGenerationShowsGradleNextStepHint() {
-    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState("gradle-kotlin-dsl"),
@@ -189,25 +240,26 @@ class CoreTuiGenerationFlowTest {
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     generationRunner.complete(Path.of("build/generated-project"));
 
-    assertThat(renderToString(controller)).contains("./gradlew quarkusDev");
-    assertThat(renderToString(controller)).doesNotContain("mvn quarkus:dev");
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .contains("./gradlew quarkusDev");
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .doesNotContain("mvn quarkus:dev");
   }
 
   @Test
   void generationFailureShowsErrorAndReleasesUiLock() {
-    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(),
-            UiScheduler.immediate(),
-            Duration.ZERO,
-            generationRunner);
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     generationRunner.fail(new RuntimeException("download failed"));
 
     assertThat(controller.statusMessage()).contains("Generation failed");
-    assertThat(renderToString(controller)).contains("Error: download failed");
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .contains("Error: download failed");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.ARTIFACT_ID);
@@ -215,19 +267,17 @@ class CoreTuiGenerationFlowTest {
 
   @Test
   void http400GenerationFailureShowsActionableErrorMessage() {
-    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(),
-            UiScheduler.immediate(),
-            Duration.ZERO,
-            generationRunner);
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     generationRunner.fail(new ApiHttpException(400, "<binary>"));
 
     assertThat(controller.statusMessage()).contains("Generation failed");
-    assertThat(renderToString(controller))
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
         .contains("Error: Quarkus API rejected generation request (HTTP 400).");
   }
 
@@ -246,7 +296,8 @@ class CoreTuiGenerationFlowTest {
 
     assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.ERROR);
     assertThat(controller.statusMessage()).contains("Generation failed");
-    assertThat(renderToString(controller)).contains("Error: runner crashed");
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .contains("Error: runner crashed");
   }
 
   @Test
@@ -262,13 +313,14 @@ class CoreTuiGenerationFlowTest {
 
     assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.ERROR);
     assertThat(controller.statusMessage()).contains("Generation failed");
-    assertThat(renderToString(controller))
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
         .contains("Error: Generation service returned null future");
   }
 
   @Test
   void completionStillAppliesWhenSchedulerDropsAsyncCallback() {
-    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
     UiScheduler droppingScheduler = (delay, task) -> () -> false;
     CoreTuiController controller =
         CoreTuiController.from(
@@ -282,7 +334,7 @@ class CoreTuiGenerationFlowTest {
 
     assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.LOADING);
 
-    renderToString(controller);
+    UiControllerTestHarness.renderToString(controller, 120, 34);
 
     assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.SUCCESS);
     assertThat(controller.statusMessage()).contains("Generation succeeded");
@@ -290,7 +342,8 @@ class CoreTuiGenerationFlowTest {
 
   @Test
   void escapeDoesNotCancelWhenGenerationAlreadyCompleted() {
-    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
     UiScheduler droppingScheduler = (delay, task) -> () -> false;
     CoreTuiController controller =
         CoreTuiController.from(
@@ -302,7 +355,7 @@ class CoreTuiGenerationFlowTest {
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     generationRunner.complete(Path.of("build/generated-project"));
 
-    CoreTuiController.UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
 
     assertThat(action.shouldQuit()).isTrue();
     assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.SUCCESS);
@@ -311,17 +364,15 @@ class CoreTuiGenerationFlowTest {
 
   @Test
   void generationProgressOverlayShowsGaugeAndPhase() {
-    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(),
-            UiScheduler.immediate(),
-            Duration.ZERO,
-            generationRunner);
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
-    String rendered = renderToString(controller);
+    String rendered = UiControllerTestHarness.renderToString(controller, 120, 34);
     assertThat(rendered).contains("Generating Project");
     assertThat(rendered).contains("requesting project archive from Quarkus API");
     assertThat(rendered).contains("Esc: cancel");
@@ -339,7 +390,7 @@ class CoreTuiGenerationFlowTest {
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
-    String rendered = renderToString(controller);
+    String rendered = UiControllerTestHarness.renderToString(controller, 120, 34);
     assertThat(rendered).contains("Generating Project");
     assertThat(rendered).contains("requesting project archive from Quarkus API");
   }
@@ -355,8 +406,7 @@ class CoreTuiGenerationFlowTest {
                 new CompletableFuture<>());
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
-    CoreTuiController.UiAction tickAction =
-        controller.onEvent(TickEvent.of(1, Duration.ofMillis(40)));
+    UiAction tickAction = controller.onEvent(TickEvent.of(1, Duration.ofMillis(40)));
 
     assertThat(tickAction.handled()).isTrue();
     assertThat(tickAction.shouldQuit()).isFalse();
@@ -365,8 +415,10 @@ class CoreTuiGenerationFlowTest {
 
   @Test
   void tickEventRequestsRepaintAfterAsyncGenerationCompletion() {
-    QueueingScheduler scheduler = new QueueingScheduler();
-    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    UiControllerTestHarness.QueueingScheduler scheduler =
+        new UiControllerTestHarness.QueueingScheduler();
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ZERO, generationRunner);
@@ -375,96 +427,26 @@ class CoreTuiGenerationFlowTest {
     generationRunner.complete(Path.of("build/generated-project"));
     scheduler.runAll();
 
-    CoreTuiController.UiAction tickAction =
-        controller.onEvent(TickEvent.of(2, Duration.ofMillis(40)));
+    UiAction tickAction = controller.onEvent(TickEvent.of(2, Duration.ofMillis(40)));
     assertThat(tickAction.handled()).isTrue();
     assertThat(controller.statusMessage()).contains("Generation succeeded");
   }
 
   @Test
   void generationProgressOverlayDisappearsAfterCompletion() {
-    ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
     CoreTuiController controller =
-        CoreTuiController.from(
-            UiTestFixtureFactory.defaultForgeUiState(),
-            UiScheduler.immediate(),
-            Duration.ZERO,
-            generationRunner);
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
-    assertThat(renderToString(controller)).contains("Generating Project");
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .contains("Generating Project");
 
     generationRunner.complete(Path.of("build/output"));
-    String afterCompletion = renderToString(controller);
+    String afterCompletion = UiControllerTestHarness.renderToString(controller, 120, 34);
     assertThat(afterCompletion).doesNotContain("Generating Project");
     assertThat(afterCompletion).contains("Generation succeeded");
-  }
-
-  private static String renderToString(CoreTuiController controller) {
-    Buffer buffer = Buffer.empty(new Rect(0, 0, 120, 34));
-    Frame frame = Frame.forTesting(buffer);
-    controller.render(frame);
-    return buffer.toAnsiStringTrimmed();
-  }
-
-  private static final class QueueingScheduler implements UiScheduler {
-    private final List<Runnable> queuedTasks = new ArrayList<>();
-
-    @Override
-    public Cancellable schedule(Duration delay, Runnable task) {
-      queuedTasks.add(task);
-      return () -> queuedTasks.remove(task);
-    }
-
-    void runAll() {
-      List<Runnable> pendingTasks = new ArrayList<>(queuedTasks);
-      queuedTasks.clear();
-      for (Runnable pendingTask : pendingTasks) {
-        pendingTask.run();
-      }
-    }
-  }
-
-  private static final class ControlledGenerationRunner
-      implements CoreTuiController.ProjectGenerationRunner {
-    private int callCount;
-    private Path lastOutputDirectory;
-    private CompletableFuture<Path> future;
-
-    ControlledGenerationRunner() {
-      callCount = 0;
-      lastOutputDirectory = null;
-      future = new CompletableFuture<>();
-    }
-
-    @Override
-    public CompletableFuture<Path> generate(
-        GenerationRequest generationRequest,
-        Path outputDirectory,
-        BooleanSupplier cancelled,
-        Consumer<CoreTuiController.GenerationProgressUpdate> progressListener) {
-      callCount++;
-      lastOutputDirectory = outputDirectory;
-      progressListener.accept(
-          CoreTuiController.GenerationProgressUpdate.requestingArchive(
-              "requesting project archive from Quarkus API..."));
-      return future;
-    }
-
-    int callCount() {
-      return callCount;
-    }
-
-    Path lastOutputDirectory() {
-      return lastOutputDirectory;
-    }
-
-    void complete(Path outputPath) {
-      future.complete(outputPath);
-    }
-
-    void fail(Throwable throwable) {
-      future.completeExceptionally(throwable);
-    }
   }
 }

@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quarkus Forge | The Terminal-Native Generator</title>
+  <meta name="description" content="Quarkus Forge is a keyboard-first terminal UI and CLI for generating Quarkus projects extremely fast." />
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="./output.css">
+  
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <script>
+    // Inline script to apply theme immediately
+    const savedTheme = localStorage.getItem('theme');
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
+</head>
+<body class="relative min-h-[100dvh] flex flex-col font-sans">
+  
+  <!-- Ambient background effects -->
+  <div class="fixed inset-0 pointer-events-none z-[-1] overflow-hidden">
+    <div class="absolute top-[-10%] right-[-5%] w-[800px] h-[800px] rounded-full bg-tui-cyan/10 blur-[100px] opacity-70 mix-blend-multiply dark:mix-blend-screen transition-opacity duration-500"></div>
+    <div class="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full bg-tui-pink/10 blur-[100px] opacity-60 mix-blend-multiply dark:mix-blend-screen transition-opacity duration-500"></div>
+    <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPjxyZWN0IHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==')] opacity-[0.03] dark:opacity-20 mix-blend-overlay transition-opacity duration-500"></div>
+  </div>
+
+  <header class="w-full max-w-7xl mx-auto px-6 py-8 flex justify-between items-center z-10 relative">
+    <div class="flex items-center gap-3 group cursor-pointer">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-tui-cyan to-tui-pink p-[1px] shadow-[0_0_15px_rgba(34,211,238,0.2)] dark:shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-transform duration-300 group-hover:scale-105">
+        <div class="w-full h-full bg-white dark:bg-zinc-950 rounded-[11px] flex items-center justify-center transition-colors duration-300">
+          <i class="ph-bold ph-terminal-window text-xl text-tui-cyan"></i>
+        </div>
+      </div>
+      <span class="font-bold text-xl tracking-tight text-slate-900 dark:text-white group-hover:text-tui-cyan transition-colors duration-300">Quarkus Forge</span>
+    </div>
+    <nav class="flex items-center gap-6 md:gap-8">
+      <a href="#features" class="hidden md:block text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">Features</a>
+      <a href="./docs/" class="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">Documentation</a>
+      <a href="https://github.com/ayagmar/quarkus-forge" target="_blank" rel="noopener noreferrer" class="hidden md:flex text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors items-center gap-2">
+        <i class="ph-fill ph-github-logo text-lg"></i>
+        <span>GitHub</span>
+      </a>
+      <button id="theme-toggle" class="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors" aria-label="Toggle Dark Mode">
+        <svg id="theme-icon-dark" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        <svg id="theme-icon-light" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+      </button>
+    </nav>
+  </header>
+
+  <main class="flex-1 w-full max-w-7xl mx-auto px-6 flex flex-col z-10">
+    
+    <!-- Hero Section: Asymmetric layout -->
+    <section class="min-h-[85vh] grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center py-12 lg:py-0">
+      
+      <!-- Left Content -->
+      <div class="lg:col-span-6 flex flex-col items-start pt-12 lg:pt-0">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-tui-cyan/10 border border-tui-cyan/20 mb-8">
+          <span class="w-2 h-2 rounded-full bg-tui-cyan animate-pulse"></span>
+          <span class="text-xs font-bold uppercase tracking-widest text-tui-cyan">Terminal Native Generation</span>
+        </div>
+        
+        <h1 class="text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tighter text-slate-900 dark:text-white leading-[1.05] mb-8 transition-colors duration-300">
+          Build <span class="text-transparent bg-clip-text bg-gradient-to-r from-tui-cyan to-tui-pink text-glow">Quarkus</span> projects without leaving the CLI.
+        </h1>
+        
+        <p class="text-lg md:text-xl text-slate-600 dark:text-slate-400 leading-relaxed max-w-[50ch] mb-10 transition-colors duration-300">
+          A lightning-fast, keyboard-first TUI for selecting extensions, configuring metadata, and scaffolding your next microservice in seconds.
+        </p>
+        
+        <div class="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+          <a href="./docs/getting-started/" class="w-full sm:w-auto px-8 py-4 rounded-full bg-slate-900 dark:bg-white text-white dark:text-zinc-950 font-bold tracking-tight hover:scale-[1.02] hover:-translate-y-1 active:scale-[0.98] transition-all duration-200 shadow-xl dark:shadow-[0_0_30px_rgba(255,255,255,0.2)] text-center">
+            Get Started <i class="ph-bold ph-arrow-right ml-1"></i>
+          </a>
+          <a href="./docs/" class="w-full sm:w-auto px-8 py-4 rounded-full glass-panel text-slate-700 dark:text-white font-medium hover:bg-slate-100 dark:hover:bg-white/5 active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2">
+            <i class="ph ph-book-open"></i> Read the Docs
+          </a>
+        </div>
+      </div>
+      
+      <!-- Right Asset / Terminal Window Mock -->
+      <div class="lg:col-span-6 flex justify-center lg:justify-end w-full">
+        <div class="relative w-full max-w-xl group perspective-[1000px]">
+          <!-- Glow behind terminal -->
+          <div class="absolute inset-0 bg-gradient-to-r from-tui-cyan to-tui-pink rounded-xl blur-2xl opacity-20 group-hover:opacity-40 transition-opacity duration-700"></div>
+          
+          <!-- Terminal Window -->
+          <div class="relative rounded-xl overflow-hidden glass-panel !bg-slate-900/90 dark:!bg-[#0f172a]/90 flex flex-col shadow-2xl transition-transform duration-500 hover:rotate-y-[-2deg] hover:rotate-x-[2deg]">
+            <!-- Header bar -->
+            <div class="h-10 border-b border-white/10 bg-black/40 flex items-center px-4 gap-2">
+              <div class="flex gap-1.5">
+                <div class="w-3 h-3 rounded-full bg-rose-500/80"></div>
+                <div class="w-3 h-3 rounded-full bg-amber-500/80"></div>
+                <div class="w-3 h-3 rounded-full bg-emerald-500/80"></div>
+              </div>
+              <div class="mx-auto text-xs font-mono text-slate-400 flex items-center gap-2">
+                <i class="ph-fill ph-folder"></i> ~/projects
+              </div>
+            </div>
+            
+            <!-- Code content -->
+            <div class="p-6 font-mono text-sm leading-loose bg-[#0c111c]/80 min-h-[300px] text-slate-300">
+              <div class="flex gap-4">
+                <span class="text-tui-pink">❯</span>
+                <span>quarkus-forge generate <span class="text-slate-500">--interactive</span></span>
+              </div>
+              <div class="mt-4 flex gap-4 text-slate-400">
+                <span>[INFO]</span>
+                <span>Initializing Forge TUI...</span>
+              </div>
+              <div class="mt-4 border border-tui-cyan/30 rounded px-4 py-3 bg-tui-cyan/5">
+                <div class="text-tui-cyan font-bold mb-2">? Select Extensions (Type to filter)</div>
+                <div class="flex items-center gap-2 text-white bg-white/10 px-2 py-1 rounded">
+                  <span class="text-tui-pink">◉</span> resteasy-reactive-jackson
+                </div>
+                <div class="flex items-center gap-2 px-2 py-1">
+                  <span class="text-slate-500">◯</span> hibernate-orm-panache
+                </div>
+                <div class="flex items-center gap-2 px-2 py-1">
+                  <span class="text-slate-500">◯</span> jdbc-postgresql
+                </div>
+              </div>
+              <div class="mt-4 flex gap-4 text-emerald-400">
+                <span class="animate-pulse">_</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Bento Grid -->
+    <section id="features" class="py-24 border-t border-slate-200 dark:border-white/5 transition-colors duration-300">
+      <div class="flex flex-col items-center mb-16 text-center">
+        <h2 class="text-3xl md:text-5xl font-bold tracking-tight text-slate-900 dark:text-white mb-4 transition-colors duration-300">Engineered for Velocity</h2>
+        <p class="text-slate-600 dark:text-slate-400 max-w-[60ch] transition-colors duration-300">Skip the browser entirely. Scaffold structurally sound Quarkus applications locally or via CI pipelines.</p>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Feature 1 -->
+        <div class="glass-panel p-8 rounded-3xl flex flex-col gap-6 hover:bg-slate-100 dark:hover:bg-white/[0.02] transition-colors relative overflow-hidden group">
+          <div class="absolute top-0 right-0 p-8 opacity-5 dark:opacity-10 group-hover:opacity-10 dark:group-hover:opacity-20 transition-opacity">
+             <i class="ph-bold ph-keyboard text-8xl text-tui-cyan"></i>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-tui-cyan/10 flex items-center justify-center border border-tui-cyan/20 text-tui-cyan">
+            <i class="ph-bold ph-keyboard text-2xl"></i>
+          </div>
+          <div>
+            <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2 transition-colors duration-300">TUI Workflow</h3>
+            <p class="text-slate-600 dark:text-slate-400 leading-relaxed text-sm transition-colors duration-300">Focus routing, instantaneous extension filtering, and Vim-style shortcuts for every action.</p>
+          </div>
+        </div>
+
+        <!-- Feature 2 -->
+        <div class="glass-panel p-8 rounded-3xl flex flex-col gap-6 hover:bg-slate-100 dark:hover:bg-white/[0.02] transition-colors relative overflow-hidden group">
+          <div class="absolute top-0 right-0 p-8 opacity-5 dark:opacity-10 group-hover:opacity-10 dark:group-hover:opacity-20 transition-opacity">
+             <i class="ph-bold ph-cpu text-8xl text-tui-pink"></i>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-tui-pink/10 flex items-center justify-center border border-tui-pink/20 text-tui-pink">
+            <i class="ph-bold ph-cpu text-2xl"></i>
+          </div>
+          <div>
+            <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2 transition-colors duration-300">Headless Generate</h3>
+            <p class="text-slate-600 dark:text-slate-400 leading-relaxed text-sm transition-colors duration-300">Use <code>generate</code> in CI pipelines with strict validation, metadata overriding, and diagnostics.</p>
+          </div>
+        </div>
+
+        <!-- Feature 3 -->
+        <div class="glass-panel p-8 rounded-3xl flex flex-col gap-6 hover:bg-slate-100 dark:hover:bg-white/[0.02] transition-colors relative overflow-hidden group">
+          <div class="absolute top-0 right-0 p-8 opacity-5 dark:opacity-10 group-hover:opacity-10 dark:group-hover:opacity-20 transition-opacity">
+             <i class="ph-bold ph-shield-check text-8xl text-emerald-500"></i>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+            <i class="ph-bold ph-shield-check text-2xl"></i>
+          </div>
+          <div>
+            <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2 transition-colors duration-300">Safe Extraction</h3>
+            <p class="text-slate-600 dark:text-slate-400 leading-relaxed text-sm transition-colors duration-300">Archive generation utilizes strict guardrails against path traversal, zip bombs, and handles clean atomic file writes.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="w-full border-t border-slate-200 dark:border-white/10 mt-auto py-10 z-10 relative bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md transition-colors duration-300">
+    <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
+      <div class="flex items-center gap-2 text-slate-500 text-sm">
+        <i class="ph-fill ph-code text-tui-cyan"></i> Built for the JVM Ecosystem
+      </div>
+      <div class="text-slate-500 text-sm flex gap-6">
+        <a href="./docs/" class="hover:text-tui-cyan transition-colors">Documentation</a>
+        <a href="https://github.com/ayagmar/quarkus-forge" class="hover:text-tui-cyan transition-colors">GitHub Repository</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    const iconDark = document.getElementById('theme-icon-dark');
+    const iconLight = document.getElementById('theme-icon-light');
+
+    function updateIcons() {
+      if (document.documentElement.classList.contains('dark')) {
+        iconLight.classList.remove('hidden');
+        iconDark.classList.add('hidden');
+      } else {
+        iconDark.classList.remove('hidden');
+        iconLight.classList.add('hidden');
+      }
+    }
+
+    themeToggleBtn.addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      const isDark = document.documentElement.classList.contains('dark');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      updateIcons();
+    });
+
+    updateIcons();
+  </script>
+</body>
+</html>

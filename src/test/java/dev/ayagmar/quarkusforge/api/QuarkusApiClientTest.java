@@ -72,6 +72,48 @@ class QuarkusApiClientTest {
   }
 
   @Test
+  void fetchPresetsReturnsNormalizedKeyMap() {
+    stubFor(
+        get(urlEqualTo("/api/presets"))
+            .willReturn(
+                okJson(
+                    """
+                    [
+                      {"key":"Web","extensions":["io.quarkus:quarkus-rest","io.quarkus:quarkus-arc"]}
+                    ]
+                    """)));
+
+    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+
+    Map<String, List<String>> presets = client.fetchPresets("").join();
+
+    assertThat(presets)
+        .containsExactly(
+            java.util.Map.entry(
+                "web", List.of("io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc")));
+  }
+
+  @Test
+  void fetchPresetsForStreamUsesStreamEndpoint() {
+    stubFor(
+        get(urlEqualTo("/api/presets/stream/io.quarkus.platform%3A3.31"))
+            .willReturn(
+                okJson(
+                    """
+                    [
+                      {"key":"data","extensions":["io.quarkus:quarkus-jdbc-postgresql"]}
+                    ]
+                    """)));
+
+    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+
+    Map<String, List<String>> presets = client.fetchPresets("io.quarkus.platform:3.31").join();
+
+    assertThat(presets).containsKey("data");
+    verify(getRequestedFor(urlEqualTo("/api/presets/stream/io.quarkus.platform%3A3.31")));
+  }
+
+  @Test
   void fetchExtensionsRetainsCategoryAndOrderMetadataWhenPresent() {
     stubFor(
         get(urlEqualTo("/api/extensions"))
@@ -425,7 +467,7 @@ class QuarkusApiClientTest {
                     "gradle-kotlin-dsl",
                     List.of("17", "21", "25")),
                 List.of(
-                    new MetadataDto.PlatformStream(
+                    new PlatformStream(
                         "io.quarkus.platform:3.31", "3.31", true, List.of("17", "21", "25")))));
   }
 

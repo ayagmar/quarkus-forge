@@ -115,10 +115,10 @@ class QuarkusApiContractDriftTest {
         ]
         """;
 
-    List<String> javaVersions =
-        QuarkusApiClient.parseJavaVersionsFromStreamsPayload(streamsPayload, objectMapper);
+    StreamsMetadata streamsMetadata =
+        QuarkusApiClient.parseStreamsMetadataPayload(streamsPayload, objectMapper);
 
-    assertThat(javaVersions).containsExactly("17", "21", "25");
+    assertThat(streamsMetadata.javaVersions()).containsExactly("17", "21", "25");
   }
 
   @Test
@@ -135,12 +135,12 @@ class QuarkusApiContractDriftTest {
         ]
         """;
 
-    List<MetadataDto.PlatformStream> platformStreams =
-        QuarkusApiClient.parsePlatformStreamsFromStreamsPayload(streamsPayload, objectMapper);
+    StreamsMetadata streamsMetadata =
+        QuarkusApiClient.parseStreamsMetadataPayload(streamsPayload, objectMapper);
 
-    assertThat(platformStreams)
+    assertThat(streamsMetadata.platformStreams())
         .containsExactly(
-            new MetadataDto.PlatformStream(
+            new PlatformStream(
                 "io.quarkus.platform:3.31", "3.31", true, List.of("17", "21", "25")));
   }
 
@@ -157,9 +157,7 @@ class QuarkusApiContractDriftTest {
         """;
 
     assertThatThrownBy(
-            () ->
-                QuarkusApiClient.parseJavaVersionsFromStreamsPayload(
-                    driftedStreamsPayload, objectMapper))
+            () -> QuarkusApiClient.parseStreamsMetadataPayload(driftedStreamsPayload, objectMapper))
         .isInstanceOf(ApiContractException.class)
         .hasMessageContaining("javaCompatibility.versions");
   }

@@ -13,11 +13,11 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import dev.ayagmar.quarkusforge.ui.ExtensionFavoritesStore;
 import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.zip.ZipEntry;
@@ -56,11 +56,10 @@ class QuarkusForgeGenerateCommandTest {
   void headlessGenerateCreatesProjectWithMultipleExtensions() throws Exception {
     stubCatalogEndpoints();
     stubDownloadEndpoint("headless-app");
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
     Path outputDir = tempDir.resolve("output");
 
-    CommandResult result =
+    CliCommandTestSupport.CommandResult result =
         runCommand(
             runtimeConfig,
             "generate",
@@ -79,18 +78,18 @@ class QuarkusForgeGenerateCommandTest {
     Path generatedProject = outputDir.resolve("headless-app");
     assertThat(generatedProject.resolve("pom.xml")).exists();
     assertThat(result.standardOut()).contains("Generation succeeded");
-    verifyGenerateRequestFor("headless-app", "io.quarkus:quarkus-rest,io.quarkus:quarkus-arc");
+    verifyGenerateRequestFor(
+        "headless-app", List.of("io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc"));
   }
 
   @Test
   void headlessGeneratePassesPlatformStreamWhenProvided() throws Exception {
     stubCatalogEndpoints();
     stubDownloadEndpoint("headless-app");
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
     Path outputDir = tempDir.resolve("output-platform");
 
-    CommandResult result =
+    CliCommandTestSupport.CommandResult result =
         runCommand(
             runtimeConfig,
             "generate",
@@ -113,11 +112,10 @@ class QuarkusForgeGenerateCommandTest {
   void headlessGenerateUsesRecommendedPlatformStreamWhenOptionIsOmitted() throws Exception {
     stubCatalogEndpoints();
     stubDownloadEndpoint("headless-app");
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
     Path outputDir = tempDir.resolve("output-default-stream");
 
-    CommandResult result =
+    CliCommandTestSupport.CommandResult result =
         runCommand(
             runtimeConfig,
             "generate",
@@ -137,10 +135,9 @@ class QuarkusForgeGenerateCommandTest {
   @Test
   void invalidPlatformStreamBlocksBeforeDownloadRequest() {
     stubCatalogEndpoints();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
-    CommandResult result =
+    CliCommandTestSupport.CommandResult result =
         runCommand(
             runtimeConfig,
             "generate",
@@ -160,10 +157,9 @@ class QuarkusForgeGenerateCommandTest {
   @Test
   void invalidExtensionIdReturnsValidationExitCode() {
     stubCatalogEndpoints();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
-    CommandResult result =
+    CliCommandTestSupport.CommandResult result =
         runCommand(
             runtimeConfig,
             "generate",
@@ -183,9 +179,9 @@ class QuarkusForgeGenerateCommandTest {
 
   @Test
   void networkFailureReturnsNetworkExitCode() {
-    QuarkusForgeCli.RuntimeConfig runtimeConfig = runtimeConfig(URI.create("http://127.0.0.1:1"));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create("http://127.0.0.1:1"));
 
-    CommandResult result =
+    CliCommandTestSupport.CommandResult result =
         runCommand(
             runtimeConfig,
             "generate",
@@ -202,10 +198,9 @@ class QuarkusForgeGenerateCommandTest {
   @Test
   void verboseDryRunEmitsGenerateLifecycleDiagnostics() {
     stubCatalogEndpoints();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
-    CommandResult result =
+    CliCommandTestSupport.CommandResult result =
         runCommand(
             runtimeConfig,
             "--verbose",
@@ -224,9 +219,9 @@ class QuarkusForgeGenerateCommandTest {
 
   @Test
   void verboseNetworkFailureEmitsCatalogLoadFailureDiagnostics() {
-    QuarkusForgeCli.RuntimeConfig runtimeConfig = runtimeConfig(URI.create("http://127.0.0.1:1"));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create("http://127.0.0.1:1"));
 
-    CommandResult result =
+    CliCommandTestSupport.CommandResult result =
         runCommand(
             runtimeConfig,
             "--verbose",
@@ -246,12 +241,11 @@ class QuarkusForgeGenerateCommandTest {
   void outputConflictReturnsArchiveExitCode() throws Exception {
     stubCatalogEndpoints();
     stubDownloadEndpoint("headless-app");
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
     Path outputDir = tempDir.resolve("output");
     Files.createDirectories(outputDir.resolve("headless-app"));
 
-    CommandResult result =
+    CliCommandTestSupport.CommandResult result =
         runCommand(
             runtimeConfig,
             "generate",
@@ -270,10 +264,9 @@ class QuarkusForgeGenerateCommandTest {
   void downloadHttpFailureReturnsNetworkExitCode() {
     stubCatalogEndpoints();
     stubFor(get(urlPathEqualTo("/api/download")).willReturn(aResponse().withStatus(503)));
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
-    CommandResult result =
+    CliCommandTestSupport.CommandResult result =
         runCommand(
             runtimeConfig,
             "generate",
@@ -336,10 +329,9 @@ class QuarkusForgeGenerateCommandTest {
                           }
                         }
                         """)));
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
-    CommandResult result =
+    CliCommandTestSupport.CommandResult result =
         withSystemProperty(
             HEADLESS_CATALOG_TIMEOUT_PROPERTY,
             "50",
@@ -368,10 +360,9 @@ class QuarkusForgeGenerateCommandTest {
                     .withFixedDelay(500)
                     .withHeader("Content-Type", "application/zip")
                     .withBody(new byte[] {80, 75, 3, 4})));
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
-    CommandResult result =
+    CliCommandTestSupport.CommandResult result =
         withSystemProperty(
             HEADLESS_GENERATION_TIMEOUT_PROPERTY,
             "50",
@@ -391,13 +382,12 @@ class QuarkusForgeGenerateCommandTest {
   @Test
   void dryRunSupportsBuiltInAndFavoritesPresetsWithoutGeneratingFiles() throws Exception {
     stubCatalogEndpoints();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
     ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile())
         .saveFavoriteExtensionIds(Set.of("io.quarkus:quarkus-jdbc-postgresql"));
     Path outputDir = tempDir.resolve("dry-run-output");
 
-    CommandResult result =
+    CliCommandTestSupport.CommandResult result =
         runCommand(
             runtimeConfig,
             "generate",
@@ -431,13 +421,12 @@ class QuarkusForgeGenerateCommandTest {
   void dryRunAndGenerateShareExtensionResolutionOrder() throws Exception {
     stubCatalogEndpoints();
     stubDownloadEndpoint("headless-app");
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
     ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile())
         .saveFavoriteExtensionIds(Set.of("io.quarkus:quarkus-jdbc-postgresql"));
     Path outputDir = tempDir.resolve("parity-output");
 
-    CommandResult dryRunResult =
+    CliCommandTestSupport.CommandResult dryRunResult =
         runCommand(
             runtimeConfig,
             "generate",
@@ -462,7 +451,7 @@ class QuarkusForgeGenerateCommandTest {
                 + " io.quarkus:quarkus-jdbc-postgresql,"
                 + " io.quarkus:quarkus-hibernate-orm-panache]");
 
-    CommandResult generateResult =
+    CliCommandTestSupport.CommandResult generateResult =
         runCommand(
             runtimeConfig,
             "generate",
@@ -482,17 +471,20 @@ class QuarkusForgeGenerateCommandTest {
     assertThat(generateResult.exitCode()).isZero();
     verifyGenerateRequestFor(
         "headless-app",
-        "io.quarkus:quarkus-rest,io.quarkus:quarkus-arc,io.quarkus:quarkus-jdbc-postgresql,io.quarkus:quarkus-hibernate-orm-panache");
+        List.of(
+            "io.quarkus:quarkus-rest",
+            "io.quarkus:quarkus-arc",
+            "io.quarkus:quarkus-jdbc-postgresql",
+            "io.quarkus:quarkus-hibernate-orm-panache"));
   }
 
   @Test
   void rootDryRunFlagBeforeGenerateSubcommandStillPreventsProjectGeneration() throws Exception {
     stubCatalogEndpoints();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
     Path outputDir = tempDir.resolve("root-dry-run-output");
 
-    CommandResult result =
+    CliCommandTestSupport.CommandResult result =
         runCommand(
             runtimeConfig,
             "--dry-run",
@@ -513,31 +505,110 @@ class QuarkusForgeGenerateCommandTest {
         .doesNotThrowAnyException();
   }
 
-  private QuarkusForgeCli.RuntimeConfig runtimeConfig(URI baseUri) {
-    return new QuarkusForgeCli.RuntimeConfig(
-        baseUri,
-        tempDir.resolve("catalog-cache.json"),
-        tempDir.resolve("favorites.json"),
-        tempDir.resolve("preferences.json"));
+  @Test
+  void dryRunCanLoadRecipeAndWriteRecipeAndLock() throws Exception {
+    stubCatalogEndpoints();
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    Path recipePath = tempDir.resolve("Forgefile");
+    Path writtenRecipe = tempDir.resolve("written-forgefile.json");
+    Path writtenLock = tempDir.resolve("forge.lock");
+    Files.writeString(
+        recipePath,
+        """
+        {
+          "groupId": "com.example",
+          "artifactId": "recipe-app",
+          "version": "1.0.0-SNAPSHOT",
+          "outputDirectory": ".",
+          "buildTool": "maven",
+          "javaVersion": "25",
+          "presets": ["web"],
+          "extensions": ["io.quarkus:quarkus-hibernate-orm-panache"]
+        }
+        """);
+
+    CliCommandTestSupport.CommandResult result =
+        runCommand(
+            runtimeConfig,
+            "generate",
+            "--dry-run",
+            "--recipe",
+            recipePath.toString(),
+            "--write-recipe",
+            writtenRecipe.toString(),
+            "--write-lock",
+            writtenLock.toString());
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(Files.readString(writtenRecipe))
+        .contains("\"artifactId\" : \"recipe-app\"")
+        .contains("\"presets\" : [ \"web\" ]");
+    assertThat(Files.readString(writtenLock))
+        .contains("\"javaVersion\" : \"25\"")
+        .contains("io.quarkus:quarkus-rest")
+        .contains("io.quarkus:quarkus-hibernate-orm-panache");
   }
 
-  private CommandResult runCommand(QuarkusForgeCli.RuntimeConfig runtimeConfig, String... args) {
-    PrintStream originalOut = System.out;
-    PrintStream originalErr = System.err;
-    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
-    ByteArrayOutputStream stderr = new ByteArrayOutputStream();
-    try {
-      System.setOut(new PrintStream(stdout, true, StandardCharsets.UTF_8));
-      System.setErr(new PrintStream(stderr, true, StandardCharsets.UTF_8));
-      int exitCode = QuarkusForgeCli.runWithArgs(args, runtimeConfig);
-      return new CommandResult(
-          exitCode,
-          stdout.toString(StandardCharsets.UTF_8),
-          stderr.toString(StandardCharsets.UTF_8));
-    } finally {
-      System.setOut(originalOut);
-      System.setErr(originalErr);
-    }
+  @Test
+  void lockDriftBlocksUntilRefreshLockIsProvided() throws Exception {
+    stubCatalogEndpoints();
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    Path lockPath = tempDir.resolve("forge.lock");
+    Files.writeString(
+        lockPath,
+        """
+        {
+          "platformStream": "io.quarkus.platform:3.31",
+          "buildTool": "maven",
+          "javaVersion": "21",
+          "presets": ["web"],
+          "extensions": ["io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc"]
+        }
+        """);
+
+    CliCommandTestSupport.CommandResult driftResult =
+        runCommand(
+            runtimeConfig,
+            "generate",
+            "--dry-run",
+            "--group-id",
+            "com.example",
+            "--artifact-id",
+            "headless-app",
+            "--preset",
+            "web",
+            "--lock",
+            lockPath.toString());
+
+    assertThat(driftResult.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_VALIDATION);
+    assertThat(driftResult.standardError()).contains("javaVersion drift");
+
+    CliCommandTestSupport.CommandResult refreshResult =
+        runCommand(
+            runtimeConfig,
+            "generate",
+            "--dry-run",
+            "--group-id",
+            "com.example",
+            "--artifact-id",
+            "headless-app",
+            "--preset",
+            "web",
+            "--lock",
+            lockPath.toString(),
+            "--refresh-lock");
+
+    assertThat(refreshResult.exitCode()).isZero();
+    assertThat(Files.readString(lockPath)).contains("\"javaVersion\" : \"25\"");
+  }
+
+  private RuntimeConfig runtimeConfig(URI baseUri) {
+    return CliCommandTestSupport.runtimeConfig(tempDir, baseUri);
+  }
+
+  private CliCommandTestSupport.CommandResult runCommand(
+      RuntimeConfig runtimeConfig, String... args) {
+    return CliCommandTestSupport.runCommand(runtimeConfig, args);
   }
 
   private void stubCatalogEndpoints() {
@@ -555,48 +626,29 @@ class QuarkusForgeGenerateCommandTest {
                       {"id":"io.quarkus:quarkus-smallrye-health","name":"SmallRye Health","shortName":"health"}
                     ]
                     """)));
-
     stubFor(
-        get(urlPathEqualTo("/api/streams"))
+        get(urlPathEqualTo("/api/presets"))
             .willReturn(
-                aResponse()
-                    .withStatus(200)
-                    .withHeader("Content-Type", "application/json")
-                    .withBody(
-                        """
-                        [
-                          {
-                            "key":"io.quarkus.platform:3.31",
-                            "javaCompatibility": {
-                              "versions":[17,21,25],
-                              "recommended":25
-                            },
-                            "recommended":true,
-                            "status":"FINAL"
-                          }
-                        ]
-                        """)));
-
+                okJson(
+                    """
+                    [
+                      {"key":"web","extensions":["io.quarkus:quarkus-rest","io.quarkus:quarkus-arc"]},
+                      {"key":"data","extensions":["io.quarkus:quarkus-hibernate-orm-panache","io.quarkus:quarkus-jdbc-postgresql"]},
+                      {"key":"messaging","extensions":["io.quarkus:quarkus-messaging","io.quarkus:quarkus-smallrye-health"]}
+                    ]
+                    """)));
     stubFor(
-        get(urlPathEqualTo("/q/openapi"))
+        get(urlPathEqualTo("/api/presets/stream/io.quarkus.platform%3A3.31"))
             .willReturn(
-                aResponse()
-                    .withStatus(200)
-                    .withHeader("Content-Type", "application/json")
-                    .withBody(
-                        """
-                        {
-                          "paths": {
-                            "/api/download": {
-                              "get": {
-                                "parameters": [
-                                  {"name":"b","schema":{"enum":["MAVEN","GRADLE","GRADLE_KOTLIN_DSL"]}}
-                                ]
-                              }
-                            }
-                          }
-                        }
-                        """)));
+                okJson(
+                    """
+                    [
+                      {"key":"web","extensions":["io.quarkus:quarkus-rest","io.quarkus:quarkus-arc"]},
+                      {"key":"data","extensions":["io.quarkus:quarkus-hibernate-orm-panache","io.quarkus:quarkus-jdbc-postgresql"]},
+                      {"key":"messaging","extensions":["io.quarkus:quarkus-messaging","io.quarkus:quarkus-smallrye-health"]}
+                    ]
+                    """)));
+    CliCommandTestSupport.stubLiveMetadataWithAllBuildTools();
   }
 
   private void stubDownloadEndpoint(String artifactId) throws Exception {
@@ -605,15 +657,23 @@ class QuarkusForgeGenerateCommandTest {
             .willReturn(aResponse().withStatus(200).withBody(generatedZipPayload(artifactId))));
   }
 
-  private void verifyGenerateRequestFor(String artifactId, String extensionsParam) {
+  private void verifyGenerateRequestFor(String artifactId, List<String> expectedExtensions) {
     wireMockServer.verify(
         getRequestedFor(urlPathEqualTo("/api/download"))
             .withQueryParam("g", equalTo("com.example"))
             .withQueryParam("a", equalTo(artifactId))
             .withQueryParam("v", equalTo("1.0.0-SNAPSHOT"))
             .withQueryParam("b", equalTo("MAVEN"))
-            .withQueryParam("j", equalTo("25"))
-            .withQueryParam("e", equalTo(extensionsParam)));
+            .withQueryParam("j", equalTo("25")));
+
+    List<String> requestedExtensions =
+        wireMockServer.findAll(getRequestedFor(urlPathEqualTo("/api/download"))).stream()
+            .filter(request -> "/api/download".equals(request.getUrl().split("\\?")[0]))
+            .findFirst()
+            .orElseThrow()
+            .queryParameter("e")
+            .values();
+    assertThat(requestedExtensions).containsExactlyElementsOf(expectedExtensions);
   }
 
   private static byte[] generatedZipPayload(String artifactId) throws Exception {
@@ -632,8 +692,10 @@ class QuarkusForgeGenerateCommandTest {
     return outputStream.toByteArray();
   }
 
-  private static CommandResult withSystemProperty(
-      String key, String value, java.util.function.Supplier<CommandResult> supplier) {
+  private static CliCommandTestSupport.CommandResult withSystemProperty(
+      String key,
+      String value,
+      java.util.function.Supplier<CliCommandTestSupport.CommandResult> supplier) {
     String previous = System.getProperty(key);
     try {
       System.setProperty(key, value);
@@ -646,6 +708,4 @@ class QuarkusForgeGenerateCommandTest {
       }
     }
   }
-
-  private record CommandResult(int exitCode, String standardOut, String standardError) {}
 }

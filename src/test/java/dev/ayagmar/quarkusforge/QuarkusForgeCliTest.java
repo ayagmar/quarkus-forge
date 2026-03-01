@@ -2,7 +2,9 @@ package dev.ayagmar.quarkusforge;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.ayagmar.quarkusforge.diagnostics.DiagnosticField;
 import java.nio.file.Path;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class QuarkusForgeCliTest {
@@ -106,22 +108,32 @@ class QuarkusForgeCliTest {
   void postHookDiagnosticsRedactsRawCommand() {
     String command = "QUARKUS_TOKEN=secret ./deploy.sh";
     var fields = QuarkusForgeCli.postHookDiagnosticFields(Path.of("/tmp/project"), command);
+    var valuesByName =
+        java.util.Arrays.stream(fields)
+            .collect(
+                java.util.stream.Collectors.toMap(DiagnosticField::name, DiagnosticField::value));
 
-    assertThat(fields).containsEntry("directory", "/tmp/project");
-    assertThat(fields).containsEntry("command", "<redacted>");
-    assertThat(fields).containsEntry("commandLength", command.length());
-    assertThat(fields).doesNotContainValue(command);
+    assertThat(valuesByName).containsEntry("directory", Path.of("/tmp/project").toString());
+    assertThat(valuesByName).containsEntry("command", "<redacted>");
+    assertThat(valuesByName).containsEntry("commandLength", command.length());
+    assertThat(valuesByName).doesNotContainValue(command);
   }
 
   @Test
   void shellCommandInvocationUsesPosixShellForNonWindows() {
-    assertThat(QuarkusForgeCli.shellCommandInvocation("echo ok", false))
+    assertThat(ShellExecutor.commandInvocation("echo ok", false))
         .containsExactly("sh", "-lc", "echo ok");
   }
 
   @Test
   void shellCommandInvocationUsesCmdForWindows() {
-    assertThat(QuarkusForgeCli.shellCommandInvocation("echo ok", true))
+    assertThat(ShellExecutor.commandInvocation("echo ok", true))
         .containsExactly("cmd.exe", "/c", "echo ok");
+  }
+
+  @Test
+  void isCommandAvailableReturnsFalseForMissingBinary() {
+    String missing = "missing-" + UUID.randomUUID();
+    assertThat(QuarkusForgeCli.isCommandAvailable(missing)).isFalse();
   }
 }

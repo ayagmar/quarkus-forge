@@ -1,0 +1,18 @@
+.Introduction
+* xref:index.adoc[Overview]
+* xref:getting-started.adoc[Getting Started]
+
+.User Guide
+* xref:usage/tui.adoc[TUI Usage]
+* xref:cli/headless-mode.adoc[CLI Headless Mode]
+
+.Configuration
+* xref:ui/keybindings.adoc[Keybindings]
+* xref:ui/theming.adoc[Theming]
+
+.Operations
+* xref:troubleshooting.adoc[Troubleshooting]
+
+.Reference
+* xref:reference/testing-strategy.adoc[Testing Strategy]
+* xref:architecture.adoc[Architecture]

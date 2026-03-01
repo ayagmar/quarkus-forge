@@ -3,7 +3,6 @@ package dev.ayagmar.quarkusforge.api;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -29,11 +28,10 @@ class CatalogSnapshotCacheTest {
             Duration.ofHours(6),
             2L * 1024L * 1024L);
 
-    CatalogSnapshotCache.CacheWriteOutcome writeOutcome =
-        cache.write(sampleMetadata(), sampleExtensions());
+    CacheWriteOutcome writeOutcome = cache.write(sampleMetadata(), sampleExtensions());
 
     assertThat(writeOutcome.written()).isTrue();
-    CatalogSnapshotCache.CachedCatalogSnapshot snapshot = cache.read().orElseThrow();
+    CachedCatalogSnapshot snapshot = cache.read().orElseThrow();
     assertThat(snapshot.stale()).isFalse();
     assertThat(snapshot.metadata()).isEqualTo(sampleMetadata());
     assertThat(snapshot.extensions()).containsExactlyElementsOf(sampleExtensions());
@@ -60,7 +58,7 @@ class CatalogSnapshotCacheTest {
             Duration.ofHours(6),
             2L * 1024L * 1024L);
 
-    CatalogSnapshotCache.CachedCatalogSnapshot snapshot = reader.read().orElseThrow();
+    CachedCatalogSnapshot snapshot = reader.read().orElseThrow();
     assertThat(snapshot.stale()).isTrue();
   }
 
@@ -85,7 +83,7 @@ class CatalogSnapshotCacheTest {
             Duration.ofHours(6),
             2L * 1024L * 1024L);
 
-    CatalogSnapshotCache.CachedCatalogSnapshot snapshot = reader.read().orElseThrow();
+    CachedCatalogSnapshot snapshot = reader.read().orElseThrow();
     assertThat(snapshot.stale()).isTrue();
   }
 
@@ -129,8 +127,7 @@ class CatalogSnapshotCacheTest {
             Duration.ofHours(6),
             128L);
 
-    CatalogSnapshotCache.CacheWriteOutcome outcome =
-        cache.write(sampleMetadata(), sampleExtensions());
+    CacheWriteOutcome outcome = cache.write(sampleMetadata(), sampleExtensions());
 
     assertThat(outcome.written()).isFalse();
     assertThat(outcome.rejected()).isTrue();
@@ -145,14 +142,8 @@ class CatalogSnapshotCacheTest {
     ObjectMapper failingMapper =
         new ObjectMapper() {
           @Override
-          public <T extends com.fasterxml.jackson.databind.JsonNode> T valueToTree(
-              Object fromValue) {
+          public byte[] writeValueAsBytes(Object value) {
             throw new IllegalArgumentException("serializer failed");
-          }
-
-          @Override
-          public com.fasterxml.jackson.databind.node.ObjectNode createObjectNode() {
-            return JsonNodeFactory.instance.objectNode();
           }
         };
     CatalogSnapshotCache cache =
@@ -163,8 +154,7 @@ class CatalogSnapshotCacheTest {
             Duration.ofHours(6),
             2L * 1024L * 1024L);
 
-    CatalogSnapshotCache.CacheWriteOutcome outcome =
-        cache.write(sampleMetadata(), sampleExtensions());
+    CacheWriteOutcome outcome = cache.write(sampleMetadata(), sampleExtensions());
 
     assertThat(outcome.written()).isFalse();
     assertThat(outcome.rejected()).isFalse();

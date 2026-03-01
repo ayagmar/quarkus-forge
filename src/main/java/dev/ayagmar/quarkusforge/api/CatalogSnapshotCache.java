@@ -1,13 +1,9 @@
 package dev.ayagmar.quarkusforge.api;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -52,8 +48,7 @@ public final class CatalogSnapshotCache {
   }
 
   public static Path defaultCacheFile() {
-    Path home = Path.of(System.getProperty("user.home", "."));
-    return home.resolve(".quarkus-forge").resolve("catalog-snapshot.json");
+    return ForgeDataPaths.catalogSnapshotFile();
   }
 
   public CacheWriteOutcome write(MetadataDto metadata, List<ExtensionDto> extensions) {
@@ -77,15 +72,7 @@ public final class CatalogSnapshotCache {
     }
 
     try {
-      Path parent = resolvedParentDirectory();
-      Files.createDirectories(parent);
-      Path tempFile = Files.createTempFile(parent, "catalog-snapshot-", ".tmp");
-      try {
-        Files.write(tempFile, payload, StandardOpenOption.TRUNCATE_EXISTING);
-        moveAtomicallyWithFallback(tempFile, cacheFile);
-      } finally {
-        Files.deleteIfExists(tempFile);
-      }
+      AtomicFileStore.writeBytes(cacheFile, payload, "catalog-snapshot-");
       return CacheWriteOutcome.writeSucceeded();
     } catch (IOException ioException) {
       return CacheWriteOutcome.writeFailed("failed to persist cache snapshot");
@@ -103,37 +90,27 @@ public final class CatalogSnapshotCache {
         return Optional.empty();
       }
 
-      JsonNode root = objectMapper.readTree(cacheFile.toFile());
-      if (!root.isObject()) {
-        return Optional.empty();
-      }
-
-      int schemaVersion = requiredInt(root, "schemaVersion");
+      CatalogSnapshotPayload payload =
+          objectMapper.readValue(cacheFile.toFile(), CatalogSnapshotPayload.class);
+      int schemaVersion = payload.schemaVersion();
       if (schemaVersion != SCHEMA_VERSION) {
         return Optional.empty();
       }
 
-      long fetchedAtMillis = requiredLong(root, "fetchedAtEpochMillis");
+      long fetchedAtMillis = payload.fetchedAtEpochMillis();
       if (fetchedAtMillis < 0) {
         return Optional.empty();
       }
 
-      JsonNode metadataNode = root.get("metadata");
-      JsonNode extensionsNode = root.get("extensions");
-      if (metadataNode == null || !metadataNode.isObject()) {
+      MetadataDto metadata = payload.metadata();
+      if (metadata == null) {
         return Optional.empty();
       }
-      if (extensionsNode == null || !extensionsNode.isArray()) {
+      List<ExtensionDto> extensions = payload.extensions();
+      if (extensions == null || extensions.isEmpty()) {
         return Optional.empty();
       }
-
-      MetadataDto metadata =
-          QuarkusApiClient.parseMetadataPayload(metadataNode.toString(), objectMapper);
-      List<ExtensionDto> extensions =
-          QuarkusApiClient.parseExtensionsPayload(extensionsNode.toString(), objectMapper);
-      if (extensions.isEmpty()) {
-        return Optional.empty();
-      }
+      extensions = List.copyOf(extensions);
 
       Instant fetchedAt = Instant.ofEpochMilli(fetchedAtMillis);
       boolean stale = isStale(fetchedAt);
@@ -149,78 +126,9 @@ public final class CatalogSnapshotCache {
   }
 
   private byte[] toPayload(MetadataDto metadata, List<ExtensionDto> extensions) throws IOException {
-    ObjectNode root = objectMapper.createObjectNode();
-    root.put("schemaVersion", SCHEMA_VERSION);
-    root.put("fetchedAtEpochMillis", clock.instant().toEpochMilli());
-    root.set("metadata", objectMapper.valueToTree(metadata));
-    root.set("extensions", objectMapper.valueToTree(extensions));
-    return objectMapper.writeValueAsBytes(root);
-  }
-
-  private static int requiredInt(JsonNode root, String fieldName) {
-    JsonNode node = root.get(fieldName);
-    if (node == null || !node.isInt()) {
-      throw new ApiContractException("cache field '%s' must be an int".formatted(fieldName));
-    }
-    return node.intValue();
-  }
-
-  private static long requiredLong(JsonNode root, String fieldName) {
-    JsonNode node = root.get(fieldName);
-    if (node == null || !node.canConvertToLong()) {
-      throw new ApiContractException("cache field '%s' must be a long".formatted(fieldName));
-    }
-    return node.longValue();
-  }
-
-  private static void moveAtomicallyWithFallback(Path source, Path target) throws IOException {
-    try {
-      Files.move(
-          source,
-          target,
-          java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-          java.nio.file.StandardCopyOption.ATOMIC_MOVE);
-    } catch (AtomicMoveNotSupportedException unsupportedException) {
-      Files.move(source, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-    }
-  }
-
-  private Path resolvedParentDirectory() throws IOException {
-    Path normalized = cacheFile.toAbsolutePath().normalize();
-    Path parent = normalized.getParent();
-    if (parent == null) {
-      throw new IOException("Cache file path has no parent directory: " + cacheFile);
-    }
-    return parent;
-  }
-
-  public record CachedCatalogSnapshot(
-      MetadataDto metadata, List<ExtensionDto> extensions, Instant fetchedAt, boolean stale) {
-    public CachedCatalogSnapshot {
-      metadata = Objects.requireNonNull(metadata);
-      extensions = List.copyOf(Objects.requireNonNull(extensions));
-      fetchedAt = Objects.requireNonNull(fetchedAt);
-      if (extensions.isEmpty()) {
-        throw new IllegalArgumentException("cached extensions must not be empty");
-      }
-    }
-  }
-
-  public record CacheWriteOutcome(boolean written, boolean rejected, String detail) {
-    public CacheWriteOutcome {
-      detail = detail == null ? "" : detail.strip();
-    }
-
-    static CacheWriteOutcome writeSucceeded() {
-      return new CacheWriteOutcome(true, false, "");
-    }
-
-    static CacheWriteOutcome writeRejected(String detail) {
-      return new CacheWriteOutcome(false, true, detail);
-    }
-
-    static CacheWriteOutcome writeFailed(String detail) {
-      return new CacheWriteOutcome(false, false, detail);
-    }
+    CatalogSnapshotPayload payload =
+        new CatalogSnapshotPayload(
+            SCHEMA_VERSION, clock.instant().toEpochMilli(), metadata, List.copyOf(extensions));
+    return objectMapper.writeValueAsBytes(payload);
   }
 }

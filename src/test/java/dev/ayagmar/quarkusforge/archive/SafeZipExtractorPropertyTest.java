@@ -32,7 +32,7 @@ class SafeZipExtractorPropertyTest {
     SafeZipExtractor extractor = new SafeZipExtractor();
     Path destination = tempDir.resolve("output-valid-" + repetitionInfo.getCurrentRepetition());
 
-    SafeZipExtractor.ExtractionResult result =
+    ExtractionResult result =
         extractor.extract(zipPath, destination, OverwritePolicy.FAIL_IF_EXISTS);
 
     assertThat(result.extractedRoot()).isEqualTo(destination);
@@ -53,7 +53,7 @@ class SafeZipExtractorPropertyTest {
     SafeZipExtractor extractor = new SafeZipExtractor();
     Path destination = tempDir.resolve("output-reordered-" + repetitionInfo.getCurrentRepetition());
 
-    SafeZipExtractor.ExtractionResult result =
+    ExtractionResult result =
         extractor.extract(zipPath, destination, OverwritePolicy.FAIL_IF_EXISTS);
 
     assertThat(result.extractedRoot()).isEqualTo(destination);

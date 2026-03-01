@@ -27,7 +27,7 @@ class SafeZipExtractorTest {
     SafeZipExtractor extractor = new SafeZipExtractor();
     Path destination = tempDir.resolve("generated-project");
 
-    SafeZipExtractor.ExtractionResult result =
+    ExtractionResult result =
         extractor.extract(zipPath, destination, OverwritePolicy.FAIL_IF_EXISTS);
 
     assertThat(result.extractedRoot()).isEqualTo(destination);
@@ -46,7 +46,7 @@ class SafeZipExtractorTest {
     SafeZipExtractor extractor = new SafeZipExtractor();
     Path destination = tempDir.resolve("generated-project");
 
-    SafeZipExtractor.ExtractionResult result =
+    ExtractionResult result =
         extractor.extract(zipPath, destination, OverwritePolicy.FAIL_IF_EXISTS);
 
     assertThat(result.extractedRoot()).isEqualTo(destination);
@@ -66,7 +66,7 @@ class SafeZipExtractorTest {
     SafeZipExtractor extractor = new SafeZipExtractor();
     Path destination = tempDir.resolve("generated-project");
 
-    SafeZipExtractor.ExtractionResult result =
+    ExtractionResult result =
         extractor.extract(zipPath, destination, OverwritePolicy.FAIL_IF_EXISTS);
 
     assertThat(result.extractedRoot()).isEqualTo(destination);

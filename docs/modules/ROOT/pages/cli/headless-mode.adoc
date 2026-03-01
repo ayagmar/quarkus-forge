@@ -1,0 +1,89 @@
+= CLI Headless Mode
+
+== Command
+
+Use `generate` for non-interactive project generation:
+
+[source,bash]
+----
+java -jar target/quarkus-forge.jar generate \
+  --group-id org.acme \
+  --artifact-id demo \
+  --project-version 1.0.0-SNAPSHOT \
+  --build-tool maven \
+  --java-version 25 \
+  --output-dir .
+----
+
+== Common Examples
+
+Dry-run validation only:
+
+[source,bash]
+----
+java -jar target/quarkus-forge.jar generate \
+  --group-id org.acme \
+  --artifact-id demo \
+  --build-tool maven \
+  --java-version 25 \
+  --dry-run
+----
+
+Use extensions and preset together:
+
+[source,bash]
+----
+
+Recipe + lock replay:
+
+[source,bash]
+----
+java -jar target/quarkus-forge.jar generate \
+  --recipe Forgefile \
+  --lock forge.lock
+----
+
+Refresh lock after intentional changes:
+
+[source,bash]
+----
+java -jar target/quarkus-forge.jar generate \
+  --recipe Forgefile \
+  --lock forge.lock \
+  --refresh-lock \
+  --dry-run
+----
+java -jar target/quarkus-forge.jar generate \
+  --group-id org.acme \
+  --artifact-id demo \
+  --build-tool maven \
+  --java-version 25 \
+  --preset web \
+  --extension io.quarkus:quarkus-smallrye-health
+----
+
+== Key Flags
+
+* Metadata: `--group-id`, `--artifact-id`, `--project-version`, `--package-name`, `--output-dir`
+* Platform/build: `--platform-stream`, `--build-tool`, `--java-version`
+* Extensions: `--extension` (repeatable or comma-separated)
+* Presets: `--preset` (repeatable; keys resolved from `code.quarkus.io/api/presets`, plus `favorites`)
+* Validation only: `--dry-run`
+* Diagnostics: `--verbose`
+* Recipe/lock: `--recipe`, `--write-recipe`, `--lock`, `--write-lock`, `--refresh-lock`
+
+== Exit Codes
+
+* `0`: success
+* `2`: validation/input error
+* `3`: network/API error
+* `4`: archive/extraction/output-path error
+* `130`: cancelled/interrupted
+
+== Notes
+
+* Output path resolves to `<output-dir>/<artifact-id>`.
+* Extension IDs are validated against the loaded catalog.
+* When `--recipe` is set, request metadata fields come from the recipe file; CLI `--preset` and `--extension` are appended.
+* A provided lock file enforces deterministic platform/build/java/preset/extension resolution unless `--refresh-lock` is set.
+* Source mode is surfaced in diagnostics (`live`, `cache`, `snapshot`).

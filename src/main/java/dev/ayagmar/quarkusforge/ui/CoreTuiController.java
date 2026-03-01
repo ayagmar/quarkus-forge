@@ -1,11 +1,14 @@
 package dev.ayagmar.quarkusforge.ui;
 
-import dev.ayagmar.quarkusforge.api.ApiErrorMessages;
+import dev.ayagmar.quarkusforge.ForgeLock;
+import dev.ayagmar.quarkusforge.ForgeRecipeLockStore;
 import dev.ayagmar.quarkusforge.api.BuildToolCodec;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
-import dev.ayagmar.quarkusforge.api.ExtensionDto;
+import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
+import dev.ayagmar.quarkusforge.api.PlatformStream;
+import dev.ayagmar.quarkusforge.api.ThrowableUnwrapper;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.CliPrefillMapper;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
@@ -20,6 +23,7 @@ import dev.tamboui.style.Overflow;
 import dev.tamboui.style.Style;
 import dev.tamboui.terminal.Frame;
 import dev.tamboui.tui.event.Event;
+import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.ResizeEvent;
 import dev.tamboui.tui.event.TickEvent;
@@ -36,15 +40,12 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
-import java.util.function.BooleanSupplier;
-import java.util.function.Consumer;
 
-public final class CoreTuiController implements BodyPanelRenderer.CompactInputRenderer {
+public final class CoreTuiController
+    implements CompactInputRenderer, UiRoutingContext, GenerationFlowCallbacks {
   private static final int METADATA_PANEL_HEIGHT_COMPACT = 4;
   private static final int METADATA_PANEL_HEIGHT_NARROW = 10;
   private static final List<FocusTarget> FOCUS_ORDER =
@@ -81,6 +82,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
           new CommandPaletteEntry(
               "Toggle favorite filter", "Ctrl+K", CommandPaletteAction.TOGGLE_FAVORITES_FILTER),
           new CommandPaletteEntry(
+              "Cycle preset filter", "Ctrl+Y", CommandPaletteAction.CYCLE_PRESET_FILTER),
+          new CommandPaletteEntry(
               "Jump to next favorite", "Ctrl+J", CommandPaletteAction.JUMP_TO_FAVORITE),
           new CommandPaletteEntry(
               "Cycle category filter", "v", CommandPaletteAction.CYCLE_CATEGORY_FILTER),
@@ -91,7 +94,14 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
           new CommandPaletteEntry(
               "Toggle error details", "Ctrl+E", CommandPaletteAction.TOGGLE_ERROR_DETAILS));
   private static final List<String> POST_GENERATION_ACTION_LABELS =
-      List.of("Open in IDE", "Open in terminal", "Generate again", "Quit");
+      List.of(
+          "Write forge.lock",
+          "Publish to GitHub (requires gh)",
+          "Open in IDE",
+          "Open in terminal",
+          "Generate again",
+          "Quit");
+  private static final String FORGE_LOCK_FILE_NAME = "forge.lock";
   private static final List<String> GLOBAL_HELP_LINES =
       List.of(
           "Global",
@@ -116,6 +126,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
           "  c / C           : close/open focused category / open all",
           "  Ctrl+J          : jump to next favorite",
           "  Ctrl+K          : toggle favorites filter",
+          "  Ctrl+Y          : cycle preset filter",
           "  Ctrl+R          : reload extension catalog",
           "",
           "Diagnostics",
@@ -146,10 +157,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   private final GenerationStateTracker generationStateTracker;
   private final FooterLinesComposer footerLinesComposer;
   private final AsyncRepaintSignal asyncRepaintSignal;
-  private CompletableFuture<Path> generationFuture;
-  private long generationStartedAtNanos;
-  private volatile boolean generationCancelRequested;
-  private volatile long generationToken;
+  private final UiEventRouter uiEventRouter;
+  private final GenerationFlowCoordinator generationFlowCoordinator;
   private volatile long extensionCatalogLoadToken;
   private boolean extensionCatalogLoading;
   private String extensionCatalogErrorMessage;
@@ -199,10 +208,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     generationStateTracker = new GenerationStateTracker();
     footerLinesComposer = new FooterLinesComposer();
     asyncRepaintSignal = new AsyncRepaintSignal();
-    generationFuture = null;
-    generationStartedAtNanos = 0L;
-    generationCancelRequested = false;
-    generationToken = 0L;
+    uiEventRouter = new UiEventRouter();
+    generationFlowCoordinator = new GenerationFlowCoordinator();
     extensionCatalogLoadToken = 0L;
     extensionCatalogLoading = false;
     extensionCatalogErrorMessage = "";
@@ -338,8 +345,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
 
   public UiAction onEvent(Event event) {
     reconcileGenerationCompletionIfDone();
-    if (event instanceof TickEvent tickEvent) {
-      return handleTickEvent(tickEvent);
+    if (event instanceof TickEvent) {
+      return handleTickEvent();
     }
     if (event instanceof ResizeEvent resizeEvent) {
       statusMessage = "Terminal resized to " + resizeEvent.width() + "x" + resizeEvent.height();
@@ -348,33 +355,31 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     if (!(event instanceof KeyEvent keyEvent)) {
       return UiAction.ignored();
     }
-    UiAction helpOverlayAction = handleHelpOverlayKey(keyEvent);
-    if (helpOverlayAction != null) {
-      return helpOverlayAction;
-    }
-    if (shouldToggleHelpOverlay(keyEvent, focusTarget)) {
-      toggleHelpOverlay();
-      return UiAction.handled(false);
-    }
-    if (isCommandPaletteToggleKey(keyEvent)) {
-      toggleCommandPalette();
-      return UiAction.handled(false);
-    }
-    UiAction commandPaletteAction = handleCommandPaletteKey(keyEvent);
-    if (commandPaletteAction != null) {
-      return commandPaletteAction;
-    }
-    UiAction postGenerationAction = handlePostGenerationMenuKey(keyEvent);
-    if (postGenerationAction != null) {
-      return postGenerationAction;
-    }
+    return uiEventRouter.routeKeyEvent(keyEvent, this);
+  }
 
+  @Override
+  public boolean shouldToggleHelpOverlay(KeyEvent keyEvent) {
+    return CoreTuiController.shouldToggleHelpOverlay(keyEvent, focusTarget);
+  }
+
+  @Override
+  public boolean isCommandPaletteToggleKey(KeyEvent keyEvent) {
+    return CoreTuiController.isCommandPaletteToggleShortcutKey(keyEvent);
+  }
+
+  @Override
+  public UiAction handleExtensionCancelFlow(KeyEvent keyEvent) {
     if (shouldClearExtensionSearchOnCancel(keyEvent)) {
       clearExtensionSearchFilter();
       return UiAction.handled(false);
     }
     if (shouldDisableFavoritesFilterOnCancel(keyEvent)) {
       toggleFavoritesOnlyFilter();
+      return UiAction.handled(false);
+    }
+    if (shouldDisablePresetFilterOnCancel(keyEvent)) {
+      clearPresetFilter();
       return UiAction.handled(false);
     }
     if (shouldDisableCategoryFilterOnCancel(keyEvent)) {
@@ -385,24 +390,34 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       focusExtensionList();
       return UiAction.handled(false);
     }
+    return null;
+  }
 
-    if (shouldQuitKeyEvent(keyEvent)) {
-      if (isGenerationInProgress()) {
-        requestGenerationCancellation();
-        return UiAction.handled(false);
-      }
-      cancelPendingAsyncOperations();
-      return UiAction.handled(true);
+  @Override
+  public UiAction handleQuitFlow(KeyEvent keyEvent) {
+    if (!shouldQuitKeyEvent(keyEvent)) {
+      return null;
     }
-
     if (isGenerationInProgress()) {
-      if (keyEvent.isConfirm()) {
-        statusMessage = "Generation already in progress. Press Esc to cancel.";
-        return UiAction.handled(false);
-      }
-      statusMessage = "Generation in progress. Press Esc to cancel.";
+      requestGenerationCancellation();
       return UiAction.handled(false);
     }
+    cancelPendingAsyncOperations();
+    return UiAction.handled(true);
+  }
+
+  @Override
+  public UiAction handleWhileGenerationInProgress(KeyEvent keyEvent) {
+    if (keyEvent.isConfirm()) {
+      statusMessage = "Generation already in progress. Press Esc to cancel.";
+      return UiAction.handled(false);
+    }
+    statusMessage = "Generation in progress. Press Esc to cancel.";
+    return UiAction.handled(false);
+  }
+
+  @Override
+  public UiAction handleGlobalShortcutFlow(KeyEvent keyEvent) {
     if (shouldFocusExtensionSearch(keyEvent, focusTarget)) {
       focusExtensionSearch();
       return UiAction.handled(false);
@@ -419,6 +434,10 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       toggleFavoritesOnlyFilter();
       return UiAction.handled(false);
     }
+    if (isPresetFilterCycleKey(keyEvent)) {
+      cyclePresetFilter();
+      return UiAction.handled(false);
+    }
     if (isJumpToFavoriteKey(keyEvent)) {
       jumpToFavorite();
       return UiAction.handled(false);
@@ -427,39 +446,44 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       toggleErrorDetails();
       return UiAction.handled(false);
     }
-    if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && keyEvent.hasShift()) {
+    return null;
+  }
+
+  @Override
+  public UiAction handleFocusNavigationFlow(KeyEvent keyEvent) {
+    if (keyEvent.isFocusPrevious()) {
       moveFocus(-1);
-      return UiAction.handled(false);
-    }
-    if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && !keyEvent.hasShift()) {
-      moveFocus(1);
       return UiAction.handled(false);
     }
     if (keyEvent.isFocusNext()) {
       moveFocus(1);
       return UiAction.handled(false);
     }
-    if (keyEvent.isFocusPrevious()) {
-      moveFocus(-1);
-      return UiAction.handled(false);
-    }
     if (focusTarget == FocusTarget.SUBMIT) {
-      if (isVimDownKey(keyEvent)) {
+      if (UiKeyMatchers.isVimDownKey(keyEvent)) {
         moveFocus(1);
         return UiAction.handled(false);
       }
-      if (isVimUpKey(keyEvent)) {
+      if (UiKeyMatchers.isVimUpKey(keyEvent)) {
         moveFocus(-1);
         return UiAction.handled(false);
       }
     }
+    return null;
+  }
 
+  @Override
+  public UiAction handleSubmitFlow(KeyEvent keyEvent) {
     if (keyEvent.isConfirm() || isGenerateShortcutKey(keyEvent)) {
       handleSubmitRequest();
       return UiAction.handled(false);
     }
+    return null;
+  }
 
-    if (focusTarget == FocusTarget.EXTENSION_SEARCH && keyEvent.isDown()) {
+  @Override
+  public UiAction handleExtensionFocusFlow(KeyEvent keyEvent) {
+    if (focusTarget == FocusTarget.EXTENSION_SEARCH && keyEvent.code() == KeyCode.DOWN) {
       focusExtensionList();
       return UiAction.handled(false);
     }
@@ -499,6 +523,10 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       cycleCategoryFilter();
       return UiAction.handled(false);
     }
+    if (focusTarget == FocusTarget.EXTENSION_LIST && isPresetFilterCycleKey(keyEvent)) {
+      cyclePresetFilter();
+      return UiAction.handled(false);
+    }
     if (focusTarget == FocusTarget.EXTENSION_LIST && isClearSelectedExtensionsKey(keyEvent)) {
       clearSelectedExtensions();
       return UiAction.handled(false);
@@ -511,19 +539,26 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       expandAllCategories();
       return UiAction.handled(false);
     }
-
     if (focusTarget == FocusTarget.EXTENSION_LIST
         && extensionCatalogState.handleListKeys(
             keyEvent, toggledName -> statusMessage = "Toggled extension: " + toggledName)) {
       return UiAction.handled(false);
     }
+    return null;
+  }
 
+  @Override
+  public UiAction handleMetadataSelectorFlow(KeyEvent keyEvent) {
     if (isMetadataSelectorFocus(focusTarget) && handleMetadataSelectorKey(focusTarget, keyEvent)) {
       revalidate();
       refreshValidationFeedbackAfterEdit();
       return UiAction.handled(false);
     }
+    return null;
+  }
 
+  @Override
+  public UiAction handleTextInputFlow(KeyEvent keyEvent) {
     if (isTextInputFocus(focusTarget)
         && handleTextInputKey(inputStates.get(focusTarget), keyEvent)) {
       if (focusTarget == FocusTarget.EXTENSION_SEARCH) {
@@ -535,8 +570,80 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       }
       return UiAction.handled(false);
     }
+    return null;
+  }
 
-    return UiAction.ignored();
+  @Override
+  public void beforeGenerationStart() {
+    successHint = "";
+    postGenerationMenuVisible = false;
+    postGenerationExitPlan = null;
+    lastGeneratedProjectPath = null;
+    lastGeneratedNextCommand = "";
+    extensionCatalogState.cancelPendingAsync();
+  }
+
+  @Override
+  public boolean transitionTo(GenerationState targetState) {
+    return transitionGenerationState(targetState);
+  }
+
+  @Override
+  public GenerationState currentState() {
+    return generationStateTracker.currentState();
+  }
+
+  @Override
+  public void onSubmitIgnored(String stateLabel) {
+    statusMessage = "Submit ignored in state: " + stateLabel;
+  }
+
+  @Override
+  public void onProgress(GenerationProgressUpdate progressUpdate) {
+    generationStateTracker.updateProgress(progressUpdate);
+    String progressMessage =
+        progressUpdate.message().isBlank() ? "working..." : progressUpdate.message();
+    statusMessage = "Generation in progress: " + progressMessage;
+  }
+
+  @Override
+  public void onGenerationSuccess(Path generatedPath) {
+    String nextCommand = nextStepCommand(request.buildTool());
+    lastGeneratedProjectPath = generatedPath;
+    lastGeneratedNextCommand = nextCommand;
+    statusMessage = "Generation succeeded: " + generatedPath;
+    errorMessage = "";
+    verboseErrorDetails = "";
+    successHint = "cd " + generatedPath + " && " + nextCommand;
+    postGenerationMenuVisible = true;
+    postGenerationActionSelection = 0;
+    requestAsyncRepaint();
+  }
+
+  @Override
+  public void onGenerationCancelled() {
+    statusMessage = "Generation cancelled. Update inputs and press Enter to retry.";
+    errorMessage = "";
+    verboseErrorDetails = "";
+    successHint = "";
+    postGenerationMenuVisible = false;
+    requestAsyncRepaint();
+  }
+
+  @Override
+  public void onGenerationFailed(Throwable cause) {
+    statusMessage = "Generation failed.";
+    errorMessage = ErrorMessageMapper.userFriendlyError(cause);
+    verboseErrorDetails = ErrorMessageMapper.verboseDetails(cause);
+    successHint = "";
+    postGenerationMenuVisible = false;
+    requestAsyncRepaint();
+  }
+
+  @Override
+  public void onCancellationRequested() {
+    statusMessage = "Cancellation requested. Waiting for cleanup...";
+    errorMessage = "";
   }
 
   public void setStartupOverlayMinDuration(Duration minimumDuration) {
@@ -687,8 +794,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
         extensionCatalogState::isFavorite);
   }
 
-  private BodyPanelRenderer.MetadataPanelSnapshot metadataPanelSnapshot() {
-    return new BodyPanelRenderer.MetadataPanelSnapshot(
+  private MetadataPanelSnapshot metadataPanelSnapshot() {
+    return new MetadataPanelSnapshot(
         metadataPanelTitle(),
         isMetadataFocused(),
         !validation.isValid(),
@@ -703,8 +810,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
         selectorValue(FocusTarget.JAVA_VERSION));
   }
 
-  private BodyPanelRenderer.ExtensionsPanelSnapshot extensionsPanelSnapshot() {
-    return new BodyPanelRenderer.ExtensionsPanelSnapshot(
+  private ExtensionsPanelSnapshot extensionsPanelSnapshot() {
+    return new ExtensionsPanelSnapshot(
         extensionsPanelTitle(),
         isExtensionPanelFocused(),
         focusTarget == FocusTarget.EXTENSION_LIST,
@@ -716,6 +823,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
         extensionCatalogStale,
         extensionCatalogState.favoritesOnlyFilterEnabled(),
         extensionCatalogState.favoriteExtensionCount(),
+        extensionCatalogState.activePresetFilterName(),
         extensionCatalogState.activeCategoryFilterTitle(),
         extensionCatalogState.filteredExtensions().size(),
         extensionCatalogState.totalCatalogExtensionCount(),
@@ -1121,8 +1229,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     frame.renderWidget(overlay, overlayArea);
   }
 
-  private FooterLinesComposer.FooterSnapshot footerSnapshot() {
-    return new FooterLinesComposer.FooterSnapshot(
+  private FooterSnapshot footerSnapshot() {
+    return new FooterSnapshot(
         isGenerationInProgress(),
         focusTarget,
         commandPaletteVisible,
@@ -1148,7 +1256,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     submitBlockedByValidation = false;
   }
 
-  private UiAction handleCommandPaletteKey(KeyEvent keyEvent) {
+  @Override
+  public UiAction handleCommandPaletteKey(KeyEvent keyEvent) {
     if (!commandPaletteVisible) {
       return null;
     }
@@ -1161,11 +1270,11 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       statusMessage = "Command palette closed";
       return UiAction.handled(false);
     }
-    if (keyEvent.isUp() || isVimUpKey(keyEvent)) {
+    if (keyEvent.isUp() || UiKeyMatchers.isVimUpKey(keyEvent)) {
       moveCommandPaletteSelection(-1);
       return UiAction.handled(false);
     }
-    if (keyEvent.isDown() || isVimDownKey(keyEvent)) {
+    if (keyEvent.isDown() || UiKeyMatchers.isVimDownKey(keyEvent)) {
       moveCommandPaletteSelection(1);
       return UiAction.handled(false);
     }
@@ -1177,7 +1286,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       commandPaletteSelection = COMMAND_PALETTE_ENTRIES.size() - 1;
       return UiAction.handled(false);
     }
-    if (isDigitKey(keyEvent)) {
+    if (UiKeyMatchers.isDigitKey(keyEvent)) {
       int selected = Character.digit(keyEvent.character(), 10) - 1;
       if (selected >= 0 && selected < COMMAND_PALETTE_ENTRIES.size()) {
         commandPaletteSelection = selected;
@@ -1192,7 +1301,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     return UiAction.handled(false);
   }
 
-  private UiAction handlePostGenerationMenuKey(KeyEvent keyEvent) {
+  @Override
+  public UiAction handlePostGenerationMenuKey(KeyEvent keyEvent) {
     if (!postGenerationMenuVisible) {
       return null;
     }
@@ -1206,23 +1316,23 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       selectPostGenerationExit(PostGenerationExitAction.QUIT);
       return UiAction.handled(true);
     }
-    if (keyEvent.isUp() || isVimUpKey(keyEvent)) {
+    if (keyEvent.isUp() || UiKeyMatchers.isVimUpKey(keyEvent)) {
       movePostGenerationSelection(-1);
       return UiAction.handled(false);
     }
-    if (keyEvent.isDown() || isVimDownKey(keyEvent)) {
+    if (keyEvent.isDown() || UiKeyMatchers.isVimDownKey(keyEvent)) {
       movePostGenerationSelection(1);
       return UiAction.handled(false);
     }
-    if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && keyEvent.hasShift()) {
+    if (keyEvent.isFocusPrevious()) {
       movePostGenerationSelection(-1);
       return UiAction.handled(false);
     }
-    if (keyEvent.isKey(dev.tamboui.tui.event.KeyCode.TAB) && !keyEvent.hasShift()) {
+    if (keyEvent.isFocusNext()) {
       movePostGenerationSelection(1);
       return UiAction.handled(false);
     }
-    if (isDigitKey(keyEvent)) {
+    if (UiKeyMatchers.isDigitKey(keyEvent)) {
       int selected = Character.digit(keyEvent.character(), 10) - 1;
       if (selected >= 0 && selected < POST_GENERATION_ACTION_LABELS.size()) {
         postGenerationActionSelection = selected;
@@ -1247,11 +1357,17 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   private UiAction executePostGenerationSelection() {
     PostGenerationExitAction action =
         switch (postGenerationActionSelection) {
-          case 0 -> PostGenerationExitAction.OPEN_IDE;
-          case 1 -> PostGenerationExitAction.OPEN_TERMINAL;
-          case 2 -> PostGenerationExitAction.GENERATE_AGAIN;
+          case 0 -> PostGenerationExitAction.EXPORT_RECIPE_LOCK;
+          case 1 -> PostGenerationExitAction.PUBLISH_GITHUB;
+          case 2 -> PostGenerationExitAction.OPEN_IDE;
+          case 3 -> PostGenerationExitAction.OPEN_TERMINAL;
+          case 4 -> PostGenerationExitAction.GENERATE_AGAIN;
           default -> PostGenerationExitAction.QUIT;
         };
+    if (action == PostGenerationExitAction.EXPORT_RECIPE_LOCK) {
+      writeLockFile();
+      return UiAction.handled(false);
+    }
     if (action == PostGenerationExitAction.GENERATE_AGAIN) {
       postGenerationMenuVisible = false;
       postGenerationActionSelection = 0;
@@ -1267,6 +1383,29 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     cancelPendingAsyncOperations();
     selectPostGenerationExit(action);
     return UiAction.handled(true);
+  }
+
+  private void writeLockFile() {
+    Path generatedProjectPath = lastGeneratedProjectPath;
+    if (generatedProjectPath == null) {
+      statusMessage = "Cannot write forge.lock: no generated project path";
+      return;
+    }
+    try {
+      Path lockPath = generatedProjectPath.resolve(FORGE_LOCK_FILE_NAME);
+      List<String> selectedExtensions = extensionCatalogState.selectedExtensionIds();
+      ForgeLock lock =
+          ForgeLock.from(
+              request.platformStream(),
+              request.buildTool(),
+              request.javaVersion(),
+              List.of(),
+              selectedExtensions);
+      ForgeRecipeLockStore.writeLock(lockPath, lock);
+      statusMessage = "Wrote " + lockPath.getFileName() + " in " + generatedProjectPath;
+    } catch (RuntimeException runtimeException) {
+      statusMessage = "Failed to write forge.lock: " + runtimeException.getMessage();
+    }
   }
 
   private void selectPostGenerationExit(PostGenerationExitAction action) {
@@ -1299,6 +1438,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       case FOCUS_EXTENSION_SEARCH -> focusExtensionSearch();
       case FOCUS_EXTENSION_LIST -> focusExtensionList();
       case TOGGLE_FAVORITES_FILTER -> toggleFavoritesOnlyFilter();
+      case CYCLE_PRESET_FILTER -> cyclePresetFilter();
       case JUMP_TO_FAVORITE -> jumpToFavorite();
       case CYCLE_CATEGORY_FILTER -> {
         if (focusTarget != FocusTarget.EXTENSION_LIST) {
@@ -1323,7 +1463,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     }
   }
 
-  private void toggleCommandPalette() {
+  @Override
+  public void toggleCommandPalette() {
     if (commandPaletteVisible) {
       closeCommandPalette();
       statusMessage = "Command palette closed";
@@ -1347,7 +1488,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     commandPaletteVisible = false;
   }
 
-  private UiAction handleHelpOverlayKey(KeyEvent keyEvent) {
+  @Override
+  public UiAction handleHelpOverlayKey(KeyEvent keyEvent) {
     if (!helpOverlayVisible) {
       return null;
     }
@@ -1368,7 +1510,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     return UiAction.handled(false);
   }
 
-  private void toggleHelpOverlay() {
+  @Override
+  public void toggleHelpOverlay() {
     if (helpOverlayVisible) {
       closeHelpOverlay();
       statusMessage = "Help closed";
@@ -1516,13 +1659,16 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private boolean handleMetadataSelectorKey(FocusTarget target, KeyEvent keyEvent) {
-    if (keyEvent.isLeft() || isVimLeftKey(keyEvent) || keyEvent.isUp() || isVimUpKey(keyEvent)) {
+    if (keyEvent.isLeft()
+        || UiKeyMatchers.isVimLeftKey(keyEvent)
+        || keyEvent.isUp()
+        || UiKeyMatchers.isVimUpKey(keyEvent)) {
       return cycleSelector(target, -1);
     }
     if (keyEvent.isRight()
-        || isVimRightKey(keyEvent)
+        || UiKeyMatchers.isVimRightKey(keyEvent)
         || keyEvent.isDown()
-        || isVimDownKey(keyEvent)) {
+        || UiKeyMatchers.isVimDownKey(keyEvent)) {
       return cycleSelector(target, 1);
     }
     if (keyEvent.isHome()) {
@@ -1561,7 +1707,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     if (metadataSnapshot == null) {
       return option;
     }
-    MetadataDto.PlatformStream platformStream = metadataSnapshot.findPlatformStream(option);
+    PlatformStream platformStream = metadataSnapshot.findPlatformStream(option);
     if (platformStream == null) {
       return option;
     }
@@ -1671,7 +1817,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       MetadataDto metadataSnapshot, String fallbackValue) {
     List<String> options = new ArrayList<>();
     if (metadataSnapshot != null) {
-      for (MetadataDto.PlatformStream platformStream : metadataSnapshot.platformStreams()) {
+      for (PlatformStream platformStream : metadataSnapshot.platformStreams()) {
         if (platformStream.key().isBlank()) {
           continue;
         }
@@ -1765,147 +1911,20 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private void startGenerationFlow() {
-    successHint = "";
-    postGenerationMenuVisible = false;
-    postGenerationExitPlan = null;
-    lastGeneratedProjectPath = null;
-    lastGeneratedNextCommand = "";
-    extensionCatalogState.cancelPendingAsync();
-    generationCancelRequested = false;
-    long token = ++generationToken;
-    if (!transitionGenerationState(GenerationState.LOADING)) {
-      statusMessage = "Submit ignored in state: " + generationStateLabel();
-      return;
-    }
-    generationStartedAtNanos = System.nanoTime();
-    onGenerationProgress(
-        token,
-        GenerationProgressUpdate.requestingArchive(
-            "requesting project archive from Quarkus API..."));
-
-    GenerationRequest generationRequest = toGenerationRequest();
-    Path outputDirectory = resolveGeneratedProjectDirectory();
-
-    CompletableFuture<Path> startedFuture;
-    try {
-      startedFuture =
-          projectGenerationRunner.generate(
-              generationRequest,
-              outputDirectory,
-              () -> generationCancelRequested || token != generationToken,
-              progressUpdate ->
-                  scheduleOnRenderThread(() -> onGenerationProgress(token, progressUpdate)));
-    } catch (RuntimeException runtimeException) {
-      onGenerationCompleted(token, null, runtimeException);
-      return;
-    }
-    if (startedFuture == null) {
-      onGenerationCompleted(
-          token, null, new IllegalStateException("Generation service returned null future"));
-      return;
-    }
-
-    generationFuture = startedFuture;
-    startedFuture.whenComplete(
-        (generatedPath, throwable) ->
-            scheduleOnRenderThread(() -> onGenerationCompleted(token, generatedPath, throwable)));
-  }
-
-  private void onGenerationProgress(long token, GenerationProgressUpdate progressUpdate) {
-    if (token != generationToken
-        || generationStateTracker.currentState() != GenerationState.LOADING) {
-      return;
-    }
-    generationStateTracker.updateProgress(progressUpdate);
-    String progressMessage =
-        progressUpdate.message().isBlank() ? "working..." : progressUpdate.message();
-    statusMessage = "Generation in progress: " + progressMessage;
-  }
-
-  private void onGenerationCompleted(long token, Path generatedPath, Throwable throwable) {
-    if (token != generationToken
-        || generationStateTracker.currentState() != GenerationState.LOADING) {
-      return;
-    }
-    generationFuture = null;
-
-    Throwable cause = unwrapCompletionCause(throwable);
-    if (cause == null && generatedPath != null) {
-      transitionGenerationState(GenerationState.SUCCESS);
-      Path normalizedPath = generatedPath.toAbsolutePath().normalize();
-      String nextCommand = nextStepCommand(request.buildTool());
-      lastGeneratedProjectPath = normalizedPath;
-      lastGeneratedNextCommand = nextCommand;
-      statusMessage = "Generation succeeded: " + normalizedPath;
-      errorMessage = "";
-      verboseErrorDetails = "";
-      successHint = "cd " + normalizedPath + " && " + nextCommand;
-      postGenerationMenuVisible = true;
-      postGenerationActionSelection = 0;
-      requestAsyncRepaint();
-      return;
-    }
-
-    if (cause == null) {
-      cause = new IllegalStateException("Generation finished without an output path");
-    }
-
-    if (cause instanceof CancellationException || generationCancelRequested) {
-      transitionGenerationState(GenerationState.CANCELLED);
-      statusMessage = "Generation cancelled. Update inputs and press Enter to retry.";
-      errorMessage = "";
-      verboseErrorDetails = "";
-      successHint = "";
-      postGenerationMenuVisible = false;
-      requestAsyncRepaint();
-      return;
-    }
-
-    transitionGenerationState(GenerationState.ERROR);
-    statusMessage = "Generation failed.";
-    errorMessage = userFriendlyError(cause);
-    verboseErrorDetails = verboseDetails(cause);
-    successHint = "";
-    postGenerationMenuVisible = false;
-    requestAsyncRepaint();
+    generationFlowCoordinator.startFlow(
+        projectGenerationRunner, toGenerationRequest(), resolveGeneratedProjectDirectory(), this);
   }
 
   private void reconcileGenerationCompletionIfDone() {
-    if (generationStateTracker.currentState() != GenerationState.LOADING
-        || generationFuture == null) {
-      return;
-    }
-    if (!generationFuture.isDone()) {
-      return;
-    }
-
-    Path generatedPath = null;
-    Throwable throwable = null;
-    try {
-      generatedPath = generationFuture.join();
-    } catch (RuntimeException completionFailure) {
-      throwable = completionFailure;
-    }
-    onGenerationCompleted(generationToken, generatedPath, throwable);
+    generationFlowCoordinator.reconcileCompletionIfDone(this);
   }
 
   private void requestGenerationCancellation() {
-    if (generationStateTracker.currentState() != GenerationState.LOADING) {
-      return;
-    }
-    if (generationFuture != null && generationFuture.isDone()) {
-      reconcileGenerationCompletionIfDone();
-      return;
-    }
-    generationCancelRequested = true;
-    statusMessage = "Cancellation requested. Waiting for cleanup...";
-    errorMessage = "";
-    if (generationFuture != null) {
-      generationFuture.cancel(true);
-    }
+    generationFlowCoordinator.requestCancellation(this);
   }
 
-  private boolean isGenerationInProgress() {
+  @Override
+  public boolean isGenerationInProgress() {
     return generationStateTracker.isInProgress();
   }
 
@@ -1929,11 +1948,13 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     generationStateTracker.resetAfterTerminalOutcome();
   }
 
-  private String generationStateLabel() {
+  @Override
+  public String generationStateLabel() {
     return generationStateTracker.stateLabel();
   }
 
-  private void scheduleOnRenderThread(Runnable task) {
+  @Override
+  public void scheduleOnRenderThread(Runnable task) {
     scheduler.schedule(Duration.ZERO, task);
   }
 
@@ -1945,38 +1966,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     return GenerationStateTracker.isValidTransition(currentState, targetState);
   }
 
-  private static Throwable unwrapCompletionCause(Throwable throwable) {
-    if (throwable == null) {
-      return null;
-    }
-    if (throwable instanceof CompletionException completionException
-        && completionException.getCause() != null) {
-      return completionException.getCause();
-    }
-    return throwable;
-  }
-
-  private static String userFriendlyError(Throwable throwable) {
-    return ApiErrorMessages.userFriendlyMessage(throwable);
-  }
-
-  private static String verboseDetails(Throwable throwable) {
-    if (throwable == null) {
-      return "";
-    }
-    if (throwable instanceof dev.ayagmar.quarkusforge.api.ApiHttpException apiHttpException) {
-      String body = apiHttpException.responseBody();
-      if (body == null || body.isBlank() || "<binary>".equals(body)) {
-        return "";
-      }
-      return body.strip();
-    }
-    String message = throwable.getMessage();
-    return message == null ? "" : message.strip();
-  }
-
   private static String catalogLoadFailureMessage(Throwable throwable) {
-    String message = userFriendlyError(throwable);
+    String message = ErrorMessageMapper.userFriendlyError(throwable);
     if (message.contains("no valid cache snapshot found")) {
       return "Live catalog/cache unavailable. Using bundled snapshot (Ctrl+R to retry).";
     }
@@ -1996,32 +1987,6 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       return "./gradlew quarkusDev";
     }
     return "mvn quarkus:dev";
-  }
-
-  @FunctionalInterface
-  public interface ExtensionCatalogLoader {
-    CompletableFuture<ExtensionCatalogLoadResult> load();
-  }
-
-  public record ExtensionCatalogLoadResult(
-      List<ExtensionDto> extensions,
-      CatalogSource source,
-      boolean stale,
-      String detailMessage,
-      MetadataDto metadata) {
-    public ExtensionCatalogLoadResult {
-      extensions = List.copyOf(Objects.requireNonNull(extensions));
-      source = Objects.requireNonNull(source);
-      detailMessage = detailMessage == null ? "" : detailMessage.strip();
-
-      if (source != CatalogSource.CACHE && stale) {
-        throw new IllegalArgumentException("stale flag is allowed only for cache source");
-      }
-    }
-
-    public static ExtensionCatalogLoadResult live(List<ExtensionDto> extensions) {
-      return new ExtensionCatalogLoadResult(extensions, CatalogSource.LIVE, false, "", null);
-    }
   }
 
   private static boolean isTextInputFocus(FocusTarget focusTarget) {
@@ -2065,7 +2030,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
         : report.errors().getFirst().field() + ": " + report.errors().getFirst().message();
   }
 
-  private UiAction handleTickEvent(TickEvent ignored) {
+  private UiAction handleTickEvent() {
     boolean startupOverlayVisibleNow = isStartupOverlayVisible();
     boolean shouldRender = extensionCatalogLoading || startupOverlayVisibleNow;
     if (startupOverlayVisibleOnLastTick && !startupOverlayVisibleNow) {
@@ -2077,10 +2042,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       shouldRender = true;
     }
     if (generationStateTracker.currentState() == GenerationState.LOADING) {
-      if (!generationCancelRequested) {
-        long elapsedMillis =
-            Math.max(0L, (System.nanoTime() - generationStartedAtNanos) / 1_000_000L);
-        generationStateTracker.tick(elapsedMillis);
+      if (!generationFlowCoordinator.isCancellationRequested()) {
+        generationStateTracker.tick(generationFlowCoordinator.elapsedMillisSinceStart());
         statusMessage = "Generation in progress: " + generationStateTracker.progressPhase();
       }
       shouldRender = true;
@@ -2131,7 +2094,8 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
       return;
     }
     if (throwable != null) {
-      applyCatalogLoadFailure(catalogLoadFailureMessage(unwrapCompletionCause(throwable)));
+      applyCatalogLoadFailure(
+          catalogLoadFailureMessage(ThrowableUnwrapper.unwrapCompletionCause(throwable)));
       return;
     }
     if (result == null) {
@@ -2170,6 +2134,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
             : catalogLoadedStatusMessage(result.source(), result.stale());
     extensionCatalogState.replaceCatalog(
         items, inputStates.get(FocusTarget.EXTENSION_SEARCH).text(), ignored -> {});
+    extensionCatalogState.setPresetExtensionsByName(result.presetExtensionsByName(), ignored -> {});
     requestAsyncRepaint();
   }
 
@@ -2195,14 +2160,11 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private static String catalogPanelErrorMessage(ExtensionCatalogLoadResult result) {
-    if (result.detailMessage().isBlank()) {
-      return "";
-    }
-    return result.source() == CatalogSource.SNAPSHOT ? result.detailMessage() : "";
+    return "";
   }
 
   private void toggleFavoriteAtSelection() {
-    ExtensionCatalogState.FavoriteToggleResult toggleResult =
+    FavoriteToggleResult toggleResult =
         extensionCatalogState.toggleFavoriteAtSelection(this::updateExtensionFilterStatus);
     if (!toggleResult.changed()) {
       statusMessage = "No extension selected to favorite";
@@ -2214,7 +2176,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private void cycleCategoryFilter() {
-    ExtensionCatalogState.CategoryFilterResult result =
+    CategoryFilterResult result =
         extensionCatalogState.cycleCategoryFilter(this::updateExtensionFilterStatus);
     if (!result.filtered()) {
       statusMessage = "Category filter cleared (" + result.matchCount() + " matches)";
@@ -2243,7 +2205,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private void toggleCategoryCollapseAtSelection() {
-    ExtensionCatalogState.CategoryCollapseResult collapseResult =
+    CategoryCollapseResult collapseResult =
         extensionCatalogState.toggleCategoryCollapseAtSelection();
     if (!collapseResult.changed()) {
       statusMessage = "No category selected to close";
@@ -2268,7 +2230,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     if (focusTarget != FocusTarget.EXTENSION_LIST) {
       focusExtensionList();
     }
-    ExtensionCatalogState.JumpToFavoriteResult jumpResult = extensionCatalogState.jumpToFavorite();
+    JumpToFavoriteResult jumpResult = extensionCatalogState.jumpToFavorite();
     if (!jumpResult.jumped()) {
       statusMessage = "No favorite extension in current catalog view";
       return;
@@ -2277,8 +2239,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private void jumpToAdjacentCategorySection(boolean forward) {
-    ExtensionCatalogState.SectionJumpResult jumpResult =
-        extensionCatalogState.jumpToAdjacentSection(forward);
+    SectionJumpResult jumpResult = extensionCatalogState.jumpToAdjacentSection(forward);
     if (!jumpResult.moved()) {
       statusMessage = forward ? "No next category section" : "No previous category section";
       return;
@@ -2287,8 +2248,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private void handleExtensionListHierarchyLeft() {
-    ExtensionCatalogState.SectionFocusResult parentSectionResult =
-        extensionCatalogState.focusParentSectionHeader();
+    SectionFocusResult parentSectionResult = extensionCatalogState.focusParentSectionHeader();
     if (parentSectionResult.moved()) {
       statusMessage = "Moved to section: " + parentSectionResult.sectionTitle();
       return;
@@ -2300,8 +2260,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private void handleExtensionListHierarchyRight() {
-    ExtensionCatalogState.SectionFocusResult childResult =
-        extensionCatalogState.focusFirstVisibleItemInSelectedSection();
+    SectionFocusResult childResult = extensionCatalogState.focusFirstVisibleItemInSelectedSection();
     if (childResult.moved()) {
       statusMessage = "Moved to first item in section: " + childResult.sectionTitle();
       return;
@@ -2316,6 +2275,25 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     boolean enabled =
         extensionCatalogState.toggleFavoritesOnlyFilter(this::updateExtensionFilterStatus);
     statusMessage = enabled ? "Favorites filter enabled" : "Favorites filter disabled";
+  }
+
+  private void cyclePresetFilter() {
+    PresetFilterResult result =
+        extensionCatalogState.cyclePresetFilter(this::updateExtensionFilterStatus);
+    if (!result.filtered()) {
+      statusMessage = "Preset filter disabled";
+      return;
+    }
+    statusMessage = "Preset filter: " + result.presetName() + " (" + result.matchCount() + ")";
+  }
+
+  private void clearPresetFilter() {
+    boolean cleared = extensionCatalogState.clearPresetFilter(this::updateExtensionFilterStatus);
+    if (!cleared) {
+      statusMessage = "Preset filter already disabled";
+      return;
+    }
+    statusMessage = "Preset filter disabled";
   }
 
   private void toggleErrorDetails() {
@@ -2339,63 +2317,43 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private static boolean isCatalogReloadKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && keyEvent.hasCtrl()
-        && (keyEvent.character() == 'r' || keyEvent.character() == 'R');
+    return AppKeyActions.isCatalogReloadKey(keyEvent);
   }
 
   private static boolean isGenerateShortcutKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && keyEvent.hasAlt()
-        && !keyEvent.hasCtrl()
-        && (keyEvent.character() == 'g' || keyEvent.character() == 'G');
+    return AppKeyActions.isGenerateShortcutKey(keyEvent);
   }
 
   private static boolean isFavoriteToggleKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && !keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && (keyEvent.character() == 'f' || keyEvent.character() == 'F');
+    return AppKeyActions.isFavoriteToggleKey(keyEvent);
   }
 
   private static boolean isClearSelectedExtensionsKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && !keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && (keyEvent.character() == 'x' || keyEvent.character() == 'X');
+    return AppKeyActions.isClearSelectedExtensionsKey(keyEvent);
   }
 
   private static boolean isCategoryFilterCycleKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && !keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && (keyEvent.character() == 'v' || keyEvent.character() == 'V');
+    return AppKeyActions.isCategoryFilterCycleKey(keyEvent);
   }
 
   private static boolean isJumpToFavoriteKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && keyEvent.hasCtrl()
-        && (keyEvent.character() == 'j' || keyEvent.character() == 'J');
+    return AppKeyActions.isJumpToFavoriteKey(keyEvent);
   }
 
   private static boolean isFavoritesFilterToggleKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && keyEvent.hasCtrl()
-        && (keyEvent.character() == 'k' || keyEvent.character() == 'K');
+    return AppKeyActions.isFavoritesFilterToggleKey(keyEvent);
+  }
+
+  private static boolean isPresetFilterCycleKey(KeyEvent keyEvent) {
+    return AppKeyActions.isPresetFilterCycleKey(keyEvent);
   }
 
   private static boolean isCategoryCollapseToggleKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && !keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && keyEvent.character() == 'c';
+    return AppKeyActions.isCategoryCollapseToggleKey(keyEvent);
   }
 
   private static boolean isExpandAllCategoriesKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && !keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && keyEvent.character() == 'C';
+    return AppKeyActions.isExpandAllCategoriesKey(keyEvent);
   }
 
   private static boolean isSectionJumpUpKey(KeyEvent keyEvent) {
@@ -2407,25 +2365,19 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private static boolean isSectionHierarchyLeftKey(KeyEvent keyEvent) {
-    return keyEvent.isLeft() || isVimLeftKey(keyEvent);
+    return keyEvent.isLeft() || UiKeyMatchers.isVimLeftKey(keyEvent);
   }
 
   private static boolean isSectionHierarchyRightKey(KeyEvent keyEvent) {
-    return keyEvent.isRight() || isVimRightKey(keyEvent);
+    return keyEvent.isRight() || UiKeyMatchers.isVimRightKey(keyEvent);
   }
 
-  private static boolean isCommandPaletteToggleKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && (keyEvent.character() == 'p' || keyEvent.character() == 'P');
+  private static boolean isCommandPaletteToggleShortcutKey(KeyEvent keyEvent) {
+    return AppKeyActions.isCommandPaletteToggleKey(keyEvent);
   }
 
   private static boolean isHelpOverlayToggleKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && !keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && keyEvent.character() == '?';
+    return AppKeyActions.isHelpOverlayToggleKey(keyEvent);
   }
 
   private static boolean shouldToggleHelpOverlay(KeyEvent keyEvent, FocusTarget currentFocus) {
@@ -2488,63 +2440,45 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
     if (extensionCatalogState.favoritesOnlyFilterEnabled()) {
       return false;
     }
+    if (!extensionCatalogState.activePresetFilterName().isBlank()) {
+      return false;
+    }
     return !extensionCatalogState.activeCategoryFilterTitle().isBlank();
   }
 
+  private boolean shouldDisablePresetFilterOnCancel(KeyEvent keyEvent) {
+    if (!keyEvent.isCancel() || isGenerationInProgress()) {
+      return false;
+    }
+    if (focusTarget != FocusTarget.EXTENSION_SEARCH && focusTarget != FocusTarget.EXTENSION_LIST) {
+      return false;
+    }
+    if (!inputStates.get(FocusTarget.EXTENSION_SEARCH).text().isBlank()) {
+      return false;
+    }
+    if (extensionCatalogState.favoritesOnlyFilterEnabled()) {
+      return false;
+    }
+    return !extensionCatalogState.activePresetFilterName().isBlank();
+  }
+
   private static boolean isErrorDetailsToggleKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && keyEvent.hasCtrl()
-        && (keyEvent.character() == 'e' || keyEvent.character() == 'E');
+    return AppKeyActions.isErrorDetailsToggleKey(keyEvent);
   }
 
   private static boolean isUpNavigation(KeyEvent keyEvent) {
-    return keyEvent.isUp() || isVimUpKey(keyEvent);
-  }
-
-  private static boolean isVimUpKey(KeyEvent keyEvent) {
-    return isPlainChar(keyEvent, 'k', 'K');
-  }
-
-  private static boolean isVimDownKey(KeyEvent keyEvent) {
-    return isPlainChar(keyEvent, 'j', 'J');
-  }
-
-  private static boolean isVimLeftKey(KeyEvent keyEvent) {
-    return isPlainChar(keyEvent, 'h', 'H');
-  }
-
-  private static boolean isVimRightKey(KeyEvent keyEvent) {
-    return isPlainChar(keyEvent, 'l', 'L');
-  }
-
-  private static boolean isPlainChar(KeyEvent keyEvent, char lower, char upper) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && !keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && (keyEvent.character() == lower || keyEvent.character() == upper);
-  }
-
-  private static boolean isDigitKey(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && !keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && Character.isDigit(keyEvent.character());
+    return keyEvent.isUp() || UiKeyMatchers.isVimUpKey(keyEvent);
   }
 
   private static boolean shouldFocusExtensionSearch(KeyEvent keyEvent, FocusTarget currentFocus) {
-    if (keyEvent.code() != dev.tamboui.tui.event.KeyCode.CHAR) {
-      return false;
-    }
-    if (!keyEvent.hasCtrl() && !keyEvent.hasAlt() && keyEvent.character() == '/') {
+    if (AppKeyActions.isFocusExtensionSearchSlashKey(keyEvent)) {
       return !isTextInputFocus(currentFocus) && currentFocus != FocusTarget.EXTENSION_SEARCH;
     }
-    return keyEvent.hasCtrl() && (keyEvent.character() == 'f' || keyEvent.character() == 'F');
+    return AppKeyActions.isFocusExtensionSearchCtrlKey(keyEvent);
   }
 
   private static boolean shouldFocusExtensionList(KeyEvent keyEvent) {
-    return keyEvent.code() == dev.tamboui.tui.event.KeyCode.CHAR
-        && keyEvent.hasCtrl()
-        && (keyEvent.character() == 'l' || keyEvent.character() == 'L');
+    return AppKeyActions.isFocusExtensionListKey(keyEvent);
   }
 
   private void focusExtensionSearch() {
@@ -2577,42 +2511,7 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
           stale
               ? "Loaded stale extension catalog from cache"
               : "Loaded extension catalog from cache";
-      case SNAPSHOT -> "Loaded extension catalog from bundled snapshot";
     };
-  }
-
-  @FunctionalInterface
-  public interface ProjectGenerationRunner {
-    CompletableFuture<Path> generate(
-        GenerationRequest generationRequest,
-        Path outputDirectory,
-        BooleanSupplier cancelled,
-        Consumer<GenerationProgressUpdate> progressListener);
-  }
-
-  public enum GenerationProgressStep {
-    REQUESTING_ARCHIVE,
-    EXTRACTING_ARCHIVE,
-    FINALIZING
-  }
-
-  public record GenerationProgressUpdate(GenerationProgressStep step, String message) {
-    public GenerationProgressUpdate {
-      step = Objects.requireNonNull(step);
-      message = message == null ? "" : message.strip();
-    }
-
-    public static GenerationProgressUpdate requestingArchive(String message) {
-      return new GenerationProgressUpdate(GenerationProgressStep.REQUESTING_ARCHIVE, message);
-    }
-
-    public static GenerationProgressUpdate extractingArchive(String message) {
-      return new GenerationProgressUpdate(GenerationProgressStep.EXTRACTING_ARCHIVE, message);
-    }
-
-    public static GenerationProgressUpdate finalizing(String message) {
-      return new GenerationProgressUpdate(GenerationProgressStep.FINALIZING, message);
-    }
   }
 
   enum GenerationState {
@@ -2625,79 +2524,34 @@ public final class CoreTuiController implements BodyPanelRenderer.CompactInputRe
   }
 
   private static boolean handleTextInputKey(TextInputState state, KeyEvent event) {
-    if (event.isDeleteBackward() || event.isKey(dev.tamboui.tui.event.KeyCode.BACKSPACE)) {
-      state.deleteBackward();
-      return true;
-    }
-    if (event.isDeleteForward() || event.isKey(dev.tamboui.tui.event.KeyCode.DELETE)) {
-      state.deleteForward();
-      return true;
-    }
-    if (event.isLeft() || event.isKey(dev.tamboui.tui.event.KeyCode.LEFT)) {
-      state.moveCursorLeft();
-      return true;
-    }
-    if (event.isRight() || event.isKey(dev.tamboui.tui.event.KeyCode.RIGHT)) {
-      state.moveCursorRight();
-      return true;
-    }
-    if (event.isHome() || event.isKey(dev.tamboui.tui.event.KeyCode.HOME)) {
-      state.moveCursorToStart();
-      return true;
-    }
-    if (event.isEnd() || event.isKey(dev.tamboui.tui.event.KeyCode.END)) {
-      state.moveCursorToEnd();
-      return true;
-    }
     if (event.code() == dev.tamboui.tui.event.KeyCode.CHAR && !event.hasCtrl() && !event.hasAlt()) {
       state.insert(event.character());
       return true;
     }
+    if (event.isDeleteBackward()) {
+      state.deleteBackward();
+      return true;
+    }
+    if (event.isDeleteForward()) {
+      state.deleteForward();
+      return true;
+    }
+    if (event.isLeft()) {
+      state.moveCursorLeft();
+      return true;
+    }
+    if (event.isRight()) {
+      state.moveCursorRight();
+      return true;
+    }
+    if (event.isHome()) {
+      state.moveCursorToStart();
+      return true;
+    }
+    if (event.isEnd()) {
+      state.moveCursorToEnd();
+      return true;
+    }
     return false;
-  }
-
-  public record UiAction(boolean handled, boolean shouldQuit) {
-    static UiAction ignored() {
-      return new UiAction(false, false);
-    }
-
-    static UiAction handled(boolean shouldQuit) {
-      return new UiAction(true, shouldQuit);
-    }
-  }
-
-  public enum PostGenerationExitAction {
-    OPEN_IDE,
-    OPEN_TERMINAL,
-    QUIT,
-    GENERATE_AGAIN
-  }
-
-  public record PostGenerationExitPlan(
-      PostGenerationExitAction action, Path projectDirectory, String nextCommand) {
-    public PostGenerationExitPlan {
-      action = Objects.requireNonNull(action);
-      nextCommand = nextCommand == null ? "" : nextCommand.strip();
-    }
-  }
-
-  private record CommandPaletteEntry(String label, String shortcut, CommandPaletteAction action) {
-    CommandPaletteEntry {
-      label = Objects.requireNonNull(label);
-      shortcut = Objects.requireNonNull(shortcut);
-      action = Objects.requireNonNull(action);
-    }
-  }
-
-  private enum CommandPaletteAction {
-    FOCUS_EXTENSION_SEARCH,
-    FOCUS_EXTENSION_LIST,
-    TOGGLE_FAVORITES_FILTER,
-    JUMP_TO_FAVORITE,
-    CYCLE_CATEGORY_FILTER,
-    TOGGLE_CATEGORY,
-    OPEN_ALL_CATEGORIES,
-    RELOAD_CATALOG,
-    TOGGLE_ERROR_DETAILS
   }
 }

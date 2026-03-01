@@ -3,6 +3,7 @@ package dev.ayagmar.quarkusforge.ui;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -24,8 +25,23 @@ class UiSchedulerTest {
             });
 
     AtomicBoolean taskRan = new AtomicBoolean(false);
-    uiScheduler.schedule(Duration.ZERO, () -> taskRan.set(true));
+    CountDownLatch taskCompleted = new CountDownLatch(1);
+    uiScheduler.schedule(
+        Duration.ZERO,
+        () -> {
+          taskRan.set(true);
+          taskCompleted.countDown();
+        });
 
+    boolean completed;
+    try {
+      completed = taskCompleted.await(1, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      completed = false;
+    }
+
+    assertThat(completed).isTrue();
     assertThat(renderThreadInvoked).isTrue();
     assertThat(taskRan).isTrue();
     assertThat(scheduler.scheduleCalls()).isEqualTo(1);

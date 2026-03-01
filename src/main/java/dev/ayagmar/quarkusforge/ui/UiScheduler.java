@@ -9,7 +9,7 @@ import java.util.function.Consumer;
 
 @FunctionalInterface
 public interface UiScheduler {
-  Cancellable schedule(Duration delay, Runnable task);
+  UiCancellable schedule(Duration delay, Runnable task);
 
   static UiScheduler immediate() {
     return (delay, task) -> {
@@ -30,10 +30,5 @@ public interface UiScheduler {
               () -> renderThreadDispatcher.accept(task), delayMillis, TimeUnit.MILLISECONDS);
       return () -> future.cancel(false);
     };
-  }
-
-  @FunctionalInterface
-  interface Cancellable {
-    boolean cancel();
   }
 }

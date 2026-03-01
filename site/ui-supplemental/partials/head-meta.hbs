@@ -1,0 +1,8 @@
+<link rel="stylesheet" href="{{{uiRootPath}}}/css/site-extra.css">
+<script>
+  const savedTheme = localStorage.getItem('theme');
+  const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
+    document.documentElement.classList.add('dark');
+  }
+</script>

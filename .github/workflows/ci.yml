@@ -26,7 +26,14 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "25"
+          java-version: '25'
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: site/package-lock.json
 
       - name: Cache Maven repository
         uses: actions/cache@v4
@@ -36,6 +43,12 @@ jobs:
           restore-keys: |
             maven-${{ runner.os }}-
 
+      - name: Install docs dependencies
+        run: npm ci --prefix site
+
+      - name: Docs build
+        run: npm run docs:build --prefix site
+
       - name: Spotless check
         run: mvn -B -ntp spotless:check
 
@@ -43,12 +56,14 @@ jobs:
         run: mvn -B -ntp checkstyle:check
 
   tests:
-    name: Tests (${{ matrix.suite }})
+    name: Tests (${{ matrix.os }}, ${{ matrix.suite }})
     needs: quality
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        suite: [unit, integration]
         include:
           - suite: unit
             command: mvn -B -ntp test
@@ -63,7 +78,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "25"
+          java-version: '25'
 
       - name: Cache Maven repository
         uses: actions/cache@v4

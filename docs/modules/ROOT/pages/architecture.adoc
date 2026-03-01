@@ -1,0 +1,19 @@
+= Architecture & Internals
+:navtitle: Architecture
+
+Quarkus Forge is designed with a strict separation between the core logic, the TUI layer, and the external API interactions.
+
+== Core Components
+
+* **API Layer**: Handles communication with `code.quarkus.io`. Responsible for fetching the extension catalog and downloading the generated project ZIPs.
+* **Domain Model**: Represents the internal state of a generation request (`ProjectRequest`, `ValidationReport`).
+* **TUI (Terminal UI)**: Built on top of a custom, asynchronous rendering engine. Uses `dev.ayagmar.quarkusforge.ui.CoreTuiController` to manage focus routing, keybindings, and state transitions.
+* **Archive & File System**: Handles safe zip extraction with guardrails (`SafeZipExtractor`) to protect against path traversal and zip bomb attacks.
+
+== Data Flow
+
+1. The user initiates a project creation via TUI or Headless CLI.
+2. The `ProjectRequest` is populated with metadata and selected extensions.
+3. The request is validated by `ProjectRequestValidator`.
+4. A query is built and sent via `QuarkusApiClient`.
+5. The resulting archive is processed by `SafeZipExtractor` to scaffold the project securely in the target directory.

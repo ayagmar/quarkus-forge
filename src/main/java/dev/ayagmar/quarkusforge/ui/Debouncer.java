@@ -6,7 +6,7 @@ import java.util.Objects;
 final class Debouncer {
   private final UiScheduler scheduler;
   private final Duration delay;
-  private UiScheduler.Cancellable pendingTask;
+  private UiCancellable pendingTask;
 
   Debouncer(UiScheduler scheduler, Duration delay) {
     this.scheduler = Objects.requireNonNull(scheduler);

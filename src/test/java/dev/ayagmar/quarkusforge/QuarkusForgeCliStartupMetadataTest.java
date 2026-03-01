@@ -1,16 +1,9 @@
 package dev.ayagmar.quarkusforge;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
-import static com.github.tomakehurst.wiremock.client.WireMock.get;
-import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
-import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterEach;
@@ -40,11 +33,10 @@ class QuarkusForgeCliStartupMetadataTest {
 
   @Test
   void dryRunUsesLiveMetadataForInitialValidationWhenAvailable() {
-    stubLiveMetadataWithMavenOnly();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    CliCommandTestSupport.stubLiveMetadataWithMavenOnly();
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
-    CommandResult result =
+    CliCommandTestSupport.CommandResult result =
         runCommand(
             runtimeConfig,
             "--dry-run",
@@ -62,11 +54,10 @@ class QuarkusForgeCliStartupMetadataTest {
 
   @Test
   void verboseDryRunEmitsMetadataLoadDiagnostics() {
-    stubLiveMetadataWithMavenOnly();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    CliCommandTestSupport.stubLiveMetadataWithMavenOnly();
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
-    CommandResult result =
+    CliCommandTestSupport.CommandResult result =
         runCommand(
             runtimeConfig,
             "--verbose",
@@ -83,12 +74,11 @@ class QuarkusForgeCliStartupMetadataTest {
 
   @Test
   void verboseSmokeModeEmitsTuiCatalogDiagnostics() {
-    stubLiveMetadataWithMavenOnly();
-    stubExtensionCatalog();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    CliCommandTestSupport.stubLiveMetadataWithMavenOnly();
+    CliCommandTestSupport.stubSingleRestExtensionCatalog();
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
-    CommandResult result = runSmoke(runtimeConfig, true);
+    CliCommandTestSupport.CommandResult result = runSmoke(runtimeConfig, true);
 
     assertThat(result.exitCode()).isZero();
     assertThat(result.standardError()).contains("\"event\":\"tui.session.start\"");
@@ -101,12 +91,11 @@ class QuarkusForgeCliStartupMetadataTest {
 
   @Test
   void smokeModeWithoutInteractiveConsoleAvoidsTerminalEscapeOutput() {
-    stubLiveMetadataWithMavenOnly();
-    stubExtensionCatalog();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    CliCommandTestSupport.stubLiveMetadataWithMavenOnly();
+    CliCommandTestSupport.stubSingleRestExtensionCatalog();
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
-    CommandResult result = runSmoke(runtimeConfig, true);
+    CliCommandTestSupport.CommandResult result = runSmoke(runtimeConfig, true);
 
     assertThat(result.exitCode()).isZero();
     assertThat(result.standardError()).contains("\"mode\":\"headless-smoke\"");
@@ -115,11 +104,10 @@ class QuarkusForgeCliStartupMetadataTest {
 
   @Test
   void dryRunUsesRecommendedPlatformStreamWhenOptionIsOmitted() {
-    stubLiveMetadataWithMavenOnly();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    CliCommandTestSupport.stubLiveMetadataWithMavenOnly();
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
-    CommandResult result =
+    CliCommandTestSupport.CommandResult result =
         runCommand(
             runtimeConfig, "--dry-run", "--group-id", "com.example", "--artifact-id", "forge-app");
 
@@ -130,11 +118,10 @@ class QuarkusForgeCliStartupMetadataTest {
 
   @Test
   void dryRunFallsBackToSnapshotWhenLiveMetadataIsUnavailable() {
-    stubStreamsUnavailable();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    CliCommandTestSupport.stubStreamsUnavailable();
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
-    CommandResult result =
+    CliCommandTestSupport.CommandResult result =
         runCommand(
             runtimeConfig,
             "--dry-run",
@@ -154,11 +141,10 @@ class QuarkusForgeCliStartupMetadataTest {
 
   @Test
   void fallbackMetadataSelectionKeepsValidationDeterministicAfterLiveFailure() {
-    stubStreamsUnavailable();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    CliCommandTestSupport.stubStreamsUnavailable();
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
-    CommandResult result =
+    CliCommandTestSupport.CommandResult result =
         runCommand(
             runtimeConfig,
             "--dry-run",
@@ -181,9 +167,8 @@ class QuarkusForgeCliStartupMetadataTest {
 
   @Test
   void dryRunIgnoresStoredTuiPreferences() throws Exception {
-    stubLiveMetadataWithMavenOnly();
-    QuarkusForgeCli.RuntimeConfig runtimeConfig =
-        runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    CliCommandTestSupport.stubLiveMetadataWithMavenOnly();
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
     Files.writeString(
         tempDir.resolve("preferences.json"),
         """
@@ -200,129 +185,24 @@ class QuarkusForgeCliStartupMetadataTest {
         }
         """);
 
-    CommandResult result = runCommand(runtimeConfig, "--dry-run");
+    CliCommandTestSupport.CommandResult result = runCommand(runtimeConfig, "--dry-run");
 
     assertThat(result.exitCode()).isZero();
     assertThat(result.standardOut()).contains("buildTool: maven");
     assertThat(result.standardError()).doesNotContain("unsupported build tool 'gradle'");
   }
 
-  private QuarkusForgeCli.RuntimeConfig runtimeConfig(URI baseUri) {
-    return new QuarkusForgeCli.RuntimeConfig(
-        baseUri,
-        tempDir.resolve("catalog-cache.json"),
-        tempDir.resolve("favorites.json"),
-        tempDir.resolve("preferences.json"));
+  private RuntimeConfig runtimeConfig(URI baseUri) {
+    return CliCommandTestSupport.runtimeConfig(tempDir, baseUri);
   }
 
-  private CommandResult runCommand(QuarkusForgeCli.RuntimeConfig runtimeConfig, String... args) {
-    PrintStream originalOut = System.out;
-    PrintStream originalErr = System.err;
-    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
-    ByteArrayOutputStream stderr = new ByteArrayOutputStream();
-    try {
-      System.setOut(new PrintStream(stdout, true, StandardCharsets.UTF_8));
-      System.setErr(new PrintStream(stderr, true, StandardCharsets.UTF_8));
-      int exitCode = QuarkusForgeCli.runWithArgs(args, runtimeConfig);
-      return new CommandResult(
-          exitCode,
-          stdout.toString(StandardCharsets.UTF_8),
-          stderr.toString(StandardCharsets.UTF_8));
-    } finally {
-      System.setOut(originalOut);
-      System.setErr(originalErr);
-    }
+  private CliCommandTestSupport.CommandResult runCommand(
+      RuntimeConfig runtimeConfig, String... args) {
+    return CliCommandTestSupport.runCommand(runtimeConfig, args);
   }
 
-  private CommandResult runSmoke(QuarkusForgeCli.RuntimeConfig runtimeConfig, boolean verbose) {
-    PrintStream originalOut = System.out;
-    PrintStream originalErr = System.err;
-    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
-    ByteArrayOutputStream stderr = new ByteArrayOutputStream();
-    try {
-      System.setOut(new PrintStream(stdout, true, StandardCharsets.UTF_8));
-      System.setErr(new PrintStream(stderr, true, StandardCharsets.UTF_8));
-      int exitCode = new QuarkusForgeCli(runtimeConfig).runSmokeForTest(verbose);
-      return new CommandResult(
-          exitCode,
-          stdout.toString(StandardCharsets.UTF_8),
-          stderr.toString(StandardCharsets.UTF_8));
-    } finally {
-      System.setOut(originalOut);
-      System.setErr(originalErr);
-    }
+  private CliCommandTestSupport.CommandResult runSmoke(
+      RuntimeConfig runtimeConfig, boolean verbose) {
+    return CliCommandTestSupport.runSmoke(runtimeConfig, verbose);
   }
-
-  private void stubLiveMetadataWithMavenOnly() {
-    stubFor(
-        get(urlPathEqualTo("/api/streams"))
-            .willReturn(
-                aResponse()
-                    .withStatus(200)
-                    .withHeader("Content-Type", "application/json")
-                    .withBody(
-                        """
-                        [
-                          {
-                            "key":"io.quarkus.platform:3.31",
-                            "javaCompatibility": {
-                              "versions":[25],
-                              "recommended":25
-                            },
-                            "recommended":true,
-                            "status":"FINAL"
-                          }
-                        ]
-                        """)));
-
-    stubFor(
-        get(urlPathEqualTo("/q/openapi"))
-            .willReturn(
-                aResponse()
-                    .withStatus(200)
-                    .withHeader("Content-Type", "application/json")
-                    .withBody(
-                        """
-                        {
-                          "paths": {
-                            "/api/download": {
-                              "get": {
-                                "parameters": [
-                                  {"name":"b","schema":{"enum":["MAVEN"]}}
-                                ]
-                              }
-                            }
-                          }
-                        }
-                        """)));
-  }
-
-  private void stubStreamsUnavailable() {
-    stubFor(get(urlPathEqualTo("/api/streams")).willReturn(aResponse().withStatus(404)));
-    stubFor(
-        get(urlPathEqualTo("/q/openapi")).willReturn(aResponse().withStatus(200).withBody("{}")));
-  }
-
-  private void stubExtensionCatalog() {
-    stubFor(
-        get(urlPathEqualTo("/api/extensions"))
-            .willReturn(
-                aResponse()
-                    .withStatus(200)
-                    .withHeader("Content-Type", "application/json")
-                    .withBody(
-                        """
-                        [
-                          {
-                            "id":"io.quarkus:quarkus-rest",
-                            "name":"REST",
-                            "shortName":"rest",
-                            "category":"Web",
-                            "order":10
-                          }
-                        ]
-                        """)));
-  }
-
-  private record CommandResult(int exitCode, String standardOut, String standardError) {}
 }

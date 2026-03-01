@@ -1,0 +1,169 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  --body-font-family: 'Outfit', 'Space Grotesk', 'Segoe UI', sans-serif;
+  --heading-font-family: 'Outfit', 'Space Grotesk', 'Segoe UI', sans-serif;
+  --code-font-family: 'JetBrains Mono', monospace;
+  --color-brand: #22d3ee;
+}
+
+/* Light Theme (Default) */
+:root {
+  --site-bg: #ffffff;
+  --site-text: #334155;
+  --site-heading: #0f172a;
+  --site-border: #e2e8f0;
+  --site-header-bg: #f8fafc;
+  --site-nav-bg: #f1f5f9;
+  --site-link: #d946ef;
+  --site-link-hover: #ec4899;
+  --site-code-bg: #f1f5f9;
+  --site-code-text: #0ea5e9;
+  --site-toolbar-bg: #ffffff;
+}
+
+/* Dark Theme */
+html.dark {
+  --site-bg: #09090b;
+  --site-text: #cbd5e1;
+  --site-heading: #f8fafc;
+  --site-border: #27272a;
+  --site-header-bg: #0f172a;
+  --site-nav-bg: #1e293b;
+  --site-link: #ec4899;
+  --site-link-hover: #f472b6;
+  --site-code-bg: #1e293b;
+  --site-code-text: #38bdf8;
+  --site-toolbar-bg: #0f172a;
+}
+
+html, body {
+  background-color: var(--site-bg) !important;
+  color: var(--site-text) !important;
+  font-family: var(--body-font-family) !important;
+}
+
+/* --- OVERRIDES FOR ANTORA CLASSES --- */
+
+/* Top Navbar */
+.header, .navbar {
+  background-color: var(--site-header-bg) !important;
+  border-bottom: 1px solid var(--site-border) !important;
+}
+.navbar-brand .navbar-item {
+  color: var(--site-heading) !important;
+}
+.navbar-end .navbar-item {
+  color: var(--site-text) !important;
+}
+.navbar-end .navbar-item:hover {
+  color: var(--site-link-hover) !important;
+}
+
+/* Left Sidebar */
+.nav-container, .nav-panel-menu, .nav-panel-explore {
+  background-color: var(--site-nav-bg) !important;
+}
+.nav-menu, .nav-panel-explore {
+  border-color: var(--site-border) !important;
+}
+.nav-item, .nav-text, .nav-title, .nav-item a {
+  color: var(--site-text) !important;
+}
+.nav-item a:hover {
+  color: var(--site-link-hover) !important;
+}
+.nav-item.is-active a {
+  color: var(--site-link) !important;
+  font-weight: bold;
+}
+
+/* Toolbar (Breadcrumbs bar) */
+.toolbar {
+  background-color: var(--site-toolbar-bg) !important;
+  border-bottom: 1px solid var(--site-border) !important;
+}
+.breadcrumbs, .breadcrumbs a {
+  color: var(--site-text) !important;
+}
+.page-versions .version-menu {
+  background-color: var(--site-nav-bg) !important;
+  border-color: var(--site-border) !important;
+}
+.page-versions .version-menu a {
+  color: var(--site-text) !important;
+}
+
+/* Main Content Area */
+.body, .main, article.doc {
+  background-color: var(--site-bg) !important;
+}
+.doc {
+  color: var(--site-text) !important;
+}
+.doc p, .doc li, .doc td, .doc span, .doc th {
+  color: var(--site-text) !important;
+}
+.doc h1, .doc h2, .doc h3, .doc h4, .doc h5, .doc h6, .doc .title {
+  color: var(--site-heading) !important;
+  font-family: var(--heading-font-family) !important;
+}
+.doc a {
+  color: var(--site-link) !important;
+}
+.doc a:hover {
+  color: var(--site-link-hover) !important;
+}
+
+/* Code Blocks */
+.doc code, .doc pre {
+  font-family: var(--code-font-family) !important;
+}
+.doc p code, .doc li code, .doc td code {
+  background-color: var(--site-code-bg) !important;
+  color: var(--site-code-text) !important;
+  border: none !important;
+}
+.doc pre {
+  background-color: var(--site-code-bg) !important;
+  border: 1px solid var(--site-border) !important;
+}
+.doc pre code {
+  color: var(--site-text) !important;
+  background-color: transparent !important;
+}
+
+/* Table of Contents (Right Sidebar) */
+.toc, .toc-menu, .toc-menu a {
+  color: var(--site-text) !important;
+}
+.toc-menu a:hover, .toc-menu a.is-active {
+  color: var(--site-link-hover) !important;
+}
+
+/* Footer */
+.footer {
+  background-color: var(--site-header-bg) !important;
+  color: var(--site-text) !important;
+  border-top: 1px solid var(--site-border) !important;
+}
+
+/* Dark mode toggle button */
+.theme-toggle {
+  background: none;
+  border: none;
+  color: var(--site-text);
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+  margin-left: 1rem;
+}
+.theme-toggle:hover {
+  background: var(--site-nav-bg);
+  color: var(--site-heading);
+}
+.theme-toggle svg { width: 1.25rem; height: 1.25rem; }

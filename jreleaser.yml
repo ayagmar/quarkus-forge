@@ -1,0 +1,44 @@
+project:
+  name: quarkus-forge
+  versionPattern: CUSTOM
+  stereotype: CLI
+  description: Keyboard-first Quarkus project generator TUI
+  copyright: 2026 ayagmar
+  links:
+    homepage: https://github.com/ayagmar/quarkus-forge
+  license: MIT
+
+release:
+  github:
+    owner: ayagmar
+    name: quarkus-forge
+    skipTag: true
+    overwrite: true
+    artifacts: true
+    changelog:
+      enabled: true
+      formatted: ALWAYS
+      preset: conventional-commits
+      sort: DESC
+      skipMergeCommits: true
+      links: true
+      format: "- {{commitShortHash}} {{commitTitle}}"
+      categoryTitleFormat: "### {{categoryTitle}}"
+      contributorsTitleFormat: "### Contributors"
+
+checksum:
+  individual: true
+
+signing:
+  active: NEVER
+
+distributions:
+  quarkus-forge:
+    type: BINARY
+    artifacts:
+      - path: artifacts/quarkus-forge-jvm.jar
+      - path: artifacts/quarkus-forge-linux-x86_64
+      - path: artifacts/quarkus-forge-macos-aarch64
+      - path: artifacts/quarkus-forge-windows-x86_64.exe
+      - path: artifacts/jbang-catalog.json
+      - path: artifacts/jbang-catalog-org.json

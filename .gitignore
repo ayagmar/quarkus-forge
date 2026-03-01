@@ -16,3 +16,11 @@ buildNumber.properties
 .project
 # JDT-specific (Eclipse Java Development Tools)
 .classpath
+
+# Node / docs-site tooling
+/site/node_modules/
+/site/build/
+/site/.cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

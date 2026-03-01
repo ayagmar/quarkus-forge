@@ -1,0 +1,25 @@
+= Testing Strategy
+
+== Test Layers
+
+* Unit tests for parsing, validation, and state transitions.
+* Integration tests for API and generation flows.
+* Pilot and regression checks for TUI/CLI behavior.
+
+== Core Verification Commands
+
+[source,bash]
+----
+mvn -q spotless:check
+mvn -q checkstyle:check
+mvn -q test
+mvn -q verify -DskipTests=true
+----
+
+== Docs Verification
+
+[source,bash]
+----
+npm run docs:build --prefix site
+npm run docs:linkcheck --prefix site
+----

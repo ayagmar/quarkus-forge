@@ -1,0 +1,67 @@
+= Getting Started
+
+== Requirements
+
+* Java 25
+* Maven 3.9+
+
+== Build
+
+[source,bash]
+----
+mvn -q -DskipTests package
+----
+
+This creates `target/quarkus-forge.jar`.
+
+== Choose Your Mode
+
+TUI mode (interactive):
+
+[source,bash]
+----
+java -jar target/quarkus-forge.jar
+----
+
+Headless mode (automation/CI):
+
+[source,bash]
+----
+
+Deterministic replay with recipe + lock:
+
+[source,bash]
+----
+java -jar target/quarkus-forge.jar generate --recipe Forgefile --lock forge.lock
+----
+java -jar target/quarkus-forge.jar generate \
+  --group-id org.acme \
+  --artifact-id demo \
+  --build-tool maven \
+  --java-version 25
+----
+
+== Install With JBang
+
+Run directly from the org catalog:
+
+[source,bash]
+----
+jbang quarkus-forge@ayagmar
+----
+
+Install as a local command:
+
+[source,bash]
+----
+jbang app install --name quarkus-forge quarkus-forge@ayagmar
+quarkus-forge
+----
+
+== Next Steps
+
+* xref:usage/tui.adoc[TUI usage guide]
+* xref:cli/headless-mode.adoc[CLI headless guide]
+* xref:ui/keybindings.adoc[Keybindings]
+* xref:ui/theming.adoc[Theming]
+* xref:troubleshooting.adoc[Troubleshooting]

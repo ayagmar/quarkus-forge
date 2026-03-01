@@ -4,14 +4,14 @@ final class GenerationStateTracker {
   private static final String[] WAITING_FRAMES = {".", "..", "...", "...."};
 
   private CoreTuiController.GenerationState currentState;
-  private CoreTuiController.GenerationProgressStep currentStep;
+  private GenerationProgressStep currentStep;
   private double progressRatio;
   private String progressPhase;
   private long waitingTick;
 
   GenerationStateTracker() {
     currentState = CoreTuiController.GenerationState.IDLE;
-    currentStep = CoreTuiController.GenerationProgressStep.REQUESTING_ARCHIVE;
+    currentStep = GenerationProgressStep.REQUESTING_ARCHIVE;
     progressRatio = 0.0;
     progressPhase = "";
     waitingTick = 0L;
@@ -32,17 +32,17 @@ final class GenerationStateTracker {
     } else if (targetState == CoreTuiController.GenerationState.LOADING) {
       progressRatio = 0.1;
       progressPhase = "Starting generation...";
-      currentStep = CoreTuiController.GenerationProgressStep.REQUESTING_ARCHIVE;
+      currentStep = GenerationProgressStep.REQUESTING_ARCHIVE;
       waitingTick = 0L;
     } else if (targetState == CoreTuiController.GenerationState.SUCCESS) {
       progressRatio = 1.0;
       progressPhase = "Done!";
-      currentStep = CoreTuiController.GenerationProgressStep.FINALIZING;
+      currentStep = GenerationProgressStep.FINALIZING;
     } else if (targetState == CoreTuiController.GenerationState.ERROR
         || targetState == CoreTuiController.GenerationState.CANCELLED) {
       progressPhase = "";
     } else if (targetState == CoreTuiController.GenerationState.IDLE) {
-      currentStep = CoreTuiController.GenerationProgressStep.REQUESTING_ARCHIVE;
+      currentStep = GenerationProgressStep.REQUESTING_ARCHIVE;
       progressRatio = 0.0;
       progressPhase = "";
       waitingTick = 0L;
@@ -50,7 +50,7 @@ final class GenerationStateTracker {
     return true;
   }
 
-  void updateProgress(CoreTuiController.GenerationProgressUpdate progressUpdate) {
+  void updateProgress(GenerationProgressUpdate progressUpdate) {
     currentStep = progressUpdate.step();
     waitingTick = 0L;
     progressPhase = progressUpdate.message();
@@ -64,7 +64,7 @@ final class GenerationStateTracker {
     if (currentState != CoreTuiController.GenerationState.LOADING) {
       return;
     }
-    if (currentStep != CoreTuiController.GenerationProgressStep.REQUESTING_ARCHIVE) {
+    if (currentStep != GenerationProgressStep.REQUESTING_ARCHIVE) {
       return;
     }
     waitingTick++;
@@ -136,7 +136,7 @@ final class GenerationStateTracker {
     };
   }
 
-  private static double baseRatioFor(CoreTuiController.GenerationProgressStep step) {
+  private static double baseRatioFor(GenerationProgressStep step) {
     return switch (step) {
       case REQUESTING_ARCHIVE -> 0.35;
       case EXTRACTING_ARCHIVE -> 0.8;
@@ -144,7 +144,7 @@ final class GenerationStateTracker {
     };
   }
 
-  private static String defaultPhaseFor(CoreTuiController.GenerationProgressStep step) {
+  private static String defaultPhaseFor(GenerationProgressStep step) {
     return switch (step) {
       case REQUESTING_ARCHIVE -> "requesting project archive from Quarkus API...";
       case EXTRACTING_ARCHIVE -> "extracting project archive...";

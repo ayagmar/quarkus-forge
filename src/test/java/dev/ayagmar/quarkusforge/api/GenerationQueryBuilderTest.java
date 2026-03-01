@@ -29,7 +29,8 @@ class GenerationQueryBuilderTest {
                 + "&v=1.0.0-SNAPSHOT"
                 + "&b=MAVEN"
                 + "&j=25"
-                + "&e=io.quarkus%3Aquarkus-rest%2Cio.quarkus%3Aquarkus-jdbc-postgresql");
+                + "&e=io.quarkus%3Aquarkus-rest"
+                + "&e=io.quarkus%3Aquarkus-jdbc-postgresql");
   }
 
   @Test

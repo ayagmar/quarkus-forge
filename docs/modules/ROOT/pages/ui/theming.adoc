@@ -1,0 +1,42 @@
+= TUI Theming
+
+== Theme Sources
+
+Theme loading order:
+
+. Built-in default colors.
+. Bundled theme resource (`src/main/resources/ui/quarkus-forge.tcss`).
+. Optional user override via `-Dquarkus.forge.theme=<path>` or `QUARKUS_FORGE_THEME=<path>`.
+
+== Token Reference
+
+* `base`: panel/background surfaces.
+* `text`: default foreground text.
+* `accent`: emphasis and active highlights.
+* `focus`: focused widgets and focus markers.
+* `muted`: secondary text and low-priority hints.
+* `success`: positive status.
+* `warning`: warning/degraded status.
+* `error`: validation and runtime errors.
+
+== Example Override
+
+[source,bash]
+----
+cat > /tmp/qf-theme.tcss <<'THEME'
+base = #0b1321
+text = #e2ecff
+accent = #ff6b6b
+focus = #2dd4bf
+muted = #94a3b8
+error = #fb7185
+THEME
+
+java -Dquarkus.forge.theme=/tmp/qf-theme.tcss -jar target/quarkus-forge.jar
+----
+
+== Fallback Rules
+
+* Missing theme file: startup continues with defaults.
+* Invalid token line or value: ignored; valid colors remain applied.
+* Unknown token access: uses text fallback color.

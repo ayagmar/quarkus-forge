@@ -1,0 +1,38 @@
+= TUI Usage
+
+== Start the TUI
+
+[source,bash]
+----
+java -jar target/quarkus-forge.jar
+----
+
+== Core Workflow
+
+. Choose `platformStream`, `buildTool`, and `javaVersion`.
+. Fill project coordinates (`groupId`, `artifactId`, `version`, `packageName`, `outputDir`).
+. Search and select extensions.
+. Submit with `Enter` (or `Alt+G`).
+
+== Focus and Navigation
+
+* `Tab` / `Shift+Tab`: move focus through fields and actions.
+* `/` or `Ctrl+F`: focus extension search.
+* `Ctrl+L`: focus extension list.
+* `Up` / `Down` (or `j` / `k`): navigate extension list.
+* `Space`: toggle focused extension.
+
+== Productivity Shortcuts
+
+* `Ctrl+R`: reload extension catalog.
+* `Ctrl+P`: command palette.
+* `?`: help overlay.
+* `Ctrl+K`: toggle favorites-only mode.
+* `Ctrl+J`: jump to next favorite.
+
+== Submit and Exit
+
+* `Enter` or `Alt+G`: generate project.
+* After success, use the post-generation menu to optionally write `forge.lock`, publish to GitHub (`gh` CLI required), then continue with IDE/terminal actions.
+* `Esc`: clear active search/filter context first, then exit.
+* `Ctrl+C`: quit immediately.

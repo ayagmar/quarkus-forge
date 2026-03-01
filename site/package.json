@@ -1,0 +1,20 @@
+{
+  "name": "quarkus-forge-docs",
+  "private": true,
+  "scripts": {
+    "docs:build:antora": "antora antora-playbook.yml",
+    "docs:build:css": "tailwindcss -i input.css -o build/pages/output.css",
+    "docs:assemble": "rm -rf build/pages && mkdir -p build/pages && cp -R build/site/. build/pages/ && cp index.html build/pages/index.html && npm run docs:build:css",
+    "docs:build": "npm run docs:build:antora && npm run docs:assemble",
+    "docs:serve": "http-server build/pages -p 8080 -c-1",
+    "docs:linkcheck": "npx linkinator build/pages --recurse --skip 'mailto:*'"
+  },
+  "devDependencies": {
+    "@antora/lunr-extension": "1.0.0-alpha.13",
+    "@tailwindcss/cli": "^4.2.1",
+    "antora": "3.1.14",
+    "http-server": "14.1.1",
+    "linkinator": "7.6.1",
+    "tailwindcss": "^4.2.1"
+  }
+}
