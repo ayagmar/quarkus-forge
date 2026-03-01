@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.0.2](https://github.com/ayagmar/quarkus-forge/compare/v0.0.1...v0.0.2) (2026-03-01)
+
+
+### Bug Fixes
+
+* **release:** harden windows native build and catalog publish ([bcfef85](https://github.com/ayagmar/quarkus-forge/commit/bcfef854d8c7a56d4081afcd83e37ab8246095fc))
+* **release:** publish tag and release in one manual run ([33669f5](https://github.com/ayagmar/quarkus-forge/commit/33669f5e424942786c6a1ebf390cf5a63c11d94b))
+* **release:** tag on release-pr merge without github releases ([ef7988f](https://github.com/ayagmar/quarkus-forge/commit/ef7988f55393bdd83c611c69e05b6ea3305f41c2))
+* **release:** use github token and re-enable tagging ([53359c8](https://github.com/ayagmar/quarkus-forge/commit/53359c829fd595e459b8abbd708d6be3a1a738f8))
+
 ## 0.0.1 (2026-03-01)
 
 
