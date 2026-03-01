@@ -1,28 +1,26 @@
 package dev.ayagmar.quarkusforge.diagnostics;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import dev.ayagmar.quarkusforge.api.ObjectMapperProvider;
+import dev.ayagmar.quarkusforge.api.JsonSupport;
+import java.io.IOException;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 public final class DiagnosticLogger {
   private final boolean enabled;
   private final String traceId;
-  private final ObjectMapper objectMapper;
 
-  private DiagnosticLogger(boolean enabled, String traceId, ObjectMapper objectMapper) {
+  private DiagnosticLogger(boolean enabled, String traceId) {
     this.enabled = enabled;
     this.traceId = traceId;
-    this.objectMapper = objectMapper;
   }
 
   public static DiagnosticLogger create(boolean enabled) {
     if (!enabled) {
-      return new DiagnosticLogger(false, "", ObjectMapperProvider.shared());
+      return new DiagnosticLogger(false, "");
     }
-    return new DiagnosticLogger(true, UUID.randomUUID().toString(), ObjectMapperProvider.shared());
+    return new DiagnosticLogger(true, UUID.randomUUID().toString());
   }
 
   public void info(String event, DiagnosticField... fields) {
@@ -37,22 +35,22 @@ public final class DiagnosticLogger {
     if (!enabled) {
       return;
     }
-    ObjectNode payload = objectMapper.createObjectNode();
+    Map<String, Object> payload = new LinkedHashMap<>();
     payload.put("ts", Instant.now().toString());
     payload.put("level", level);
     payload.put("event", event);
     payload.put("traceId", traceId);
     for (DiagnosticField field : fields) {
-      payload.set(field.name(), objectMapper.valueToTree(field.value()));
+      payload.put(field.name(), field.value());
     }
     try {
-      System.err.println(objectMapper.writeValueAsString(payload));
-    } catch (JsonProcessingException jsonProcessingException) {
+      System.err.println(JsonSupport.writeString(payload));
+    } catch (IOException ioException) {
       System.err.println(
           "{\"event\":\"diagnostic.encoding.failure\",\"traceId\":\""
               + traceId
               + "\",\"message\":\""
-              + jsonProcessingException.getMessage().replace("\"", "'")
+              + ioException.getMessage().replace("\"", "'")
               + "\"}");
     }
   }

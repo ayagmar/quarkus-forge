@@ -2,7 +2,6 @@ package dev.ayagmar.quarkusforge.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -23,7 +22,7 @@ class CatalogSnapshotCacheTest {
     CatalogSnapshotCache cache =
         new CatalogSnapshotCache(
             tempDir.resolve("catalog-snapshot.json"),
-            new ObjectMapper(),
+            CatalogSnapshotCache.defaultPayloadCodec(),
             clock,
             Duration.ofHours(6),
             2L * 1024L * 1024L);
@@ -43,7 +42,7 @@ class CatalogSnapshotCacheTest {
     CatalogSnapshotCache writer =
         new CatalogSnapshotCache(
             cacheFile,
-            new ObjectMapper(),
+            CatalogSnapshotCache.defaultPayloadCodec(),
             Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
             Duration.ofHours(6),
             2L * 1024L * 1024L);
@@ -53,7 +52,7 @@ class CatalogSnapshotCacheTest {
     CatalogSnapshotCache reader =
         new CatalogSnapshotCache(
             cacheFile,
-            new ObjectMapper(),
+            CatalogSnapshotCache.defaultPayloadCodec(),
             Clock.fixed(Instant.parse("2026-02-22T06:00:01Z"), ZoneOffset.UTC),
             Duration.ofHours(6),
             2L * 1024L * 1024L);
@@ -68,7 +67,7 @@ class CatalogSnapshotCacheTest {
     CatalogSnapshotCache writer =
         new CatalogSnapshotCache(
             cacheFile,
-            new ObjectMapper(),
+            CatalogSnapshotCache.defaultPayloadCodec(),
             Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
             Duration.ofHours(6),
             2L * 1024L * 1024L);
@@ -78,7 +77,7 @@ class CatalogSnapshotCacheTest {
     CatalogSnapshotCache reader =
         new CatalogSnapshotCache(
             cacheFile,
-            new ObjectMapper(),
+            CatalogSnapshotCache.defaultPayloadCodec(),
             Clock.fixed(Instant.parse("2026-02-22T06:00:00Z"), ZoneOffset.UTC),
             Duration.ofHours(6),
             2L * 1024L * 1024L);
@@ -108,7 +107,7 @@ class CatalogSnapshotCacheTest {
     CatalogSnapshotCache cache =
         new CatalogSnapshotCache(
             cacheFile,
-            new ObjectMapper(),
+            CatalogSnapshotCache.defaultPayloadCodec(),
             Clock.systemUTC(),
             Duration.ofHours(6),
             2L * 1024L * 1024L);
@@ -122,7 +121,7 @@ class CatalogSnapshotCacheTest {
     CatalogSnapshotCache cache =
         new CatalogSnapshotCache(
             cacheFile,
-            new ObjectMapper(),
+            CatalogSnapshotCache.defaultPayloadCodec(),
             Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
             Duration.ofHours(6),
             128L);
@@ -139,17 +138,22 @@ class CatalogSnapshotCacheTest {
   @Test
   void writeConvertsSerializationRuntimeFailureToWriteFailedOutcome() {
     Path cacheFile = tempDir.resolve("catalog-snapshot.json");
-    ObjectMapper failingMapper =
-        new ObjectMapper() {
+    CatalogSnapshotCache.SnapshotPayloadCodec failingCodec =
+        new CatalogSnapshotCache.SnapshotPayloadCodec() {
           @Override
-          public byte[] writeValueAsBytes(Object value) {
+          public CatalogSnapshotPayload read(Path file) throws java.io.IOException {
+            return CatalogSnapshotCache.defaultPayloadCodec().read(file);
+          }
+
+          @Override
+          public byte[] write(CatalogSnapshotPayload payload) {
             throw new IllegalArgumentException("serializer failed");
           }
         };
     CatalogSnapshotCache cache =
         new CatalogSnapshotCache(
             cacheFile,
-            failingMapper,
+            failingCodec,
             Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
             Duration.ofHours(6),
             2L * 1024L * 1024L);

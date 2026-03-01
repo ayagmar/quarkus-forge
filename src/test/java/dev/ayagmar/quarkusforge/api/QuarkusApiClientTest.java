@@ -385,8 +385,7 @@ class QuarkusApiClientTest {
 
   @Test
   void parseExtensionsPayloadNullIsReportedAsContractError() {
-    assertThatThrownBy(
-            () -> QuarkusApiClient.parseExtensionsPayload(null, ObjectMapperProvider.shared()))
+    assertThatThrownBy(() -> QuarkusApiClient.parseExtensionsPayload(null))
         .isInstanceOf(ApiContractException.class)
         .hasMessage("Malformed JSON payload");
   }
@@ -615,7 +614,6 @@ class QuarkusApiClientTest {
   private QuarkusApiClient newClient(RetryPolicy retryPolicy, RecordingSleeper sleeper) {
     return new QuarkusApiClient(
         HttpClient.newHttpClient(),
-        ObjectMapperProvider.shared(),
         URI.create(wireMockServer.baseUrl()),
         retryPolicy,
         sleeper,

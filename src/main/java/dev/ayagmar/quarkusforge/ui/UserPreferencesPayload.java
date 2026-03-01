@@ -1,8 +1,5 @@
 package dev.ayagmar.quarkusforge.ui;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
-@JsonIgnoreProperties(ignoreUnknown = true)
 record UserPreferencesPayload(
     int schemaVersion,
     String groupId,

@@ -11,7 +11,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
-import dev.ayagmar.quarkusforge.api.ObjectMapperProvider;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
 import dev.ayagmar.quarkusforge.api.RetryPolicy;
 import java.io.ByteArrayOutputStream;
@@ -326,7 +325,6 @@ class ProjectArchiveServiceTest {
   private QuarkusApiClient newClient() {
     return new QuarkusApiClient(
         HttpClient.newHttpClient(),
-        ObjectMapperProvider.shared(),
         URI.create(wireMockServer.baseUrl()),
         new RetryPolicy(1, Duration.ofSeconds(3), Duration.ofMillis(1), 0.0d),
         delay -> java.util.concurrent.CompletableFuture.completedFuture(null),

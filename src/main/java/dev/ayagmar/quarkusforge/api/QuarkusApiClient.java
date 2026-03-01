@@ -1,7 +1,5 @@
 package dev.ayagmar.quarkusforge.api;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -42,13 +40,8 @@ public final class QuarkusApiClient {
   private static final List<String> FALLBACK_BUILD_TOOLS =
       List.of("maven", "gradle", "gradle-kotlin-dsl");
   private static final Duration MAX_RETRY_DELAY = Duration.ofSeconds(30);
-  private static final TypeReference<List<ExtensionPayload>> EXTENSIONS_TYPE =
-      new TypeReference<>() {};
-  private static final TypeReference<List<StreamPayload>> STREAMS_TYPE = new TypeReference<>() {};
-  private static final TypeReference<List<PresetPayload>> PRESETS_TYPE = new TypeReference<>() {};
 
   private final HttpClient httpClient;
-  private final ObjectMapper objectMapper;
   private final URI baseUri;
   private final RetryPolicy retryPolicy;
   private final AsyncSleeper sleeper;
@@ -58,7 +51,6 @@ public final class QuarkusApiClient {
   public QuarkusApiClient(URI baseUri) {
     this(
         HttpClient.newHttpClient(),
-        ObjectMapperProvider.shared(),
         baseUri,
         RetryPolicy.defaults(),
         AsyncSleeper.system(),
@@ -68,14 +60,12 @@ public final class QuarkusApiClient {
 
   public QuarkusApiClient(
       HttpClient httpClient,
-      ObjectMapper objectMapper,
       URI baseUri,
       RetryPolicy retryPolicy,
       AsyncSleeper sleeper,
       Clock clock,
       Supplier<Double> jitterSupplier) {
     this.httpClient = Objects.requireNonNull(httpClient);
-    this.objectMapper = Objects.requireNonNull(objectMapper);
     this.baseUri = Objects.requireNonNull(baseUri);
     this.retryPolicy = Objects.requireNonNull(retryPolicy);
     this.sleeper = Objects.requireNonNull(sleeper);
@@ -87,7 +77,7 @@ public final class QuarkusApiClient {
     HttpRequest request = newGetRequest(baseUri.resolve("/api/extensions"), "application/json");
     return sendWithRetry(request, BodyHandlers.ofString(StandardCharsets.UTF_8), 1)
         .thenApply(this::assertSuccessful)
-        .thenApply(response -> parseExtensionsPayload(response.body(), objectMapper));
+        .thenApply(response -> parseExtensionsPayload(response.body()));
   }
 
   public CompletableFuture<MetadataDto> fetchMetadata() {
@@ -97,12 +87,12 @@ public final class QuarkusApiClient {
     CompletableFuture<StreamsMetadata> streamsMetadataFuture =
         sendWithRetry(streamsRequest, BodyHandlers.ofString(StandardCharsets.UTF_8), 1)
             .thenApply(this::assertSuccessful)
-            .thenApply(response -> parseStreamsMetadataPayload(response.body(), objectMapper));
+            .thenApply(response -> parseStreamsMetadataPayload(response.body()));
 
     CompletableFuture<List<String>> buildToolsFuture =
         sendWithRetry(openApiRequest, BodyHandlers.ofString(StandardCharsets.UTF_8), 1)
             .thenApply(this::assertSuccessful)
-            .thenApply(response -> parseBuildToolsFromOpenApiPayload(response.body(), objectMapper))
+            .thenApply(response -> parseBuildToolsFromOpenApiPayload(response.body()))
             .exceptionally(ignored -> fallbackBuildTools());
 
     return streamsMetadataFuture.thenCombine(buildToolsFuture, QuarkusApiClient::toMetadata);
@@ -117,59 +107,70 @@ public final class QuarkusApiClient {
     HttpRequest request = newGetRequest(presetsUri, "application/json");
     return sendWithRetry(request, BodyHandlers.ofString(StandardCharsets.UTF_8), 1)
         .thenApply(this::assertSuccessful)
-        .thenApply(response -> parsePresetsPayload(response.body(), objectMapper));
+        .thenApply(response -> parsePresetsPayload(response.body()));
   }
 
-  static MetadataDto parseMetadataPayload(String payload, ObjectMapper objectMapper) {
-    MetadataPayload metadataPayload = readValue(payload, objectMapper, MetadataPayload.class);
-    if (metadataPayload.javaVersions() == null) {
+  static MetadataDto parseMetadataPayload(String payload) {
+    return parseMetadataObject(parseObjectPayload(payload));
+  }
+
+  static MetadataDto parseMetadataObject(Map<String, Object> metadataPayload) {
+    List<Object> javaVersionsNode = readArray(metadataPayload, "javaVersions");
+    if (javaVersionsNode == null) {
       throw new ApiContractException("Metadata payload is missing 'javaVersions' array");
     }
-    if (metadataPayload.buildTools() == null) {
+
+    List<Object> buildToolsNode = readArray(metadataPayload, "buildTools");
+    if (buildToolsNode == null) {
       throw new ApiContractException("Metadata payload is missing 'buildTools' array");
     }
 
-    List<String> javaVersions = copyStringList(metadataPayload.javaVersions(), "javaVersions");
-    List<String> buildTools = copyStringList(metadataPayload.buildTools(), "buildTools");
+    List<String> javaVersions = copyStringList(javaVersionsNode, "javaVersions");
+    List<String> buildTools = copyStringList(buildToolsNode, "buildTools");
     Map<String, List<String>> compatibility =
-        parseCompatibility(metadataPayload.compatibility(), buildTools);
-    List<PlatformStream> platformStreams = parsePlatformStreams(metadataPayload.platformStreams());
+        parseCompatibility(readObject(metadataPayload, "compatibility"), buildTools);
+    List<PlatformStream> platformStreams =
+        parsePlatformStreams(readArray(metadataPayload, "platformStreams"));
     return new MetadataDto(javaVersions, buildTools, compatibility, platformStreams);
   }
 
-  static StreamsMetadata parseStreamsMetadataPayload(String payload, ObjectMapper objectMapper) {
-    List<StreamPayload> streamPayloads = readValue(payload, objectMapper, STREAMS_TYPE);
+  static StreamsMetadata parseStreamsMetadataPayload(String payload) {
+    List<Object> streamPayloads = parseArrayPayload(payload);
 
     Set<Integer> versions = new LinkedHashSet<>();
     List<PlatformStream> platformStreams = new ArrayList<>();
-    for (StreamPayload stream : streamPayloads) {
-      String key = requiredText(stream.key(), "key");
-      JavaCompatibilityPayload javaCompatibility = stream.javaCompatibility();
+    for (Object streamNode : streamPayloads) {
+      Map<String, Object> stream = castObject(streamNode, "Stream payload entries must be objects");
+      String key = requiredText(readText(stream, "key"), "key");
+      Map<String, Object> javaCompatibility = readObject(stream, "javaCompatibility");
       if (javaCompatibility == null) {
         throw new ApiContractException("Stream payload is missing 'javaCompatibility' object");
       }
-      List<Integer> javaVersionsNode = javaCompatibility.versions();
+      List<Object> javaVersionsNode = readArray(javaCompatibility, "versions");
       if (javaVersionsNode == null) {
         throw new ApiContractException("Stream payload is missing 'javaCompatibility.versions'");
       }
+
       List<String> streamJavaVersions = new ArrayList<>();
-      for (Integer version : javaVersionsNode) {
-        if (version == null) {
+      for (Object versionNode : javaVersionsNode) {
+        Integer parsedVersion = toInteger(versionNode);
+        if (parsedVersion == null) {
           throw new ApiContractException(
               "Stream payload field 'javaCompatibility.versions' must contain integers");
         }
-        int parsed = version;
-        if (parsed > 0) {
-          versions.add(parsed);
-          streamJavaVersions.add(String.valueOf(parsed));
+        if (parsedVersion > 0) {
+          versions.add(parsedVersion);
+          streamJavaVersions.add(String.valueOf(parsedVersion));
         }
       }
+
       if (streamJavaVersions.isEmpty()) {
         throw new ApiContractException(
             "Stream payload 'javaCompatibility.versions' must contain at least one positive value");
       }
-      String platformVersion = normalizeOptionalText(stream.platformVersion());
-      boolean recommended = stream.recommended();
+
+      String platformVersion = normalizeOptionalText(readText(stream, "platformVersion"));
+      boolean recommended = Boolean.TRUE.equals(readBoolean(stream, "recommended"));
       platformStreams.add(
           new PlatformStream(key, platformVersion, recommended, streamJavaVersions));
     }
@@ -177,35 +178,41 @@ public final class QuarkusApiClient {
     if (versions.isEmpty()) {
       throw new ApiContractException("Streams payload did not provide any Java versions");
     }
+
     List<String> javaVersions =
         versions.stream().sorted(Comparator.naturalOrder()).map(String::valueOf).toList();
     return new StreamsMetadata(javaVersions, List.copyOf(platformStreams));
   }
 
-  static List<String> parseBuildToolsFromOpenApiPayload(String payload, ObjectMapper objectMapper) {
-    OpenApiPayload openApiPayload = readValue(payload, objectMapper, OpenApiPayload.class);
-    OpenApiPathsPayload paths = openApiPayload.paths();
-    OpenApiPathPayload downloadPath = paths == null ? null : paths.download();
-    OpenApiGetPayload getOperation = downloadPath == null ? null : downloadPath.getOperation();
-    List<OpenApiParameterPayload> parametersNode =
-        getOperation == null ? null : getOperation.parameters();
+  static List<String> parseBuildToolsFromOpenApiPayload(String payload) {
+    Map<String, Object> openApiPayload = parseObjectPayload(payload);
+    Map<String, Object> paths = readObject(openApiPayload, "paths");
+    Map<String, Object> downloadPath = paths == null ? null : readObject(paths, "/api/download");
+    Map<String, Object> getOperation =
+        downloadPath == null ? null : readObject(downloadPath, "get");
+    List<Object> parametersNode =
+        getOperation == null ? null : readArray(getOperation, "parameters");
     if (parametersNode == null) {
       throw new ApiContractException(
           "OpenAPI payload is missing '/api/download.get.parameters' array");
     }
 
     Set<String> buildTools = new LinkedHashSet<>();
-    for (OpenApiParameterPayload parameter : parametersNode) {
-      if (parameter == null || !"b".equals(parameter.name())) {
+    for (Object parameterNode : parametersNode) {
+      Map<String, Object> parameter =
+          castObject(parameterNode, "OpenAPI parameter entries must be objects");
+      if (!"b".equals(readText(parameter, "name"))) {
         continue;
       }
-      OpenApiSchemaPayload schema = parameter.schema();
-      List<String> parameterEnum = schema == null ? null : schema.enumValues();
+
+      Map<String, Object> schema = readObject(parameter, "schema");
+      List<Object> parameterEnum = schema == null ? null : readArray(schema, "enum");
       if (parameterEnum == null) {
         throw new ApiContractException(
             "OpenAPI payload is missing '/api/download' build tool enum");
       }
-      for (String value : parameterEnum) {
+
+      for (String value : copyStringList(parameterEnum, "enum")) {
         String buildTool = BuildToolCodec.toUiValue(normalizeOptionalText(value));
         if (buildTool.isBlank()) {
           throw new ApiContractException("OpenAPI build tool enum must not contain blank values");
@@ -275,36 +282,36 @@ public final class QuarkusApiClient {
             });
   }
 
-  static List<ExtensionDto> parseExtensionsPayload(String payload, ObjectMapper objectMapper) {
-    List<ExtensionPayload> root = readValue(payload, objectMapper, EXTENSIONS_TYPE);
+  static List<ExtensionDto> parseExtensionsPayload(String payload) {
+    return parseExtensionsArray(parseArrayPayload(payload));
+  }
 
+  static List<ExtensionDto> parseExtensionsArray(List<Object> root) {
     List<ExtensionDto> extensions = new ArrayList<>();
-    for (ExtensionPayload node : root) {
-      if (node == null) {
-        throw new ApiContractException("Extensions payload entries must be objects");
-      }
-      String id = requiredText(node.id(), "id");
-      String name = requiredText(node.name(), "name");
-      String shortName = resolvedShortName(node.shortName(), name);
-      String category = resolvedCategory(node.category());
-      Integer order = node.order();
+    for (Object extensionNode : root) {
+      Map<String, Object> node =
+          castObject(extensionNode, "Extensions payload entries must be objects");
+      String id = requiredText(readText(node, "id"), "id");
+      String name = requiredText(readText(node, "name"), "name");
+      String shortName = resolvedShortName(readText(node, "shortName"), name);
+      String category = resolvedCategory(readText(node, "category"));
+      Integer order = readInteger(node, "order");
       extensions.add(new ExtensionDto(id, name, shortName, category, order));
     }
     return List.copyOf(extensions);
   }
 
-  static Map<String, List<String>> parsePresetsPayload(String payload, ObjectMapper objectMapper) {
-    List<PresetPayload> root = readValue(payload, objectMapper, PRESETS_TYPE);
+  static Map<String, List<String>> parsePresetsPayload(String payload) {
+    List<Object> root = parseArrayPayload(payload);
     Map<String, List<String>> presetsByName = new LinkedHashMap<>();
-    for (PresetPayload preset : root) {
-      if (preset == null) {
-        throw new ApiContractException("Presets payload entries must be objects");
-      }
-      String key = normalizeOptionalText(preset.key()).toLowerCase(Locale.ROOT);
+    for (Object presetNode : root) {
+      Map<String, Object> preset =
+          castObject(presetNode, "Presets payload entries must be objects");
+      String key = normalizeOptionalText(readText(preset, "key")).toLowerCase(Locale.ROOT);
       if (key.isBlank()) {
         throw new ApiContractException("Preset payload field 'key' must not be blank");
       }
-      List<String> presetExtensions = copyStringList(preset.extensions(), "extensions");
+      List<String> presetExtensions = copyStringList(readArray(preset, "extensions"), "extensions");
       presetsByName.put(key, presetExtensions);
     }
     return Map.copyOf(presetsByName);
@@ -478,23 +485,6 @@ public final class QuarkusApiClient {
     return decoded.indexOf('\u0000') >= 0;
   }
 
-  private static <T> T readValue(String payload, ObjectMapper objectMapper, Class<T> valueType) {
-    try {
-      return objectMapper.readValue(payload, valueType);
-    } catch (IOException | RuntimeException ioException) {
-      throw new ApiContractException("Malformed JSON payload", ioException);
-    }
-  }
-
-  private static <T> T readValue(
-      String payload, ObjectMapper objectMapper, TypeReference<T> valueTypeRef) {
-    try {
-      return objectMapper.readValue(payload, valueTypeRef);
-    } catch (IOException | RuntimeException ioException) {
-      throw new ApiContractException("Malformed JSON payload", ioException);
-    }
-  }
-
   private static Path moveDownloadedArchive(Path temporaryArchive, Path destinationFile) {
     try {
       Files.move(temporaryArchive, destinationFile, StandardCopyOption.REPLACE_EXISTING);
@@ -540,19 +530,22 @@ public final class QuarkusApiClient {
     return "Other";
   }
 
-  private static List<String> copyStringList(List<String> values, String fieldName) {
+  private static List<String> copyStringList(List<Object> values, String fieldName) {
+    if (values == null) {
+      throw new ApiContractException("Field '" + fieldName + "' must contain only strings");
+    }
     List<String> valuesCopy = new ArrayList<>();
-    for (String element : Objects.requireNonNull(values)) {
-      if (element == null) {
+    for (Object element : values) {
+      if (!(element instanceof String stringValue)) {
         throw new ApiContractException("Field '" + fieldName + "' must contain only strings");
       }
-      valuesCopy.add(element);
+      valuesCopy.add(stringValue);
     }
     return List.copyOf(valuesCopy);
   }
 
   private static Map<String, List<String>> parseCompatibility(
-      Map<String, List<String>> compatibilityPayload, List<String> buildTools) {
+      Map<String, Object> compatibilityPayload, List<String> buildTools) {
     Map<String, List<String>> compatibility = new LinkedHashMap<>();
     if (compatibilityPayload == null) {
       return Map.of();
@@ -560,12 +553,19 @@ public final class QuarkusApiClient {
 
     Map<String, BuildToolCompatibilitySelection> compatibilityByNormalizedBuildTool =
         new LinkedHashMap<>();
-    for (Map.Entry<String, List<String>> entry : compatibilityPayload.entrySet()) {
+    for (Map.Entry<String, Object> entry : compatibilityPayload.entrySet()) {
+      List<String> compatibilityValues =
+          entry.getValue() == null
+              ? null
+              : copyStringList(
+                  castArray(entry.getValue(), "Field 'compatibility' values must be arrays"),
+                  "compatibility." + entry.getKey());
+
       String normalizedBuildTool = normalizeKey(entry.getKey());
       BuildToolCompatibilitySelection previous =
           compatibilityByNormalizedBuildTool.putIfAbsent(
               normalizedBuildTool,
-              new BuildToolCompatibilitySelection(entry.getKey(), entry.getValue()));
+              new BuildToolCompatibilitySelection(entry.getKey(), compatibilityValues));
       if (previous != null) {
         throw new ApiContractException(
             "Metadata payload compatibility contains duplicate build tool entries differing"
@@ -585,36 +585,149 @@ public final class QuarkusApiClient {
         throw new ApiContractException(
             "Metadata payload compatibility missing build tool entry '" + buildTool + "'");
       }
-      compatibility.put(buildTool, copyStringList(javaVersions, "compatibility." + buildTool));
+      compatibility.put(buildTool, List.copyOf(javaVersions));
     }
     return compatibility;
   }
 
-  private static List<PlatformStream> parsePlatformStreams(List<PlatformStreamPayload> node) {
+  private static List<PlatformStream> parsePlatformStreams(List<Object> node) {
     if (node == null) {
       return List.of();
     }
 
     List<PlatformStream> platformStreams = new ArrayList<>();
-    for (PlatformStreamPayload platformStreamNode : node) {
-      if (platformStreamNode == null) {
-        throw new ApiContractException("Metadata platform stream entry must be an object");
-      }
-      String key = requiredText(platformStreamNode.key(), "key");
-      String platformVersion = normalizeOptionalText(platformStreamNode.platformVersion());
-      List<String> javaVersionsNode = platformStreamNode.javaVersions();
+    for (Object platformStreamNode : node) {
+      Map<String, Object> stream =
+          castObject(platformStreamNode, "Metadata platform stream entry must be an object");
+      String key = requiredText(readText(stream, "key"), "key");
+      String platformVersion = normalizeOptionalText(readText(stream, "platformVersion"));
+      List<Object> javaVersionsNode = readArray(stream, "javaVersions");
       if (javaVersionsNode == null) {
         throw new ApiContractException(
             "Metadata platform stream entry is missing 'javaVersions' array");
       }
       List<String> javaVersions = copyStringList(javaVersionsNode, "platformStreams.javaVersions");
-      platformStreams.add(
-          new PlatformStream(key, platformVersion, platformStreamNode.recommended(), javaVersions));
+      boolean recommended = Boolean.TRUE.equals(readBoolean(stream, "recommended"));
+      platformStreams.add(new PlatformStream(key, platformVersion, recommended, javaVersions));
     }
     return List.copyOf(platformStreams);
   }
 
   private static String normalizeKey(String key) {
     return key == null ? "" : key.trim().toLowerCase(Locale.ROOT);
+  }
+
+  private static Map<String, Object> parseObjectPayload(String payload) {
+    try {
+      return JsonSupport.parseObject(payload);
+    } catch (IOException | RuntimeException exception) {
+      throw new ApiContractException("Malformed JSON payload", exception);
+    }
+  }
+
+  private static List<Object> parseArrayPayload(String payload) {
+    try {
+      return JsonSupport.parseArray(payload);
+    } catch (IOException | RuntimeException exception) {
+      throw new ApiContractException("Malformed JSON payload", exception);
+    }
+  }
+
+  private static String readText(Map<String, Object> source, String fieldName) {
+    Object value = source.get(fieldName);
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof String text) {
+      return text;
+    }
+    throw new ApiContractException("Malformed JSON payload");
+  }
+
+  private static Boolean readBoolean(Map<String, Object> source, String fieldName) {
+    Object value = source.get(fieldName);
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof Boolean booleanValue) {
+      return booleanValue;
+    }
+    throw new ApiContractException("Malformed JSON payload");
+  }
+
+  private static Integer readInteger(Map<String, Object> source, String fieldName) {
+    return toInteger(source.get(fieldName));
+  }
+
+  private static Integer toInteger(Object value) {
+    if (value == null) {
+      return null;
+    }
+    if (!(value instanceof Number number) || !isWholeNumber(number)) {
+      throw new ApiContractException("Malformed JSON payload");
+    }
+    long asLong = number.longValue();
+    if (asLong > Integer.MAX_VALUE || asLong < Integer.MIN_VALUE) {
+      throw new ApiContractException("Malformed JSON payload");
+    }
+    return (int) asLong;
+  }
+
+  private static boolean isWholeNumber(Number number) {
+    if (number instanceof Byte
+        || number instanceof Short
+        || number instanceof Integer
+        || number instanceof Long
+        || number instanceof java.math.BigInteger) {
+      return true;
+    }
+    if (number instanceof Float floatValue) {
+      return Float.isFinite(floatValue) && floatValue == Math.rint(floatValue);
+    }
+    if (number instanceof Double doubleValue) {
+      return Double.isFinite(doubleValue) && doubleValue == Math.rint(doubleValue);
+    }
+    if (number instanceof java.math.BigDecimal bigDecimalValue) {
+      return bigDecimalValue.stripTrailingZeros().scale() <= 0;
+    }
+    return false;
+  }
+
+  private static Map<String, Object> readObject(Map<String, Object> source, String fieldName) {
+    Object value = source.get(fieldName);
+    if (value == null) {
+      return null;
+    }
+    return castObject(value, "Malformed JSON payload");
+  }
+
+  private static List<Object> readArray(Map<String, Object> source, String fieldName) {
+    Object value = source.get(fieldName);
+    if (value == null) {
+      return null;
+    }
+    return castArray(value, "Malformed JSON payload");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> castObject(Object value, String errorMessage) {
+    if (!(value instanceof Map<?, ?> rawObject)) {
+      throw new ApiContractException(errorMessage);
+    }
+    Map<String, Object> object = new LinkedHashMap<>();
+    for (Map.Entry<?, ?> entry : rawObject.entrySet()) {
+      if (!(entry.getKey() instanceof String key)) {
+        throw new ApiContractException(errorMessage);
+      }
+      object.put(key, entry.getValue());
+    }
+    return object;
+  }
+
+  private static List<Object> castArray(Object value, String errorMessage) {
+    if (!(value instanceof List<?> rawArray)) {
+      throw new ApiContractException(errorMessage);
+    }
+    return new ArrayList<>(rawArray);
   }
 }

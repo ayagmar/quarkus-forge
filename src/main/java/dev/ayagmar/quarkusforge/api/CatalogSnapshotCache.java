@@ -1,13 +1,15 @@
 package dev.ayagmar.quarkusforge.api;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -17,24 +19,19 @@ public final class CatalogSnapshotCache {
   static final long DEFAULT_MAX_BYTES = 2L * 1024L * 1024L;
 
   private final Path cacheFile;
-  private final ObjectMapper objectMapper;
+  private final SnapshotPayloadCodec payloadCodec;
   private final Clock clock;
   private final Duration ttl;
   private final long maxBytes;
 
   public CatalogSnapshotCache(Path cacheFile) {
-    this(
-        cacheFile,
-        ObjectMapperProvider.shared(),
-        Clock.systemUTC(),
-        DEFAULT_TTL,
-        DEFAULT_MAX_BYTES);
+    this(cacheFile, defaultPayloadCodec(), Clock.systemUTC(), DEFAULT_TTL, DEFAULT_MAX_BYTES);
   }
 
   CatalogSnapshotCache(
-      Path cacheFile, ObjectMapper objectMapper, Clock clock, Duration ttl, long maxBytes) {
+      Path cacheFile, SnapshotPayloadCodec payloadCodec, Clock clock, Duration ttl, long maxBytes) {
     this.cacheFile = Objects.requireNonNull(cacheFile);
-    this.objectMapper = Objects.requireNonNull(objectMapper);
+    this.payloadCodec = Objects.requireNonNull(payloadCodec);
     this.clock = Objects.requireNonNull(clock);
     this.ttl = Objects.requireNonNull(ttl);
     this.maxBytes = maxBytes;
@@ -45,6 +42,10 @@ public final class CatalogSnapshotCache {
     if (maxBytes <= 0L) {
       throw new IllegalArgumentException("maxBytes must be > 0");
     }
+  }
+
+  static SnapshotPayloadCodec defaultPayloadCodec() {
+    return JsonSnapshotPayloadCodec.INSTANCE;
   }
 
   public static Path defaultCacheFile() {
@@ -90,8 +91,7 @@ public final class CatalogSnapshotCache {
         return Optional.empty();
       }
 
-      CatalogSnapshotPayload payload =
-          objectMapper.readValue(cacheFile.toFile(), CatalogSnapshotPayload.class);
+      CatalogSnapshotPayload payload = payloadCodec.read(cacheFile);
       int schemaVersion = payload.schemaVersion();
       if (schemaVersion != SCHEMA_VERSION) {
         return Optional.empty();
@@ -129,6 +129,137 @@ public final class CatalogSnapshotCache {
     CatalogSnapshotPayload payload =
         new CatalogSnapshotPayload(
             SCHEMA_VERSION, clock.instant().toEpochMilli(), metadata, List.copyOf(extensions));
-    return objectMapper.writeValueAsBytes(payload);
+    return payloadCodec.write(payload);
+  }
+
+  interface SnapshotPayloadCodec {
+    CatalogSnapshotPayload read(Path file) throws IOException;
+
+    byte[] write(CatalogSnapshotPayload payload) throws IOException;
+  }
+
+  private static final class JsonSnapshotPayloadCodec implements SnapshotPayloadCodec {
+    private static final JsonSnapshotPayloadCodec INSTANCE = new JsonSnapshotPayloadCodec();
+
+    @Override
+    public CatalogSnapshotPayload read(Path file) throws IOException {
+      Map<String, Object> root = JsonSupport.parseObject(Files.readString(file));
+
+      Integer schemaVersion = readInteger(root.get("schemaVersion"));
+      Long fetchedAtEpochMillis = readLong(root.get("fetchedAtEpochMillis"));
+      Map<String, Object> metadataObject = asObject(root.get("metadata"));
+      List<Object> extensionsArray = asArray(root.get("extensions"));
+
+      MetadataDto metadata =
+          metadataObject == null ? null : QuarkusApiClient.parseMetadataObject(metadataObject);
+      List<ExtensionDto> extensions =
+          extensionsArray == null ? null : QuarkusApiClient.parseExtensionsArray(extensionsArray);
+
+      return new CatalogSnapshotPayload(
+          schemaVersion == null ? -1 : schemaVersion,
+          fetchedAtEpochMillis == null ? -1L : fetchedAtEpochMillis,
+          metadata,
+          extensions);
+    }
+
+    @Override
+    public byte[] write(CatalogSnapshotPayload payload) throws IOException {
+      Map<String, Object> root = new LinkedHashMap<>();
+      root.put("schemaVersion", payload.schemaVersion());
+      root.put("fetchedAtEpochMillis", payload.fetchedAtEpochMillis());
+      root.put("metadata", toMetadataMap(payload.metadata()));
+      root.put("extensions", toExtensionsArray(payload.extensions()));
+      return JsonSupport.writeBytes(root);
+    }
+
+    private static Integer readInteger(Object value) {
+      if (value == null) {
+        return null;
+      }
+      if (!(value instanceof Number number)) {
+        throw new ApiContractException("Malformed JSON payload");
+      }
+      long longValue = number.longValue();
+      if (longValue > Integer.MAX_VALUE || longValue < Integer.MIN_VALUE) {
+        throw new ApiContractException("Malformed JSON payload");
+      }
+      return (int) longValue;
+    }
+
+    private static Long readLong(Object value) {
+      if (value == null) {
+        return null;
+      }
+      if (!(value instanceof Number number)) {
+        throw new ApiContractException("Malformed JSON payload");
+      }
+      return number.longValue();
+    }
+
+    private static Map<String, Object> asObject(Object value) {
+      if (value == null) {
+        return null;
+      }
+      if (!(value instanceof Map<?, ?> rawObject)) {
+        throw new ApiContractException("Malformed JSON payload");
+      }
+      Map<String, Object> object = new LinkedHashMap<>();
+      for (Map.Entry<?, ?> entry : rawObject.entrySet()) {
+        if (!(entry.getKey() instanceof String key)) {
+          throw new ApiContractException("Malformed JSON payload");
+        }
+        object.put(key, entry.getValue());
+      }
+      return object;
+    }
+
+    private static List<Object> asArray(Object value) {
+      if (value == null) {
+        return null;
+      }
+      if (!(value instanceof List<?> rawArray)) {
+        throw new ApiContractException("Malformed JSON payload");
+      }
+      return new ArrayList<>(rawArray);
+    }
+
+    private static Map<String, Object> toMetadataMap(MetadataDto metadata) {
+      if (metadata == null) {
+        return null;
+      }
+      Map<String, Object> root = new LinkedHashMap<>();
+      root.put("javaVersions", metadata.javaVersions());
+      root.put("buildTools", metadata.buildTools());
+      root.put("compatibility", metadata.compatibility());
+
+      List<Object> platformStreams = new ArrayList<>();
+      for (PlatformStream stream : metadata.platformStreams()) {
+        Map<String, Object> streamObject = new LinkedHashMap<>();
+        streamObject.put("key", stream.key());
+        streamObject.put("platformVersion", stream.platformVersion());
+        streamObject.put("recommended", stream.recommended());
+        streamObject.put("javaVersions", stream.javaVersions());
+        platformStreams.add(streamObject);
+      }
+      root.put("platformStreams", platformStreams);
+      return root;
+    }
+
+    private static List<Object> toExtensionsArray(List<ExtensionDto> extensions) {
+      if (extensions == null) {
+        return null;
+      }
+      List<Object> extensionArray = new ArrayList<>();
+      for (ExtensionDto extension : extensions) {
+        Map<String, Object> extensionObject = new LinkedHashMap<>();
+        extensionObject.put("id", extension.id());
+        extensionObject.put("name", extension.name());
+        extensionObject.put("shortName", extension.shortName());
+        extensionObject.put("category", extension.category());
+        extensionObject.put("order", extension.order());
+        extensionArray.add(extensionObject);
+      }
+      return extensionArray;
+    }
   }
 }

@@ -50,7 +50,7 @@ class CatalogDataServiceTest {
             onlineClient(),
             new CatalogSnapshotCache(
                 cacheFile,
-                ObjectMapperProvider.shared(),
+                CatalogSnapshotCache.defaultPayloadCodec(),
                 Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
                 Duration.ofHours(6),
                 2L * 1024L * 1024L));
@@ -63,7 +63,7 @@ class CatalogDataServiceTest {
             offlineClient(),
             new CatalogSnapshotCache(
                 cacheFile,
-                ObjectMapperProvider.shared(),
+                CatalogSnapshotCache.defaultPayloadCodec(),
                 Clock.fixed(Instant.parse("2026-02-22T01:00:00Z"), ZoneOffset.UTC),
                 Duration.ofHours(6),
                 2L * 1024L * 1024L));
@@ -85,7 +85,7 @@ class CatalogDataServiceTest {
             onlineClient(),
             new CatalogSnapshotCache(
                 cacheFile,
-                ObjectMapperProvider.shared(),
+                CatalogSnapshotCache.defaultPayloadCodec(),
                 Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
                 Duration.ofHours(6),
                 2L * 1024L * 1024L));
@@ -96,7 +96,7 @@ class CatalogDataServiceTest {
             offlineClient(),
             new CatalogSnapshotCache(
                 cacheFile,
-                ObjectMapperProvider.shared(),
+                CatalogSnapshotCache.defaultPayloadCodec(),
                 Clock.fixed(Instant.parse("2026-02-22T06:00:01Z"), ZoneOffset.UTC),
                 Duration.ofHours(6),
                 2L * 1024L * 1024L));
@@ -115,7 +115,7 @@ class CatalogDataServiceTest {
             offlineClient(),
             new CatalogSnapshotCache(
                 cacheFile,
-                ObjectMapperProvider.shared(),
+                CatalogSnapshotCache.defaultPayloadCodec(),
                 Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
                 Duration.ofHours(6),
                 2L * 1024L * 1024L));
@@ -136,7 +136,7 @@ class CatalogDataServiceTest {
             onlineClient(),
             new CatalogSnapshotCache(
                 cacheFile,
-                ObjectMapperProvider.shared(),
+                CatalogSnapshotCache.defaultPayloadCodec(),
                 Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
                 Duration.ofHours(6),
                 2L * 1024L * 1024L));
@@ -172,7 +172,7 @@ class CatalogDataServiceTest {
             offlineClient(),
             new CatalogSnapshotCache(
                 cacheFile,
-                ObjectMapperProvider.shared(),
+                CatalogSnapshotCache.defaultPayloadCodec(),
                 Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
                 Duration.ofHours(6),
                 2L * 1024L * 1024L));
@@ -193,7 +193,7 @@ class CatalogDataServiceTest {
             onlineClient(),
             new CatalogSnapshotCache(
                 cacheFile,
-                ObjectMapperProvider.shared(),
+                CatalogSnapshotCache.defaultPayloadCodec(),
                 Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
                 Duration.ofHours(6),
                 128L));
@@ -215,7 +215,7 @@ class CatalogDataServiceTest {
             onlineClient(),
             new CatalogSnapshotCache(
                 cacheFile,
-                ObjectMapperProvider.shared(),
+                CatalogSnapshotCache.defaultPayloadCodec(),
                 Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
                 Duration.ofHours(6),
                 2L * 1024L * 1024L));
@@ -227,7 +227,7 @@ class CatalogDataServiceTest {
             onlineClient(),
             new CatalogSnapshotCache(
                 cacheFile,
-                ObjectMapperProvider.shared(),
+                CatalogSnapshotCache.defaultPayloadCodec(),
                 Clock.fixed(Instant.parse("2026-02-22T01:00:00Z"), ZoneOffset.UTC),
                 Duration.ofHours(6),
                 2L * 1024L * 1024L));
@@ -345,7 +345,6 @@ class CatalogDataServiceTest {
   private static QuarkusApiClient newClient(URI baseUri) {
     return new QuarkusApiClient(
         HttpClient.newHttpClient(),
-        ObjectMapperProvider.shared(),
         baseUri,
         new RetryPolicy(1, Duration.ofSeconds(2), Duration.ofMillis(1), 0.0d),
         delay -> CompletableFuture.completedFuture(null),

@@ -1,7 +1,6 @@
 package dev.ayagmar.quarkusforge.ui;
 
 import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
-import dev.ayagmar.quarkusforge.api.ObjectMapperProvider;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
@@ -22,7 +21,7 @@ public interface ExtensionFavoritesStore {
   }
 
   static ExtensionFavoritesStore fileBacked(Path file) {
-    return new FileBackedExtensionFavoritesStore(file, ObjectMapperProvider.shared());
+    return new FileBackedExtensionFavoritesStore(file);
   }
 
   static Path defaultFile() {

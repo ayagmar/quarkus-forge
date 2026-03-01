@@ -14,7 +14,7 @@
 
     <tamboui.version>0.2.0-SNAPSHOT</tamboui.version>
     <picocli.version>4.7.7</picocli.version>
-    <jackson.version>2.20.2</jackson.version>
+    <jackson.core.version>2.20.2</jackson.core.version>
     <junit.version>6.0.1</junit.version>
     <assertj.version>3.27.7</assertj.version>
     <wiremock.version>3.13.2</wiremock.version>
@@ -64,8 +64,8 @@
     </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
-      <version>${jackson.version}</version>
+      <artifactId>jackson-core</artifactId>
+      <version>${jackson.core.version}</version>
     </dependency>
 
     <dependency>
