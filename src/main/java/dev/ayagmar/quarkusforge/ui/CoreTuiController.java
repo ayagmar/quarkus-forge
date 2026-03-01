@@ -94,9 +94,7 @@ public final class CoreTuiController
   private boolean helpOverlayVisible;
   private int commandPaletteSelection;
   private final PostGenerationMenuState postGenerationMenu = new PostGenerationMenuState();
-  private long startupOverlayMinDurationNanos;
-  private long startupOverlayVisibleUntilNanos;
-  private boolean startupOverlayVisibleOnLastTick;
+  private final StartupOverlayTracker startupOverlay = new StartupOverlayTracker();
 
   private CoreTuiController(
       ForgeUiState initialState,
@@ -133,12 +131,6 @@ public final class CoreTuiController
     catalogLoadState = CatalogLoadState.initial();
     extensionCatalogLoader = null;
     showErrorDetails = false;
-    commandPaletteVisible = false;
-    helpOverlayVisible = false;
-    commandPaletteSelection = 0;
-    startupOverlayMinDurationNanos = 0L;
-    startupOverlayVisibleUntilNanos = 0L;
-    startupOverlayVisibleOnLastTick = false;
 
     for (FocusTarget target : FocusTarget.values()) {
       inputStates.put(target, new TextInputState(""));
@@ -227,10 +219,7 @@ public final class CoreTuiController
     long loadToken = ++extensionCatalogLoadToken;
     catalogLoadState = CatalogLoadState.loadingFrom(catalogLoadState);
     statusMessage = "Loading extension catalog...";
-    startupOverlayVisibleUntilNanos =
-        loadToken == 1 && startupOverlayMinDurationNanos > 0L
-            ? System.nanoTime() + startupOverlayMinDurationNanos
-            : 0L;
+    startupOverlay.activateIfFirstLoad(loadToken);
     requestAsyncRepaint();
 
     CompletableFuture<ExtensionCatalogLoadResult> loadFuture;
@@ -552,7 +541,7 @@ public final class CoreTuiController
 
   public void setStartupOverlayMinDuration(Duration minimumDuration) {
     Objects.requireNonNull(minimumDuration);
-    startupOverlayMinDurationNanos = Math.max(0L, minimumDuration.toNanos());
+    startupOverlay.setMinDuration(minimumDuration);
   }
 
   public void render(Frame frame) {
@@ -1579,13 +1568,11 @@ public final class CoreTuiController
   }
 
   private UiAction handleTickEvent() {
-    boolean startupOverlayVisibleNow = isStartupOverlayVisible();
-    boolean shouldRender = catalogLoadState.isLoading() || startupOverlayVisibleNow;
-    if (startupOverlayVisibleOnLastTick && !startupOverlayVisibleNow) {
-      // Force one final redraw to clear expired startup overlay without key input.
+    boolean loading = catalogLoadState.isLoading();
+    boolean shouldRender = loading || startupOverlay.isVisible(loading);
+    if (startupOverlay.tick(loading)) {
       shouldRender = true;
     }
-    startupOverlayVisibleOnLastTick = startupOverlayVisibleNow;
     if (asyncRepaintSignal.consume()) {
       shouldRender = true;
     }
@@ -1704,7 +1691,7 @@ public final class CoreTuiController
   }
 
   private boolean isStartupOverlayVisible() {
-    return catalogLoadState.isLoading() || System.nanoTime() < startupOverlayVisibleUntilNanos;
+    return startupOverlay.isVisible(catalogLoadState.isLoading());
   }
 
   private void requestAsyncRepaint() {
