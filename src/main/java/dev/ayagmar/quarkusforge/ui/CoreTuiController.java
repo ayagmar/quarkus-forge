@@ -60,82 +60,10 @@ public final class CoreTuiController
           FocusTarget.EXTENSION_SEARCH,
           FocusTarget.EXTENSION_LIST,
           FocusTarget.SUBMIT);
-
-  private static final List<String> STARTUP_SPLASH_ART =
-      List.of(
-          "   ____ _   _   _    ____  _  ___   _ ____",
-          "  / __ \\ | | | / \\  |  _ \\| |/ / | | / ___|",
-          " | |  | | |_| |/ _ \\ | |_) | ' /| | | \\___ \\",
-          " | |__| |  _  / ___ \\|  _ <| . \\| |_| |___) |",
-          "  \\___\\_\\_| |_/_/   \\_\\_| \\_\\_|\\_\\\\___/|____/");
   private static final ProjectGenerationRunner NOOP_PROJECT_GENERATION_RUNNER =
       (generationRequest, outputDirectory, cancelled, progressListener) ->
           CompletableFuture.failedFuture(
               new IllegalStateException("Generation flow is not configured in this runtime"));
-  private static final List<CommandPaletteEntry> COMMAND_PALETTE_ENTRIES =
-      List.of(
-          new CommandPaletteEntry(
-              "Focus extension search", "/ or Ctrl+F", CommandPaletteAction.FOCUS_EXTENSION_SEARCH),
-          new CommandPaletteEntry(
-              "Focus extension list", "Ctrl+L", CommandPaletteAction.FOCUS_EXTENSION_LIST),
-          new CommandPaletteEntry(
-              "Toggle favorite filter", "Ctrl+K", CommandPaletteAction.TOGGLE_FAVORITES_FILTER),
-          new CommandPaletteEntry(
-              "Cycle preset filter", "Ctrl+Y", CommandPaletteAction.CYCLE_PRESET_FILTER),
-          new CommandPaletteEntry(
-              "Jump to next favorite", "Ctrl+J", CommandPaletteAction.JUMP_TO_FAVORITE),
-          new CommandPaletteEntry(
-              "Cycle category filter", "v", CommandPaletteAction.CYCLE_CATEGORY_FILTER),
-          new CommandPaletteEntry("Toggle category", "c", CommandPaletteAction.TOGGLE_CATEGORY),
-          new CommandPaletteEntry(
-              "Open all categories", "C", CommandPaletteAction.OPEN_ALL_CATEGORIES),
-          new CommandPaletteEntry("Reload catalog", "Ctrl+R", CommandPaletteAction.RELOAD_CATALOG),
-          new CommandPaletteEntry(
-              "Toggle error details", "Ctrl+E", CommandPaletteAction.TOGGLE_ERROR_DETAILS));
-  private static final List<String> POST_GENERATION_ACTION_LABELS =
-      List.of(
-          "Export Forgefile + forge.lock",
-          "Publish to GitHub (requires gh)",
-          "Open in IDE",
-          "Open in terminal",
-          "Generate again",
-          "Quit");
-  private static final List<String> GITHUB_VISIBILITY_LABELS =
-      List.of("Private repo", "Public repo", "Internal repo (GitHub Enterprise)");
-  private static final String FORGE_LOCK_FILE_NAME = "forge.lock";
-  private static final String FORGE_RECIPE_FILE_NAME = "Forgefile";
-  private static final List<String> GLOBAL_HELP_LINES =
-      List.of(
-          "Global",
-          "  Tab / Shift+Tab : move focus",
-          "  Enter           : submit generation",
-          "  Alt+G           : submit generation",
-          "  Esc / Ctrl+C    : cancel generation or quit",
-          "  ?               : toggle help",
-          "  Ctrl+P          : command palette",
-          "",
-          "Extensions",
-          "  / or Ctrl+F     : focus extension search",
-          "  Esc             : clear search/filter or return to list",
-          "  Ctrl+L          : focus extension list",
-          "  Up/Down or j/k  : move in list",
-          "  Home/End        : first/last list row",
-          "  PgUp/PgDn       : previous/next category",
-          "  Space           : toggle extension",
-          "  v               : cycle category filter",
-          "  x               : clear selected extensions",
-          "  f               : toggle favorite",
-          "  c / C           : close/open focused category / open all",
-          "  Ctrl+J          : jump to next favorite",
-          "  Ctrl+K          : toggle favorites filter",
-          "  Ctrl+Y          : cycle preset filter",
-          "  Ctrl+R          : reload extension catalog",
-          "",
-          "Diagnostics",
-          "  Ctrl+E          : toggle expanded error details",
-          "",
-          "Help",
-          "  Esc or ?        : close this help");
   private final EnumMap<FocusTarget, TextInputState> inputStates = new EnumMap<>(FocusTarget.class);
   private final ProjectRequestValidator requestValidator = new ProjectRequestValidator();
   private MetadataCompatibilityContext metadataCompatibility;
@@ -951,7 +879,7 @@ public final class CoreTuiController
 
   private void renderCommandPalette(Frame frame, Rect viewport) {
     OverlayRenderer.renderCommandPalette(
-        frame, viewport, theme, COMMAND_PALETTE_ENTRIES, commandPaletteSelection);
+        frame, viewport, theme, UiTextConstants.COMMAND_PALETTE_ENTRIES, commandPaletteSelection);
   }
 
   private boolean isGenerationActive() {
@@ -974,7 +902,7 @@ public final class CoreTuiController
   }
 
   private List<String> helpOverlayLines() {
-    List<String> lines = new ArrayList<>(GLOBAL_HELP_LINES);
+    List<String> lines = new ArrayList<>(UiTextConstants.GLOBAL_HELP_LINES);
     lines.add("");
     lines.add("Context (" + contextHelpTitle() + ")");
     lines.addAll(contextHelpLines());
@@ -1057,7 +985,7 @@ public final class CoreTuiController
     String readyLabel = extensionCatalogLoading ? "waiting" : "ready";
     String spinner = extensionCatalogLoading ? "|" : "-";
     List<String> lines = new ArrayList<>();
-    lines.addAll(STARTUP_SPLASH_ART);
+    lines.addAll(UiTextConstants.STARTUP_SPLASH_ART);
     lines.add("");
     lines.add("  metadata fetch   : " + metadataLabel);
     lines.add("  catalog load     : " + catalogLabel);
@@ -1070,11 +998,11 @@ public final class CoreTuiController
   private void renderPostGenerationOverlay(Frame frame, Rect viewport) {
     if (githubVisibilityMenuVisible) {
       OverlayRenderer.renderGitHubVisibilityOverlay(
-          frame, viewport, theme, GITHUB_VISIBILITY_LABELS, githubVisibilitySelection);
+          frame, viewport, theme, UiTextConstants.GITHUB_VISIBILITY_LABELS, githubVisibilitySelection);
       return;
     }
     OverlayRenderer.renderPostGenerationOverlay(
-        frame, viewport, theme, POST_GENERATION_ACTION_LABELS, postGenerationActionSelection);
+        frame, viewport, theme, UiTextConstants.POST_GENERATION_ACTION_LABELS, postGenerationActionSelection);
   }
 
   private FooterSnapshot footerSnapshot() {
@@ -1131,12 +1059,12 @@ public final class CoreTuiController
       return UiAction.handled(false);
     }
     if (keyEvent.isEnd()) {
-      commandPaletteSelection = COMMAND_PALETTE_ENTRIES.size() - 1;
+      commandPaletteSelection = UiTextConstants.COMMAND_PALETTE_ENTRIES.size() - 1;
       return UiAction.handled(false);
     }
     if (UiKeyMatchers.isDigitKey(keyEvent)) {
       int selected = Character.digit(keyEvent.character(), 10) - 1;
-      if (selected >= 0 && selected < COMMAND_PALETTE_ENTRIES.size()) {
+      if (selected >= 0 && selected < UiTextConstants.COMMAND_PALETTE_ENTRIES.size()) {
         commandPaletteSelection = selected;
         executeCommandPaletteSelection();
       }
@@ -1185,7 +1113,7 @@ public final class CoreTuiController
     }
     if (UiKeyMatchers.isDigitKey(keyEvent)) {
       int selected = Character.digit(keyEvent.character(), 10) - 1;
-      if (selected >= 0 && selected < POST_GENERATION_ACTION_LABELS.size()) {
+      if (selected >= 0 && selected < UiTextConstants.POST_GENERATION_ACTION_LABELS.size()) {
         postGenerationActionSelection = selected;
         return executePostGenerationSelection();
       }
@@ -1225,7 +1153,7 @@ public final class CoreTuiController
     }
     if (UiKeyMatchers.isDigitKey(keyEvent)) {
       int selected = Character.digit(keyEvent.character(), 10) - 1;
-      if (selected >= 0 && selected < GITHUB_VISIBILITY_LABELS.size()) {
+      if (selected >= 0 && selected < UiTextConstants.GITHUB_VISIBILITY_LABELS.size()) {
         githubVisibilitySelection = selected;
         return confirmGitHubVisibilitySelection();
       }
@@ -1238,7 +1166,7 @@ public final class CoreTuiController
   }
 
   private void movePostGenerationSelection(int delta) {
-    int size = POST_GENERATION_ACTION_LABELS.size();
+    int size = UiTextConstants.POST_GENERATION_ACTION_LABELS.size();
     if (size == 0) {
       return;
     }
@@ -1246,7 +1174,7 @@ public final class CoreTuiController
   }
 
   private void moveGitHubVisibilitySelection(int delta) {
-    int size = GITHUB_VISIBILITY_LABELS.size();
+    int size = UiTextConstants.GITHUB_VISIBILITY_LABELS.size();
     if (size == 0) {
       return;
     }
@@ -1304,7 +1232,7 @@ public final class CoreTuiController
       return;
     }
     try {
-      Path lockPath = generatedProjectPath.resolve(FORGE_LOCK_FILE_NAME);
+      Path lockPath = generatedProjectPath.resolve(UiTextConstants.FORGE_LOCK_FILE_NAME);
       List<String> selectedExtensions = extensionCatalogState.selectedExtensionIds();
       ForgeLock lock =
           ForgeLock.from(
@@ -1317,7 +1245,7 @@ public final class CoreTuiController
       Path recipePath =
           ForgeDataPaths.recipesRoot()
               .resolve(request.artifactId())
-              .resolve(FORGE_RECIPE_FILE_NAME);
+              .resolve(UiTextConstants.FORGE_RECIPE_FILE_NAME);
       ForgeRecipe recipe =
           new ForgeRecipe(
               request.groupId(),
@@ -1369,7 +1297,7 @@ public final class CoreTuiController
   }
 
   private void moveCommandPaletteSelection(int delta) {
-    int size = COMMAND_PALETTE_ENTRIES.size();
+    int size = UiTextConstants.COMMAND_PALETTE_ENTRIES.size();
     if (size == 0) {
       return;
     }
@@ -1377,11 +1305,11 @@ public final class CoreTuiController
   }
 
   private void executeCommandPaletteSelection() {
-    if (COMMAND_PALETTE_ENTRIES.isEmpty()) {
+    if (UiTextConstants.COMMAND_PALETTE_ENTRIES.isEmpty()) {
       closeCommandPalette();
       return;
     }
-    CommandPaletteAction action = COMMAND_PALETTE_ENTRIES.get(commandPaletteSelection).action();
+    CommandPaletteAction action = UiTextConstants.COMMAND_PALETTE_ENTRIES.get(commandPaletteSelection).action();
     closeCommandPalette();
     executeCommandPaletteAction(action);
   }
