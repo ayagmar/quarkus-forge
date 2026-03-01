@@ -785,7 +785,7 @@ final class ExtensionCatalogState {
   private void recordRecentSelection(String extensionId) {
     recentExtensionIds.remove(extensionId);
     recentExtensionIds.addFirst(extensionId);
-    while (recentExtensionIds.size() > 10) {
+    while (recentExtensionIds.size() > CatalogRowBuilder.MAX_RECENT_SELECTIONS) {
       recentExtensionIds.removeLast();
     }
     persistUserStateAsync();

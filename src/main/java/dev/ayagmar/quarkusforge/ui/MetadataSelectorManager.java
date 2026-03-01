@@ -109,7 +109,15 @@ final class MetadataSelectorManager {
       case PLATFORM_STREAM -> availablePlatformStreams;
       case BUILD_TOOL -> availableBuildTools;
       case JAVA_VERSION -> availableJavaVersions;
-      default -> List.of();
+      case GROUP_ID,
+          ARTIFACT_ID,
+          VERSION,
+          PACKAGE_NAME,
+          OUTPUT_DIR,
+          EXTENSION_SEARCH,
+          EXTENSION_LIST,
+          SUBMIT ->
+          List.of();
     };
   }
 

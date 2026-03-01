@@ -128,7 +128,6 @@ public final class CoreTuiController
     uiEventRouter = new UiEventRouter();
     generationFlowCoordinator = new GenerationFlowCoordinator();
     extensionCatalogLoadToken = 0L;
-    catalogLoadState = CatalogLoadState.initial();
     extensionCatalogLoader = null;
     showErrorDetails = false;
 

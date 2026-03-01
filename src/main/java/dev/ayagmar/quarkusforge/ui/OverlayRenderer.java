@@ -11,6 +11,7 @@ import dev.tamboui.widgets.block.BorderType;
 import dev.tamboui.widgets.block.Borders;
 import dev.tamboui.widgets.gauge.LineGauge;
 import dev.tamboui.widgets.paragraph.Paragraph;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -31,7 +32,7 @@ final class OverlayRenderer {
     if (viewport.width() < 28 || viewport.height() < 10) {
       return;
     }
-    List<String> lines = new java.util.ArrayList<>();
+    List<String> lines = new ArrayList<>();
     for (int i = 0; i < entries.size(); i++) {
       CommandPaletteEntry entry = entries.get(i);
       String prefix = i == selectedIndex ? "> " : "  ";
@@ -65,7 +66,7 @@ final class OverlayRenderer {
     if (viewport.width() < 36 || viewport.height() < 10) {
       return;
     }
-    List<String> lines = new java.util.ArrayList<>();
+    List<String> lines = new ArrayList<>();
     for (int i = 0; i < actionLabels.size(); i++) {
       String prefix = i == selectedIndex ? "> " : "  ";
       lines.add(prefix + (i + 1) + ". " + actionLabels.get(i));
@@ -82,7 +83,7 @@ final class OverlayRenderer {
     if (viewport.width() < 44 || viewport.height() < 10) {
       return;
     }
-    List<String> lines = new java.util.ArrayList<>();
+    List<String> lines = new ArrayList<>();
     for (int index = 0; index < visibilityLabels.size(); index++) {
       String prefix = index == selectedIndex ? "> " : "  ";
       lines.add(prefix + (index + 1) + ". " + visibilityLabels.get(index));
@@ -115,11 +116,11 @@ final class OverlayRenderer {
             .build();
 
     Rect inner = overlayBlock.inner(overlayArea);
-    frame.renderWidget(overlayBlock, overlayArea);
-
     if (inner.isEmpty() || inner.height() < 4) {
       return;
     }
+
+    frame.renderWidget(overlayBlock, overlayArea);
 
     List<Rect> rows =
         Layout.vertical()

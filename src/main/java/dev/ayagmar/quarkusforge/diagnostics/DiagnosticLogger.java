@@ -47,7 +47,7 @@ public final class DiagnosticLogger {
       System.err.println(JsonSupport.writeString(payload));
     } catch (IOException ioException) {
       String message = ioException.getMessage();
-      String safeMessage = message == null ? "unknown" : message.replace("\"", "'");
+      String safeMessage = message == null ? "unknown" : escapeJsonValue(message);
       System.err.println(
           "{\"event\":\"diagnostic.encoding.failure\",\"traceId\":\""
               + traceId
@@ -55,5 +55,27 @@ public final class DiagnosticLogger {
               + safeMessage
               + "\"}");
     }
+  }
+
+  private static String escapeJsonValue(String value) {
+    StringBuilder sb = new StringBuilder(value.length());
+    for (int i = 0; i < value.length(); i++) {
+      char ch = value.charAt(i);
+      switch (ch) {
+        case '"' -> sb.append("'");
+        case '\\' -> sb.append("\\\\");
+        case '\n' -> sb.append("\\n");
+        case '\r' -> sb.append("\\r");
+        case '\t' -> sb.append("\\t");
+        default -> {
+          if (ch < 0x20) {
+            sb.append(String.format("\\u%04x", (int) ch));
+          } else {
+            sb.append(ch);
+          }
+        }
+      }
+    }
+    return sb.toString();
   }
 }

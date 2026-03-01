@@ -14,6 +14,7 @@ import java.util.Set;
  */
 final class CatalogRowBuilder {
   static final String RECENT_SECTION_TITLE = "Recently Selected";
+  static final int MAX_RECENT_SELECTIONS = 10;
 
   private CatalogRowBuilder() {}
 
@@ -124,7 +125,7 @@ final class CatalogRowBuilder {
       if (item != null) {
         recent.add(item);
       }
-      if (recent.size() >= 10) {
+      if (recent.size() >= MAX_RECENT_SELECTIONS) {
         break;
       }
     }
@@ -142,15 +143,16 @@ final class CatalogRowBuilder {
     }
 
     String previousTitle = null;
+    boolean collapsed = false;
     for (ExtensionCatalogItem item : items) {
       String title = resolveCategoryTitle(item.categoryKey(), item.category());
       if (!title.equals(previousTitle)) {
-        boolean collapsed = collapsedCategories.contains(title);
+        collapsed = collapsedCategories.contains(title);
         int hiddenCount = collapsed ? categoryItemCount.getOrDefault(title, 0) : 0;
         rows.add(ExtensionCatalogRow.section(title, collapsed, hiddenCount));
         previousTitle = title;
       }
-      if (!collapsedCategories.contains(title)) {
+      if (!collapsed) {
         rows.add(ExtensionCatalogRow.item(item));
       }
     }

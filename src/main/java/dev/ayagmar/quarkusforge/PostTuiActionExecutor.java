@@ -42,7 +42,10 @@ final class PostTuiActionExecutor {
         executeShellCommand("code .", generatedProjectDir, diagnostics, "open-ide");
       }
       case PUBLISH_GITHUB -> {
-        GitHubVisibility visibility = exitPlan.githubVisibility();
+        GitHubVisibility visibility =
+            exitPlan.githubVisibility() == null
+                ? GitHubVisibility.PRIVATE
+                : exitPlan.githubVisibility();
         diagnostics.info(
             "tui.post-action.start",
             df("action", "publish-github"),

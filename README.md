@@ -117,7 +117,7 @@ Recipe path resolution:
 mvn clean verify
 ```
 
-Runs all unit tests (452) and integration tests.
+Runs all unit and integration tests.
 
 ## Docs
 

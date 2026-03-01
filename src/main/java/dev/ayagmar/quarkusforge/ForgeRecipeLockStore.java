@@ -62,7 +62,7 @@ public final class ForgeRecipeLockStore {
           JsonFieldReader.readStringOrEmpty(root, "javaVersion"),
           JsonFieldReader.readStringListOrEmpty(root, "presets"),
           JsonFieldReader.readStringListOrEmpty(root, "extensions"));
-    } catch (IOException ioException) {
+    } catch (IOException | RuntimeException ioException) {
       throw new IllegalArgumentException(
           "Failed to read lock file '" + file + "': " + ioException.getMessage(), ioException);
     }
