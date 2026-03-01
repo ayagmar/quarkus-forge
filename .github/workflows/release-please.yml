@@ -58,17 +58,16 @@ jobs:
         id: release
         uses: googleapis/release-please-action@v4
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN != '' && secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ github.token }}
           target-branch: master
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           release-as: ${{ steps.version.outputs.release_as }}
-          skip-github-release: true
 
       - name: Auto-merge release-please PR
         if: steps.release.outputs.prs_created == 'true'
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN != '' && secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           PRS_JSON: ${{ steps.release.outputs.prs }}
         run: |
           set -euo pipefail
