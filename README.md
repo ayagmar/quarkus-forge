@@ -4,10 +4,11 @@ Quarkus Forge is a keyboard-first terminal UI (TUI) and headless CLI for generat
 
 ## Why use Quarkus Forge?
 
-- **Keyboard-First TUI:** Zero-mouse, Vim-like bindings for navigating catalogs, toggling extensions, and validating inputs.
+- **Keyboard-First TUI:** Zero-mouse, Vim-like bindings for navigating catalogs, toggling extensions, and validating inputs. Inline validation hints, search match counts, and animated progress feedback.
 - **Speed & Caching:** Background loading and local snapshot caching mean you don't wait for the network to start configuring your project.
 - **Headless & CI-Ready:** Powerful non-interactive modes for generating applications identically across local environments and CI pipelines.
 - **Deterministic State:** Supports `Forgefile` and `forge.lock` for exact reproduction of generated applications, much like standard dependency managers.
+- **Customizable:** Theming via `.tcss` files, configurable IDE command via `QUARKUS_FORGE_IDE_COMMAND`, post-generation hooks.
 - **Workflow Enhancers:** Post-generation handoffs allow you to drop straight into VS Code, an interactive shell, or automatically publish to GitHub.
 
 ## Architecture
@@ -15,7 +16,7 @@ Quarkus Forge is a keyboard-first terminal UI (TUI) and headless CLI for generat
 The codebase is organized into focused modules that follow SOLID principles and separate concerns cleanly.
 
 ### API Layer (`api/`)
-- **`QuarkusApiClient`** — Async HTTP client with retry/backoff, responsible only for transport orchestration.
+- **`QuarkusApiClient`** — Async HTTP client with retry/backoff, implements `AutoCloseable` for resource safety. Responsible only for transport orchestration.
 - **`ApiPayloadParser`** — Stateless JSON deserialization for all API payloads (extensions, metadata, streams, presets, OpenAPI).
 - **`JsonFieldReader`** — Shared JSON field reading helpers used across all store and parser classes (DRY).
 - **`CatalogSnapshotCache`** — Local catalog snapshot persistence and freshness management.
@@ -35,7 +36,7 @@ The codebase is organized into focused modules that follow SOLID principles and 
 
 ### CLI Layer (root package)
 - **`QuarkusForgeCli`** — Picocli command entry point, TUI bootstrap, and runtime configuration.
-- **`HeadlessGenerationService`** — Decoupled headless generation engine for CI/scripting.
+- **`HeadlessGenerationService`** — Decoupled headless generation engine for CI/scripting, with `AsyncFailureHandler` for consistent error handling.
 - **`PostTuiActionExecutor`** — Post-generation shell actions (IDE open, GitHub publish, terminal handoff).
 - **`ForgeRecipeLockStore`** — Forgefile and forge.lock persistence.
 
@@ -94,6 +95,33 @@ java -jar target/quarkus-forge.jar generate --recipe Forgefile --lock forge.lock
 # Refresh lock after recipe changes
 java -jar target/quarkus-forge.jar generate \
   --recipe Forgefile --lock forge.lock --refresh-lock --dry-run
+```
+
+## Customization
+
+### Theming
+Create a `.tcss` file with semantic color tokens:
+```
+# my-theme.tcss
+base = #1e1e2e
+text = #cdd6f4
+accent = #f38ba8
+focus = #89b4fa
+muted = #6c7086
+```
+Apply via environment variable or system property:
+```bash
+export QUARKUS_FORGE_THEME=/path/to/my-theme.tcss
+# or
+java -Dquarkus.forge.theme=/path/to/my-theme.tcss -jar target/quarkus-forge.jar
+```
+
+### IDE Command
+The "Open in IDE" post-generation action defaults to `code .` (VS Code). Override via:
+```bash
+export QUARKUS_FORGE_IDE_COMMAND="idea ."        # IntelliJ
+export QUARKUS_FORGE_IDE_COMMAND="nvim ."        # Neovim
+export QUARKUS_FORGE_IDE_COMMAND="cursor ."      # Cursor
 ```
 
 ## Where Files Live

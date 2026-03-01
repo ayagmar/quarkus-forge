@@ -81,6 +81,7 @@ CoreTuiController (State Machine)
             ├── ExtensionInteractionHandler  Bridge to catalog interactions
             ├── CatalogRowBuilder            Pure function: row building
             ├── UiTextConstants              UI text content
+            ├── AsyncFailureHandler          Reusable async exception mapping
             └── GenerationFlowCoordinator    Async generation lifecycle
 ....
 
@@ -304,19 +305,26 @@ When the user presses `Esc` in the extension search or list, the TUI unwinds fil
 | `MetadataPanelSnapshot`, `ExtensionsPanelSnapshot`, `FooterSnapshot` are immutable records passed to renderers — no side effects.
 
 | *DRY*
-| `JsonFieldReader` deduplicates JSON helpers across 5+ classes. `renderCompactField` consolidates two near-identical rendering methods.
+| `JsonFieldReader` deduplicates JSON helpers across 5+ classes. `renderCompactField` consolidates two near-identical rendering methods. `AsyncFailureHandler` centralizes 4-exception async failure mapping. `applyFavoritesAndPresetFilters` eliminates duplicate filter pipeline.
 
 | *Derived State Elimination*
 | `successHint` is computed from `PostGenerationMenuState` rather than stored as a separate mutable field.
 
 | *Encapsulation*
 | `PostGenerationMenuState`, `StartupOverlayTracker`, `MetadataSelectorManager` each own their state and expose it through focused APIs.
+
+| *Resource Safety*
+| `QuarkusApiClient` implements `AutoCloseable`; all instantiation sites use try-with-resources or `whenComplete` callbacks to prevent thread pool leaks.
+
+| *Atomic Persistence*
+| `FileBackedExtensionFavoritesStore.saveAll()` writes both favorites and recents in a single file operation, preventing data loss from split read-modify-write.
 |===
 
 == Testing Strategy
 
-* **452 unit tests** with deterministic async harnesses for TUI state machine testing
+* **516 unit tests** with deterministic async harnesses for TUI state machine testing
 * **2 integration tests** using WireMock for API contract verification
+* Dedicated unit tests for extracted state managers: `PostGenerationMenuState`, `MetadataSelectorManager`, `CatalogRowBuilder`, `StartupOverlayTracker`
 * Async TUI tests use `UiScheduler.immediate()` and `Duration.ZERO` debounce for deterministic behavior
 * Property-based tests for ZIP extraction edge cases
 
