@@ -146,6 +146,7 @@ jobs:
   package-jbang-catalog:
     needs: quality-gates
     runs-on: ubuntu-latest
+    environment: prd
 
     steps:
       - name: Checkout
