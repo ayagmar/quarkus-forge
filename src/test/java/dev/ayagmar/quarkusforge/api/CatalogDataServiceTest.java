@@ -4,9 +4,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
-import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
-import static com.github.tomakehurst.wiremock.client.WireMock.verify;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -33,8 +31,6 @@ class CatalogDataServiceTest {
   void setUp() {
     wireMockServer = new WireMockServer(0);
     wireMockServer.start();
-    com.github.tomakehurst.wiremock.client.WireMock.configureFor(
-        "localhost", wireMockServer.port());
   }
 
   @AfterEach
@@ -240,13 +236,13 @@ class CatalogDataServiceTest {
 
     assertThat(startupData.source()).isEqualTo(CatalogSource.CACHE);
     assertThat(startupData.detailMessage()).contains("startup");
-    verify(0, getRequestedFor(urlEqualTo("/api/extensions")));
-    verify(0, getRequestedFor(urlEqualTo("/api/streams")));
-    verify(0, getRequestedFor(urlEqualTo("/q/openapi")));
+    wireMockServer.verify(0, getRequestedFor(urlEqualTo("/api/extensions")));
+    wireMockServer.verify(0, getRequestedFor(urlEqualTo("/api/streams")));
+    wireMockServer.verify(0, getRequestedFor(urlEqualTo("/q/openapi")));
   }
 
   private void stubCatalogEndpoints() {
-    stubFor(
+    wireMockServer.stubFor(
         get(urlEqualTo("/api/extensions"))
             .willReturn(
                 okJson(
@@ -257,7 +253,7 @@ class CatalogDataServiceTest {
                     ]
                     """)));
 
-    stubFor(
+    wireMockServer.stubFor(
         get(urlEqualTo("/api/streams"))
             .willReturn(
                 aResponse()
@@ -278,7 +274,7 @@ class CatalogDataServiceTest {
                         ]
                         """)));
 
-    stubFor(
+    wireMockServer.stubFor(
         get(urlEqualTo("/q/openapi"))
             .willReturn(
                 aResponse()
@@ -301,7 +297,7 @@ class CatalogDataServiceTest {
   }
 
   private void stubExtensionsWithMetadataUnavailable() {
-    stubFor(
+    wireMockServer.stubFor(
         get(urlEqualTo("/api/extensions"))
             .willReturn(
                 okJson(
@@ -312,11 +308,11 @@ class CatalogDataServiceTest {
                     ]
                     """)));
 
-    stubFor(
+    wireMockServer.stubFor(
         get(urlEqualTo("/api/streams"))
             .willReturn(aResponse().withStatus(404).withBody("not found")));
 
-    stubFor(
+    wireMockServer.stubFor(
         get(urlEqualTo("/q/openapi"))
             .willReturn(
                 aResponse()
@@ -351,7 +347,7 @@ class CatalogDataServiceTest {
         HttpClient.newHttpClient(),
         ObjectMapperProvider.shared(),
         baseUri,
-        new RetryPolicy(1, Duration.ofMillis(200), Duration.ofMillis(1), 0.0d),
+        new RetryPolicy(1, Duration.ofSeconds(2), Duration.ofMillis(1), 0.0d),
         delay -> CompletableFuture.completedFuture(null),
         Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
         () -> 0.5d);
