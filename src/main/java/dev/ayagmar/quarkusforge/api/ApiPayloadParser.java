@@ -199,14 +199,7 @@ public final class ApiPayloadParser {
   }
 
   static String readText(Map<String, Object> source, String fieldName) {
-    Object value = source.get(fieldName);
-    if (value == null) {
-      return null;
-    }
-    if (value instanceof String text) {
-      return text;
-    }
-    throw new ApiContractException("Malformed JSON payload");
+    return JsonFieldReader.readString(source, fieldName);
   }
 
   static Boolean readBoolean(Map<String, Object> source, String fieldName) {
@@ -221,7 +214,7 @@ public final class ApiPayloadParser {
   }
 
   static Integer readInteger(Map<String, Object> source, String fieldName) {
-    return toInteger(source.get(fieldName));
+    return JsonFieldReader.readInt(source, fieldName);
   }
 
   static Integer toInteger(Object value) {
@@ -239,19 +232,11 @@ public final class ApiPayloadParser {
   }
 
   static Map<String, Object> readObject(Map<String, Object> source, String fieldName) {
-    Object value = source.get(fieldName);
-    if (value == null) {
-      return null;
-    }
-    return castObject(value, "Malformed JSON payload");
+    return JsonFieldReader.readObject(source, fieldName);
   }
 
   static List<Object> readArray(Map<String, Object> source, String fieldName) {
-    Object value = source.get(fieldName);
-    if (value == null) {
-      return null;
-    }
-    return castArray(value, "Malformed JSON payload");
+    return JsonFieldReader.readArray(source, fieldName);
   }
 
   static List<String> copyStringList(List<Object> values, String fieldName) {

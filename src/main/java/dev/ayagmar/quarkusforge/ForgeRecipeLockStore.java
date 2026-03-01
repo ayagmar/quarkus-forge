@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge;
 
+import dev.ayagmar.quarkusforge.api.JsonFieldReader;
 import dev.ayagmar.quarkusforge.api.JsonSupport;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -16,16 +17,16 @@ public final class ForgeRecipeLockStore {
     try {
       Map<String, Object> root = JsonSupport.parseObject(Files.readString(file));
       return new ForgeRecipe(
-          readString(root, "groupId"),
-          readString(root, "artifactId"),
-          readString(root, "version"),
-          readString(root, "packageName"),
-          readString(root, "outputDirectory"),
-          readString(root, "platformStream"),
-          readString(root, "buildTool"),
-          readString(root, "javaVersion"),
-          readStringList(root, "presets"),
-          readStringList(root, "extensions"));
+          JsonFieldReader.readStringOrEmpty(root, "groupId"),
+          JsonFieldReader.readStringOrEmpty(root, "artifactId"),
+          JsonFieldReader.readStringOrEmpty(root, "version"),
+          JsonFieldReader.readStringOrEmpty(root, "packageName"),
+          JsonFieldReader.readStringOrEmpty(root, "outputDirectory"),
+          JsonFieldReader.readStringOrEmpty(root, "platformStream"),
+          JsonFieldReader.readStringOrEmpty(root, "buildTool"),
+          JsonFieldReader.readStringOrEmpty(root, "javaVersion"),
+          JsonFieldReader.readStringListOrEmpty(root, "presets"),
+          JsonFieldReader.readStringListOrEmpty(root, "extensions"));
     } catch (IOException | RuntimeException ioException) {
       throw new IllegalArgumentException(
           "Failed to read recipe '" + file + "': " + ioException.getMessage(), ioException);
@@ -57,11 +58,11 @@ public final class ForgeRecipeLockStore {
     try {
       Map<String, Object> root = JsonSupport.parseObject(Files.readString(file));
       return new ForgeLock(
-          readString(root, "platformStream"),
-          readString(root, "buildTool"),
-          readString(root, "javaVersion"),
-          readStringList(root, "presets"),
-          readStringList(root, "extensions"));
+          JsonFieldReader.readStringOrEmpty(root, "platformStream"),
+          JsonFieldReader.readStringOrEmpty(root, "buildTool"),
+          JsonFieldReader.readStringOrEmpty(root, "javaVersion"),
+          JsonFieldReader.readStringListOrEmpty(root, "presets"),
+          JsonFieldReader.readStringListOrEmpty(root, "extensions"));
     } catch (IOException ioException) {
       throw new IllegalArgumentException(
           "Failed to read lock file '" + file + "': " + ioException.getMessage(), ioException);
@@ -82,35 +83,6 @@ public final class ForgeRecipeLockStore {
       throw new IllegalArgumentException(
           "Failed to write lock file '" + file + "': " + ioException.getMessage(), ioException);
     }
-  }
-
-  private static String readString(Map<String, Object> root, String key) {
-    Object value = root.get(key);
-    if (value == null) {
-      return "";
-    }
-    if (value instanceof String stringValue) {
-      return stringValue;
-    }
-    throw new IllegalArgumentException("Field '" + key + "' must be a string");
-  }
-
-  private static List<String> readStringList(Map<String, Object> root, String key) {
-    Object value = root.get(key);
-    if (value == null) {
-      return List.of();
-    }
-    if (!(value instanceof List<?> rawList)) {
-      throw new IllegalArgumentException("Field '" + key + "' must be an array of strings");
-    }
-    List<String> values = new java.util.ArrayList<>();
-    for (Object element : rawList) {
-      if (!(element instanceof String stringValue)) {
-        throw new IllegalArgumentException("Field '" + key + "' must be an array of strings");
-      }
-      values.add(stringValue);
-    }
-    return List.copyOf(values);
   }
 
   private static void createParentDirectories(Path file) throws IOException {
