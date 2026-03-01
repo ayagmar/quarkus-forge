@@ -113,7 +113,7 @@ class QuarkusForgeCliTest {
             .collect(
                 java.util.stream.Collectors.toMap(DiagnosticField::name, DiagnosticField::value));
 
-    assertThat(valuesByName).containsEntry("directory", "/tmp/project");
+    assertThat(valuesByName).containsEntry("directory", Path.of("/tmp/project").toString());
     assertThat(valuesByName).containsEntry("command", "<redacted>");
     assertThat(valuesByName).containsEntry("commandLength", command.length());
     assertThat(valuesByName).doesNotContainValue(command);
