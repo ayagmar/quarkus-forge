@@ -1,5 +1,7 @@
 package dev.ayagmar.quarkusforge.ui;
 
+import dev.ayagmar.quarkusforge.ForgeLock;
+import dev.ayagmar.quarkusforge.ForgeRecipeLockStore;
 import dev.ayagmar.quarkusforge.api.BuildToolCodec;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
@@ -21,6 +23,7 @@ import dev.tamboui.style.Overflow;
 import dev.tamboui.style.Style;
 import dev.tamboui.terminal.Frame;
 import dev.tamboui.tui.event.Event;
+import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.ResizeEvent;
 import dev.tamboui.tui.event.TickEvent;
@@ -79,6 +82,8 @@ public final class CoreTuiController
           new CommandPaletteEntry(
               "Toggle favorite filter", "Ctrl+K", CommandPaletteAction.TOGGLE_FAVORITES_FILTER),
           new CommandPaletteEntry(
+              "Cycle preset filter", "Ctrl+Y", CommandPaletteAction.CYCLE_PRESET_FILTER),
+          new CommandPaletteEntry(
               "Jump to next favorite", "Ctrl+J", CommandPaletteAction.JUMP_TO_FAVORITE),
           new CommandPaletteEntry(
               "Cycle category filter", "v", CommandPaletteAction.CYCLE_CATEGORY_FILTER),
@@ -89,7 +94,8 @@ public final class CoreTuiController
           new CommandPaletteEntry(
               "Toggle error details", "Ctrl+E", CommandPaletteAction.TOGGLE_ERROR_DETAILS));
   private static final List<String> POST_GENERATION_ACTION_LABELS =
-      List.of("Open in IDE", "Open in terminal", "Generate again", "Quit");
+      List.of("Write forge.lock", "Open in IDE", "Open in terminal", "Generate again", "Quit");
+  private static final String FORGE_LOCK_FILE_NAME = "forge.lock";
   private static final List<String> GLOBAL_HELP_LINES =
       List.of(
           "Global",
@@ -114,6 +120,7 @@ public final class CoreTuiController
           "  c / C           : close/open focused category / open all",
           "  Ctrl+J          : jump to next favorite",
           "  Ctrl+K          : toggle favorites filter",
+          "  Ctrl+Y          : cycle preset filter",
           "  Ctrl+R          : reload extension catalog",
           "",
           "Diagnostics",
@@ -332,8 +339,8 @@ public final class CoreTuiController
 
   public UiAction onEvent(Event event) {
     reconcileGenerationCompletionIfDone();
-    if (event instanceof TickEvent tickEvent) {
-      return handleTickEvent(tickEvent);
+    if (event instanceof TickEvent) {
+      return handleTickEvent();
     }
     if (event instanceof ResizeEvent resizeEvent) {
       statusMessage = "Terminal resized to " + resizeEvent.width() + "x" + resizeEvent.height();
@@ -363,6 +370,10 @@ public final class CoreTuiController
     }
     if (shouldDisableFavoritesFilterOnCancel(keyEvent)) {
       toggleFavoritesOnlyFilter();
+      return UiAction.handled(false);
+    }
+    if (shouldDisablePresetFilterOnCancel(keyEvent)) {
+      clearPresetFilter();
       return UiAction.handled(false);
     }
     if (shouldDisableCategoryFilterOnCancel(keyEvent)) {
@@ -417,6 +428,10 @@ public final class CoreTuiController
       toggleFavoritesOnlyFilter();
       return UiAction.handled(false);
     }
+    if (isPresetFilterCycleKey(keyEvent)) {
+      cyclePresetFilter();
+      return UiAction.handled(false);
+    }
     if (isJumpToFavoriteKey(keyEvent)) {
       jumpToFavorite();
       return UiAction.handled(false);
@@ -462,7 +477,7 @@ public final class CoreTuiController
 
   @Override
   public UiAction handleExtensionFocusFlow(KeyEvent keyEvent) {
-    if (focusTarget == FocusTarget.EXTENSION_SEARCH && keyEvent.isDown()) {
+    if (focusTarget == FocusTarget.EXTENSION_SEARCH && keyEvent.code() == KeyCode.DOWN) {
       focusExtensionList();
       return UiAction.handled(false);
     }
@@ -500,6 +515,10 @@ public final class CoreTuiController
     }
     if (focusTarget == FocusTarget.EXTENSION_LIST && isCategoryFilterCycleKey(keyEvent)) {
       cycleCategoryFilter();
+      return UiAction.handled(false);
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST && isPresetFilterCycleKey(keyEvent)) {
+      cyclePresetFilter();
       return UiAction.handled(false);
     }
     if (focusTarget == FocusTarget.EXTENSION_LIST && isClearSelectedExtensionsKey(keyEvent)) {
@@ -798,6 +817,7 @@ public final class CoreTuiController
         extensionCatalogStale,
         extensionCatalogState.favoritesOnlyFilterEnabled(),
         extensionCatalogState.favoriteExtensionCount(),
+        extensionCatalogState.activePresetFilterName(),
         extensionCatalogState.activeCategoryFilterTitle(),
         extensionCatalogState.filteredExtensions().size(),
         extensionCatalogState.totalCatalogExtensionCount(),
@@ -1331,11 +1351,16 @@ public final class CoreTuiController
   private UiAction executePostGenerationSelection() {
     PostGenerationExitAction action =
         switch (postGenerationActionSelection) {
-          case 0 -> PostGenerationExitAction.OPEN_IDE;
-          case 1 -> PostGenerationExitAction.OPEN_TERMINAL;
-          case 2 -> PostGenerationExitAction.GENERATE_AGAIN;
+          case 0 -> PostGenerationExitAction.EXPORT_RECIPE_LOCK;
+          case 1 -> PostGenerationExitAction.OPEN_IDE;
+          case 2 -> PostGenerationExitAction.OPEN_TERMINAL;
+          case 3 -> PostGenerationExitAction.GENERATE_AGAIN;
           default -> PostGenerationExitAction.QUIT;
         };
+    if (action == PostGenerationExitAction.EXPORT_RECIPE_LOCK) {
+      writeLockFile();
+      return UiAction.handled(false);
+    }
     if (action == PostGenerationExitAction.GENERATE_AGAIN) {
       postGenerationMenuVisible = false;
       postGenerationActionSelection = 0;
@@ -1351,6 +1376,29 @@ public final class CoreTuiController
     cancelPendingAsyncOperations();
     selectPostGenerationExit(action);
     return UiAction.handled(true);
+  }
+
+  private void writeLockFile() {
+    Path generatedProjectPath = lastGeneratedProjectPath;
+    if (generatedProjectPath == null) {
+      statusMessage = "Cannot write forge.lock: no generated project path";
+      return;
+    }
+    try {
+      Path lockPath = generatedProjectPath.resolve(FORGE_LOCK_FILE_NAME);
+      List<String> selectedExtensions = extensionCatalogState.selectedExtensionIds();
+      ForgeLock lock =
+          ForgeLock.from(
+              request.platformStream(),
+              request.buildTool(),
+              request.javaVersion(),
+              List.of(),
+              selectedExtensions);
+      ForgeRecipeLockStore.writeLock(lockPath, lock);
+      statusMessage = "Wrote " + lockPath.getFileName() + " in " + generatedProjectPath;
+    } catch (RuntimeException runtimeException) {
+      statusMessage = "Failed to write forge.lock: " + runtimeException.getMessage();
+    }
   }
 
   private void selectPostGenerationExit(PostGenerationExitAction action) {
@@ -1383,6 +1431,7 @@ public final class CoreTuiController
       case FOCUS_EXTENSION_SEARCH -> focusExtensionSearch();
       case FOCUS_EXTENSION_LIST -> focusExtensionList();
       case TOGGLE_FAVORITES_FILTER -> toggleFavoritesOnlyFilter();
+      case CYCLE_PRESET_FILTER -> cyclePresetFilter();
       case JUMP_TO_FAVORITE -> jumpToFavorite();
       case CYCLE_CATEGORY_FILTER -> {
         if (focusTarget != FocusTarget.EXTENSION_LIST) {
@@ -1974,7 +2023,7 @@ public final class CoreTuiController
         : report.errors().getFirst().field() + ": " + report.errors().getFirst().message();
   }
 
-  private UiAction handleTickEvent(TickEvent ignored) {
+  private UiAction handleTickEvent() {
     boolean startupOverlayVisibleNow = isStartupOverlayVisible();
     boolean shouldRender = extensionCatalogLoading || startupOverlayVisibleNow;
     if (startupOverlayVisibleOnLastTick && !startupOverlayVisibleNow) {
@@ -2078,6 +2127,7 @@ public final class CoreTuiController
             : catalogLoadedStatusMessage(result.source(), result.stale());
     extensionCatalogState.replaceCatalog(
         items, inputStates.get(FocusTarget.EXTENSION_SEARCH).text(), ignored -> {});
+    extensionCatalogState.setPresetExtensionsByName(result.presetExtensionsByName(), ignored -> {});
     requestAsyncRepaint();
   }
 
@@ -2103,10 +2153,7 @@ public final class CoreTuiController
   }
 
   private static String catalogPanelErrorMessage(ExtensionCatalogLoadResult result) {
-    if (result.detailMessage().isBlank()) {
-      return "";
-    }
-    return result.source() == CatalogSource.SNAPSHOT ? result.detailMessage() : "";
+    return "";
   }
 
   private void toggleFavoriteAtSelection() {
@@ -2223,6 +2270,25 @@ public final class CoreTuiController
     statusMessage = enabled ? "Favorites filter enabled" : "Favorites filter disabled";
   }
 
+  private void cyclePresetFilter() {
+    PresetFilterResult result =
+        extensionCatalogState.cyclePresetFilter(this::updateExtensionFilterStatus);
+    if (!result.filtered()) {
+      statusMessage = "Preset filter disabled";
+      return;
+    }
+    statusMessage = "Preset filter: " + result.presetName() + " (" + result.matchCount() + ")";
+  }
+
+  private void clearPresetFilter() {
+    boolean cleared = extensionCatalogState.clearPresetFilter(this::updateExtensionFilterStatus);
+    if (!cleared) {
+      statusMessage = "Preset filter already disabled";
+      return;
+    }
+    statusMessage = "Preset filter disabled";
+  }
+
   private void toggleErrorDetails() {
     String activeError = activeErrorDetails();
     if (activeError.isBlank()) {
@@ -2269,6 +2335,10 @@ public final class CoreTuiController
 
   private static boolean isFavoritesFilterToggleKey(KeyEvent keyEvent) {
     return AppKeyActions.isFavoritesFilterToggleKey(keyEvent);
+  }
+
+  private static boolean isPresetFilterCycleKey(KeyEvent keyEvent) {
+    return AppKeyActions.isPresetFilterCycleKey(keyEvent);
   }
 
   private static boolean isCategoryCollapseToggleKey(KeyEvent keyEvent) {
@@ -2363,7 +2433,26 @@ public final class CoreTuiController
     if (extensionCatalogState.favoritesOnlyFilterEnabled()) {
       return false;
     }
+    if (!extensionCatalogState.activePresetFilterName().isBlank()) {
+      return false;
+    }
     return !extensionCatalogState.activeCategoryFilterTitle().isBlank();
+  }
+
+  private boolean shouldDisablePresetFilterOnCancel(KeyEvent keyEvent) {
+    if (!keyEvent.isCancel() || isGenerationInProgress()) {
+      return false;
+    }
+    if (focusTarget != FocusTarget.EXTENSION_SEARCH && focusTarget != FocusTarget.EXTENSION_LIST) {
+      return false;
+    }
+    if (!inputStates.get(FocusTarget.EXTENSION_SEARCH).text().isBlank()) {
+      return false;
+    }
+    if (extensionCatalogState.favoritesOnlyFilterEnabled()) {
+      return false;
+    }
+    return !extensionCatalogState.activePresetFilterName().isBlank();
   }
 
   private static boolean isErrorDetailsToggleKey(KeyEvent keyEvent) {
@@ -2415,7 +2504,6 @@ public final class CoreTuiController
           stale
               ? "Loaded stale extension catalog from cache"
               : "Loaded extension catalog from cache";
-      case SNAPSHOT -> "Loaded extension catalog from bundled snapshot";
     };
   }
 
@@ -2429,6 +2517,10 @@ public final class CoreTuiController
   }
 
   private static boolean handleTextInputKey(TextInputState state, KeyEvent event) {
+    if (event.code() == dev.tamboui.tui.event.KeyCode.CHAR && !event.hasCtrl() && !event.hasAlt()) {
+      state.insert(event.character());
+      return true;
+    }
     if (event.isDeleteBackward()) {
       state.deleteBackward();
       return true;
@@ -2451,10 +2543,6 @@ public final class CoreTuiController
     }
     if (event.isEnd()) {
       state.moveCursorToEnd();
-      return true;
-    }
-    if (event.code() == dev.tamboui.tui.event.KeyCode.CHAR && !event.hasCtrl() && !event.hasAlt()) {
-      state.insert(event.character());
       return true;
     }
     return false;

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
@@ -44,6 +45,7 @@ public final class QuarkusApiClient {
   private static final TypeReference<List<ExtensionPayload>> EXTENSIONS_TYPE =
       new TypeReference<>() {};
   private static final TypeReference<List<StreamPayload>> STREAMS_TYPE = new TypeReference<>() {};
+  private static final TypeReference<List<PresetPayload>> PRESETS_TYPE = new TypeReference<>() {};
 
   private final HttpClient httpClient;
   private final ObjectMapper objectMapper;
@@ -106,6 +108,18 @@ public final class QuarkusApiClient {
     return streamsMetadataFuture.thenCombine(buildToolsFuture, QuarkusApiClient::toMetadata);
   }
 
+  public CompletableFuture<Map<String, List<String>>> fetchPresets(String streamKey) {
+    URI presetsUri =
+        streamKey == null || streamKey.isBlank()
+            ? baseUri.resolve("/api/presets")
+            : baseUri.resolve(
+                "/api/presets/stream/" + URLEncoder.encode(streamKey, StandardCharsets.UTF_8));
+    HttpRequest request = newGetRequest(presetsUri, "application/json");
+    return sendWithRetry(request, BodyHandlers.ofString(StandardCharsets.UTF_8), 1)
+        .thenApply(this::assertSuccessful)
+        .thenApply(response -> parsePresetsPayload(response.body(), objectMapper));
+  }
+
   static MetadataDto parseMetadataPayload(String payload, ObjectMapper objectMapper) {
     MetadataPayload metadataPayload = readValue(payload, objectMapper, MetadataPayload.class);
     if (metadataPayload.javaVersions() == null) {
@@ -121,16 +135,6 @@ public final class QuarkusApiClient {
         parseCompatibility(metadataPayload.compatibility(), buildTools);
     List<PlatformStream> platformStreams = parsePlatformStreams(metadataPayload.platformStreams());
     return new MetadataDto(javaVersions, buildTools, compatibility, platformStreams);
-  }
-
-  static List<String> parseJavaVersionsFromStreamsPayload(
-      String payload, ObjectMapper objectMapper) {
-    return parseStreamsMetadataPayload(payload, objectMapper).javaVersions();
-  }
-
-  static List<PlatformStream> parsePlatformStreamsFromStreamsPayload(
-      String payload, ObjectMapper objectMapper) {
-    return parseStreamsMetadataPayload(payload, objectMapper).platformStreams();
   }
 
   static StreamsMetadata parseStreamsMetadataPayload(String payload, ObjectMapper objectMapper) {
@@ -287,6 +291,23 @@ public final class QuarkusApiClient {
       extensions.add(new ExtensionDto(id, name, shortName, category, order));
     }
     return List.copyOf(extensions);
+  }
+
+  static Map<String, List<String>> parsePresetsPayload(String payload, ObjectMapper objectMapper) {
+    List<PresetPayload> root = readValue(payload, objectMapper, PRESETS_TYPE);
+    Map<String, List<String>> presetsByName = new LinkedHashMap<>();
+    for (PresetPayload preset : root) {
+      if (preset == null) {
+        throw new ApiContractException("Presets payload entries must be objects");
+      }
+      String key = normalizeOptionalText(preset.key()).toLowerCase(Locale.ROOT);
+      if (key.isBlank()) {
+        throw new ApiContractException("Preset payload field 'key' must not be blank");
+      }
+      List<String> presetExtensions = copyStringList(preset.extensions(), "extensions");
+      presetsByName.put(key, presetExtensions);
+    }
+    return Map.copyOf(presetsByName);
   }
 
   private <T> CompletableFuture<HttpResponse<T>> sendWithRetry(

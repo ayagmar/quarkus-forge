@@ -32,13 +32,7 @@ public final class CatalogDataService {
           snapshot.stale()
               ? "Loaded stale extension catalog from cache at startup (Ctrl+R to refresh live data)"
               : "Loaded extension catalog from cache at startup (Ctrl+R to refresh live data)";
-      return CompletableFuture.completedFuture(
-          new CatalogData(
-              snapshot.metadata(),
-              snapshot.extensions(),
-              CatalogSource.CACHE,
-              snapshot.stale(),
-              detail));
+      return CompletableFuture.completedFuture(toCachedCatalogData(snapshot, detail));
     }
     return load();
   }
@@ -95,17 +89,16 @@ public final class CatalogDataService {
       String detail =
           "Live catalog unavailable (%s); using %scached snapshot"
               .formatted(ErrorMessageMapper.simpleError(cause), snapshot.stale() ? "stale " : "");
-      return CompletableFuture.completedFuture(
-          new CatalogData(
-              snapshot.metadata(),
-              snapshot.extensions(),
-              CatalogSource.CACHE,
-              snapshot.stale(),
-              detail));
+      return CompletableFuture.completedFuture(toCachedCatalogData(snapshot, detail));
     }
 
     return CompletableFuture.failedFuture(
         new ApiClientException(
             "Live catalog unavailable and no valid cache snapshot found", cause));
+  }
+
+  private static CatalogData toCachedCatalogData(CachedCatalogSnapshot snapshot, String detail) {
+    return new CatalogData(
+        snapshot.metadata(), snapshot.extensions(), CatalogSource.CACHE, snapshot.stale(), detail);
   }
 }
