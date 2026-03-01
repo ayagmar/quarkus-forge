@@ -58,12 +58,6 @@
       <scope>runtime</scope>
     </dependency>
     <dependency>
-      <groupId>dev.tamboui</groupId>
-      <artifactId>tamboui-jline3-backend</artifactId>
-      <version>${tamboui.version}</version>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
       <groupId>info.picocli</groupId>
       <artifactId>picocli</artifactId>
       <version>${picocli.version}</version>
@@ -257,6 +251,8 @@
               <mainClass>dev.ayagmar.quarkusforge.QuarkusForgeCli</mainClass>
               <buildArgs>
                 <buildArg>--no-fallback</buildArg>
+                <buildArg>-Os</buildArg>
+                <buildArg>--emit build-report</buildArg>
                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
                 <buildArg>-H:+SharedArenaSupport</buildArg>
                 <buildArg>--enable-url-protocols=http,https</buildArg>

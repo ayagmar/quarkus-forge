@@ -1,0 +1,110 @@
+[
+  {
+    "name": "dev.ayagmar.quarkusforge.api.CatalogSnapshotPayload",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "dev.ayagmar.quarkusforge.api.ExtensionDto",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "dev.ayagmar.quarkusforge.api.ExtensionPayload",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "dev.ayagmar.quarkusforge.api.JavaCompatibilityPayload",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "dev.ayagmar.quarkusforge.api.MetadataDto",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "dev.ayagmar.quarkusforge.api.MetadataPayload",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "dev.ayagmar.quarkusforge.api.OpenApiGetPayload",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "dev.ayagmar.quarkusforge.api.OpenApiParameterPayload",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "dev.ayagmar.quarkusforge.api.OpenApiPathPayload",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "dev.ayagmar.quarkusforge.api.OpenApiPathsPayload",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "dev.ayagmar.quarkusforge.api.OpenApiPayload",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "dev.ayagmar.quarkusforge.api.OpenApiSchemaPayload",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "dev.ayagmar.quarkusforge.api.PlatformStream",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "dev.ayagmar.quarkusforge.api.PlatformStreamPayload",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "dev.ayagmar.quarkusforge.api.PresetPayload",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "dev.ayagmar.quarkusforge.api.StreamPayload",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "dev.ayagmar.quarkusforge.ui.ExtensionFavoritesPayload",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "dev.ayagmar.quarkusforge.ui.UserPreferencesPayload",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  }
+]

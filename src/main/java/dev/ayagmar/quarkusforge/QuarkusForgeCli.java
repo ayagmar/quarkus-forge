@@ -54,7 +54,6 @@ import picocli.CommandLine.Option;
 @Command(
     name = "quarkus-forge",
     version = "0.1.0-SNAPSHOT",
-    mixinStandardHelpOptions = true,
     subcommands = {GenerateCommand.class},
     description = "Quarkus forge terminal UI")
 public final class QuarkusForgeCli implements Callable<Integer> {
@@ -62,12 +61,9 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   static final int EXIT_CODE_NETWORK = 3;
   static final int EXIT_CODE_ARCHIVE = 4;
   static final int EXIT_CODE_CANCELLED = 130;
-  static final String NATIVE_ACCESS_FLAG = "--enable-native-access=ALL-UNNAMED";
-
   private static final String BACKEND_PROPERTY_NAME = "tamboui.backend";
   private static final String BACKEND_ENV_NAME = "TAMBOUI_BACKEND";
   private static final String PANAMA_BACKEND = "panama";
-  private static final String JLINE_BACKEND = "jline3";
 
   private static final String PRESET_FAVORITES = "favorites";
   private static final Duration STARTUP_METADATA_REFRESH_TIMEOUT = Duration.ofSeconds(2);
@@ -104,6 +100,18 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       defaultValue = "false",
       description = "Emit structured JSON-line diagnostics to stderr")
   private boolean verbose;
+
+  @Option(
+      names = {"-h", "--help"},
+      usageHelp = true,
+      description = "Show this help message and exit.")
+  private boolean helpRequested;
+
+  @Option(
+      names = {"-V", "--version"},
+      versionHelp = true,
+      description = "Print version information and exit.")
+  private boolean versionRequested;
 
   @Option(
       names = "--post-generate-hook",
@@ -482,16 +490,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     if (isBackendPreferenceExplicitlyConfigured()) {
       return;
     }
-    String backendPreference =
-        defaultBackendPreference(
-            isNativeImageRuntime(), QuarkusForgeCli.class.getModule().isNativeAccessEnabled());
-    System.setProperty(BACKEND_PROPERTY_NAME, backendPreference);
-    if (JLINE_BACKEND.equals(backendPreference)) {
-      System.err.println(
-          "JVM started without "
-              + NATIVE_ACCESS_FLAG
-              + "; preferring jline backend (terminal-native warnings may still appear).");
-    }
+    System.setProperty(BACKEND_PROPERTY_NAME, defaultBackendPreference());
   }
 
   static Bindings appBindingsProfile() {
@@ -502,11 +501,8 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     return TuiConfig.builder().tickRate(TUI_TICK_RATE).bindings(appBindingsProfile()).build();
   }
 
-  static String defaultBackendPreference(boolean nativeImageRuntime, boolean nativeAccessEnabled) {
-    if (nativeImageRuntime || nativeAccessEnabled) {
-      return PANAMA_BACKEND + "," + JLINE_BACKEND;
-    }
-    return JLINE_BACKEND;
+  static String defaultBackendPreference() {
+    return PANAMA_BACKEND;
   }
 
   private static boolean isBackendPreferenceExplicitlyConfigured() {
@@ -516,10 +512,6 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     }
     String envValue = System.getenv(BACKEND_ENV_NAME);
     return envValue != null && !envValue.isBlank();
-  }
-
-  private static boolean isNativeImageRuntime() {
-    return "runtime".equalsIgnoreCase(System.getProperty("org.graalvm.nativeimage.imagecode"));
   }
 
   static ForgeUiState buildInitialState(
