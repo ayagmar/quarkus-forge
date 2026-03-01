@@ -120,13 +120,13 @@ class QuarkusForgeCliTest {
 
   @Test
   void shellCommandInvocationUsesPosixShellForNonWindows() {
-    assertThat(QuarkusForgeCli.shellCommandInvocation("echo ok", false))
+    assertThat(ShellExecutor.commandInvocation("echo ok", false))
         .containsExactly("sh", "-lc", "echo ok");
   }
 
   @Test
   void shellCommandInvocationUsesCmdForWindows() {
-    assertThat(QuarkusForgeCli.shellCommandInvocation("echo ok", true))
+    assertThat(ShellExecutor.commandInvocation("echo ok", true))
         .containsExactly("cmd.exe", "/c", "echo ok");
   }
 }

@@ -69,7 +69,6 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   private static final String PANAMA_BACKEND = "panama";
   private static final String JLINE_BACKEND = "jline3";
 
-  private static final Map<String, List<String>> BUILTIN_PRESETS = builtInPresets();
   private static final String PRESET_FAVORITES = "favorites";
   private static final Duration STARTUP_METADATA_REFRESH_TIMEOUT = Duration.ofSeconds(2);
   static final Duration STARTUP_SPLASH_MIN_DURATION = Duration.ofMillis(450);
@@ -320,6 +319,9 @@ public final class QuarkusForgeCli implements Callable<Integer> {
             df("directory", generatedProjectDir.toString()));
         openInteractiveShell(generatedProjectDir, exitPlan.nextCommand(), diagnostics);
       }
+      case EXPORT_RECIPE_LOCK -> {
+        // Export is handled inside the TUI and does not exit the session.
+      }
       case QUIT, GENERATE_AGAIN -> {
         // No direct action.
       }
@@ -365,10 +367,6 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       df("command", "<redacted>"),
       df("commandLength", command.length())
     };
-  }
-
-  static List<String> shellCommandInvocation(String command, boolean windowsOs) {
-    return ShellExecutor.commandInvocation(command, windowsOs);
   }
 
   private static void executeShellCommand(
@@ -519,10 +517,6 @@ public final class QuarkusForgeCli implements Callable<Integer> {
         request.javaVersion());
   }
 
-  private static void printValidationErrors(ValidationReport validation) {
-    printValidationErrors(validation, "", "");
-  }
-
   static void printValidationErrors(
       ValidationReport validation, String sourceLabel, String sourceDetail) {
     System.err.println("Input validation failed:");
@@ -585,16 +579,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     };
   }
 
-  private static Map<String, List<String>> builtInPresets() {
-    return Map.of(
-        "web", List.of("io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc"),
-        "data",
-            List.of(
-                "io.quarkus:quarkus-hibernate-orm-panache", "io.quarkus:quarkus-jdbc-postgresql"),
-        "messaging", List.of("io.quarkus:quarkus-messaging", "io.quarkus:quarkus-smallrye-health"));
-  }
-
-  private static String normalizePresetName(String presetName) {
+  static String normalizePresetName(String presetName) {
     if (presetName == null) {
       return "";
     }
@@ -616,8 +601,25 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     }
   }
 
+  Map<String, List<String>> loadBuiltInPresets(String platformStream)
+      throws ExecutionException, InterruptedException, TimeoutException {
+    QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
+    CompletableFuture<Map<String, List<String>>> presetsFuture =
+        apiClient.fetchPresets(platformStream);
+    Duration timeout = headlessCatalogTimeout();
+    try {
+      return presetsFuture.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+    } catch (TimeoutException timeoutException) {
+      presetsFuture.cancel(true);
+      throw new TimeoutException("preset load timed out after " + timeout.toMillis() + "ms");
+    }
+  }
+
   List<String> resolveRequestedExtensions(
-      List<String> extensionInputs, List<String> presetInputs, Set<String> knownExtensionIds) {
+      List<String> extensionInputs,
+      List<String> presetInputs,
+      Set<String> knownExtensionIds,
+      Map<String, List<String>> presetExtensionsByName) {
     List<ValidationError> errors = new ArrayList<>();
     LinkedHashSet<String> resolved = new LinkedHashSet<>();
 
@@ -632,17 +634,17 @@ public final class QuarkusForgeCli implements Callable<Integer> {
                 .loadFavoriteExtensionIds());
         continue;
       }
-      List<String> presetExtensions = BUILTIN_PRESETS.get(preset);
+      List<String> presetExtensions = presetExtensionsByName.get(preset);
       if (presetExtensions == null) {
+        String allowedPresets = String.join(", ", presetExtensionsByName.keySet());
+        if (!allowedPresets.isBlank()) {
+          allowedPresets = allowedPresets + ", " + PRESET_FAVORITES;
+        } else {
+          allowedPresets = PRESET_FAVORITES;
+        }
         errors.add(
             new ValidationError(
-                "preset",
-                "unknown preset '"
-                    + presetInput
-                    + "'. Allowed: "
-                    + String.join(", ", BUILTIN_PRESETS.keySet())
-                    + ", "
-                    + PRESET_FAVORITES));
+                "preset", "unknown preset '" + presetInput + "'. Allowed: " + allowedPresets));
         continue;
       }
       resolved.addAll(presetExtensions);
