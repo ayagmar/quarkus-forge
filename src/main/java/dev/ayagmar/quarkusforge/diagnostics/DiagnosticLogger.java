@@ -46,11 +46,13 @@ public final class DiagnosticLogger {
     try {
       System.err.println(JsonSupport.writeString(payload));
     } catch (IOException ioException) {
+      String message = ioException.getMessage();
+      String safeMessage = message == null ? "unknown" : message.replace("\"", "'");
       System.err.println(
           "{\"event\":\"diagnostic.encoding.failure\",\"traceId\":\""
               + traceId
               + "\",\"message\":\""
-              + ioException.getMessage().replace("\"", "'")
+              + safeMessage
               + "\"}");
     }
   }
