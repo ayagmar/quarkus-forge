@@ -23,11 +23,18 @@ jobs:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN != '' && secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
           release-type: maven
           target-branch: master
-          package-name: quarkus-forge
 
       - name: Auto-merge release-please PR
         if: steps.release.outputs.prs_created == 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN != '' && secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ fromJSON(steps.release.outputs.pr).number }}
-        run: gh pr merge "$PR_NUMBER" --auto --squash --delete-branch
+          PRS_JSON: ${{ steps.release.outputs.prs }}
+        run: |
+          set -euo pipefail
+          if [ -z "$PRS_JSON" ] || [ "$PRS_JSON" = "[]" ]; then
+            echo "No release PR payload to merge."
+            exit 0
+          fi
+          echo "$PRS_JSON" | jq -r '.[].number' | while read -r pr_number; do
+            gh pr merge "$pr_number" --auto --squash --delete-branch
+          done
