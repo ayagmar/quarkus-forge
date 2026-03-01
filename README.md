@@ -7,7 +7,7 @@ Quarkus Forge is a keyboard-first terminal UI (TUI) and headless CLI for generat
 - **Keyboard-First TUI:** Zero-mouse, Vim-like bindings for navigating catalogs, toggling extensions, and validating inputs. Inline validation hints, search match counts, and animated progress feedback.
 - **Speed & Caching:** Background loading and local snapshot caching mean you don't wait for the network to start configuring your project.
 - **Headless & CI-Ready:** Powerful non-interactive modes for generating applications identically across local environments and CI pipelines.
-- **Deterministic State:** Supports `Forgefile` and `forge.lock` for exact reproduction of generated applications, much like standard dependency managers.
+- **Deterministic State:** Supports `Forgefile` with an optional `locked` section for exact reproduction of generated applications, much like standard dependency managers.
 - **Customizable:** Theming via `.tcss` files, configurable IDE command via `QUARKUS_FORGE_IDE_COMMAND`, post-generation hooks.
 - **Workflow Enhancers:** Post-generation handoffs allow you to drop straight into VS Code, an interactive shell, or automatically publish to GitHub.
 
@@ -38,7 +38,7 @@ The codebase is organized into focused modules that follow SOLID principles and 
 - **`QuarkusForgeCli`** — Picocli command entry point, TUI bootstrap, and runtime configuration.
 - **`HeadlessGenerationService`** — Decoupled headless generation engine for CI/scripting, with `AsyncFailureHandler` for consistent error handling.
 - **`PostTuiActionExecutor`** — Post-generation shell actions (IDE open, GitHub publish, terminal handoff).
-- **`ForgeRecipeLockStore`** — Forgefile and forge.lock persistence.
+- **`ForgefileStore`** — Forgefile persistence (with optional locked section).
 
 ### Archive Layer (`archive/`)
 - **`SafeZipExtractor`** — Hardened ZIP extraction with Zip-Bomb and Zip-Slip protections.
@@ -89,12 +89,18 @@ java -jar target/quarkus-forge.jar \
 
 ### Deterministic Replay
 ```bash
-# Generate from recipe + lock
-java -jar target/quarkus-forge.jar generate --recipe Forgefile --lock forge.lock
+# Generate from a Forgefile template
+java -jar target/quarkus-forge.jar generate --from Forgefile
 
-# Refresh lock after recipe changes
-java -jar target/quarkus-forge.jar generate \
-  --recipe Forgefile --lock forge.lock --refresh-lock --dry-run
+# Generate and write/update the locked section
+java -jar target/quarkus-forge.jar generate --from Forgefile --lock
+
+# Verify no drift against locked section
+java -jar target/quarkus-forge.jar generate --from Forgefile --lock-check --dry-run
+
+# Save current configuration as a shareable template
+java -jar target/quarkus-forge.jar generate --save-as my-template.json --lock \
+  --group-id com.acme --artifact-id my-service -e io.quarkus:quarkus-rest
 ```
 
 ## Customization
@@ -132,12 +138,11 @@ export QUARKUS_FORGE_IDE_COMMAND="cursor ."      # Cursor
   - `favorites.json` — favorite extensions
   - `recipes/` — reusable Forge recipes
 - **Project/workflow files:**
-  - `forge.lock` — deterministic lock for CI reproducibility
-  - `Forgefile` — project recipe template
+  - `Forgefile` — shareable project template with optional `locked` section for CI reproducibility
 
-Recipe path resolution:
-- `--recipe <name>`: uses local file if found; otherwise resolves `~/.quarkus-forge/recipes/<name>`.
-- `--write-recipe <name>`: writes to `~/.quarkus-forge/recipes/<name>` when `<name>` is just a filename.
+Forgefile path resolution:
+- `--from <name>`: uses local file if found; otherwise resolves `~/.quarkus-forge/recipes/<name>`.
+- `--save-as <name>`: writes to `~/.quarkus-forge/recipes/<name>` when `<name>` is just a filename.
 
 ## Verification
 
