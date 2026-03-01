@@ -9,7 +9,6 @@ import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
 import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
-import dev.ayagmar.quarkusforge.api.PlatformStream;
 import dev.ayagmar.quarkusforge.api.ThrowableUnwrapper;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.CliPrefillMapper;
@@ -145,9 +144,7 @@ public final class CoreTuiController
   private final ProjectGenerationRunner projectGenerationRunner;
   private final UiTheme theme;
   private final BodyPanelRenderer bodyPanelRenderer;
-  private List<String> availableBuildTools;
-  private List<String> availableJavaVersions;
-  private List<String> availablePlatformStreams;
+  private final MetadataSelectorManager metadataSelectors = new MetadataSelectorManager();
 
   private ProjectRequest request;
   private ValidationReport validation;
@@ -236,9 +233,6 @@ public final class CoreTuiController
     startupOverlayMinDurationNanos = 0L;
     startupOverlayVisibleUntilNanos = 0L;
     startupOverlayVisibleOnLastTick = false;
-    availableBuildTools = List.of();
-    availableJavaVersions = List.of();
-    availablePlatformStreams = List.of();
 
     for (FocusTarget target : FocusTarget.values()) {
       inputStates.put(target, new TextInputState(""));
@@ -824,8 +818,10 @@ public final class CoreTuiController
         request.version(),
         request.packageName(),
         request.outputDirectory(),
-        selectorOptionLabel(
-            FocusTarget.PLATFORM_STREAM, selectorValue(FocusTarget.PLATFORM_STREAM)),
+        MetadataSelectorManager.optionDisplayLabel(
+            FocusTarget.PLATFORM_STREAM,
+            selectorValue(FocusTarget.PLATFORM_STREAM),
+            metadataCompatibility.metadataSnapshot()),
         selectorValue(FocusTarget.BUILD_TOOL),
         selectorValue(FocusTarget.JAVA_VERSION));
   }
@@ -1573,23 +1569,12 @@ public final class CoreTuiController
 
   private void syncMetadataSelectors() {
     MetadataDto metadataSnapshot = metadataCompatibility.metadataSnapshot();
-    availableBuildTools =
-        resolveSelectorOptions(
-            metadataSnapshot == null ? List.of() : metadataSnapshot.buildTools(),
-            request.buildTool());
-    availableJavaVersions =
-        resolveSelectorOptions(
-            metadataSnapshot == null ? List.of() : metadataSnapshot.javaVersions(),
+    MetadataSelectorManager.ResolvedSelections resolved =
+        metadataSelectors.sync(
+            metadataSnapshot,
+            request.platformStream(),
+            request.buildTool(),
             request.javaVersion());
-    availablePlatformStreams =
-        resolvePlatformStreamOptions(metadataSnapshot, request.platformStream());
-
-    String selectedPlatformStream =
-        normalizeSelectedPlatformStream(
-            request.platformStream(), metadataSnapshot, availablePlatformStreams);
-    String selectedBuildTool = normalizeSelectedOption(request.buildTool(), availableBuildTools);
-    String selectedJavaVersion =
-        normalizeSelectedOption(request.javaVersion(), availableJavaVersions);
 
     request =
         CliPrefillMapper.map(
@@ -1599,9 +1584,9 @@ public final class CoreTuiController
                 inputStates.get(FocusTarget.VERSION).text(),
                 inputStates.get(FocusTarget.PACKAGE_NAME).text(),
                 inputStates.get(FocusTarget.OUTPUT_DIR).text(),
-                selectedPlatformStream,
-                selectedBuildTool,
-                selectedJavaVersion));
+                resolved.platformStream(),
+                resolved.buildTool(),
+                resolved.javaVersion()));
 
     inputStates
         .get(FocusTarget.PLATFORM_STREAM)
@@ -1620,80 +1605,44 @@ public final class CoreTuiController
         || UiKeyMatchers.isVimLeftKey(keyEvent)
         || keyEvent.isUp()
         || UiKeyMatchers.isVimUpKey(keyEvent)) {
-      return cycleSelector(target, -1);
+      return applySelectorCycle(target, -1);
     }
     if (keyEvent.isRight()
         || UiKeyMatchers.isVimRightKey(keyEvent)
         || keyEvent.isDown()
         || UiKeyMatchers.isVimDownKey(keyEvent)) {
-      return cycleSelector(target, 1);
+      return applySelectorCycle(target, 1);
     }
     if (keyEvent.isHome()) {
-      return selectSelectorEdge(target, true);
+      return applySelectorEdge(target, true);
     }
     if (keyEvent.isEnd()) {
-      return selectSelectorEdge(target, false);
+      return applySelectorEdge(target, false);
     }
     return false;
   }
 
+  private boolean applySelectorCycle(FocusTarget target, int delta) {
+    String newValue = metadataSelectors.cycle(target, selectorValue(target), delta);
+    if (newValue == null) {
+      return false;
+    }
+    applySelector(target, newValue);
+    return true;
+  }
+
+  private boolean applySelectorEdge(FocusTarget target, boolean first) {
+    String newValue = metadataSelectors.selectEdge(target, first);
+    if (newValue == null) {
+      return false;
+    }
+    applySelector(target, newValue);
+    return true;
+  }
+
   private String selectorInlineLabel(FocusTarget target) {
-    List<String> options = selectorOptionsFor(target);
-    if (options.isEmpty()) {
-      return "( ) no options available";
-    }
-
-    String selected = selectorValue(target);
-    List<String> labels = new ArrayList<>();
-    for (String option : options) {
-      boolean selectedOption = option.equalsIgnoreCase(selected);
-      labels.add((selectedOption ? "(*) " : "( ) ") + selectorOptionLabel(target, option));
-    }
-    return String.join("  ", labels);
-  }
-
-  private String selectorOptionLabel(FocusTarget target, String option) {
-    if (target != FocusTarget.PLATFORM_STREAM) {
-      return option.isBlank() ? "default" : option;
-    }
-    if (option.isBlank()) {
-      return "default";
-    }
-
-    MetadataDto metadataSnapshot = metadataCompatibility.metadataSnapshot();
-    if (metadataSnapshot == null) {
-      return option;
-    }
-    PlatformStream platformStream = metadataSnapshot.findPlatformStream(option);
-    if (platformStream == null) {
-      return option;
-    }
-    return platformStream.recommended()
-        ? platformStream.platformVersion() + "*"
-        : platformStream.platformVersion();
-  }
-
-  private boolean cycleSelector(FocusTarget target, int delta) {
-    List<String> options = selectorOptionsFor(target);
-    if (options.isEmpty()) {
-      return false;
-    }
-    int currentIndex = indexOfOption(options, selectorValue(target));
-    if (currentIndex < 0) {
-      currentIndex = 0;
-    }
-    int selectedIndex = Math.floorMod(currentIndex + delta, options.size());
-    applySelector(target, options.get(selectedIndex));
-    return true;
-  }
-
-  private boolean selectSelectorEdge(FocusTarget target, boolean first) {
-    List<String> options = selectorOptionsFor(target);
-    if (options.isEmpty()) {
-      return false;
-    }
-    applySelector(target, first ? options.getFirst() : options.getLast());
-    return true;
+    return metadataSelectors.inlineLabel(
+        target, selectorValue(target), metadataCompatibility.metadataSnapshot());
   }
 
   private void applySelector(FocusTarget target, String selectedValue) {
@@ -1735,15 +1684,6 @@ public final class CoreTuiController
     };
   }
 
-  private List<String> selectorOptionsFor(FocusTarget target) {
-    return switch (target) {
-      case PLATFORM_STREAM -> availablePlatformStreams;
-      case BUILD_TOOL -> availableBuildTools;
-      case JAVA_VERSION -> availableJavaVersions;
-      default -> List.of();
-    };
-  }
-
   private String selectorValue(FocusTarget target) {
     return switch (target) {
       case PLATFORM_STREAM -> request.platformStream();
@@ -1751,82 +1691,6 @@ public final class CoreTuiController
       case JAVA_VERSION -> request.javaVersion();
       default -> "";
     };
-  }
-
-  private static List<String> resolveSelectorOptions(
-      List<String> metadataValues, String fallbackValue) {
-    List<String> options = new ArrayList<>();
-    for (String metadataValue : metadataValues) {
-      if (metadataValue == null || metadataValue.isBlank()) {
-        continue;
-      }
-      if (indexOfOption(options, metadataValue) < 0) {
-        options.add(metadataValue);
-      }
-    }
-    if (options.isEmpty() && fallbackValue != null && !fallbackValue.isBlank()) {
-      options.add(fallbackValue);
-    }
-    return List.copyOf(options);
-  }
-
-  private static List<String> resolvePlatformStreamOptions(
-      MetadataDto metadataSnapshot, String fallbackValue) {
-    List<String> options = new ArrayList<>();
-    if (metadataSnapshot != null) {
-      for (PlatformStream platformStream : metadataSnapshot.platformStreams()) {
-        if (platformStream.key().isBlank()) {
-          continue;
-        }
-        if (indexOfOption(options, platformStream.key()) < 0) {
-          options.add(platformStream.key());
-        }
-      }
-    }
-    if (options.isEmpty()) {
-      if (fallbackValue != null && !fallbackValue.isBlank()) {
-        options.add(fallbackValue);
-      } else {
-        options.add("");
-      }
-    }
-    return List.copyOf(options);
-  }
-
-  private static String normalizeSelectedOption(String currentValue, List<String> options) {
-    if (options.isEmpty()) {
-      return currentValue == null ? "" : currentValue.trim();
-    }
-    int index = indexOfOption(options, currentValue);
-    return index >= 0 ? options.get(index) : options.getFirst();
-  }
-
-  private static String normalizeSelectedPlatformStream(
-      String currentValue, MetadataDto metadataSnapshot, List<String> options) {
-    int explicitIndex = indexOfOption(options, currentValue);
-    if (explicitIndex >= 0) {
-      return options.get(explicitIndex);
-    }
-    if (metadataSnapshot != null && !metadataSnapshot.platformStreams().isEmpty()) {
-      int recommendedIndex =
-          indexOfOption(options, metadataSnapshot.recommendedPlatformStreamKey());
-      if (recommendedIndex >= 0) {
-        return options.get(recommendedIndex);
-      }
-    }
-    return options.isEmpty() ? "" : options.getFirst();
-  }
-
-  private static int indexOfOption(List<String> options, String candidate) {
-    if (candidate == null || candidate.isBlank()) {
-      return options.indexOf("");
-    }
-    for (int i = 0; i < options.size(); i++) {
-      if (options.get(i).equalsIgnoreCase(candidate.trim())) {
-        return i;
-      }
-    }
-    return -1;
   }
 
   private void rebuildRequestFromInputs() {
@@ -1956,9 +1820,7 @@ public final class CoreTuiController
   }
 
   private static boolean isMetadataSelectorFocus(FocusTarget focusTarget) {
-    return focusTarget == FocusTarget.PLATFORM_STREAM
-        || focusTarget == FocusTarget.BUILD_TOOL
-        || focusTarget == FocusTarget.JAVA_VERSION;
+    return MetadataSelectorManager.isSelectorFocus(focusTarget);
   }
 
   private static String panelTitle(String baseTitle, boolean focused) {
