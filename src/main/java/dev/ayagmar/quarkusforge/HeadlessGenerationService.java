@@ -1,11 +1,9 @@
 package dev.ayagmar.quarkusforge;
 
 import dev.ayagmar.quarkusforge.api.CatalogData;
-import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
-import dev.ayagmar.quarkusforge.api.ThrowableUnwrapper;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticField;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
@@ -21,11 +19,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import picocli.CommandLine;
 
 final class HeadlessGenerationService {
@@ -56,30 +51,14 @@ final class HeadlessGenerationService {
           df("source", catalogData.source().label()),
           df("stale", catalogData.stale()),
           df("detail", catalogData.detailMessage()));
-    } catch (CancellationException cancellationException) {
-      diagnostics.error("catalog.load.cancelled", df("phase", "before-start"));
-      System.err.println("Generation cancelled before start.");
-      return QuarkusForgeCli.EXIT_CODE_CANCELLED;
-    } catch (InterruptedException interruptedException) {
-      Thread.currentThread().interrupt();
-      diagnostics.error("catalog.load.cancelled", df("phase", "interrupted"));
-      System.err.println("Generation cancelled before start.");
-      return QuarkusForgeCli.EXIT_CODE_CANCELLED;
-    } catch (TimeoutException timeoutException) {
-      Duration timeout = operations.headlessCatalogTimeout();
-      diagnostics.error("catalog.load.timeout", df("timeoutMs", timeout.toMillis()));
-      System.err.println(
-          "Failed to load extension catalog: request timed out after " + timeout.toMillis() + "ms");
-      return QuarkusForgeCli.EXIT_CODE_NETWORK;
-    } catch (ExecutionException executionException) {
-      Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);
-      diagnostics.error(
-          "catalog.load.failure",
-          df("causeType", cause.getClass().getSimpleName()),
-          df("message", ErrorMessageMapper.userFriendlyError(cause)));
-      System.err.println(
-          "Failed to load extension catalog: " + ErrorMessageMapper.userFriendlyError(cause));
-      return operations.mapHeadlessFailureToExitCode(cause);
+    } catch (Exception e) {
+      return AsyncFailureHandler.handleFailure(
+          e,
+          operations.headlessCatalogTimeout(),
+          "catalog.load",
+          "Failed to load extension catalog",
+          diagnostics,
+          operations::mapHeadlessFailureToExitCode);
     }
 
     ProjectRequest request = operations.toProjectRequest(effectiveInputs.requestOptions());
@@ -111,30 +90,14 @@ final class HeadlessGenerationService {
       try {
         presetExtensionsByName =
             operations.loadBuiltInPresets(validatedState.request().platformStream());
-      } catch (CancellationException cancellationException) {
-        diagnostics.error("preset.load.cancelled", df("phase", "before-resolution"));
-        System.err.println("Failed to load presets: request cancelled.");
-        return QuarkusForgeCli.EXIT_CODE_CANCELLED;
-      } catch (InterruptedException interruptedException) {
-        Thread.currentThread().interrupt();
-        diagnostics.error("preset.load.cancelled", df("phase", "interrupted"));
-        System.err.println("Failed to load presets: request cancelled.");
-        return QuarkusForgeCli.EXIT_CODE_CANCELLED;
-      } catch (TimeoutException timeoutException) {
-        Duration timeout = operations.headlessCatalogTimeout();
-        diagnostics.error("preset.load.timeout", df("timeoutMs", timeout.toMillis()));
-        System.err.println(
-            "Failed to load presets: request timed out after " + timeout.toMillis() + "ms");
-        return QuarkusForgeCli.EXIT_CODE_NETWORK;
-      } catch (ExecutionException executionException) {
-        Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);
-        diagnostics.error(
-            "preset.load.failure",
-            df("causeType", cause.getClass().getSimpleName()),
-            df("message", ErrorMessageMapper.userFriendlyError(cause)));
-        System.err.println(
-            "Failed to load presets: " + ErrorMessageMapper.userFriendlyError(cause));
-        return operations.mapHeadlessFailureToExitCode(cause);
+      } catch (Exception e) {
+        return AsyncFailureHandler.handleFailure(
+            e,
+            operations.headlessCatalogTimeout(),
+            "preset.load",
+            "Failed to load presets",
+            diagnostics,
+            operations::mapHeadlessFailureToExitCode);
       }
     }
 
@@ -195,12 +158,12 @@ final class HeadlessGenerationService {
 
     CompletableFuture<Path> generationFuture =
         operations.startGeneration(generationRequest, outputPath, System.out::println);
+    Duration generationTimeout = operations.headlessGenerationTimeout();
+    diagnostics.info(
+        "generate.execute.start",
+        df("outputPath", outputPath.toString()),
+        df("extensionCount", extensionIds.size()));
     try {
-      Duration generationTimeout = operations.headlessGenerationTimeout();
-      diagnostics.info(
-          "generate.execute.start",
-          df("outputPath", outputPath.toString()),
-          df("extensionCount", extensionIds.size()));
       Path generatedProjectRoot =
           generationFuture.get(generationTimeout.toMillis(), TimeUnit.MILLISECONDS);
       diagnostics.info(
@@ -209,31 +172,17 @@ final class HeadlessGenerationService {
       System.out.println(
           "Generation succeeded: " + generatedProjectRoot.toAbsolutePath().normalize());
       return CommandLine.ExitCode.OK;
-    } catch (CancellationException cancellationException) {
-      diagnostics.error("generate.execute.cancelled", df("phase", "execution"));
-      System.err.println("Generation cancelled.");
-      return QuarkusForgeCli.EXIT_CODE_CANCELLED;
-    } catch (InterruptedException interruptedException) {
-      Thread.currentThread().interrupt();
-      diagnostics.error("generate.execute.cancelled", df("phase", "interrupted"));
-      System.err.println("Generation cancelled.");
-      return QuarkusForgeCli.EXIT_CODE_CANCELLED;
-    } catch (TimeoutException timeoutException) {
-      generationFuture.cancel(true);
-      Duration timeout = operations.headlessGenerationTimeout();
-      diagnostics.error("generate.execute.timeout", df("timeoutMs", timeout.toMillis()));
-      System.err.println("Generation failed: request timed out after " + timeout.toMillis() + "ms");
-      return QuarkusForgeCli.EXIT_CODE_NETWORK;
-    } catch (ExecutionException executionException) {
-      Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);
-      int exitCode = operations.mapHeadlessFailureToExitCode(cause);
-      diagnostics.error(
-          "generate.execute.failure",
-          df("causeType", cause.getClass().getSimpleName()),
-          df("message", ErrorMessageMapper.userFriendlyError(cause)),
-          df("exitCode", exitCode));
-      System.err.println("Generation failed: " + ErrorMessageMapper.userFriendlyError(cause));
-      return exitCode;
+    } catch (Exception e) {
+      if (e instanceof java.util.concurrent.TimeoutException) {
+        generationFuture.cancel(true);
+      }
+      return AsyncFailureHandler.handleFailure(
+          e,
+          generationTimeout,
+          "generate.execute",
+          "Generation failed",
+          diagnostics,
+          cause -> operations.mapHeadlessFailureToExitCode(cause));
     }
   }
 
