@@ -1,4 +1,4 @@
-name: Release Please
+name: Release Cut
 
 on:
   workflow_dispatch:
@@ -15,22 +15,44 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
-  issues: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  release-please:
+  release-cut:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
-      - name: Compute release-as version
-        id: version
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Compute release and next development versions
+        id: versions
         run: |
           set -euo pipefail
-          current="$(jq -r '."."' .release-please-manifest.json)"
+          git fetch --tags --force
+          latest_tag="$(git tag --list 'v*' --sort=-version:refname | head -n 1)"
+          if [ -z "$latest_tag" ]; then
+            latest_tag="v0.0.0"
+          fi
+
+          current="${latest_tag#v}"
           IFS='.' read -r major minor patch <<< "$current"
 
           case "${{ github.event.inputs.bump }}" in
@@ -52,39 +74,41 @@ jobs:
               ;;
           esac
 
-          echo "release_as=${major}.${minor}.${patch}" >> "$GITHUB_OUTPUT"
+          release_version="${major}.${minor}.${patch}"
+          next_dev_version="${major}.${minor}.$((patch + 1))-SNAPSHOT"
 
-      - name: Run release-please
-        id: release
-        uses: googleapis/release-please-action@v4
-        with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-          target-branch: master
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
-          release-as: ${{ steps.version.outputs.release_as }}
-          skip-github-release: true
+          echo "release_version=${release_version}" >> "$GITHUB_OUTPUT"
+          echo "next_dev_version=${next_dev_version}" >> "$GITHUB_OUTPUT"
 
-      - name: Auto-merge release-please PR
-        if: steps.release.outputs.prs_created == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-          PRS_JSON: ${{ steps.release.outputs.prs }}
+      - name: Set release version
+        run: mvn -B -ntp versions:set -DnewVersion=${{ steps.versions.outputs.release_version }} -DgenerateBackupPoms=false
+
+      - name: Commit and tag release
         run: |
           set -euo pipefail
-          if [ -z "$PRS_JSON" ] || [ "$PRS_JSON" = "[]" ]; then
-            echo "No release PR payload to merge."
-            exit 0
+          git add pom.xml
+          if git diff --cached --quiet; then
+            echo "No release version change detected."
+            exit 1
           fi
-          echo "$PRS_JSON" | jq -r '.[].number' | while read -r pr_number; do
-            gh pr merge "$pr_number" --repo ayagmar/quarkus-forge --squash --delete-branch
-          done
+          git commit -m "chore(release): cut v${{ steps.versions.outputs.release_version }}"
+          git tag "v${{ steps.versions.outputs.release_version }}"
 
-      - name: Publish release and tag from merged release PR
-        uses: googleapis/release-please-action@v4
-        with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-          target-branch: master
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
-          skip-github-pull-request: true
+      - name: Set next development snapshot
+        run: mvn -B -ntp versions:set -DnewVersion=${{ steps.versions.outputs.next_dev_version }} -DgenerateBackupPoms=false
+
+      - name: Commit next development snapshot
+        run: |
+          set -euo pipefail
+          git add pom.xml
+          if git diff --cached --quiet; then
+            echo "No snapshot version change detected."
+            exit 1
+          fi
+          git commit -m "chore(release): prepare next iteration ${{ steps.versions.outputs.next_dev_version }}"
+
+      - name: Push commits and tag
+        run: |
+          set -euo pipefail
+          git push origin HEAD:master
+          git push origin "v${{ steps.versions.outputs.release_version }}"
