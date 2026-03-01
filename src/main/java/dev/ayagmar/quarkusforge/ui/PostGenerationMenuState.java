@@ -36,10 +36,6 @@ final class PostGenerationMenuState {
     return lastGeneratedProjectPath;
   }
 
-  String lastGeneratedNextCommand() {
-    return lastGeneratedNextCommand;
-  }
-
   PostGenerationExitPlan exitPlan() {
     return exitPlan;
   }
@@ -49,10 +45,6 @@ final class PostGenerationMenuState {
       return "";
     }
     return "cd " + lastGeneratedProjectPath + " && " + lastGeneratedNextCommand;
-  }
-
-  void clearExitPlan() {
-    exitPlan = null;
   }
 
   void reset() {
