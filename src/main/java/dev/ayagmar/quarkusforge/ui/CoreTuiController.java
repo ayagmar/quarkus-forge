@@ -87,12 +87,8 @@ public final class CoreTuiController
   private final UiEventRouter uiEventRouter;
   private final GenerationFlowCoordinator generationFlowCoordinator;
   private volatile long extensionCatalogLoadToken;
-  private boolean extensionCatalogLoading;
-  private String extensionCatalogErrorMessage;
-  private String extensionCatalogSource;
-  private boolean extensionCatalogStale;
+  private CatalogLoadState catalogLoadState = CatalogLoadState.initial();
   private ExtensionCatalogLoader extensionCatalogLoader;
-  private String successHint;
   private boolean showErrorDetails;
   private boolean commandPaletteVisible;
   private boolean helpOverlayVisible;
@@ -134,12 +130,8 @@ public final class CoreTuiController
     uiEventRouter = new UiEventRouter();
     generationFlowCoordinator = new GenerationFlowCoordinator();
     extensionCatalogLoadToken = 0L;
-    extensionCatalogLoading = false;
-    extensionCatalogErrorMessage = "";
-    extensionCatalogSource = "snapshot";
-    extensionCatalogStale = false;
+    catalogLoadState = CatalogLoadState.initial();
     extensionCatalogLoader = null;
-    successHint = "";
     showErrorDetails = false;
     commandPaletteVisible = false;
     helpOverlayVisible = false;
@@ -233,8 +225,7 @@ public final class CoreTuiController
     Objects.requireNonNull(loader);
     extensionCatalogLoader = loader;
     long loadToken = ++extensionCatalogLoadToken;
-    extensionCatalogLoading = true;
-    extensionCatalogErrorMessage = "";
+    catalogLoadState = CatalogLoadState.loadingFrom(catalogLoadState);
     statusMessage = "Loading extension catalog...";
     startupOverlayVisibleUntilNanos =
         loadToken == 1 && startupOverlayMinDurationNanos > 0L
@@ -498,7 +489,6 @@ public final class CoreTuiController
 
   @Override
   public void beforeGenerationStart() {
-    successHint = "";
     postGenerationMenu.resetForNewGeneration();
     extensionCatalogState.cancelPendingAsync();
   }
@@ -533,7 +523,6 @@ public final class CoreTuiController
     statusMessage = "Generation succeeded: " + generatedPath;
     errorMessage = "";
     verboseErrorDetails = "";
-    successHint = "cd " + generatedPath + " && " + nextCommand;
     requestAsyncRepaint();
   }
 
@@ -542,7 +531,6 @@ public final class CoreTuiController
     statusMessage = "Generation cancelled. Update inputs and press Enter to retry.";
     errorMessage = "";
     verboseErrorDetails = "";
-    successHint = "";
     postGenerationMenu.hideAfterFailureOrCancel();
     requestAsyncRepaint();
   }
@@ -552,7 +540,6 @@ public final class CoreTuiController
     statusMessage = "Generation failed.";
     errorMessage = ErrorMessageMapper.userFriendlyError(cause);
     verboseErrorDetails = ErrorMessageMapper.verboseDetails(cause);
-    successHint = "";
     postGenerationMenu.hideAfterFailureOrCancel();
     requestAsyncRepaint();
   }
@@ -736,10 +723,10 @@ public final class CoreTuiController
         focusTarget == FocusTarget.EXTENSION_LIST,
         focusTarget == FocusTarget.SUBMIT,
         focusTarget == FocusTarget.EXTENSION_SEARCH,
-        extensionCatalogLoading,
-        extensionCatalogErrorMessage,
-        extensionCatalogSource,
-        extensionCatalogStale,
+        catalogLoadState.isLoading(),
+        catalogLoadState.errorMessage(),
+        catalogLoadState.sourceLabel(),
+        catalogLoadState.isStale(),
         extensionCatalogState.favoritesOnlyFilterEnabled(),
         extensionCatalogState.favoriteExtensionCount(),
         extensionCatalogState.activePresetFilterName(),
@@ -941,9 +928,9 @@ public final class CoreTuiController
   private List<String> startupStatusLines() {
     String metadataLabel =
         metadataCompatibility.loadError() == null ? "done" : "done (snapshot fallback)";
-    String catalogLabel = extensionCatalogLoading ? "in progress" : "done";
-    String readyLabel = extensionCatalogLoading ? "waiting" : "ready";
-    String spinner = extensionCatalogLoading ? "|" : "-";
+    String catalogLabel = catalogLoadState.isLoading() ? "in progress" : "done";
+    String readyLabel = catalogLoadState.isLoading() ? "waiting" : "ready";
+    String spinner = catalogLoadState.isLoading() ? "|" : "-";
     List<String> lines = new ArrayList<>();
     lines.addAll(UiTextConstants.STARTUP_SPLASH_ART);
     lines.add("");
@@ -984,7 +971,7 @@ public final class CoreTuiController
         activeErrorDetails(),
         verboseErrorDetails(),
         showErrorDetails,
-        successHint);
+        postGenerationMenu.successHint());
   }
 
   private void moveFocus(int offset) {
@@ -1062,7 +1049,6 @@ public final class CoreTuiController
         yield UiAction.handled(false);
       }
       case PostGenerationMenuState.MenuKeyResult.GenerateAgain _ -> {
-        successHint = "";
         resetGenerationStateAfterTerminalOutcome();
         statusMessage = "Ready for next generation";
         errorMessage = "";
@@ -1257,10 +1243,10 @@ public final class CoreTuiController
   }
 
   private String extensionsPanelTitle() {
-    if (extensionCatalogLoading) {
+    if (catalogLoadState.isLoading()) {
       return "Extensions [loading]";
     }
-    if (!extensionCatalogErrorMessage.isBlank()) {
+    if (!catalogLoadState.errorMessage().isBlank()) {
       return "Extensions [fallback]";
     }
     return "Extensions";
@@ -1293,8 +1279,8 @@ public final class CoreTuiController
     if (!errorMessage.isBlank()) {
       return errorMessage;
     }
-    if (!extensionCatalogErrorMessage.isBlank()) {
-      return extensionCatalogErrorMessage;
+    if (!catalogLoadState.errorMessage().isBlank()) {
+      return catalogLoadState.errorMessage();
     }
     return "";
   }
@@ -1303,8 +1289,8 @@ public final class CoreTuiController
     if (!verboseErrorDetails.isBlank()) {
       return verboseErrorDetails;
     }
-    if (!extensionCatalogErrorMessage.isBlank()) {
-      return extensionCatalogErrorMessage;
+    if (!catalogLoadState.errorMessage().isBlank()) {
+      return catalogLoadState.errorMessage();
     }
     return "";
   }
@@ -1472,7 +1458,12 @@ public final class CoreTuiController
 
   private void cancelPendingAsyncOperations() {
     extensionCatalogLoadToken++;
-    extensionCatalogLoading = false;
+    if (catalogLoadState instanceof CatalogLoadState.Loading loading
+        && loading.previous() != null) {
+      catalogLoadState = loading.previous();
+    } else if (catalogLoadState.isLoading()) {
+      catalogLoadState = CatalogLoadState.initial();
+    }
     extensionCatalogState.cancelPendingAsync();
   }
 
@@ -1540,13 +1531,6 @@ public final class CoreTuiController
     return "Catalog load failed: " + message;
   }
 
-  private String catalogReloadFailureStatusMessage() {
-    if ("snapshot".equals(extensionCatalogSource) && !extensionCatalogStale) {
-      return "Using fallback extension catalog";
-    }
-    return "Catalog reload failed; keeping current catalog";
-  }
-
   private static String nextStepCommand(String buildTool) {
     String normalizedBuildTool = BuildToolCodec.toUiValue(buildTool);
     if ("gradle".equals(normalizedBuildTool) || "gradle-kotlin-dsl".equals(normalizedBuildTool)) {
@@ -1596,7 +1580,7 @@ public final class CoreTuiController
 
   private UiAction handleTickEvent() {
     boolean startupOverlayVisibleNow = isStartupOverlayVisible();
-    boolean shouldRender = extensionCatalogLoading || startupOverlayVisibleNow;
+    boolean shouldRender = catalogLoadState.isLoading() || startupOverlayVisibleNow;
     if (startupOverlayVisibleOnLastTick && !startupOverlayVisibleNow) {
       // Force one final redraw to clear expired startup overlay without key input.
       shouldRender = true;
@@ -1685,12 +1669,9 @@ public final class CoreTuiController
       syncMetadataSelectors();
       revalidate();
     }
-    extensionCatalogLoading = false;
-    extensionCatalogSource = result.source().label();
-    extensionCatalogStale = result.stale();
+    catalogLoadState = CatalogLoadState.loaded(result.source().label(), result.stale());
     errorMessage = "";
     verboseErrorDetails = "";
-    extensionCatalogErrorMessage = catalogPanelErrorMessage(result);
     statusMessage =
         !result.detailMessage().isBlank()
             ? result.detailMessage()
@@ -1706,24 +1687,28 @@ public final class CoreTuiController
   }
 
   private void applyCatalogLoadFailure(String message) {
-    extensionCatalogLoading = false;
-    extensionCatalogErrorMessage = message;
+    CatalogLoadState previous =
+        catalogLoadState instanceof CatalogLoadState.Loading loading ? loading.previous() : null;
+    if (previous instanceof CatalogLoadState.Loaded prev && prev.isLiveLoad()) {
+      // Reload failed after a previous successful live load — keep the existing catalog
+      catalogLoadState = prev;
+      statusMessage = "Catalog reload failed; keeping current catalog";
+    } else {
+      // Initial load failed or no live catalog yet — fall back
+      catalogLoadState = CatalogLoadState.failed(message);
+      statusMessage = "Using fallback extension catalog";
+    }
     errorMessage = message;
     verboseErrorDetails = message;
-    statusMessage = catalogReloadFailureStatusMessage();
     requestAsyncRepaint();
   }
 
   private boolean isStartupOverlayVisible() {
-    return extensionCatalogLoading || System.nanoTime() < startupOverlayVisibleUntilNanos;
+    return catalogLoadState.isLoading() || System.nanoTime() < startupOverlayVisibleUntilNanos;
   }
 
   private void requestAsyncRepaint() {
     asyncRepaintSignal.request();
-  }
-
-  private static String catalogPanelErrorMessage(ExtensionCatalogLoadResult result) {
-    return "";
   }
 
   private void toggleFavoriteAtSelection() {

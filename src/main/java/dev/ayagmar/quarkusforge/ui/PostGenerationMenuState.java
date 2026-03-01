@@ -44,6 +44,13 @@ final class PostGenerationMenuState {
     return exitPlan;
   }
 
+  String successHint() {
+    if (lastGeneratedProjectPath == null || lastGeneratedNextCommand.isEmpty()) {
+      return "";
+    }
+    return "cd " + lastGeneratedProjectPath + " && " + lastGeneratedNextCommand;
+  }
+
   void clearExitPlan() {
     exitPlan = null;
   }
@@ -54,6 +61,8 @@ final class PostGenerationMenuState {
     githubVisibilityMenuVisible = false;
     githubVisibilitySelection = 0;
     exitPlan = null;
+    lastGeneratedProjectPath = null;
+    lastGeneratedNextCommand = "";
   }
 
   void resetForNewGeneration() {
