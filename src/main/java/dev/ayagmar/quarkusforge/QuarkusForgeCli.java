@@ -77,6 +77,8 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   private static final String HEADLESS_GENERATION_TIMEOUT_PROPERTY =
       "quarkus.forge.headless.generation-timeout-ms";
   private static final ShellExecutor SHELL_EXECUTOR = new ShellExecutor();
+  private static final PostTuiActionExecutor POST_TUI_ACTION_EXECUTOR =
+      new PostTuiActionExecutor(SHELL_EXECUTOR);
   private static final TuiBootstrapService TUI_BOOTSTRAP_SERVICE = new TuiBootstrapService();
 
   @Mixin private RequestOptions requestOptions = new RequestOptions();
@@ -169,7 +171,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     diagnostics.info("cli.tui.launch", df("searchDebounceMs", searchDebounceMs));
     TuiSessionSummary summary = runTui(initialState, searchDebounceMs, runtimeConfig, diagnostics);
     preferencesStore.saveLastRequest(summary.finalRequest());
-    executePostTuiActions(summary, postGenerateHookCommand, diagnostics);
+    POST_TUI_ACTION_EXECUTOR.execute(summary, postGenerateHookCommand, diagnostics);
     return CommandLine.ExitCode.OK;
   }
 
@@ -298,166 +300,22 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     diagnostics.info("tui.session.exit", df("outcome", "completed"));
   }
 
-  private static void executePostTuiActions(
-      TuiSessionSummary summary, String postGenerateHookCommand, DiagnosticLogger diagnostics) {
-    PostGenerationExitPlan exitPlan = summary.exitPlan();
-    if (exitPlan == null || exitPlan.projectDirectory() == null) {
-      return;
-    }
-    Path generatedProjectDir = exitPlan.projectDirectory();
-
-    if (postGenerateHookCommand != null && !postGenerateHookCommand.isBlank()) {
-      String hookCommand = postGenerateHookCommand.strip();
-      diagnostics.info(
-          "tui.post-hook.start", postHookDiagnosticFields(generatedProjectDir, hookCommand));
-      executeShellCommand(hookCommand, generatedProjectDir, diagnostics, "post-generate-hook");
-    }
-
-    switch (exitPlan.action()) {
-      case OPEN_IDE -> {
-        diagnostics.info(
-            "tui.post-action.start",
-            df("action", "open-ide"),
-            df("directory", generatedProjectDir.toString()));
-        executeShellCommand("code .", generatedProjectDir, diagnostics, "open-ide");
-      }
-      case PUBLISH_GITHUB -> {
-        GitHubVisibility visibility = exitPlan.githubVisibility();
-        diagnostics.info(
-            "tui.post-action.start",
-            df("action", "publish-github"),
-            df("directory", generatedProjectDir.toString()),
-            df("visibility", visibility.cliFlag()));
-        if (!isCommandAvailable("gh")) {
-          String message =
-              "Publish to GitHub requires GitHub CLI ('gh') on PATH. Install it and rerun.";
-          diagnostics.error(
-              "tui.post-action.failure", df("action", "publish-github"), df("message", message));
-          System.err.println(message);
-          break;
-        }
-        executeShellCommand(
-            githubPublishCommand(visibility), generatedProjectDir, diagnostics, "publish-github");
-      }
-      case OPEN_TERMINAL -> {
-        diagnostics.info(
-            "tui.post-action.start",
-            df("action", "open-terminal"),
-            df("directory", generatedProjectDir.toString()));
-        openInteractiveShell(generatedProjectDir, exitPlan.nextCommand(), diagnostics);
-      }
-      case EXPORT_RECIPE_LOCK -> {
-        // Export is handled inside the TUI and does not exit the session.
-      }
-      case QUIT, GENERATE_AGAIN -> {
-        // No direct action.
-      }
-    }
-  }
-
-  private static void openInteractiveShell(
-      Path generatedProjectDir, String nextCommand, DiagnosticLogger diagnostics) {
-    if (System.console() == null || isWindowsOs()) {
-      printTerminalHandoff(generatedProjectDir, nextCommand);
-      return;
-    }
-
-    System.out.println();
-    System.out.println("Opening shell in: " + generatedProjectDir);
-    if (nextCommand != null && !nextCommand.isBlank()) {
-      System.out.println("Tip: " + nextCommand);
-    }
-    System.out.println("(Type 'exit' to return)");
-    System.out.println();
-
-    executeShellCommand("exec ${SHELL:-sh} -i", generatedProjectDir, diagnostics, "open-terminal");
-  }
-
-  private static void printTerminalHandoff(Path generatedProjectDir, String nextCommand) {
-    System.out.println();
-    System.out.println("Terminal handoff:");
-    System.out.println("  cd " + generatedProjectDir);
-    if (nextCommand != null && !nextCommand.isBlank()) {
-      System.out.println("  " + nextCommand);
-    }
-    System.out.println();
-  }
+  // Delegating to PostTuiActionExecutor — kept for backward compatibility.
 
   static boolean isWindowsOs() {
-    String osName = System.getProperty("os.name", "");
-    return osName.toLowerCase(java.util.Locale.ROOT).contains("win");
+    return PostTuiActionExecutor.isWindowsOs();
   }
 
   static boolean isCommandAvailable(String command) {
-    if (command == null || command.isBlank()) {
-      return false;
-    }
-    String path = System.getenv("PATH");
-    if (path == null || path.isBlank()) {
-      return false;
-    }
-
-    String executable = command.strip();
-    String[] pathEntries = path.split(java.io.File.pathSeparator);
-    boolean windows = isWindowsOs();
-    for (String pathEntry : pathEntries) {
-      if (pathEntry == null || pathEntry.isBlank()) {
-        continue;
-      }
-      java.nio.file.Path directory = java.nio.file.Path.of(pathEntry);
-      if (isExecutableFile(directory.resolve(executable), windows)) {
-        return true;
-      }
-      if (windows) {
-        if (isExecutableFile(directory.resolve(executable + ".exe"), true)
-            || isExecutableFile(directory.resolve(executable + ".cmd"), true)
-            || isExecutableFile(directory.resolve(executable + ".bat"), true)) {
-          return true;
-        }
-      }
-    }
-    return false;
+    return PostTuiActionExecutor.isCommandAvailable(command);
   }
 
   static String githubPublishCommand(GitHubVisibility visibility) {
-    GitHubVisibility resolvedVisibility =
-        visibility == null ? GitHubVisibility.PRIVATE : visibility;
-    return "gh repo create --source . --push --" + resolvedVisibility.cliFlag();
-  }
-
-  private static boolean isExecutableFile(java.nio.file.Path path, boolean windows) {
-    if (!java.nio.file.Files.isRegularFile(path)) {
-      return false;
-    }
-    return windows || java.nio.file.Files.isExecutable(path);
+    return PostTuiActionExecutor.githubPublishCommand(visibility);
   }
 
   static DiagnosticField[] postHookDiagnosticFields(Path generatedProjectDir, String command) {
-    return new DiagnosticField[] {
-      df("directory", generatedProjectDir.toString()),
-      df("command", "<redacted>"),
-      df("commandLength", command.length())
-    };
-  }
-
-  private static void executeShellCommand(
-      String command, Path workingDirectory, DiagnosticLogger diagnostics, String actionName) {
-    SHELL_EXECUTOR.execute(
-        command,
-        workingDirectory,
-        actionName,
-        new ShellExecutorDiagnostics() {
-          @Override
-          public void success(String action) {
-            diagnostics.info("tui.post-action.success", df("action", action));
-          }
-
-          @Override
-          public void error(String action, String message) {
-            diagnostics.error(
-                "tui.post-action.failure", df("action", action), df("message", message));
-          }
-        });
+    return PostTuiActionExecutor.postHookDiagnosticFields(generatedProjectDir, command);
   }
 
   static java.util.function.BiFunction<CatalogData, Throwable, ExtensionCatalogLoadResult>
