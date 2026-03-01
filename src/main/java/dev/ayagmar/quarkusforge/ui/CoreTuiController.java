@@ -266,23 +266,32 @@ public final class CoreTuiController
 
   @Override
   public UiAction handleExtensionCancelFlow(KeyEvent keyEvent) {
-    if (shouldClearExtensionSearchOnCancel(keyEvent)) {
+    if (!keyEvent.isCancel() || isGenerationInProgress()) {
+      return null;
+    }
+    boolean isExtensionFocus =
+        focusTarget == FocusTarget.EXTENSION_SEARCH || focusTarget == FocusTarget.EXTENSION_LIST;
+    if (!isExtensionFocus) {
+      return null;
+    }
+    // Priority: clear search > disable favorites > disable preset > disable category > exit search
+    if (!inputStates.get(FocusTarget.EXTENSION_SEARCH).text().isBlank()) {
       clearExtensionSearchFilter();
       return UiAction.handled(false);
     }
-    if (shouldDisableFavoritesFilterOnCancel(keyEvent)) {
+    if (extensionCatalogState.favoritesOnlyFilterEnabled()) {
       toggleFavoritesOnlyFilter();
       return UiAction.handled(false);
     }
-    if (shouldDisablePresetFilterOnCancel(keyEvent)) {
+    if (!extensionCatalogState.activePresetFilterName().isBlank()) {
       clearPresetFilter();
       return UiAction.handled(false);
     }
-    if (shouldDisableCategoryFilterOnCancel(keyEvent)) {
+    if (!extensionCatalogState.activeCategoryFilterTitle().isBlank()) {
       clearCategoryFilter();
       return UiAction.handled(false);
     }
-    if (shouldExitExtensionSearchOnCancel(keyEvent)) {
+    if (focusTarget == FocusTarget.EXTENSION_SEARCH) {
       focusExtensionList();
       return UiAction.handled(false);
     }
@@ -318,7 +327,7 @@ public final class CoreTuiController
       focusExtensionSearch();
       return UiAction.handled(false);
     }
-    if (shouldFocusExtensionList(keyEvent)) {
+    if (AppKeyActions.isFocusExtensionListKey(keyEvent)) {
       focusExtensionList();
       return UiAction.handled(false);
     }
@@ -1794,74 +1803,6 @@ public final class CoreTuiController
     return !isTextInputFocus(currentFocus);
   }
 
-  private boolean shouldClearExtensionSearchOnCancel(KeyEvent keyEvent) {
-    if (!keyEvent.isCancel() || isGenerationInProgress()) {
-      return false;
-    }
-    if (focusTarget != FocusTarget.EXTENSION_SEARCH && focusTarget != FocusTarget.EXTENSION_LIST) {
-      return false;
-    }
-    return !inputStates.get(FocusTarget.EXTENSION_SEARCH).text().isBlank();
-  }
-
-  private boolean shouldExitExtensionSearchOnCancel(KeyEvent keyEvent) {
-    if (!keyEvent.isCancel() || isGenerationInProgress()) {
-      return false;
-    }
-    if (focusTarget != FocusTarget.EXTENSION_SEARCH) {
-      return false;
-    }
-    return inputStates.get(FocusTarget.EXTENSION_SEARCH).text().isBlank();
-  }
-
-  private boolean shouldDisableFavoritesFilterOnCancel(KeyEvent keyEvent) {
-    if (!keyEvent.isCancel() || isGenerationInProgress()) {
-      return false;
-    }
-    if (focusTarget != FocusTarget.EXTENSION_SEARCH && focusTarget != FocusTarget.EXTENSION_LIST) {
-      return false;
-    }
-    if (!inputStates.get(FocusTarget.EXTENSION_SEARCH).text().isBlank()) {
-      return false;
-    }
-    return extensionCatalogState.favoritesOnlyFilterEnabled();
-  }
-
-  private boolean shouldDisableCategoryFilterOnCancel(KeyEvent keyEvent) {
-    if (!keyEvent.isCancel() || isGenerationInProgress()) {
-      return false;
-    }
-    if (focusTarget != FocusTarget.EXTENSION_SEARCH && focusTarget != FocusTarget.EXTENSION_LIST) {
-      return false;
-    }
-    if (!inputStates.get(FocusTarget.EXTENSION_SEARCH).text().isBlank()) {
-      return false;
-    }
-    if (extensionCatalogState.favoritesOnlyFilterEnabled()) {
-      return false;
-    }
-    if (!extensionCatalogState.activePresetFilterName().isBlank()) {
-      return false;
-    }
-    return !extensionCatalogState.activeCategoryFilterTitle().isBlank();
-  }
-
-  private boolean shouldDisablePresetFilterOnCancel(KeyEvent keyEvent) {
-    if (!keyEvent.isCancel() || isGenerationInProgress()) {
-      return false;
-    }
-    if (focusTarget != FocusTarget.EXTENSION_SEARCH && focusTarget != FocusTarget.EXTENSION_LIST) {
-      return false;
-    }
-    if (!inputStates.get(FocusTarget.EXTENSION_SEARCH).text().isBlank()) {
-      return false;
-    }
-    if (extensionCatalogState.favoritesOnlyFilterEnabled()) {
-      return false;
-    }
-    return !extensionCatalogState.activePresetFilterName().isBlank();
-  }
-
   private static boolean isUpNavigation(KeyEvent keyEvent) {
     return keyEvent.isUp() || UiKeyMatchers.isVimUpKey(keyEvent);
   }
@@ -1871,10 +1812,6 @@ public final class CoreTuiController
       return !isTextInputFocus(currentFocus) && currentFocus != FocusTarget.EXTENSION_SEARCH;
     }
     return AppKeyActions.isFocusExtensionSearchCtrlKey(keyEvent);
-  }
-
-  private static boolean shouldFocusExtensionList(KeyEvent keyEvent) {
-    return AppKeyActions.isFocusExtensionListKey(keyEvent);
   }
 
   private void focusExtensionSearch() {
