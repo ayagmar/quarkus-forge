@@ -11,6 +11,7 @@ import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ValidationError;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
+import dev.ayagmar.quarkusforge.ui.ExtensionFavoritesStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -24,11 +25,17 @@ import java.util.concurrent.TimeUnit;
 import picocli.CommandLine;
 
 final class HeadlessGenerationService {
-  int run(
-      GenerateCommand command,
-      boolean globalDryRun,
-      boolean verbose,
-      HeadlessGenerationOperations operations) {
+  private static final String PRESET_FAVORITES = "favorites";
+
+  private final HeadlessCatalogClient catalogClient;
+  private final RuntimeConfig runtimeConfig;
+
+  HeadlessGenerationService(HeadlessCatalogClient catalogClient, RuntimeConfig runtimeConfig) {
+    this.catalogClient = catalogClient;
+    this.runtimeConfig = runtimeConfig;
+  }
+
+  int run(GenerateCommand command, boolean globalDryRun, boolean verbose) {
     DiagnosticLogger diagnostics = DiagnosticLogger.create(verbose);
     diagnostics.info(
         "generate.start", df("mode", command.dryRun || globalDryRun ? "dry-run" : "apply"));
@@ -43,9 +50,10 @@ final class HeadlessGenerationService {
       return QuarkusForgeCli.EXIT_CODE_VALIDATION;
     }
 
+    Duration catalogTimeout = HeadlessTimeouts.catalogTimeout();
     CatalogData catalogData;
     try {
-      catalogData = operations.loadCatalogData();
+      catalogData = catalogClient.loadCatalogData(catalogTimeout);
       diagnostics.info(
           "catalog.load.success",
           df("source", catalogData.source().label()),
@@ -54,26 +62,26 @@ final class HeadlessGenerationService {
     } catch (Exception e) {
       return AsyncFailureHandler.handleFailure(
           e,
-          operations.headlessCatalogTimeout(),
+          catalogTimeout,
           "catalog.load",
           "Failed to load extension catalog",
           diagnostics,
-          operations::mapHeadlessFailureToExitCode);
+          ProjectRequestFactory::mapFailureToExitCode);
     }
 
-    ProjectRequest request = operations.toProjectRequest(effectiveInputs.requestOptions());
+    ProjectRequest request = ProjectRequestFactory.fromOptions(effectiveInputs.requestOptions());
     MetadataCompatibilityContext metadataCompatibility =
         MetadataCompatibilityContext.success(catalogData.metadata());
     ProjectRequest requestWithResolvedStream =
-        operations.applyRecommendedPlatformStream(request, metadataCompatibility);
+        ProjectRequestFactory.applyRecommendedPlatformStream(request, metadataCompatibility);
     ForgeUiState validatedState =
-        operations.buildInitialState(requestWithResolvedStream, metadataCompatibility);
+        ProjectRequestFactory.buildInitialState(requestWithResolvedStream, metadataCompatibility);
     if (!validatedState.canSubmit()) {
       diagnostics.error(
           "generate.validation.failed",
           df("errorCount", validatedState.validation().errors().size()),
           df("catalogSource", catalogData.source().label()));
-      operations.printValidationErrors(
+      HeadlessOutputPrinter.printValidationErrors(
           validatedState.validation(),
           catalogData.source().label() + (catalogData.stale() ? " [stale]" : ""),
           catalogData.detailMessage());
@@ -89,22 +97,23 @@ final class HeadlessGenerationService {
     if (requiresBuiltInPresets(effectiveInputs.presetInputs())) {
       try {
         presetExtensionsByName =
-            operations.loadBuiltInPresets(validatedState.request().platformStream());
+            catalogClient.loadBuiltInPresets(
+                validatedState.request().platformStream(), catalogTimeout);
       } catch (Exception e) {
         return AsyncFailureHandler.handleFailure(
             e,
-            operations.headlessCatalogTimeout(),
+            catalogTimeout,
             "preset.load",
             "Failed to load presets",
             diagnostics,
-            operations::mapHeadlessFailureToExitCode);
+            ProjectRequestFactory::mapFailureToExitCode);
       }
     }
 
     List<String> extensionIds;
     try {
       extensionIds =
-          operations.resolveRequestedExtensions(
+          resolveRequestedExtensions(
               effectiveInputs.extensionInputs(),
               effectiveInputs.presetInputs(),
               knownExtensionIds,
@@ -119,7 +128,7 @@ final class HeadlessGenerationService {
       diagnostics.error(
           "generate.extension-validation.failed",
           df("errorCount", validationException.errors().size()));
-      operations.printValidationErrors(
+      HeadlessOutputPrinter.printValidationErrors(
           new ValidationReport(validationException.errors()),
           catalogData.source().label() + (catalogData.stale() ? " [stale]" : ""),
           catalogData.detailMessage());
@@ -133,7 +142,7 @@ final class HeadlessGenerationService {
           df("extensionCount", extensionIds.size()),
           df("catalogSource", catalogData.source().label()),
           df("stale", catalogData.stale()));
-      operations.printDryRunSummary(
+      HeadlessOutputPrinter.printDryRunSummary(
           validatedState.request(),
           extensionIds,
           catalogData.source().label(),
@@ -157,8 +166,8 @@ final class HeadlessGenerationService {
             extensionIds);
 
     CompletableFuture<Path> generationFuture =
-        operations.startGeneration(generationRequest, outputPath, System.out::println);
-    Duration generationTimeout = operations.headlessGenerationTimeout();
+        catalogClient.startGeneration(generationRequest, outputPath, System.out::println);
+    Duration generationTimeout = HeadlessTimeouts.generationTimeout();
     diagnostics.info(
         "generate.execute.start",
         df("outputPath", outputPath.toString()),
@@ -182,8 +191,63 @@ final class HeadlessGenerationService {
           "generate.execute",
           "Generation failed",
           diagnostics,
-          cause -> operations.mapHeadlessFailureToExitCode(cause));
+          ProjectRequestFactory::mapFailureToExitCode);
     }
+  }
+
+  List<String> resolveRequestedExtensions(
+      List<String> extensionInputs,
+      List<String> presetInputs,
+      Set<String> knownExtensionIds,
+      Map<String, List<String>> presetExtensionsByName) {
+    List<ValidationError> errors = new ArrayList<>();
+    LinkedHashSet<String> resolved = new LinkedHashSet<>();
+
+    for (String presetInput : presetInputs) {
+      String preset = ProjectRequestFactory.normalizePresetName(presetInput);
+      if (preset.isBlank()) {
+        continue;
+      }
+      if (PRESET_FAVORITES.equals(preset)) {
+        resolved.addAll(
+            ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile())
+                .loadFavoriteExtensionIds());
+        continue;
+      }
+      List<String> presetExtensions = presetExtensionsByName.get(preset);
+      if (presetExtensions == null) {
+        String allowedPresets = String.join(", ", presetExtensionsByName.keySet());
+        if (!allowedPresets.isBlank()) {
+          allowedPresets = allowedPresets + ", " + PRESET_FAVORITES;
+        } else {
+          allowedPresets = PRESET_FAVORITES;
+        }
+        errors.add(
+            new ValidationError(
+                "preset", "unknown preset '" + presetInput + "'. Allowed: " + allowedPresets));
+        continue;
+      }
+      resolved.addAll(presetExtensions);
+    }
+
+    for (String extensionInput : extensionInputs) {
+      if (extensionInput == null || extensionInput.isBlank()) {
+        errors.add(new ValidationError("extension", "must not be blank"));
+        continue;
+      }
+      resolved.add(extensionInput.trim());
+    }
+
+    for (String extensionId : resolved) {
+      if (!knownExtensionIds.contains(extensionId)) {
+        errors.add(new ValidationError("extension", "unknown extension id '" + extensionId + "'"));
+      }
+    }
+
+    if (!errors.isEmpty()) {
+      throw new ValidationException(errors);
+    }
+    return List.copyOf(resolved);
   }
 
   private static DiagnosticField df(String name, Object value) {
@@ -229,8 +293,8 @@ final class HeadlessGenerationService {
 
   private static boolean requiresBuiltInPresets(List<String> presetInputs) {
     for (String presetInput : presetInputs) {
-      String preset = QuarkusForgeCli.normalizePresetName(presetInput);
-      if (!preset.isBlank() && !"favorites".equals(preset)) {
+      String preset = ProjectRequestFactory.normalizePresetName(presetInput);
+      if (!preset.isBlank() && !PRESET_FAVORITES.equals(preset)) {
         return true;
       }
     }
@@ -284,7 +348,7 @@ final class HeadlessGenerationService {
               "lock", "extensions drift: lock=" + lock.extensions() + ", request=" + extensionIds));
     }
     List<String> normalizedPresets =
-        presetInputs.stream().map(QuarkusForgeCli::normalizePresetName).toList();
+        presetInputs.stream().map(ProjectRequestFactory::normalizePresetName).toList();
     if (!lock.presets().equals(normalizedPresets)) {
       errors.add(
           new ValidationError(
@@ -302,7 +366,7 @@ final class HeadlessGenerationService {
   private static void writeRecipeAndLockIfRequested(
       EffectiveGenerateInputs inputs, ProjectRequest request, List<String> extensionIds) {
     List<String> normalizedPresets =
-        inputs.presetInputs().stream().map(QuarkusForgeCli::normalizePresetName).toList();
+        inputs.presetInputs().stream().map(ProjectRequestFactory::normalizePresetName).toList();
 
     if (inputs.writeRecipeFile() != null) {
       ForgeRecipe recipe =
