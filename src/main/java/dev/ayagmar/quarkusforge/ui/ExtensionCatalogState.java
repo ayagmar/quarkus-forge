@@ -497,17 +497,7 @@ final class ExtensionCatalogState {
 
     List<ExtensionCatalogItem> rankedResults =
         catalogIndex.search(currentQuery, favoriteExtensionIds);
-    if (favoritesOnlyFilterEnabled) {
-      rankedResults =
-          rankedResults.stream().filter(item -> favoriteExtensionIds.contains(item.id())).toList();
-    }
-    if (!activePresetFilterName.isBlank()) {
-      List<String> presetExtensions = presetExtensionsByName.get(activePresetFilterName);
-      Set<String> allowedIds =
-          new LinkedHashSet<>(presetExtensions == null ? List.of() : presetExtensions);
-      rankedResults =
-          rankedResults.stream().filter(item -> allowedIds.contains(item.id())).toList();
-    }
+    rankedResults = applyFavoritesAndPresetFilters(rankedResults);
 
     Set<String> availableCategoryTitles = new LinkedHashSet<>(filterableCategoryTitles());
     if (!activeCategoryFilterTitle.isBlank()
@@ -534,18 +524,23 @@ final class ExtensionCatalogState {
 
   private List<String> filterableCategoryTitles() {
     List<ExtensionCatalogItem> rankedResults = catalogIndex.search("", favoriteExtensionIds);
+    rankedResults = applyFavoritesAndPresetFilters(rankedResults);
+    return List.copyOf(availableCategoryTitles(rankedResults));
+  }
+
+  private List<ExtensionCatalogItem> applyFavoritesAndPresetFilters(
+      List<ExtensionCatalogItem> items) {
+    List<ExtensionCatalogItem> result = items;
     if (favoritesOnlyFilterEnabled) {
-      rankedResults =
-          rankedResults.stream().filter(item -> favoriteExtensionIds.contains(item.id())).toList();
+      result = result.stream().filter(item -> favoriteExtensionIds.contains(item.id())).toList();
     }
     if (!activePresetFilterName.isBlank()) {
       List<String> presetExtensions = presetExtensionsByName.get(activePresetFilterName);
       Set<String> allowedIds =
           new LinkedHashSet<>(presetExtensions == null ? List.of() : presetExtensions);
-      rankedResults =
-          rankedResults.stream().filter(item -> allowedIds.contains(item.id())).toList();
+      result = result.stream().filter(item -> allowedIds.contains(item.id())).toList();
     }
-    return List.copyOf(availableCategoryTitles(rankedResults));
+    return result;
   }
 
   private void refreshRows(String previousFocusedExtensionId) {
