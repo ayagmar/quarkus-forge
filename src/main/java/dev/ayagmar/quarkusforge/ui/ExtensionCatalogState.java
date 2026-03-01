@@ -17,8 +17,6 @@ import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
 final class ExtensionCatalogState {
-  private static final String RECENT_SECTION_TITLE = "Recently Selected";
-  private static final int MAX_RECENT_SELECTIONS = 10;
   private static final List<ExtensionCatalogItem> DEFAULT_EXTENSIONS =
       List.of(
           new ExtensionCatalogItem("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
@@ -299,7 +297,7 @@ final class ExtensionCatalogState {
       if (!row.isSectionHeader()) {
         continue;
       }
-      if (RECENT_SECTION_TITLE.equals(row.label())) {
+      if (CatalogRowBuilder.RECENT_SECTION_TITLE.equals(row.label())) {
         continue;
       }
       listState.select(i);
@@ -390,7 +388,7 @@ final class ExtensionCatalogState {
       return false;
     }
     ExtensionCatalogRow row = filteredRows.get(selectedRow);
-    return row.isSectionHeader() && !RECENT_SECTION_TITLE.equals(row.label());
+    return row.isSectionHeader() && !CatalogRowBuilder.RECENT_SECTION_TITLE.equals(row.label());
   }
 
   boolean isSelectedCategorySectionCollapsed() {
@@ -523,7 +521,8 @@ final class ExtensionCatalogState {
               .filter(
                   item ->
                       activeCategoryFilterTitle.equals(
-                          resolveCategoryTitle(item.categoryKey(), item.category())))
+                          CatalogRowBuilder.resolveCategoryTitle(
+                              item.categoryKey(), item.category())))
               .toList();
     }
 
@@ -550,103 +549,22 @@ final class ExtensionCatalogState {
   }
 
   private void refreshRows(String previousFocusedExtensionId) {
-    filteredRows = buildRows(filteredExtensions);
-    selectableRowIndexes = buildSelectableIndexes(filteredRows);
-    allRowIndexes = buildAllRowIndexes(filteredRows);
-    rowIndexByExtensionId = buildRowIndexByExtensionId(filteredRows);
+    filteredRows =
+        CatalogRowBuilder.buildRows(
+            filteredExtensions,
+            collapsedCategoryTitles,
+            recentExtensionIds,
+            currentQuery,
+            favoritesOnlyFilterEnabled,
+            activePresetFilterName);
+    selectableRowIndexes = CatalogRowBuilder.buildSelectableIndexes(filteredRows);
+    allRowIndexes = CatalogRowBuilder.buildAllRowIndexes(filteredRows);
+    rowIndexByExtensionId = CatalogRowBuilder.buildRowIndexByExtensionId(filteredRows);
     restoreSelection(previousFocusedExtensionId);
   }
 
   private static Set<String> availableCategoryTitles(List<ExtensionCatalogItem> rankedItems) {
-    Set<String> categoryTitles = new LinkedHashSet<>();
-    for (ExtensionCatalogItem item : rankedItems) {
-      categoryTitles.add(resolveCategoryTitle(item.categoryKey(), item.category()));
-    }
-    return categoryTitles;
-  }
-
-  private List<ExtensionCatalogRow> buildRows(List<ExtensionCatalogItem> rankedItems) {
-    if (rankedItems.isEmpty()) {
-      return List.of();
-    }
-
-    List<ExtensionCatalogRow> rows = new ArrayList<>();
-    prependRecentRows(rows, rankedItems);
-
-    Map<String, Integer> categoryItemCount = new LinkedHashMap<>();
-    for (ExtensionCatalogItem item : rankedItems) {
-      String categoryTitle = resolveCategoryTitle(item.categoryKey(), item.category());
-      categoryItemCount.merge(categoryTitle, 1, Integer::sum);
-    }
-
-    String previousCategoryTitle = null;
-    for (ExtensionCatalogItem item : rankedItems) {
-      String categoryTitle = resolveCategoryTitle(item.categoryKey(), item.category());
-      if (!categoryTitle.equals(previousCategoryTitle)) {
-        boolean collapsed = collapsedCategoryTitles.contains(categoryTitle);
-        int hiddenCount = collapsed ? categoryItemCount.getOrDefault(categoryTitle, 0) : 0;
-        rows.add(ExtensionCatalogRow.section(categoryTitle, collapsed, hiddenCount));
-        previousCategoryTitle = categoryTitle;
-      }
-      if (collapsedCategoryTitles.contains(categoryTitle)) {
-        continue;
-      }
-      rows.add(ExtensionCatalogRow.item(item));
-    }
-    return List.copyOf(rows);
-  }
-
-  private void prependRecentRows(
-      List<ExtensionCatalogRow> rows, List<ExtensionCatalogItem> rankedItems) {
-    if (!currentQuery.isBlank()
-        || favoritesOnlyFilterEnabled
-        || !activePresetFilterName.isBlank()
-        || recentExtensionIds.isEmpty()) {
-      return;
-    }
-    List<ExtensionCatalogItem> recentItems = resolveRecentItems(rankedItems);
-    if (recentItems.isEmpty()) {
-      return;
-    }
-    rows.add(ExtensionCatalogRow.section(RECENT_SECTION_TITLE, false, 0));
-    for (ExtensionCatalogItem item : recentItems) {
-      rows.add(ExtensionCatalogRow.item(item));
-    }
-  }
-
-  private List<ExtensionCatalogItem> resolveRecentItems(List<ExtensionCatalogItem> rankedItems) {
-    Map<String, ExtensionCatalogItem> byId = new LinkedHashMap<>();
-    for (ExtensionCatalogItem item : rankedItems) {
-      byId.put(item.id(), item);
-    }
-    List<ExtensionCatalogItem> recentItems = new ArrayList<>();
-    for (String recentId : recentExtensionIds) {
-      ExtensionCatalogItem item = byId.get(recentId);
-      if (item != null) {
-        recentItems.add(item);
-      }
-      if (recentItems.size() >= MAX_RECENT_SELECTIONS) {
-        break;
-      }
-    }
-    return recentItems;
-  }
-
-  private static String resolveCategoryTitle(String categoryKey, String rawCategory) {
-    return switch (categoryKey) {
-      case "core" -> "Core";
-      case "web" -> "Web";
-      case "data" -> "Data";
-      case "serialization" -> "Serialization";
-      case "messaging" -> "Messaging";
-      case "security" -> "Security";
-      case "cloud" -> "Cloud";
-      case "observability" -> "Observability";
-      case "testing" -> "Testing";
-      case "misc" -> "Misc";
-      case "other" -> "Other";
-      default -> titleCase(rawCategory);
-    };
+    return CatalogRowBuilder.availableCategoryTitles(rankedItems);
   }
 
   private static Map<String, List<String>> normalizePresetMap(Map<String, List<String>> presetMap) {
@@ -673,46 +591,6 @@ final class ExtensionCatalogState {
     List<String> names = new ArrayList<>(presetExtensionsByName.keySet());
     names.sort(String::compareTo);
     return List.copyOf(names);
-  }
-
-  private static String titleCase(String value) {
-    if (value == null || value.isBlank()) {
-      return "Other";
-    }
-    String normalized = value.trim();
-    if (normalized.length() == 1) {
-      return normalized.toUpperCase(Locale.ROOT);
-    }
-    return normalized.substring(0, 1).toUpperCase(Locale.ROOT) + normalized.substring(1);
-  }
-
-  private static List<Integer> buildSelectableIndexes(List<ExtensionCatalogRow> rows) {
-    List<Integer> indexes = new ArrayList<>();
-    for (int i = 0; i < rows.size(); i++) {
-      if (!rows.get(i).isSectionHeader()) {
-        indexes.add(i);
-      }
-    }
-    return List.copyOf(indexes);
-  }
-
-  private static Map<String, Integer> buildRowIndexByExtensionId(List<ExtensionCatalogRow> rows) {
-    Map<String, Integer> indexes = new LinkedHashMap<>();
-    for (int i = 0; i < rows.size(); i++) {
-      ExtensionCatalogRow row = rows.get(i);
-      if (row.extension() != null) {
-        indexes.put(row.extension().id(), i);
-      }
-    }
-    return Map.copyOf(indexes);
-  }
-
-  private static List<Integer> buildAllRowIndexes(List<ExtensionCatalogRow> rows) {
-    List<Integer> indexes = new ArrayList<>();
-    for (int i = 0; i < rows.size(); i++) {
-      indexes.add(i);
-    }
-    return List.copyOf(indexes);
   }
 
   private void restoreSelection(String previouslyFocusedExtensionId) {
@@ -766,7 +644,7 @@ final class ExtensionCatalogState {
       if (!row.isSectionHeader()) {
         continue;
       }
-      if (RECENT_SECTION_TITLE.equals(row.label())) {
+      if (CatalogRowBuilder.RECENT_SECTION_TITLE.equals(row.label())) {
         continue;
       }
       return i;
@@ -868,7 +746,7 @@ final class ExtensionCatalogState {
     }
     ExtensionCatalogRow row = filteredRows.get(rowIndex);
     if (row.isSectionHeader()) {
-      if (RECENT_SECTION_TITLE.equals(row.label())) {
+      if (CatalogRowBuilder.RECENT_SECTION_TITLE.equals(row.label())) {
         return null;
       }
       return row.label();
@@ -880,7 +758,7 @@ final class ExtensionCatalogState {
     if (isUnderRecentSection(rowIndex)) {
       return null;
     }
-    return resolveCategoryTitle(extension.categoryKey(), extension.category());
+    return CatalogRowBuilder.resolveCategoryTitle(extension.categoryKey(), extension.category());
   }
 
   private boolean isUnderRecentSection(int rowIndex) {
@@ -889,7 +767,7 @@ final class ExtensionCatalogState {
       if (!candidate.isSectionHeader()) {
         continue;
       }
-      return RECENT_SECTION_TITLE.equals(candidate.label());
+      return CatalogRowBuilder.RECENT_SECTION_TITLE.equals(candidate.label());
     }
     return false;
   }
@@ -907,7 +785,7 @@ final class ExtensionCatalogState {
   private void recordRecentSelection(String extensionId) {
     recentExtensionIds.remove(extensionId);
     recentExtensionIds.addFirst(extensionId);
-    while (recentExtensionIds.size() > MAX_RECENT_SELECTIONS) {
+    while (recentExtensionIds.size() > 10) {
       recentExtensionIds.removeLast();
     }
     persistUserStateAsync();
