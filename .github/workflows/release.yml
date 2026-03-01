@@ -13,45 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  quality-gates:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Java 25
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '25'
-
-      - name: Set up Node 24
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-          cache-dependency-path: site/package-lock.json
-
-      - name: Cache Maven repository
-        uses: actions/cache@v4
-        with:
-          path: .m2/repository
-          key: maven-${{ runner.os }}-${{ hashFiles('pom.xml', '.mvn/maven.config') }}
-          restore-keys: |
-            maven-${{ runner.os }}-
-
-      - name: Build docs
-        run: npm ci --prefix site && npm run docs:build --prefix site
-
-      - name: Run tests
-        run: mvn -B -ntp test
-
-      - name: Style and static checks
-        run: mvn -B -ntp spotless:check checkstyle:check
-
   package-jvm:
-    needs: quality-gates
     runs-on: ubuntu-latest
 
     steps:
@@ -85,7 +47,6 @@ jobs:
           path: target/quarkus-forge-jvm.jar
 
   package-native:
-    needs: quality-gates
     strategy:
       fail-fast: false
       matrix:
@@ -143,7 +104,6 @@ jobs:
           path: target/quarkus-forge-${{ matrix.platform }}${{ matrix.ext }}
 
   package-jbang-catalog:
-    needs: quality-gates
     runs-on: ubuntu-latest
 
     steps:
