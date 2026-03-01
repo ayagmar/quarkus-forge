@@ -39,13 +39,18 @@ final class FileBackedExtensionFavoritesStore implements ExtensionFavoritesStore
   }
 
   @Override
-  public void saveFavoriteExtensionIds(Set<String> favoriteExtensionIds) {
-    writeState(ExtensionFavoriteIds.normalizeSet(favoriteExtensionIds), loadRecentExtensionIds());
-  }
-
-  @Override
-  public void saveRecentExtensionIds(List<String> recentExtensionIds) {
-    writeState(loadFavoriteExtensionIds(), ExtensionFavoriteIds.normalizeList(recentExtensionIds));
+  public void saveAll(Set<String> favoriteExtensionIds, List<String> recentExtensionIds) {
+    try {
+      ExtensionFavoritesPayload payload =
+          new ExtensionFavoritesPayload(
+              SCHEMA_VERSION,
+              new TreeSet<>(ExtensionFavoriteIds.normalizeSet(favoriteExtensionIds)),
+              List.copyOf(ExtensionFavoriteIds.normalizeList(recentExtensionIds)));
+      AtomicFileStore.writeBytes(
+          file, JsonSupport.writeBytes(toJsonMap(payload)), "extension-favorites-");
+    } catch (IOException ignored) {
+      // Best-effort persistence only.
+    }
   }
 
   private ExtensionFavoritesPayload loadPayload() {
@@ -64,18 +69,6 @@ final class FileBackedExtensionFavoritesStore implements ExtensionFavoritesStore
           JsonFieldReader.readStringList(root, "recentExtensionIds"));
     } catch (IOException | RuntimeException ignored) {
       return null;
-    }
-  }
-
-  private void writeState(Set<String> favoriteExtensionIds, List<String> recentExtensionIds) {
-    try {
-      ExtensionFavoritesPayload payload =
-          new ExtensionFavoritesPayload(
-              SCHEMA_VERSION, new TreeSet<>(favoriteExtensionIds), List.copyOf(recentExtensionIds));
-      AtomicFileStore.writeBytes(
-          file, JsonSupport.writeBytes(toJsonMap(payload)), "extension-favorites-");
-    } catch (IOException ignored) {
-      // Best-effort persistence only.
     }
   }
 

@@ -31,7 +31,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-public final class QuarkusApiClient {
+public final class QuarkusApiClient implements AutoCloseable {
   private static final List<String> FALLBACK_BUILD_TOOLS =
       List.of("maven", "gradle", "gradle-kotlin-dsl");
   private static final Duration MAX_RETRY_DELAY = Duration.ofSeconds(30);
@@ -66,6 +66,11 @@ public final class QuarkusApiClient {
     this.sleeper = Objects.requireNonNull(sleeper);
     this.clock = Objects.requireNonNull(clock);
     this.jitterSupplier = Objects.requireNonNull(jitterSupplier);
+  }
+
+  @Override
+  public void close() {
+    httpClient.close();
   }
 
   public CompletableFuture<List<ExtensionDto>> fetchExtensions() {
@@ -107,10 +112,22 @@ public final class QuarkusApiClient {
   }
 
   private static MetadataDto toMetadata(StreamsMetadata streamsMetadata, List<String> buildTools) {
-    Map<String, List<String>> compatibility = new LinkedHashMap<>();
     List<String> javaVersions = streamsMetadata.javaVersions();
+
+    // Use the recommended stream's Java versions for the compatibility matrix.
+    // Without this, the matrix uses the union of all streams' Java versions,
+    // so a version only supported by one stream appears compatible with all build tools.
+    List<String> recommendedJavaVersions = javaVersions;
+    for (PlatformStream stream : streamsMetadata.platformStreams()) {
+      if (stream.recommended() && !stream.javaVersions().isEmpty()) {
+        recommendedJavaVersions = stream.javaVersions();
+        break;
+      }
+    }
+
+    Map<String, List<String>> compatibility = new LinkedHashMap<>();
     for (String buildTool : buildTools) {
-      compatibility.put(buildTool, javaVersions);
+      compatibility.put(buildTool, recommendedJavaVersions);
     }
     return new MetadataDto(
         javaVersions, buildTools, compatibility, streamsMetadata.platformStreams());

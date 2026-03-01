@@ -799,10 +799,7 @@ final class ExtensionCatalogState {
         preferencePersistenceChain
             .exceptionally(ignored -> null)
             .thenRunAsync(
-                () -> {
-                  favoritesStore.saveFavoriteExtensionIds(favoriteSnapshot);
-                  favoritesStore.saveRecentExtensionIds(recentSnapshot);
-                },
+                () -> favoritesStore.saveAll(favoriteSnapshot, recentSnapshot),
                 favoritesPersistenceExecutor);
   }
 }

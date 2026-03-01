@@ -289,13 +289,14 @@ public final class QuarkusForgeCli implements Callable<Integer> {
         df("smokeMode", true),
         df("searchDebounceMs", Math.max(0, searchDebounceMs)),
         df("mode", "headless-smoke"));
-    QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
-    CatalogDataService catalogDataService =
-        new CatalogDataService(
-            apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
-    diagnostics.info("catalog.load.start", df("mode", "tui"));
-    catalogDataService.load().handle(QuarkusForgeCli.catalogLoadDiagnostics(diagnostics)).join();
-    diagnostics.info("tui.session.exit", df("outcome", "completed"));
+    try (QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri())) {
+      CatalogDataService catalogDataService =
+          new CatalogDataService(
+              apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
+      diagnostics.info("catalog.load.start", df("mode", "tui"));
+      catalogDataService.load().handle(QuarkusForgeCli.catalogLoadDiagnostics(diagnostics)).join();
+      diagnostics.info("tui.session.exit", df("outcome", "completed"));
+    }
   }
 
   static java.util.function.BiFunction<CatalogData, Throwable, ExtensionCatalogLoadResult>
@@ -480,31 +481,33 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   }
 
   CatalogData loadCatalogData() throws ExecutionException, InterruptedException, TimeoutException {
-    QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
-    CatalogDataService catalogDataService =
-        new CatalogDataService(
-            apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
-    Duration timeout = headlessCatalogTimeout();
-    CompletableFuture<CatalogData> loadFuture = catalogDataService.load();
-    try {
-      return loadFuture.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
-    } catch (TimeoutException timeoutException) {
-      loadFuture.cancel(true);
-      throw new TimeoutException("catalog load timed out after " + timeout.toMillis() + "ms");
+    try (QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri())) {
+      CatalogDataService catalogDataService =
+          new CatalogDataService(
+              apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
+      Duration timeout = headlessCatalogTimeout();
+      CompletableFuture<CatalogData> loadFuture = catalogDataService.load();
+      try {
+        return loadFuture.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+      } catch (TimeoutException timeoutException) {
+        loadFuture.cancel(true);
+        throw new TimeoutException("catalog load timed out after " + timeout.toMillis() + "ms");
+      }
     }
   }
 
   Map<String, List<String>> loadBuiltInPresets(String platformStream)
       throws ExecutionException, InterruptedException, TimeoutException {
-    QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
-    CompletableFuture<Map<String, List<String>>> presetsFuture =
-        apiClient.fetchPresets(platformStream);
-    Duration timeout = headlessCatalogTimeout();
-    try {
-      return presetsFuture.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
-    } catch (TimeoutException timeoutException) {
-      presetsFuture.cancel(true);
-      throw new TimeoutException("preset load timed out after " + timeout.toMillis() + "ms");
+    try (QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri())) {
+      CompletableFuture<Map<String, List<String>>> presetsFuture =
+          apiClient.fetchPresets(platformStream);
+      Duration timeout = headlessCatalogTimeout();
+      try {
+        return presetsFuture.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+      } catch (TimeoutException timeoutException) {
+        presetsFuture.cancel(true);
+        throw new TimeoutException("preset load timed out after " + timeout.toMillis() + "ms");
+      }
     }
   }
 
@@ -564,8 +567,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
   }
 
   private StartupMetadataSelection loadStartupMetadataSelection(DiagnosticLogger diagnostics) {
-    QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
-    try {
+    try (QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri())) {
       MetadataDto metadata =
           apiClient
               .fetchMetadata()
@@ -627,17 +629,19 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
     ProjectArchiveService archiveService =
         new ProjectArchiveService(apiClient, new SafeZipExtractor());
-    return archiveService.downloadAndExtract(
-        generationRequest,
-        outputPath,
-        OverwritePolicy.FAIL_IF_EXISTS,
-        () -> Thread.currentThread().isInterrupted(),
-        progress ->
-            progressLineConsumer.accept(
-                switch (progress) {
-                  case REQUESTING_ARCHIVE -> "requesting project archive from Quarkus API...";
-                  case EXTRACTING_ARCHIVE -> "extracting project archive...";
-                }));
+    return archiveService
+        .downloadAndExtract(
+            generationRequest,
+            outputPath,
+            OverwritePolicy.FAIL_IF_EXISTS,
+            () -> Thread.currentThread().isInterrupted(),
+            progress ->
+                progressLineConsumer.accept(
+                    switch (progress) {
+                      case REQUESTING_ARCHIVE -> "requesting project archive from Quarkus API...";
+                      case EXTRACTING_ARCHIVE -> "extracting project archive...";
+                    }))
+        .whenComplete((ignored, throwable) -> apiClient.close());
   }
 
   static Duration headlessCatalogTimeout() {

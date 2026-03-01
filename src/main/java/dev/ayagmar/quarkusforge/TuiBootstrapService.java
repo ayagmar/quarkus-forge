@@ -38,8 +38,8 @@ final class TuiBootstrapService {
         of("searchDebounceMs", Math.max(0, searchDebounceMs)));
     QuarkusForgeCli.configureTerminalBackendPreference();
     TuiConfig tuiConfig = QuarkusForgeCli.appTuiConfig();
-    try (var tui = TuiRunner.create(tuiConfig)) {
-      QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
+    try (var tui = TuiRunner.create(tuiConfig);
+        QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri())) {
       CatalogDataService catalogDataService =
           new CatalogDataService(
               apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));

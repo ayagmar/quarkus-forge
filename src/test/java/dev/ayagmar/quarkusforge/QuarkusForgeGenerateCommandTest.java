@@ -385,7 +385,7 @@ class QuarkusForgeGenerateCommandTest {
     stubCatalogEndpoints();
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
     ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile())
-        .saveFavoriteExtensionIds(Set.of("io.quarkus:quarkus-jdbc-postgresql"));
+        .saveAll(Set.of("io.quarkus:quarkus-jdbc-postgresql"), List.of());
     Path outputDir = tempDir.resolve("dry-run-output");
 
     CliCommandTestSupport.CommandResult result =
@@ -424,7 +424,7 @@ class QuarkusForgeGenerateCommandTest {
     stubDownloadEndpoint("headless-app");
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
     ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile())
-        .saveFavoriteExtensionIds(Set.of("io.quarkus:quarkus-jdbc-postgresql"));
+        .saveAll(Set.of("io.quarkus:quarkus-jdbc-postgresql"), List.of());
     Path outputDir = tempDir.resolve("parity-output");
 
     CliCommandTestSupport.CommandResult dryRunResult =
