@@ -59,6 +59,13 @@ final class PostTuiActionExecutor {
             df("action", "publish-github"),
             df("directory", generatedProjectDir.toString()),
             df("visibility", visibility.cliFlag()));
+        if (!isCommandAvailable("git")) {
+          String message = "Publish to GitHub requires 'git' on PATH. Install it and rerun.";
+          diagnostics.error(
+              "tui.post-action.failure", df("action", "publish-github"), df("message", message));
+          System.err.println(message);
+          break;
+        }
         if (!isCommandAvailable("gh")) {
           String message =
               "Publish to GitHub requires GitHub CLI ('gh') on PATH. Install it and rerun.";
@@ -173,7 +180,9 @@ final class PostTuiActionExecutor {
   static String githubPublishCommand(GitHubVisibility visibility) {
     GitHubVisibility resolvedVisibility =
         visibility == null ? GitHubVisibility.PRIVATE : visibility;
-    return "gh repo create --source . --push --" + resolvedVisibility.cliFlag();
+    return "git init && git add . && git commit -m 'Initial commit from quarkus-forge' && "
+        + "gh repo create --source . --push --"
+        + resolvedVisibility.cliFlag();
   }
 
   static DiagnosticField[] postHookDiagnosticFields(Path generatedProjectDir, String command) {

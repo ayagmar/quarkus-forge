@@ -63,8 +63,10 @@ Output: `target/quarkus-forge.jar`
 
 ### Interactive TUI
 ```bash
-java -jar target/quarkus-forge.jar
+java --enable-native-access=ALL-UNNAMED -jar target/quarkus-forge.jar
 ```
+> **Note:** The `--enable-native-access=ALL-UNNAMED` flag suppresses Panama FFM warnings from the TamboUI terminal backend.
+
 Hit `?` for help, `Ctrl+P` for the command palette, or `/` to jump to extension search.
 
 ### Headless Generate

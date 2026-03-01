@@ -149,10 +149,13 @@ class QuarkusForgeCliTest {
   @Test
   void githubPublishCommandIncludesVisibilityFlag() {
     assertThat(PostTuiActionExecutor.githubPublishCommand(GitHubVisibility.PRIVATE))
-        .isEqualTo("gh repo create --source . --push --private");
+        .contains("git init")
+        .contains("git add .")
+        .contains("git commit")
+        .endsWith("gh repo create --source . --push --private");
     assertThat(PostTuiActionExecutor.githubPublishCommand(GitHubVisibility.PUBLIC))
-        .isEqualTo("gh repo create --source . --push --public");
+        .endsWith("gh repo create --source . --push --public");
     assertThat(PostTuiActionExecutor.githubPublishCommand(GitHubVisibility.INTERNAL))
-        .isEqualTo("gh repo create --source . --push --internal");
+        .endsWith("gh repo create --source . --push --internal");
   }
 }
