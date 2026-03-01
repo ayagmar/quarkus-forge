@@ -63,6 +63,7 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           release-as: ${{ steps.version.outputs.release_as }}
+          skip-github-release: true
 
       - name: Auto-merge release-please PR
         if: steps.release.outputs.prs_created == 'true'
@@ -76,5 +77,14 @@ jobs:
             exit 0
           fi
           echo "$PRS_JSON" | jq -r '.[].number' | while read -r pr_number; do
-            gh pr merge "$pr_number" --repo ayagmar/quarkus-forge --auto --squash --delete-branch
+            gh pr merge "$pr_number" --repo ayagmar/quarkus-forge --squash --delete-branch
           done
+
+      - name: Publish release and tag from merged release PR
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          target-branch: master
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          skip-github-pull-request: true
