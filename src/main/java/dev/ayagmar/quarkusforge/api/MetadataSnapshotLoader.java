@@ -16,7 +16,7 @@ public final class MetadataSnapshotLoader {
         throw new ApiContractException("Missing metadata snapshot resource: " + SNAPSHOT_RESOURCE);
       }
       String payload = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-      return QuarkusApiClient.parseMetadataPayload(payload);
+      return ApiPayloadParser.parseMetadataPayload(payload);
     } catch (IOException ioException) {
       throw new ApiContractException("Failed to read metadata snapshot resource", ioException);
     }

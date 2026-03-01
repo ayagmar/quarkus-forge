@@ -24,8 +24,8 @@ class QuarkusApiContractDriftTest {
               new String(snapshotInputStream.readAllBytes(), StandardCharsets.UTF_8));
     }
 
-    var extensions = QuarkusApiClient.parseExtensionsArray(asArray(snapshot.get("extensions")));
-    MetadataDto metadata = QuarkusApiClient.parseMetadataObject(asObject(snapshot.get("metadata")));
+    var extensions = ApiPayloadParser.parseExtensionsArray(asArray(snapshot.get("extensions")));
+    MetadataDto metadata = ApiPayloadParser.parseMetadataObject(asObject(snapshot.get("metadata")));
 
     assertThat(extensions).isNotEmpty();
     assertThat(metadata.javaVersions()).contains("25");
@@ -38,7 +38,7 @@ class QuarkusApiContractDriftTest {
   void contractDriftIsDetectedWhenRequiredFieldsDisappear() {
     String driftedMetadataPayload = "{\"javaVersions\":[\"25\"]}";
 
-    assertThatThrownBy(() -> QuarkusApiClient.parseMetadataPayload(driftedMetadataPayload))
+    assertThatThrownBy(() -> ApiPayloadParser.parseMetadataPayload(driftedMetadataPayload))
         .isInstanceOf(ApiContractException.class)
         .hasMessage("Metadata payload is missing 'buildTools' array");
   }
@@ -47,7 +47,7 @@ class QuarkusApiContractDriftTest {
   void missingCompatibilityMatrixParsesAsEmptyCompatibilityMap() {
     String metadataWithoutCompatibility = "{\"javaVersions\":[\"25\"],\"buildTools\":[\"maven\"]}";
 
-    MetadataDto metadata = QuarkusApiClient.parseMetadataPayload(metadataWithoutCompatibility);
+    MetadataDto metadata = ApiPayloadParser.parseMetadataPayload(metadataWithoutCompatibility);
 
     assertThat(metadata.compatibility()).isEmpty();
   }
@@ -66,7 +66,7 @@ class QuarkusApiContractDriftTest {
         }
         """;
 
-    MetadataDto metadata = QuarkusApiClient.parseMetadataPayload(mixedCaseMetadataPayload);
+    MetadataDto metadata = ApiPayloadParser.parseMetadataPayload(mixedCaseMetadataPayload);
 
     assertThat(metadata.compatibility()).containsEntry("maven", List.of("21", "25"));
     assertThat(metadata.compatibility()).containsEntry("gradle", List.of("25"));
@@ -87,7 +87,7 @@ class QuarkusApiContractDriftTest {
         """;
 
     assertThatThrownBy(
-            () -> QuarkusApiClient.parseMetadataPayload(duplicateCaseCompatibilityPayload))
+            () -> ApiPayloadParser.parseMetadataPayload(duplicateCaseCompatibilityPayload))
         .isInstanceOf(ApiContractException.class)
         .hasMessageContaining("differing only by case");
   }
@@ -108,7 +108,7 @@ class QuarkusApiContractDriftTest {
         ]
         """;
 
-    StreamsMetadata streamsMetadata = QuarkusApiClient.parseStreamsMetadataPayload(streamsPayload);
+    StreamsMetadata streamsMetadata = ApiPayloadParser.parseStreamsMetadataPayload(streamsPayload);
 
     assertThat(streamsMetadata.javaVersions()).containsExactly("17", "21", "25");
   }
@@ -127,7 +127,7 @@ class QuarkusApiContractDriftTest {
         ]
         """;
 
-    StreamsMetadata streamsMetadata = QuarkusApiClient.parseStreamsMetadataPayload(streamsPayload);
+    StreamsMetadata streamsMetadata = ApiPayloadParser.parseStreamsMetadataPayload(streamsPayload);
 
     assertThat(streamsMetadata.platformStreams())
         .containsExactly(
@@ -147,7 +147,7 @@ class QuarkusApiContractDriftTest {
         ]
         """;
 
-    assertThatThrownBy(() -> QuarkusApiClient.parseStreamsMetadataPayload(driftedStreamsPayload))
+    assertThatThrownBy(() -> ApiPayloadParser.parseStreamsMetadataPayload(driftedStreamsPayload))
         .isInstanceOf(ApiContractException.class)
         .hasMessageContaining("javaCompatibility.versions");
   }
@@ -170,7 +170,7 @@ class QuarkusApiContractDriftTest {
         }
         """;
 
-    List<String> buildTools = QuarkusApiClient.parseBuildToolsFromOpenApiPayload(openApiPayload);
+    List<String> buildTools = ApiPayloadParser.parseBuildToolsFromOpenApiPayload(openApiPayload);
 
     assertThat(buildTools).containsExactly("maven", "gradle", "gradle-kotlin-dsl");
   }
@@ -193,7 +193,7 @@ class QuarkusApiContractDriftTest {
         """;
 
     assertThatThrownBy(
-            () -> QuarkusApiClient.parseBuildToolsFromOpenApiPayload(driftedOpenApiPayload))
+            () -> ApiPayloadParser.parseBuildToolsFromOpenApiPayload(driftedOpenApiPayload))
         .isInstanceOf(ApiContractException.class)
         .hasMessageContaining("build tool enum");
   }
@@ -207,7 +207,7 @@ class QuarkusApiContractDriftTest {
       openApiPayload = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
     }
 
-    List<String> buildTools = QuarkusApiClient.parseBuildToolsFromOpenApiPayload(openApiPayload);
+    List<String> buildTools = ApiPayloadParser.parseBuildToolsFromOpenApiPayload(openApiPayload);
 
     assertThat(buildTools).containsExactly("maven", "gradle", "gradle-kotlin-dsl");
   }

@@ -151,9 +151,9 @@ public final class CatalogSnapshotCache {
       List<Object> extensionsArray = asArray(root.get("extensions"));
 
       MetadataDto metadata =
-          metadataObject == null ? null : QuarkusApiClient.parseMetadataObject(metadataObject);
+          metadataObject == null ? null : ApiPayloadParser.parseMetadataObject(metadataObject);
       List<ExtensionDto> extensions =
-          extensionsArray == null ? null : QuarkusApiClient.parseExtensionsArray(extensionsArray);
+          extensionsArray == null ? null : ApiPayloadParser.parseExtensionsArray(extensionsArray);
 
       return new CatalogSnapshotPayload(
           schemaVersion == null ? -1 : schemaVersion,
