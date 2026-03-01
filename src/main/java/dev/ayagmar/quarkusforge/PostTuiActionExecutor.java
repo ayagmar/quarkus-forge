@@ -36,6 +36,10 @@ final class PostTuiActionExecutor {
       executeShellCommand(hookCommand, generatedProjectDir, diagnostics, "post-generate-hook");
     }
 
+    if (exitPlan.action() == null) {
+      return;
+    }
+
     switch (exitPlan.action()) {
       case OPEN_IDE -> {
         String ideCommand = resolveIdeCommand();

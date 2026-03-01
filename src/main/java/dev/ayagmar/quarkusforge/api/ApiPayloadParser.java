@@ -210,14 +210,14 @@ public final class ApiPayloadParser {
     if (value == null) {
       return null;
     }
-    if (!(value instanceof Number number) || !isWholeNumber(number)) {
+    if (!(value instanceof Number number)) {
       throw new ApiContractException("Malformed JSON payload");
     }
-    long asLong = number.longValue();
-    if (asLong > Integer.MAX_VALUE || asLong < Integer.MIN_VALUE) {
+    try {
+      return new java.math.BigDecimal(number.toString()).intValueExact();
+    } catch (ArithmeticException | NumberFormatException e) {
       throw new ApiContractException("Malformed JSON payload");
     }
-    return (int) asLong;
   }
 
   static Map<String, Object> readObject(Map<String, Object> source, String fieldName) {
@@ -261,26 +261,6 @@ public final class ApiPayloadParser {
   }
 
   // ── Private helpers ───────────────────────────────────────────────────
-
-  private static boolean isWholeNumber(Number number) {
-    if (number instanceof Byte
-        || number instanceof Short
-        || number instanceof Integer
-        || number instanceof Long
-        || number instanceof java.math.BigInteger) {
-      return true;
-    }
-    if (number instanceof Float floatValue) {
-      return Float.isFinite(floatValue) && floatValue == Math.rint(floatValue);
-    }
-    if (number instanceof Double doubleValue) {
-      return Double.isFinite(doubleValue) && doubleValue == Math.rint(doubleValue);
-    }
-    if (number instanceof java.math.BigDecimal bigDecimalValue) {
-      return bigDecimalValue.stripTrailingZeros().scale() <= 0;
-    }
-    return false;
-  }
 
   private static String requiredText(String value, String fieldName) {
     if (value == null || value.isBlank()) {

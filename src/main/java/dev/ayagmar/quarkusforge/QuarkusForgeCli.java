@@ -491,7 +491,10 @@ public final class QuarkusForgeCli implements Callable<Integer> {
         return loadFuture.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
       } catch (TimeoutException timeoutException) {
         loadFuture.cancel(true);
-        throw new TimeoutException("catalog load timed out after " + timeout.toMillis() + "ms");
+        TimeoutException wrapped =
+            new TimeoutException("catalog load timed out after " + timeout.toMillis() + "ms");
+        wrapped.initCause(timeoutException);
+        throw wrapped;
       }
     }
   }
@@ -506,7 +509,10 @@ public final class QuarkusForgeCli implements Callable<Integer> {
         return presetsFuture.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
       } catch (TimeoutException timeoutException) {
         presetsFuture.cancel(true);
-        throw new TimeoutException("preset load timed out after " + timeout.toMillis() + "ms");
+        TimeoutException wrapped =
+            new TimeoutException("preset load timed out after " + timeout.toMillis() + "ms");
+        wrapped.initCause(timeoutException);
+        throw wrapped;
       }
     }
   }

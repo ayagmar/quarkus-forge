@@ -52,6 +52,12 @@ class PostGenerationMenuStateTest {
   }
 
   @Test
+  void successHintQuotesPathWithSpaces() {
+    state.showAfterSuccess(Path.of("/tmp/my project"), "mvn quarkus:dev");
+    assertThat(state.successHint()).isEqualTo("cd \"/tmp/my project\" && mvn quarkus:dev");
+  }
+
+  @Test
   void resetClearsAllState() {
     state.showAfterSuccess(Path.of("/tmp/project"), "cmd");
     state.reset();

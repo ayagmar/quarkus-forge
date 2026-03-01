@@ -1,7 +1,9 @@
 package dev.ayagmar.quarkusforge.api;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -79,7 +81,7 @@ public final class JsonFieldReader {
     if (values == null) {
       return null;
     }
-    return Set.copyOf(values);
+    return Collections.unmodifiableSet(new LinkedHashSet<>(values));
   }
 
   public static Map<String, Object> readObject(Map<String, Object> source, String fieldName) {
@@ -125,7 +127,7 @@ public final class JsonFieldReader {
   private static int toExactInt(Number number) {
     try {
       return new java.math.BigDecimal(number.toString()).intValueExact();
-    } catch (ArithmeticException e) {
+    } catch (ArithmeticException | NumberFormatException e) {
       throw new ApiContractException("Malformed JSON payload");
     }
   }
@@ -133,7 +135,7 @@ public final class JsonFieldReader {
   private static long toExactLong(Number number) {
     try {
       return new java.math.BigDecimal(number.toString()).longValueExact();
-    } catch (ArithmeticException e) {
+    } catch (ArithmeticException | NumberFormatException e) {
       throw new ApiContractException("Malformed JSON payload");
     }
   }

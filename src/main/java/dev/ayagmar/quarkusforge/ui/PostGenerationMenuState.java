@@ -44,7 +44,9 @@ final class PostGenerationMenuState {
     if (lastGeneratedProjectPath == null || lastGeneratedNextCommand.isEmpty()) {
       return "";
     }
-    return "cd " + lastGeneratedProjectPath + " && " + lastGeneratedNextCommand;
+    String path = lastGeneratedProjectPath.toString();
+    String quotedPath = path.contains(" ") ? "\"" + path + "\"" : path;
+    return "cd " + quotedPath + " && " + lastGeneratedNextCommand;
   }
 
   void reset() {
