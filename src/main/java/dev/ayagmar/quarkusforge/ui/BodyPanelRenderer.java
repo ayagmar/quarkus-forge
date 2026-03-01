@@ -6,6 +6,9 @@ import dev.tamboui.layout.Rect;
 import dev.tamboui.style.Overflow;
 import dev.tamboui.style.Style;
 import dev.tamboui.terminal.Frame;
+import dev.tamboui.text.Line;
+import dev.tamboui.text.Span;
+import dev.tamboui.text.Text;
 import dev.tamboui.widgets.block.Block;
 import dev.tamboui.widgets.block.BorderType;
 import dev.tamboui.widgets.block.Borders;
@@ -324,34 +327,35 @@ final class BodyPanelRenderer {
       }
     }
 
-    StringBuilder summary = new StringBuilder("  Selected: ");
+    List<Span> spans = new ArrayList<>();
+    spans.add(Span.styled("  Selected: ", Style.EMPTY.fg(theme.color("accent"))));
     for (int i = 0; i < maxDisplay; i++) {
       if (i > 0) {
-        summary.append(", ");
+        spans.add(Span.styled(" ", Style.EMPTY));
       }
       String id = selectedIds.get(i);
       String name = visibleNameById.get(id);
       if (name == null || name.isBlank()) {
-        // Fallback: derive a readable-ish label from the id.
         String shortName = id.contains(":") ? id.substring(id.lastIndexOf(':') + 1) : id;
         if (shortName.startsWith("quarkus-")) {
           shortName = shortName.substring(8);
         }
         name = shortName;
       }
-      summary.append(name);
+      spans.add(
+          Span.styled(
+              " " + name + " ", Style.EMPTY.fg(theme.color("base")).bg(theme.color("accent"))));
     }
     if (selectedIds.size() > maxDisplay) {
-      summary.append(" +").append(selectedIds.size() - maxDisplay).append(" more");
+      spans.add(
+          Span.styled(
+              " +" + (selectedIds.size() - maxDisplay) + " more ",
+              Style.EMPTY.fg(theme.color("base")).bg(theme.color("muted"))));
     }
-    summary.append("  [x: clear all]");
+    spans.add(Span.styled("  [x: clear]", Style.EMPTY.fg(theme.color("muted"))));
 
     Paragraph paragraph =
-        Paragraph.builder()
-            .text(summary.toString())
-            .style(Style.EMPTY.fg(theme.color("accent")).bold())
-            .overflow(Overflow.ELLIPSIS)
-            .build();
+        Paragraph.builder().text(Text.from(Line.from(spans))).overflow(Overflow.ELLIPSIS).build();
     frame.renderWidget(paragraph, area);
   }
 
@@ -425,11 +429,17 @@ final class BodyPanelRenderer {
       ExtensionCatalogItem extension = row.extension();
       boolean selected = selectedLookup.matches(extension.id());
       boolean favorite = favoriteLookup.matches(extension.id());
-      // Use clearer visual indicators
       String checkedPrefix = selected ? "[x] " : "[ ] ";
       String favoritePrefix = favorite ? "★ " : "  ";
       String displayLabel = extensionDisplayLabel(extension);
-      items.add(ListItem.from(checkedPrefix + favoritePrefix + displayLabel).toSizedWidget());
+      String query = snapshot.searchQuery();
+      if (query.isBlank()) {
+        items.add(ListItem.from(checkedPrefix + favoritePrefix + displayLabel).toSizedWidget());
+      } else {
+        Line line =
+            buildHighlightedLine(checkedPrefix + favoritePrefix, displayLabel, query, theme);
+        items.add(ListItem.from(line).toSizedWidget());
+      }
     }
 
     boolean extensionError = !snapshot.catalogErrorMessage().isBlank();
@@ -468,6 +478,42 @@ final class BodyPanelRenderer {
 
   private static String extensionDisplayLabel(ExtensionCatalogItem extension) {
     return extension.name();
+  }
+
+  private static Line buildHighlightedLine(
+      String prefix, String label, String query, UiTheme theme) {
+    List<Span> spans = new ArrayList<>();
+    spans.add(Span.raw(prefix));
+
+    String lowerLabel = label.toLowerCase(java.util.Locale.ROOT);
+    String lowerQuery = query.toLowerCase(java.util.Locale.ROOT);
+    Style highlightStyle = Style.EMPTY.fg(theme.color("warning")).bold();
+
+    int labelPos = 0;
+    int queryPos = 0;
+    StringBuilder normal = new StringBuilder();
+
+    while (labelPos < label.length() && queryPos < lowerQuery.length()) {
+      if (lowerLabel.charAt(labelPos) == lowerQuery.charAt(queryPos)) {
+        if (!normal.isEmpty()) {
+          spans.add(Span.raw(normal.toString()));
+          normal.setLength(0);
+        }
+        spans.add(Span.styled(String.valueOf(label.charAt(labelPos)), highlightStyle));
+        queryPos++;
+      } else {
+        normal.append(label.charAt(labelPos));
+      }
+      labelPos++;
+    }
+    if (labelPos < label.length()) {
+      normal.append(label.substring(labelPos));
+    }
+    if (!normal.isEmpty()) {
+      spans.add(Span.raw(normal.toString()));
+    }
+
+    return Line.from(spans);
   }
 
   private static String sectionHeaderLabel(ExtensionCatalogRow row) {
