@@ -25,6 +25,7 @@ import dev.ayagmar.quarkusforge.domain.ValidationError;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.ayagmar.quarkusforge.ui.ExtensionCatalogLoadResult;
 import dev.ayagmar.quarkusforge.ui.ExtensionFavoritesStore;
+import dev.ayagmar.quarkusforge.ui.GitHubVisibility;
 import dev.ayagmar.quarkusforge.ui.PostGenerationExitPlan;
 import dev.ayagmar.quarkusforge.ui.UserPreferencesStore;
 import dev.tamboui.tui.TuiConfig;
@@ -321,10 +322,12 @@ public final class QuarkusForgeCli implements Callable<Integer> {
         executeShellCommand("code .", generatedProjectDir, diagnostics, "open-ide");
       }
       case PUBLISH_GITHUB -> {
+        GitHubVisibility visibility = exitPlan.githubVisibility();
         diagnostics.info(
             "tui.post-action.start",
             df("action", "publish-github"),
-            df("directory", generatedProjectDir.toString()));
+            df("directory", generatedProjectDir.toString()),
+            df("visibility", visibility.cliFlag()));
         if (!isCommandAvailable("gh")) {
           String message =
               "Publish to GitHub requires GitHub CLI ('gh') on PATH. Install it and rerun.";
@@ -334,7 +337,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
           break;
         }
         executeShellCommand(
-            "gh repo create --source . --push", generatedProjectDir, diagnostics, "publish-github");
+            githubPublishCommand(visibility), generatedProjectDir, diagnostics, "publish-github");
       }
       case OPEN_TERMINAL -> {
         diagnostics.info(
@@ -414,6 +417,12 @@ public final class QuarkusForgeCli implements Callable<Integer> {
       }
     }
     return false;
+  }
+
+  static String githubPublishCommand(GitHubVisibility visibility) {
+    GitHubVisibility resolvedVisibility =
+        visibility == null ? GitHubVisibility.PRIVATE : visibility;
+    return "gh repo create --source . --push --" + resolvedVisibility.cliFlag();
   }
 
   private static boolean isExecutableFile(java.nio.file.Path path, boolean windows) {

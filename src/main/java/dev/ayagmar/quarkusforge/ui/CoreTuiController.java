@@ -101,6 +101,8 @@ public final class CoreTuiController
           "Open in terminal",
           "Generate again",
           "Quit");
+  private static final List<String> GITHUB_VISIBILITY_LABELS =
+      List.of("Private repo", "Public repo", "Internal repo (GitHub Enterprise)");
   private static final String FORGE_LOCK_FILE_NAME = "forge.lock";
   private static final List<String> GLOBAL_HELP_LINES =
       List.of(
@@ -172,6 +174,8 @@ public final class CoreTuiController
   private int commandPaletteSelection;
   private boolean postGenerationMenuVisible;
   private int postGenerationActionSelection;
+  private boolean githubVisibilityMenuVisible;
+  private int githubVisibilitySelection;
   private Path lastGeneratedProjectPath;
   private String lastGeneratedNextCommand;
   private PostGenerationExitPlan postGenerationExitPlan;
@@ -223,6 +227,8 @@ public final class CoreTuiController
     commandPaletteSelection = 0;
     postGenerationMenuVisible = false;
     postGenerationActionSelection = 0;
+    githubVisibilityMenuVisible = false;
+    githubVisibilitySelection = defaultGitHubVisibilitySelection();
     lastGeneratedProjectPath = null;
     lastGeneratedNextCommand = "";
     postGenerationExitPlan = null;
@@ -577,6 +583,8 @@ public final class CoreTuiController
   public void beforeGenerationStart() {
     successHint = "";
     postGenerationMenuVisible = false;
+    githubVisibilityMenuVisible = false;
+    githubVisibilitySelection = defaultGitHubVisibilitySelection();
     postGenerationExitPlan = null;
     lastGeneratedProjectPath = null;
     lastGeneratedNextCommand = "";
@@ -617,6 +625,8 @@ public final class CoreTuiController
     successHint = "cd " + generatedPath + " && " + nextCommand;
     postGenerationMenuVisible = true;
     postGenerationActionSelection = 0;
+    githubVisibilityMenuVisible = false;
+    githubVisibilitySelection = defaultGitHubVisibilitySelection();
     requestAsyncRepaint();
   }
 
@@ -627,6 +637,7 @@ public final class CoreTuiController
     verboseErrorDetails = "";
     successHint = "";
     postGenerationMenuVisible = false;
+    githubVisibilityMenuVisible = false;
     requestAsyncRepaint();
   }
 
@@ -637,6 +648,7 @@ public final class CoreTuiController
     verboseErrorDetails = ErrorMessageMapper.verboseDetails(cause);
     successHint = "";
     postGenerationMenuVisible = false;
+    githubVisibilityMenuVisible = false;
     requestAsyncRepaint();
   }
 
@@ -1092,6 +1104,9 @@ public final class CoreTuiController
   }
 
   private String contextHelpTitle() {
+    if (githubVisibilityMenuVisible) {
+      return "github visibility";
+    }
     if (postGenerationMenuVisible) {
       return "post-generate";
     }
@@ -1107,6 +1122,12 @@ public final class CoreTuiController
   }
 
   private List<String> contextHelpLines() {
+    if (githubVisibilityMenuVisible) {
+      return List.of(
+          "  Up/Down or j/k  : choose repository visibility",
+          "  Enter           : confirm and publish",
+          "  Esc             : back to post-generate actions");
+    }
     if (postGenerationMenuVisible) {
       return List.of(
           "  Up/Down or j/k  : choose post-generate action",
@@ -1192,6 +1213,10 @@ public final class CoreTuiController
   }
 
   private void renderPostGenerationOverlay(Frame frame, Rect viewport) {
+    if (githubVisibilityMenuVisible) {
+      renderGitHubVisibilityOverlay(frame, viewport);
+      return;
+    }
     if (viewport.width() < 36 || viewport.height() < 10) {
       return;
     }
@@ -1221,6 +1246,44 @@ public final class CoreTuiController
             .block(
                 Block.builder()
                     .title("Project Generated [focus]")
+                    .borders(Borders.ALL)
+                    .borderType(BorderType.ROUNDED)
+                    .borderStyle(Style.EMPTY.fg(theme.color("focus")).bold())
+                    .build())
+            .build();
+    frame.renderWidget(overlay, overlayArea);
+  }
+
+  private void renderGitHubVisibilityOverlay(Frame frame, Rect viewport) {
+    if (viewport.width() < 44 || viewport.height() < 10) {
+      return;
+    }
+    List<String> lines = new ArrayList<>();
+    for (int index = 0; index < GITHUB_VISIBILITY_LABELS.size(); index++) {
+      String prefix = index == githubVisibilitySelection ? "> " : "  ";
+      lines.add(prefix + (index + 1) + ". " + GITHUB_VISIBILITY_LABELS.get(index));
+    }
+    lines.add("");
+    lines.add("Enter: confirm | Up/Down or j/k: navigate | Esc: back");
+
+    int maxLineLength = lines.stream().mapToInt(String::length).max().orElse(50);
+    int width = Math.min(Math.max(66, maxLineLength + 4), viewport.width() - 2);
+    int height = Math.min(lines.size() + 2, viewport.height() - 2);
+    Rect overlayArea =
+        new Rect(
+            viewport.x() + Math.max(0, (viewport.width() - width) / 2),
+            viewport.y() + Math.max(0, (viewport.height() - height) / 2),
+            width,
+            height);
+
+    Paragraph overlay =
+        Paragraph.builder()
+            .text(String.join("\n", lines))
+            .style(Style.EMPTY.fg(theme.color("text")).bg(theme.color("base")))
+            .overflow(Overflow.ELLIPSIS)
+            .block(
+                Block.builder()
+                    .title("Publish to GitHub [focus]")
                     .borders(Borders.ALL)
                     .borderType(BorderType.ROUNDED)
                     .borderStyle(Style.EMPTY.fg(theme.color("focus")).bold())
@@ -1306,6 +1369,9 @@ public final class CoreTuiController
     if (!postGenerationMenuVisible) {
       return null;
     }
+    if (githubVisibilityMenuVisible) {
+      return handleGitHubVisibilityMenuKey(keyEvent);
+    }
     if (keyEvent.isCtrlC()) {
       cancelPendingAsyncOperations();
       selectPostGenerationExit(PostGenerationExitAction.QUIT);
@@ -1346,12 +1412,66 @@ public final class CoreTuiController
     return UiAction.handled(false);
   }
 
+  private UiAction handleGitHubVisibilityMenuKey(KeyEvent keyEvent) {
+    if (keyEvent.isCtrlC()) {
+      cancelPendingAsyncOperations();
+      selectPostGenerationExit(PostGenerationExitAction.QUIT);
+      return UiAction.handled(true);
+    }
+    if (keyEvent.isCancel()) {
+      githubVisibilityMenuVisible = false;
+      return UiAction.handled(false);
+    }
+    if (keyEvent.isUp() || UiKeyMatchers.isVimUpKey(keyEvent)) {
+      moveGitHubVisibilitySelection(-1);
+      return UiAction.handled(false);
+    }
+    if (keyEvent.isDown() || UiKeyMatchers.isVimDownKey(keyEvent)) {
+      moveGitHubVisibilitySelection(1);
+      return UiAction.handled(false);
+    }
+    if (keyEvent.isFocusPrevious()) {
+      moveGitHubVisibilitySelection(-1);
+      return UiAction.handled(false);
+    }
+    if (keyEvent.isFocusNext()) {
+      moveGitHubVisibilitySelection(1);
+      return UiAction.handled(false);
+    }
+    if (UiKeyMatchers.isDigitKey(keyEvent)) {
+      int selected = Character.digit(keyEvent.character(), 10) - 1;
+      if (selected >= 0 && selected < GITHUB_VISIBILITY_LABELS.size()) {
+        githubVisibilitySelection = selected;
+        return confirmGitHubVisibilitySelection();
+      }
+      return UiAction.handled(false);
+    }
+    if (keyEvent.isConfirm() || keyEvent.isSelect()) {
+      return confirmGitHubVisibilitySelection();
+    }
+    return UiAction.handled(false);
+  }
+
   private void movePostGenerationSelection(int delta) {
     int size = POST_GENERATION_ACTION_LABELS.size();
     if (size == 0) {
       return;
     }
     postGenerationActionSelection = Math.floorMod(postGenerationActionSelection + delta, size);
+  }
+
+  private void moveGitHubVisibilitySelection(int delta) {
+    int size = GITHUB_VISIBILITY_LABELS.size();
+    if (size == 0) {
+      return;
+    }
+    githubVisibilitySelection = Math.floorMod(githubVisibilitySelection + delta, size);
+  }
+
+  private UiAction confirmGitHubVisibilitySelection() {
+    cancelPendingAsyncOperations();
+    selectPostGenerationExit(PostGenerationExitAction.PUBLISH_GITHUB, selectedGitHubVisibility());
+    return UiAction.handled(true);
   }
 
   private UiAction executePostGenerationSelection() {
@@ -1368,9 +1488,16 @@ public final class CoreTuiController
       writeLockFile();
       return UiAction.handled(false);
     }
+    if (action == PostGenerationExitAction.PUBLISH_GITHUB) {
+      githubVisibilityMenuVisible = true;
+      githubVisibilitySelection = defaultGitHubVisibilitySelection();
+      return UiAction.handled(false);
+    }
     if (action == PostGenerationExitAction.GENERATE_AGAIN) {
       postGenerationMenuVisible = false;
       postGenerationActionSelection = 0;
+      githubVisibilityMenuVisible = false;
+      githubVisibilitySelection = defaultGitHubVisibilitySelection();
       postGenerationExitPlan = null;
       successHint = "";
       lastGeneratedProjectPath = null;
@@ -1409,10 +1536,30 @@ public final class CoreTuiController
   }
 
   private void selectPostGenerationExit(PostGenerationExitAction action) {
+    selectPostGenerationExit(action, GitHubVisibility.PRIVATE);
+  }
+
+  private void selectPostGenerationExit(
+      PostGenerationExitAction action, GitHubVisibility githubVisibility) {
     postGenerationMenuVisible = false;
     postGenerationActionSelection = 0;
+    githubVisibilityMenuVisible = false;
+    githubVisibilitySelection = defaultGitHubVisibilitySelection();
     postGenerationExitPlan =
-        new PostGenerationExitPlan(action, lastGeneratedProjectPath, lastGeneratedNextCommand);
+        new PostGenerationExitPlan(
+            action, lastGeneratedProjectPath, lastGeneratedNextCommand, githubVisibility);
+  }
+
+  private GitHubVisibility selectedGitHubVisibility() {
+    return switch (githubVisibilitySelection) {
+      case 1 -> GitHubVisibility.PUBLIC;
+      case 2 -> GitHubVisibility.INTERNAL;
+      default -> GitHubVisibility.PRIVATE;
+    };
+  }
+
+  private static int defaultGitHubVisibilitySelection() {
+    return 0;
   }
 
   private void moveCommandPaletteSelection(int delta) {

@@ -127,12 +127,18 @@ class CoreTuiGenerationFlowTest {
     assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
         .contains("Publish to GitHub (requires gh)");
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    UiAction choosePublishAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    assertThat(choosePublishAction.shouldQuit()).isFalse();
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .contains("Publish to GitHub [focus]");
+
     UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
     assertThat(action.shouldQuit()).isTrue();
     assertThat(controller.postGenerationExitPlan()).isPresent();
-    assertThat(controller.postGenerationExitPlan().orElseThrow().action())
-        .isEqualTo(PostGenerationExitAction.PUBLISH_GITHUB);
+    PostGenerationExitPlan exitPlan = controller.postGenerationExitPlan().orElseThrow();
+    assertThat(exitPlan.action()).isEqualTo(PostGenerationExitAction.PUBLISH_GITHUB);
+    assertThat(exitPlan.githubVisibility()).isEqualTo(GitHubVisibility.PRIVATE);
   }
 
   @Test

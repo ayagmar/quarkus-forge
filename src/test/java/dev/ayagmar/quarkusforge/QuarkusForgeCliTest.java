@@ -3,6 +3,7 @@ package dev.ayagmar.quarkusforge;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticField;
+import dev.ayagmar.quarkusforge.ui.GitHubVisibility;
 import java.nio.file.Path;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -123,5 +124,15 @@ class QuarkusForgeCliTest {
   void isCommandAvailableReturnsFalseForMissingBinary() {
     String missing = "missing-" + UUID.randomUUID();
     assertThat(QuarkusForgeCli.isCommandAvailable(missing)).isFalse();
+  }
+
+  @Test
+  void githubPublishCommandIncludesVisibilityFlag() {
+    assertThat(QuarkusForgeCli.githubPublishCommand(GitHubVisibility.PRIVATE))
+        .isEqualTo("gh repo create --source . --push --private");
+    assertThat(QuarkusForgeCli.githubPublishCommand(GitHubVisibility.PUBLIC))
+        .isEqualTo("gh repo create --source . --push --public");
+    assertThat(QuarkusForgeCli.githubPublishCommand(GitHubVisibility.INTERNAL))
+        .isEqualTo("gh repo create --source . --push --internal");
   }
 }
