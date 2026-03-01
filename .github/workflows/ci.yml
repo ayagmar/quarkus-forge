@@ -56,12 +56,14 @@ jobs:
         run: mvn -B -ntp checkstyle:check
 
   tests:
-    name: Tests (${{ matrix.suite }})
+    name: Tests (${{ matrix.os }}, ${{ matrix.suite }})
     needs: quality
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        suite: [unit, integration]
         include:
           - suite: unit
             command: mvn -B -ntp test
