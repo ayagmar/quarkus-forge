@@ -562,12 +562,11 @@ class QuarkusForgeGenerateCommandTest {
             () -> {
               Path recipePath = ForgeDataPaths.recipesRoot().resolve("starter.json");
               assertThatCode(
-                      () ->
-                          {
-                            Files.createDirectories(recipePath.getParent());
-                            Files.writeString(
-                                recipePath,
-                                """
+                      () -> {
+                        Files.createDirectories(recipePath.getParent());
+                        Files.writeString(
+                            recipePath,
+                            """
                                 {
                                   "groupId": "com.example",
                                   "artifactId": "recipe-app",
@@ -579,7 +578,7 @@ class QuarkusForgeGenerateCommandTest {
                                   "extensions": ["io.quarkus:quarkus-hibernate-orm-panache"]
                                 }
                                 """);
-                          })
+                      })
                   .doesNotThrowAnyException();
 
               return runCommand(

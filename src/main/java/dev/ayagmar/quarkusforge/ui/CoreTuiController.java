@@ -1533,7 +1533,9 @@ public final class CoreTuiController
               selectedExtensions);
       ForgeRecipeLockStore.writeLock(lockPath, lock);
       Path recipePath =
-          ForgeDataPaths.recipesRoot().resolve(request.artifactId()).resolve(FORGE_RECIPE_FILE_NAME);
+          ForgeDataPaths.recipesRoot()
+              .resolve(request.artifactId())
+              .resolve(FORGE_RECIPE_FILE_NAME);
       ForgeRecipe recipe =
           new ForgeRecipe(
               request.groupId(),
