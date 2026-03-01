@@ -14,6 +14,7 @@ release:
   github:
     owner: ayagmar
     name: quarkus-forge
+    branch: master
     skipTag: true
     overwrite: true
     artifacts: true
