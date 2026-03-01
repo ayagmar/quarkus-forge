@@ -6,8 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -24,8 +22,12 @@ class QuarkusApiContractDriftTest {
               new String(snapshotInputStream.readAllBytes(), StandardCharsets.UTF_8));
     }
 
-    var extensions = ApiPayloadParser.parseExtensionsArray(asArray(snapshot.get("extensions")));
-    MetadataDto metadata = ApiPayloadParser.parseMetadataObject(asObject(snapshot.get("metadata")));
+    var extensions =
+        ApiPayloadParser.parseExtensionsArray(
+            ApiPayloadParser.castArray(snapshot.get("extensions"), "extensions must be an array"));
+    MetadataDto metadata =
+        ApiPayloadParser.parseMetadataObject(
+            ApiPayloadParser.castObject(snapshot.get("metadata"), "metadata must be an object"));
 
     assertThat(extensions).isNotEmpty();
     assertThat(metadata.javaVersions()).contains("25");
@@ -210,26 +212,5 @@ class QuarkusApiContractDriftTest {
     List<String> buildTools = ApiPayloadParser.parseBuildToolsFromOpenApiPayload(openApiPayload);
 
     assertThat(buildTools).containsExactly("maven", "gradle", "gradle-kotlin-dsl");
-  }
-
-  private static Map<String, Object> asObject(Object value) {
-    if (!(value instanceof Map<?, ?> rawObject)) {
-      throw new ApiContractException("Malformed JSON payload");
-    }
-    Map<String, Object> object = new LinkedHashMap<>();
-    for (Map.Entry<?, ?> entry : rawObject.entrySet()) {
-      if (!(entry.getKey() instanceof String key)) {
-        throw new ApiContractException("Malformed JSON payload");
-      }
-      object.put(key, entry.getValue());
-    }
-    return object;
-  }
-
-  private static List<Object> asArray(Object value) {
-    if (!(value instanceof List<?> rawArray)) {
-      throw new ApiContractException("Malformed JSON payload");
-    }
-    return new ArrayList<>(rawArray);
   }
 }

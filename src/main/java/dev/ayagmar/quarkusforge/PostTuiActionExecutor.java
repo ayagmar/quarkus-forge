@@ -35,11 +35,12 @@ final class PostTuiActionExecutor {
 
     switch (exitPlan.action()) {
       case OPEN_IDE -> {
+        String ideCommand = resolveIdeCommand();
         diagnostics.info(
             "tui.post-action.start",
             df("action", "open-ide"),
             df("directory", generatedProjectDir.toString()));
-        executeShellCommand("code .", generatedProjectDir, diagnostics, "open-ide");
+        executeShellCommand(ideCommand, generatedProjectDir, diagnostics, "open-ide");
       }
       case PUBLISH_GITHUB -> {
         GitHubVisibility visibility =
@@ -117,6 +118,14 @@ final class PostTuiActionExecutor {
   }
 
   // ── Static helpers ────────────────────────────────────────────────────
+
+  static String resolveIdeCommand() {
+    String custom = System.getenv("QUARKUS_FORGE_IDE_COMMAND");
+    if (custom != null && !custom.isBlank()) {
+      return custom.strip();
+    }
+    return "code .";
+  }
 
   static boolean isWindowsOs() {
     String osName = System.getProperty("os.name", "");

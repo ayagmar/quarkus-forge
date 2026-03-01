@@ -240,9 +240,6 @@ public final class ApiPayloadParser {
   }
 
   static List<String> copyStringList(List<Object> values, String fieldName) {
-    if (values == null) {
-      throw new ApiContractException("Field '" + fieldName + "' must contain only strings");
-    }
     List<String> valuesCopy = new ArrayList<>();
     for (Object element : values) {
       if (!(element instanceof String stringValue)) {

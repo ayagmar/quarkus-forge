@@ -174,14 +174,9 @@ final class PostGenerationMenuState {
 
   private MenuKeyResult executeSelection() {
     PostGenerationExitAction action =
-        switch (actionSelection) {
-          case 0 -> PostGenerationExitAction.EXPORT_RECIPE_LOCK;
-          case 1 -> PostGenerationExitAction.PUBLISH_GITHUB;
-          case 2 -> PostGenerationExitAction.OPEN_IDE;
-          case 3 -> PostGenerationExitAction.OPEN_TERMINAL;
-          case 4 -> PostGenerationExitAction.GENERATE_AGAIN;
-          default -> PostGenerationExitAction.QUIT;
-        };
+        (actionSelection >= 0 && actionSelection < UiTextConstants.POST_GENERATION_ACTIONS.size())
+            ? UiTextConstants.POST_GENERATION_ACTIONS.get(actionSelection).action()
+            : PostGenerationExitAction.QUIT;
     if (action == PostGenerationExitAction.EXPORT_RECIPE_LOCK) {
       return MenuKeyResult.exportRecipe();
     }

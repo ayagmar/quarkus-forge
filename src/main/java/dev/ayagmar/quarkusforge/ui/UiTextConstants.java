@@ -41,14 +41,21 @@ final class UiTextConstants {
           new CommandPaletteEntry(
               "Toggle error details", "Ctrl+E", CommandPaletteAction.TOGGLE_ERROR_DETAILS));
 
-  static final List<String> POST_GENERATION_ACTION_LABELS =
+  record PostGenerationAction(String label, PostGenerationExitAction action) {}
+
+  static final List<PostGenerationAction> POST_GENERATION_ACTIONS =
       List.of(
-          "Export Forgefile + forge.lock",
-          "Publish to GitHub (requires gh)",
-          "Open in IDE",
-          "Open in terminal",
-          "Generate again",
-          "Quit");
+          new PostGenerationAction(
+              "Export Forgefile + forge.lock", PostGenerationExitAction.EXPORT_RECIPE_LOCK),
+          new PostGenerationAction(
+              "Publish to GitHub (requires gh)", PostGenerationExitAction.PUBLISH_GITHUB),
+          new PostGenerationAction("Open in IDE", PostGenerationExitAction.OPEN_IDE),
+          new PostGenerationAction("Open in terminal", PostGenerationExitAction.OPEN_TERMINAL),
+          new PostGenerationAction("Generate again", PostGenerationExitAction.GENERATE_AGAIN),
+          new PostGenerationAction("Quit", PostGenerationExitAction.QUIT));
+
+  static final List<String> POST_GENERATION_ACTION_LABELS =
+      POST_GENERATION_ACTIONS.stream().map(PostGenerationAction::label).toList();
 
   static final List<String> GITHUB_VISIBILITY_LABELS =
       List.of("Private repo", "Public repo", "Internal repo (GitHub Enterprise)");

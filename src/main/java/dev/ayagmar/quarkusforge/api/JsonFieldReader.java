@@ -37,11 +37,7 @@ public final class JsonFieldReader {
     if (!(value instanceof Number number)) {
       throw new ApiContractException("Malformed JSON payload");
     }
-    long longValue = number.longValue();
-    if (longValue > Integer.MAX_VALUE || longValue < Integer.MIN_VALUE) {
-      throw new ApiContractException("Malformed JSON payload");
-    }
-    return (int) longValue;
+    return toExactInt(number);
   }
 
   public static Long readLong(Map<String, Object> source, String fieldName) {
@@ -52,7 +48,7 @@ public final class JsonFieldReader {
     if (!(value instanceof Number number)) {
       throw new ApiContractException("Malformed JSON payload");
     }
-    return number.longValue();
+    return toExactLong(number);
   }
 
   public static List<String> readStringList(Map<String, Object> source, String fieldName) {
@@ -113,5 +109,21 @@ public final class JsonFieldReader {
       throw new ApiContractException("Malformed JSON payload");
     }
     return new ArrayList<>(rawArray);
+  }
+
+  private static int toExactInt(Number number) {
+    try {
+      return new java.math.BigDecimal(number.toString()).intValueExact();
+    } catch (ArithmeticException e) {
+      throw new ApiContractException("Malformed JSON payload");
+    }
+  }
+
+  private static long toExactLong(Number number) {
+    try {
+      return new java.math.BigDecimal(number.toString()).longValueExact();
+    } catch (ArithmeticException e) {
+      throw new ApiContractException("Malformed JSON payload");
+    }
   }
 }
