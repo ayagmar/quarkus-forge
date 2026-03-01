@@ -35,8 +35,9 @@ class PostGenerationMenuStateTest {
 
   @Test
   void successHintCombinesPathAndCommand() {
-    state.showAfterSuccess(Path.of("/tmp/project"), "mvn quarkus:dev");
-    assertThat(state.successHint()).isEqualTo("cd /tmp/project && mvn quarkus:dev");
+    Path path = Path.of("/tmp/project");
+    state.showAfterSuccess(path, "mvn quarkus:dev");
+    assertThat(state.successHint()).isEqualTo("cd " + path + " && mvn quarkus:dev");
   }
 
   @Test
@@ -53,8 +54,9 @@ class PostGenerationMenuStateTest {
 
   @Test
   void successHintQuotesPathWithSpaces() {
-    state.showAfterSuccess(Path.of("/tmp/my project"), "mvn quarkus:dev");
-    assertThat(state.successHint()).isEqualTo("cd \"/tmp/my project\" && mvn quarkus:dev");
+    Path path = Path.of("/tmp/my project");
+    state.showAfterSuccess(path, "mvn quarkus:dev");
+    assertThat(state.successHint()).isEqualTo("cd \"" + path + "\" && mvn quarkus:dev");
   }
 
   @Test
