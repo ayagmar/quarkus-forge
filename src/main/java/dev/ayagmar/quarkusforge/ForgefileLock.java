@@ -2,13 +2,18 @@ package dev.ayagmar.quarkusforge;
 
 import java.util.List;
 
-public record ForgeLock(
+/**
+ * The locked section of a {@link Forgefile}. Pins exact resolved values for deterministic builds.
+ * When present, drift detection compares generation inputs against these pinned values.
+ */
+public record ForgefileLock(
     String platformStream,
     String buildTool,
     String javaVersion,
     List<String> presets,
     List<String> extensions) {
-  public ForgeLock {
+
+  public ForgefileLock {
     platformStream = ForgeRecordValues.normalize(platformStream);
     buildTool = ForgeRecordValues.normalize(buildTool);
     javaVersion = ForgeRecordValues.normalize(javaVersion);
@@ -16,12 +21,12 @@ public record ForgeLock(
     extensions = ForgeRecordValues.copyOrEmpty(extensions);
   }
 
-  public static ForgeLock from(
+  public static ForgefileLock of(
       String platformStream,
       String buildTool,
       String javaVersion,
       List<String> presets,
       List<String> extensions) {
-    return new ForgeLock(platformStream, buildTool, javaVersion, presets, extensions);
+    return new ForgefileLock(platformStream, buildTool, javaVersion, presets, extensions);
   }
 }

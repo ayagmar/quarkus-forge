@@ -1,12 +1,11 @@
 package dev.ayagmar.quarkusforge.ui;
 
-import dev.ayagmar.quarkusforge.ForgeLock;
-import dev.ayagmar.quarkusforge.ForgeRecipe;
-import dev.ayagmar.quarkusforge.ForgeRecipeLockStore;
+import dev.ayagmar.quarkusforge.Forgefile;
+import dev.ayagmar.quarkusforge.ForgefileLock;
+import dev.ayagmar.quarkusforge.ForgefileStore;
 import dev.ayagmar.quarkusforge.api.BuildToolCodec;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
-import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.api.ThrowableUnwrapper;
@@ -1063,26 +1062,20 @@ public final class CoreTuiController
   private void exportRecipeAndLockFiles() {
     Path generatedProjectPath = postGenerationMenu.lastGeneratedProjectPath();
     if (generatedProjectPath == null) {
-      statusMessage = "Cannot export files: no generated project path";
+      statusMessage = "Cannot export Forgefile: no generated project path";
       return;
     }
     try {
-      Path lockPath = generatedProjectPath.resolve(UiTextConstants.FORGE_LOCK_FILE_NAME);
       List<String> selectedExtensions = extensionCatalogState.selectedExtensionIds();
-      ForgeLock lock =
-          ForgeLock.from(
+      ForgefileLock lock =
+          ForgefileLock.of(
               request.platformStream(),
               request.buildTool(),
               request.javaVersion(),
               List.of(),
               selectedExtensions);
-      ForgeRecipeLockStore.writeLock(lockPath, lock);
-      Path recipePath =
-          ForgeDataPaths.recipesRoot()
-              .resolve(request.artifactId())
-              .resolve(UiTextConstants.FORGE_RECIPE_FILE_NAME);
-      ForgeRecipe recipe =
-          new ForgeRecipe(
+      Forgefile forgefile =
+          new Forgefile(
               request.groupId(),
               request.artifactId(),
               request.version(),
@@ -1092,15 +1085,13 @@ public final class CoreTuiController
               request.buildTool(),
               request.javaVersion(),
               List.of(),
-              selectedExtensions);
-      ForgeRecipeLockStore.writeRecipe(recipePath, recipe);
-      statusMessage =
-          "Exported forge.lock in "
-              + generatedProjectPath
-              + " and Forgefile in "
-              + recipePath.getParent();
+              selectedExtensions,
+              lock);
+      Path forgefilePath = generatedProjectPath.resolve(UiTextConstants.FORGE_FILE_NAME);
+      ForgefileStore.save(forgefilePath, forgefile);
+      statusMessage = "Exported Forgefile to " + forgefilePath;
     } catch (RuntimeException runtimeException) {
-      statusMessage = "Failed to export Forgefile/forge.lock: " + runtimeException.getMessage();
+      statusMessage = "Failed to export Forgefile: " + runtimeException.getMessage();
     }
   }
 

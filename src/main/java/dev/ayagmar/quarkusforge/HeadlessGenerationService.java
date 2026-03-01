@@ -40,9 +40,9 @@ final class HeadlessGenerationService {
     diagnostics.info(
         "generate.start", df("mode", command.dryRun || globalDryRun ? "dry-run" : "apply"));
 
-    EffectiveGenerateInputs effectiveInputs;
+    EffectiveInputs inputs;
     try {
-      effectiveInputs = loadEffectiveInputs(command);
+      inputs = loadEffectiveInputs(command);
     } catch (IllegalArgumentException illegalArgumentException) {
       diagnostics.error(
           "generate.inputs.failed", df("message", illegalArgumentException.getMessage()));
@@ -69,7 +69,7 @@ final class HeadlessGenerationService {
           ProjectRequestFactory::mapFailureToExitCode);
     }
 
-    ProjectRequest request = ProjectRequestFactory.fromOptions(effectiveInputs.requestOptions());
+    ProjectRequest request = ProjectRequestFactory.fromOptions(inputs.requestOptions());
     MetadataCompatibilityContext metadataCompatibility =
         MetadataCompatibilityContext.success(catalogData.metadata());
     ProjectRequest requestWithResolvedStream =
@@ -94,7 +94,7 @@ final class HeadlessGenerationService {
     }
 
     Map<String, List<String>> presetExtensionsByName = Map.of();
-    if (requiresBuiltInPresets(effectiveInputs.presetInputs())) {
+    if (requiresBuiltInPresets(inputs.presetInputs())) {
       try {
         presetExtensionsByName =
             catalogClient.loadBuiltInPresets(
@@ -114,16 +114,14 @@ final class HeadlessGenerationService {
     try {
       extensionIds =
           resolveRequestedExtensions(
-              effectiveInputs.extensionInputs(),
-              effectiveInputs.presetInputs(),
+              inputs.extensionInputs(),
+              inputs.presetInputs(),
               knownExtensionIds,
               presetExtensionsByName);
-      validateLockDrift(
-          effectiveInputs.lock(),
-          effectiveInputs.refreshLock(),
-          validatedState.request(),
-          effectiveInputs.presetInputs(),
-          extensionIds);
+
+      if (inputs.lockCheck()) {
+        validateLockDrift(inputs.forgefile(), validatedState.request(), inputs, extensionIds);
+      }
     } catch (ValidationException validationException) {
       diagnostics.error(
           "generate.extension-validation.failed",
@@ -147,7 +145,7 @@ final class HeadlessGenerationService {
           extensionIds,
           catalogData.source().label(),
           catalogData.stale());
-      writeRecipeAndLockIfRequested(effectiveInputs, validatedState.request(), extensionIds);
+      saveForgefileIfRequested(inputs, validatedState.request(), extensionIds);
       return CommandLine.ExitCode.OK;
     }
 
@@ -177,7 +175,7 @@ final class HeadlessGenerationService {
           generationFuture.get(generationTimeout.toMillis(), TimeUnit.MILLISECONDS);
       diagnostics.info(
           "generate.execute.success", df("projectRoot", generatedProjectRoot.toString()));
-      writeRecipeAndLockIfRequested(effectiveInputs, validatedState.request(), extensionIds);
+      saveForgefileIfRequested(inputs, validatedState.request(), extensionIds);
       System.out.println(
           "Generation succeeded: " + generatedProjectRoot.toAbsolutePath().normalize());
       return CommandLine.ExitCode.OK;
@@ -250,45 +248,46 @@ final class HeadlessGenerationService {
     return List.copyOf(resolved);
   }
 
+  // --- Private helpers ---
+
   private static DiagnosticField df(String name, Object value) {
     return DiagnosticField.of(name, value);
   }
 
-  private static EffectiveGenerateInputs loadEffectiveInputs(GenerateCommand command) {
+  private static EffectiveInputs loadEffectiveInputs(GenerateCommand command) {
     RequestOptions requestOptions = command.requestOptions;
     List<String> presetInputs = new ArrayList<>(command.presets);
     List<String> extensionInputs = new ArrayList<>(command.extensions);
-    ForgeLock lock = null;
+    Forgefile forgefile = null;
+    Path forgefilePath = null;
 
-    if (command.recipeFile != null && !command.recipeFile.isBlank()) {
-      Path recipePath = resolveRecipeReadPath(command.recipeFile);
-      ForgeRecipe recipe = ForgeRecipeLockStore.loadRecipe(recipePath);
-      requestOptions = recipe.toRequestOptions();
-      presetInputs = new ArrayList<>(recipe.presets());
+    if (command.fromFile != null && !command.fromFile.isBlank()) {
+      forgefilePath = resolveForgefileReadPath(command.fromFile);
+      forgefile = ForgefileStore.load(forgefilePath);
+      requestOptions = forgefile.toRequestOptions();
+      presetInputs = new ArrayList<>(forgefile.presets());
       presetInputs.addAll(command.presets);
-      extensionInputs = new ArrayList<>(recipe.extensions());
+      extensionInputs = new ArrayList<>(forgefile.extensions());
       extensionInputs.addAll(command.extensions);
     }
 
-    if (command.lockFile != null && !command.lockFile.isBlank()) {
-      lock = ForgeRecipeLockStore.loadLock(Path.of(command.lockFile).toAbsolutePath().normalize());
+    if (command.lock && forgefile == null && command.saveAsFile == null) {
+      throw new IllegalArgumentException("--lock requires --from or --save-as");
+    }
+    if (command.lockCheck && (forgefile == null || forgefile.locked() == null)) {
+      throw new IllegalArgumentException(
+          "--lock-check requires --from pointing to a Forgefile with a locked section");
     }
 
-    if (command.refreshLock
-        && (command.lockFile == null || command.lockFile.isBlank())
-        && (command.writeLockFile == null || command.writeLockFile.isBlank())) {
-      throw new IllegalArgumentException("--refresh-lock requires --lock or --write-lock");
-    }
-
-    return new EffectiveGenerateInputs(
+    return new EffectiveInputs(
         requestOptions,
         List.copyOf(presetInputs),
         List.copyOf(extensionInputs),
-        lock,
-        command.refreshLock,
-        recipeWritePathOrNull(command.writeRecipeFile),
-        normalizedPathOrNull(command.lockFile),
-        normalizedPathOrNull(command.writeLockFile));
+        forgefile,
+        forgefilePath,
+        command.lock,
+        command.lockCheck,
+        saveAsPathOrNull(command.saveAsFile));
   }
 
   private static boolean requiresBuiltInPresets(List<String> presetInputs) {
@@ -302,21 +301,21 @@ final class HeadlessGenerationService {
   }
 
   private static void validateLockDrift(
-      ForgeLock lock,
-      boolean refreshLock,
+      Forgefile forgefile,
       ProjectRequest request,
-      List<String> presetInputs,
+      EffectiveInputs inputs,
       List<String> extensionIds) {
-    if (lock == null || refreshLock) {
+    if (forgefile == null || forgefile.locked() == null) {
       return;
     }
+    ForgefileLock lock = forgefile.locked();
 
     List<ValidationError> errors = new ArrayList<>();
     if (!lock.platformStream().equals(request.platformStream())) {
       errors.add(
           new ValidationError(
-              "lock",
-              "platformStream drift: lock='"
+              "locked",
+              "platformStream drift: locked='"
                   + lock.platformStream()
                   + "', request='"
                   + request.platformStream()
@@ -325,8 +324,8 @@ final class HeadlessGenerationService {
     if (!lock.buildTool().equals(request.buildTool())) {
       errors.add(
           new ValidationError(
-              "lock",
-              "buildTool drift: lock='"
+              "locked",
+              "buildTool drift: locked='"
                   + lock.buildTool()
                   + "', request='"
                   + request.buildTool()
@@ -335,8 +334,8 @@ final class HeadlessGenerationService {
     if (!lock.javaVersion().equals(request.javaVersion())) {
       errors.add(
           new ValidationError(
-              "lock",
-              "javaVersion drift: lock='"
+              "locked",
+              "javaVersion drift: locked='"
                   + lock.javaVersion()
                   + "', request='"
                   + request.javaVersion()
@@ -345,62 +344,67 @@ final class HeadlessGenerationService {
     if (!lock.extensions().equals(extensionIds)) {
       errors.add(
           new ValidationError(
-              "lock", "extensions drift: lock=" + lock.extensions() + ", request=" + extensionIds));
+              "locked",
+              "extensions drift: locked=" + lock.extensions() + ", request=" + extensionIds));
     }
     List<String> normalizedPresets =
-        presetInputs.stream().map(ProjectRequestFactory::normalizePresetName).toList();
+        inputs.presetInputs().stream().map(ProjectRequestFactory::normalizePresetName).toList();
     if (!lock.presets().equals(normalizedPresets)) {
       errors.add(
           new ValidationError(
-              "lock", "presets drift: lock=" + lock.presets() + ", request=" + normalizedPresets));
+              "locked",
+              "presets drift: locked=" + lock.presets() + ", request=" + normalizedPresets));
     }
 
     if (!errors.isEmpty()) {
       errors.add(
           new ValidationError(
-              "lock", "rerun with --refresh-lock to accept and rewrite lock contents"));
+              "locked", "rerun with --lock to accept and update the locked section"));
       throw new ValidationException(errors);
     }
   }
 
-  private static void writeRecipeAndLockIfRequested(
-      EffectiveGenerateInputs inputs, ProjectRequest request, List<String> extensionIds) {
+  private static void saveForgefileIfRequested(
+      EffectiveInputs inputs, ProjectRequest request, List<String> extensionIds) {
     List<String> normalizedPresets =
         inputs.presetInputs().stream().map(ProjectRequestFactory::normalizePresetName).toList();
 
-    if (inputs.writeRecipeFile() != null) {
-      ForgeRecipe recipe =
-          ForgeRecipe.from(inputs.requestOptions(), normalizedPresets, inputs.extensionInputs());
-      ForgeRecipeLockStore.writeRecipe(inputs.writeRecipeFile(), recipe);
+    // Determine what Forgefile to write (--save-as creates a new one, --from updates existing)
+    Forgefile forgefile;
+    if (inputs.forgefile() != null) {
+      forgefile = inputs.forgefile();
+    } else {
+      forgefile =
+          Forgefile.from(inputs.requestOptions(), normalizedPresets, inputs.extensionInputs());
     }
 
-    Path lockPath = null;
-    if (inputs.writeLockFile() != null) {
-      lockPath = inputs.writeLockFile();
-    } else if (inputs.refreshLock() && inputs.lockFile() != null) {
-      lockPath = inputs.lockFile();
-    }
-    if (lockPath != null) {
-      ForgeLock lock =
-          ForgeLock.from(
+    // Add locked section if --lock was requested
+    if (inputs.writeLock()) {
+      ForgefileLock lock =
+          ForgefileLock.of(
               request.platformStream(),
               request.buildTool(),
               request.javaVersion(),
               normalizedPresets,
               extensionIds);
-      ForgeRecipeLockStore.writeLock(lockPath, lock);
+      forgefile = forgefile.withLock(lock);
+    }
+
+    // Write to --save-as path, or update --from path in-place
+    Path writePath = inputs.saveAsFile();
+    if (writePath == null && inputs.writeLock() && inputs.forgefilePath() != null) {
+      writePath = inputs.forgefilePath();
+    }
+    if (writePath == null && inputs.saveAsFile() == null) {
+      return; // Nothing to write
+    }
+    if (writePath != null) {
+      ForgefileStore.save(writePath, forgefile);
     }
   }
 
-  private static Path normalizedPathOrNull(String pathValue) {
-    if (pathValue == null || pathValue.isBlank()) {
-      return null;
-    }
-    return Path.of(pathValue).toAbsolutePath().normalize();
-  }
-
-  private static Path resolveRecipeReadPath(String recipeReference) {
-    Path requestedPath = Path.of(recipeReference);
+  private static Path resolveForgefileReadPath(String reference) {
+    Path requestedPath = Path.of(reference);
     Path localPath = requestedPath.toAbsolutePath().normalize();
     if (requestedPath.isAbsolute() || Files.exists(localPath)) {
       return localPath;
@@ -408,7 +412,7 @@ final class HeadlessGenerationService {
     return ForgeDataPaths.recipesRoot().resolve(requestedPath).toAbsolutePath().normalize();
   }
 
-  private static Path recipeWritePathOrNull(String pathValue) {
+  private static Path saveAsPathOrNull(String pathValue) {
     if (pathValue == null || pathValue.isBlank()) {
       return null;
     }
@@ -419,13 +423,13 @@ final class HeadlessGenerationService {
     return ForgeDataPaths.recipesRoot().resolve(requestedPath).toAbsolutePath().normalize();
   }
 
-  private record EffectiveGenerateInputs(
+  private record EffectiveInputs(
       RequestOptions requestOptions,
       List<String> presetInputs,
       List<String> extensionInputs,
-      ForgeLock lock,
-      boolean refreshLock,
-      Path writeRecipeFile,
-      Path lockFile,
-      Path writeLockFile) {}
+      Forgefile forgefile,
+      Path forgefilePath,
+      boolean writeLock,
+      boolean lockCheck,
+      Path saveAsFile) {}
 }

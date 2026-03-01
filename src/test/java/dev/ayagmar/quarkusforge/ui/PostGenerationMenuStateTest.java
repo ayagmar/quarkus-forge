@@ -129,7 +129,7 @@ class PostGenerationMenuStateTest {
 
     @Test
     void enterOnExportRecipeReturnsExportResult() {
-      // Index 0 is Export Forgefile + forge.lock
+      // Index 0 is Export Forgefile
       MenuKeyResult result = state.handleKey(KeyEvent.ofKey(KeyCode.ENTER));
       assertThat(result).isInstanceOf(MenuKeyResult.ExportRecipe.class);
     }

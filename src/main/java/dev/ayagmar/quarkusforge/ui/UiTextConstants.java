@@ -9,8 +9,7 @@ import java.util.List;
 final class UiTextConstants {
   private UiTextConstants() {}
 
-  static final String FORGE_LOCK_FILE_NAME = "forge.lock";
-  static final String FORGE_RECIPE_FILE_NAME = "Forgefile";
+  static final String FORGE_FILE_NAME = "Forgefile";
 
   static final List<String> STARTUP_SPLASH_ART =
       List.of(
@@ -45,8 +44,7 @@ final class UiTextConstants {
 
   static final List<PostGenerationAction> POST_GENERATION_ACTIONS =
       List.of(
-          new PostGenerationAction(
-              "Export Forgefile + forge.lock", PostGenerationExitAction.EXPORT_RECIPE_LOCK),
+          new PostGenerationAction("Export Forgefile", PostGenerationExitAction.EXPORT_RECIPE_LOCK),
           new PostGenerationAction(
               "Publish to GitHub (requires gh)", PostGenerationExitAction.PUBLISH_GITHUB),
           new PostGenerationAction("Open in IDE", PostGenerationExitAction.OPEN_IDE),
