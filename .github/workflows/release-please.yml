@@ -1,9 +1,6 @@
 name: Release Please
 
 on:
-  push:
-    branches:
-      - master
   workflow_dispatch:
 
 permissions:
@@ -36,5 +33,5 @@ jobs:
             exit 0
           fi
           echo "$PRS_JSON" | jq -r '.[].number' | while read -r pr_number; do
-            gh pr merge "$pr_number" --auto --squash --delete-branch
+            gh pr merge "$pr_number" --repo ayagmar/quarkus-forge --auto --squash --delete-branch
           done
