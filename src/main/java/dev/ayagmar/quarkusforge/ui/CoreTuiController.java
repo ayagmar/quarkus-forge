@@ -28,8 +28,6 @@ import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.ResizeEvent;
 import dev.tamboui.tui.event.TickEvent;
-import dev.tamboui.widgets.block.Block;
-import dev.tamboui.widgets.block.Borders;
 import dev.tamboui.widgets.input.TextInputState;
 import dev.tamboui.widgets.paragraph.Paragraph;
 import java.nio.file.Path;
@@ -998,11 +996,19 @@ public final class CoreTuiController
   private void renderPostGenerationOverlay(Frame frame, Rect viewport) {
     if (githubVisibilityMenuVisible) {
       OverlayRenderer.renderGitHubVisibilityOverlay(
-          frame, viewport, theme, UiTextConstants.GITHUB_VISIBILITY_LABELS, githubVisibilitySelection);
+          frame,
+          viewport,
+          theme,
+          UiTextConstants.GITHUB_VISIBILITY_LABELS,
+          githubVisibilitySelection);
       return;
     }
     OverlayRenderer.renderPostGenerationOverlay(
-        frame, viewport, theme, UiTextConstants.POST_GENERATION_ACTION_LABELS, postGenerationActionSelection);
+        frame,
+        viewport,
+        theme,
+        UiTextConstants.POST_GENERATION_ACTION_LABELS,
+        postGenerationActionSelection);
   }
 
   private FooterSnapshot footerSnapshot() {
@@ -1309,7 +1315,8 @@ public final class CoreTuiController
       closeCommandPalette();
       return;
     }
-    CommandPaletteAction action = UiTextConstants.COMMAND_PALETTE_ENTRIES.get(commandPaletteSelection).action();
+    CommandPaletteAction action =
+        UiTextConstants.COMMAND_PALETTE_ENTRIES.get(commandPaletteSelection).action();
     closeCommandPalette();
     executeCommandPaletteAction(action);
   }
@@ -1499,10 +1506,7 @@ public final class CoreTuiController
     MetadataDto metadataSnapshot = metadataCompatibility.metadataSnapshot();
     MetadataSelectorManager.ResolvedSelections resolved =
         metadataSelectors.sync(
-            metadataSnapshot,
-            request.platformStream(),
-            request.buildTool(),
-            request.javaVersion());
+            metadataSnapshot, request.platformStream(), request.buildTool(), request.javaVersion());
 
     request =
         CliPrefillMapper.map(

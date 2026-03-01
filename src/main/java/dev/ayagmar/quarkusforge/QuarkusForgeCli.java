@@ -25,7 +25,6 @@ import dev.ayagmar.quarkusforge.domain.ValidationError;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.ayagmar.quarkusforge.ui.ExtensionCatalogLoadResult;
 import dev.ayagmar.quarkusforge.ui.ExtensionFavoritesStore;
-import dev.ayagmar.quarkusforge.ui.PostGenerationExitPlan;
 import dev.ayagmar.quarkusforge.ui.UserPreferencesStore;
 import dev.tamboui.tui.TuiConfig;
 import dev.tamboui.tui.bindings.Bindings;

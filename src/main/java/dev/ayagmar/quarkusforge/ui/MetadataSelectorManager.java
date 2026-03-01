@@ -6,8 +6,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Manages the metadata selector state (platform stream, build tool, java version) for the TUI
- * form. Encapsulates option resolution, cycling, and label generation.
+ * Manages the metadata selector state (platform stream, build tool, java version) for the TUI form.
+ * Encapsulates option resolution, cycling, and label generation.
  */
 final class MetadataSelectorManager {
   private List<String> availableBuildTools = List.of();
@@ -51,8 +51,7 @@ final class MetadataSelectorManager {
         normalizeSelectedPlatformStream(
             currentPlatformStream, metadataSnapshot, availablePlatformStreams);
     String selectedBuildTool = normalizeSelectedOption(currentBuildTool, availableBuildTools);
-    String selectedJavaVersion =
-        normalizeSelectedOption(currentJavaVersion, availableJavaVersions);
+    String selectedJavaVersion = normalizeSelectedOption(currentJavaVersion, availableJavaVersions);
 
     return new ResolvedSelections(selectedPlatformStream, selectedBuildTool, selectedJavaVersion);
   }
@@ -90,8 +89,7 @@ final class MetadataSelectorManager {
    * Generates the inline label showing all options with radio-button style markers, e.g. "(*) maven
    * ( ) gradle ( ) gradle-kotlin-dsl"
    */
-  String inlineLabel(
-      FocusTarget target, String selectedValue, MetadataDto metadataSnapshot) {
+  String inlineLabel(FocusTarget target, String selectedValue, MetadataDto metadataSnapshot) {
     List<String> options = optionsFor(target);
     if (options.isEmpty()) {
       return "( ) no options available";

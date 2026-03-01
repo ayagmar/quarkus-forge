@@ -1,19 +1,68 @@
 = Architecture & Internals
 :navtitle: Architecture
 
-Quarkus Forge is designed with a strict separation between the core logic, the TUI layer, and the external API interactions.
+Quarkus Forge separates core logic, TUI rendering, API transport, and archive processing into focused modules with clear boundaries.
 
-== Core Components
+== Module Structure
 
-* **API Layer**: Handles communication with `code.quarkus.io`. Responsible for fetching the extension catalog and downloading the generated project ZIPs.
-* **Domain Model**: Represents the internal state of a generation request (`ProjectRequest`, `ValidationReport`).
-* **TUI (Terminal UI)**: Built on top of a custom, asynchronous rendering engine. Uses `dev.ayagmar.quarkusforge.ui.CoreTuiController` to manage focus routing, keybindings, and state transitions.
-* **Archive & File System**: Handles safe zip extraction with guardrails (`SafeZipExtractor`) to protect against path traversal and zip bomb attacks.
+=== API Layer (`api/`)
+
+Handles communication with `code.quarkus.io`:
+
+* **`QuarkusApiClient`** — Async HTTP transport with configurable retry/backoff. Responsible only for sending requests and receiving responses.
+* **`ApiPayloadParser`** — Stateless JSON deserialization for all API payload types (extensions, metadata, streams, presets, OpenAPI build tools). Separated from transport for testability.
+* **`JsonFieldReader`** — Shared JSON field reading utilities (`readString`, `readInt`, `readStringList`, etc.) used across all store and parser classes.
+* **`CatalogSnapshotCache`** — Local file-based catalog snapshot with schema versioning and freshness tracking.
+* **`CatalogDataService`** — Orchestrates live fetch → cache fallback → bundled snapshot resolution.
+
+=== Domain Layer (`domain/`)
+
+Pure logic with no I/O dependencies:
+
+* **`ProjectRequest`** — Immutable value object representing a generation configuration.
+* **`ProjectRequestValidator`** — Validates project metadata fields (group ID, artifact ID, version, etc.).
+* **`MetadataCompatibilityContext`** — Enforces metadata-driven compatibility constraints between build tools, Java versions, and platform streams.
+* **`CliPrefillMapper`** — Maps CLI option values and user input into normalized `ProjectRequest` instances.
+
+=== UI Layer (`ui/`)
+
+TUI rendering and interaction, built on the https://github.com/ayagmar/tamboui[TamboUI] framework:
+
+* **`CoreTuiController`** — Central state machine managing focus routing, keybindings, generation flow, and rendering orchestration.
+* **`OverlayRenderer`** — Stateless rendering for modal overlays (command palette, help, generation progress, post-generation menus, startup splash).
+* **`MetadataSelectorManager`** — Encapsulates metadata selector state: option resolution from API metadata, cycling, edge selection, and inline radio-button label generation.
+* **`UiTextConstants`** — UI text content (help lines, splash art, command palette entries, action labels) separated from controller logic.
+* **`ExtensionCatalogState`** — Extension catalog interaction state: search, filtering, favorites, presets, category collapse, and list navigation.
+* **`UiEventRouter`** — Dispatches keyboard events through a priority chain of handlers (overlays → cancel flows → shortcuts → focus navigation → input).
+* **`BodyPanelRenderer`** / **`FooterLinesComposer`** — Layout-specific rendering helpers.
+
+=== CLI Layer (root package)
+
+Entry points and orchestration:
+
+* **`QuarkusForgeCli`** — Picocli `@Command` entry point. Bootstraps the TUI or dispatches to headless generation.
+* **`HeadlessGenerationService`** — Non-interactive generation engine for CI/scripting use cases.
+* **`PostTuiActionExecutor`** — Executes post-generation shell actions (IDE open, GitHub publish via `gh`, interactive terminal handoff).
+* **`ForgeRecipeLockStore`** — Reads and writes `Forgefile` (recipe) and `forge.lock` (deterministic lock) files.
+
+=== Archive Layer (`archive/`)
+
+* **`SafeZipExtractor`** — Hardened ZIP extraction with protections against Zip-Bomb (size limits, entry count caps) and Zip-Slip (path traversal) attacks.
+* **`ProjectArchiveService`** — Orchestrates archive download, extraction, progress reporting, and cancellation.
 
 == Data Flow
 
-1. The user initiates a project creation via TUI or Headless CLI.
-2. The `ProjectRequest` is populated with metadata and selected extensions.
-3. The request is validated by `ProjectRequestValidator`.
-4. A query is built and sent via `QuarkusApiClient`.
-5. The resulting archive is processed by `SafeZipExtractor` to scaffold the project securely in the target directory.
+1. The user initiates project creation via the TUI or headless CLI.
+2. A `ProjectRequest` is populated from user input, CLI options, or a `Forgefile` recipe.
+3. The request is validated by `ProjectRequestValidator` and `MetadataCompatibilityContext`.
+4. `QuarkusApiClient` sends the generation request; `ApiPayloadParser` deserializes the response.
+5. `SafeZipExtractor` scaffolds the project securely in the target directory.
+6. Post-generation actions (IDE, GitHub, terminal) are executed by `PostTuiActionExecutor`.
+
+== Design Principles
+
+* **Single Responsibility**: Each class has one clear reason to change.
+* **Stateless rendering**: `OverlayRenderer` and `BodyPanelRenderer` take snapshot data — no side effects.
+* **Transport vs. parsing**: `QuarkusApiClient` handles HTTP; `ApiPayloadParser` handles JSON.
+* **DRY**: `JsonFieldReader` eliminates duplicated JSON helpers across 5+ classes.
+* **Testability**: 452 unit tests with deterministic async harnesses for TUI state machine testing.

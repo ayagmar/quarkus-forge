@@ -61,11 +61,7 @@ final class OverlayRenderer {
   }
 
   static void renderPostGenerationOverlay(
-      Frame frame,
-      Rect viewport,
-      UiTheme theme,
-      List<String> actionLabels,
-      int selectedIndex) {
+      Frame frame, Rect viewport, UiTheme theme, List<String> actionLabels, int selectedIndex) {
     if (viewport.width() < 36 || viewport.height() < 10) {
       return;
     }
@@ -82,11 +78,7 @@ final class OverlayRenderer {
   }
 
   static void renderGitHubVisibilityOverlay(
-      Frame frame,
-      Rect viewport,
-      UiTheme theme,
-      List<String> visibilityLabels,
-      int selectedIndex) {
+      Frame frame, Rect viewport, UiTheme theme, List<String> visibilityLabels, int selectedIndex) {
     if (viewport.width() < 44 || viewport.height() < 10) {
       return;
     }
@@ -103,11 +95,7 @@ final class OverlayRenderer {
   }
 
   static void renderGenerationOverlay(
-      Frame frame,
-      Rect viewport,
-      UiTheme theme,
-      double progressRatio,
-      String progressPhase) {
+      Frame frame, Rect viewport, UiTheme theme, double progressRatio, String progressPhase) {
     if (viewport.width() < 30 || viewport.height() < 8) {
       return;
     }
@@ -136,10 +124,7 @@ final class OverlayRenderer {
     List<Rect> rows =
         Layout.vertical()
             .constraints(
-                Constraint.length(1),
-                Constraint.length(1),
-                Constraint.length(1),
-                Constraint.fill())
+                Constraint.length(1), Constraint.length(1), Constraint.length(1), Constraint.fill())
             .split(inner);
 
     Paragraph phaseLine =
