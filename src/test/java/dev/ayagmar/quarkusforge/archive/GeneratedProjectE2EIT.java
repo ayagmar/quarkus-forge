@@ -4,6 +4,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.havingExactly;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.verify;
@@ -106,7 +107,10 @@ class GeneratedProjectE2EIT {
             .withQueryParam("b", equalTo("MAVEN"))
             .withQueryParam("j", equalTo("25"))
             .withQueryParam(
-                "e", equalTo("io.quarkus:quarkus-resteasy-reactive,io.quarkus:quarkus-arc")));
+                "e",
+                havingExactly(
+                    equalTo("io.quarkus:quarkus-resteasy-reactive"),
+                    equalTo("io.quarkus:quarkus-arc"))));
 
     assertThat(generatedProject.resolve("pom.xml")).exists();
     assertThat(generatedProject.resolve("README.md")).exists();

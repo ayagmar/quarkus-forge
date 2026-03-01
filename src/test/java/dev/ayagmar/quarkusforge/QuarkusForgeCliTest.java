@@ -116,7 +116,7 @@ class QuarkusForgeCliTest {
   @Test
   void postHookDiagnosticsRedactsRawCommand() {
     String command = "QUARKUS_TOKEN=secret ./deploy.sh";
-    var fields = QuarkusForgeCli.postHookDiagnosticFields(Path.of("/tmp/project"), command);
+    var fields = PostTuiActionExecutor.postHookDiagnosticFields(Path.of("/tmp/project"), command);
     var valuesByName =
         java.util.Arrays.stream(fields)
             .collect(
@@ -143,16 +143,16 @@ class QuarkusForgeCliTest {
   @Test
   void isCommandAvailableReturnsFalseForMissingBinary() {
     String missing = "missing-" + UUID.randomUUID();
-    assertThat(QuarkusForgeCli.isCommandAvailable(missing)).isFalse();
+    assertThat(PostTuiActionExecutor.isCommandAvailable(missing)).isFalse();
   }
 
   @Test
   void githubPublishCommandIncludesVisibilityFlag() {
-    assertThat(QuarkusForgeCli.githubPublishCommand(GitHubVisibility.PRIVATE))
+    assertThat(PostTuiActionExecutor.githubPublishCommand(GitHubVisibility.PRIVATE))
         .isEqualTo("gh repo create --source . --push --private");
-    assertThat(QuarkusForgeCli.githubPublishCommand(GitHubVisibility.PUBLIC))
+    assertThat(PostTuiActionExecutor.githubPublishCommand(GitHubVisibility.PUBLIC))
         .isEqualTo("gh repo create --source . --push --public");
-    assertThat(QuarkusForgeCli.githubPublishCommand(GitHubVisibility.INTERNAL))
+    assertThat(PostTuiActionExecutor.githubPublishCommand(GitHubVisibility.INTERNAL))
         .isEqualTo("gh repo create --source . --push --internal");
   }
 }

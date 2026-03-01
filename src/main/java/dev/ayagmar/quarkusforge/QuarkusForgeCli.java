@@ -25,7 +25,6 @@ import dev.ayagmar.quarkusforge.domain.ValidationError;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.ayagmar.quarkusforge.ui.ExtensionCatalogLoadResult;
 import dev.ayagmar.quarkusforge.ui.ExtensionFavoritesStore;
-import dev.ayagmar.quarkusforge.ui.GitHubVisibility;
 import dev.ayagmar.quarkusforge.ui.PostGenerationExitPlan;
 import dev.ayagmar.quarkusforge.ui.UserPreferencesStore;
 import dev.tamboui.tui.TuiConfig;
@@ -298,24 +297,6 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     diagnostics.info("catalog.load.start", df("mode", "tui"));
     catalogDataService.load().handle(QuarkusForgeCli.catalogLoadDiagnostics(diagnostics)).join();
     diagnostics.info("tui.session.exit", df("outcome", "completed"));
-  }
-
-  // Delegating to PostTuiActionExecutor — kept for backward compatibility.
-
-  static boolean isWindowsOs() {
-    return PostTuiActionExecutor.isWindowsOs();
-  }
-
-  static boolean isCommandAvailable(String command) {
-    return PostTuiActionExecutor.isCommandAvailable(command);
-  }
-
-  static String githubPublishCommand(GitHubVisibility visibility) {
-    return PostTuiActionExecutor.githubPublishCommand(visibility);
-  }
-
-  static DiagnosticField[] postHookDiagnosticFields(Path generatedProjectDir, String command) {
-    return PostTuiActionExecutor.postHookDiagnosticFields(generatedProjectDir, command);
   }
 
   static java.util.function.BiFunction<CatalogData, Throwable, ExtensionCatalogLoadResult>
