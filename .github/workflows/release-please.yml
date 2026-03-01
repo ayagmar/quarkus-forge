@@ -64,6 +64,7 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           release-as: ${{ steps.version.outputs.release_as }}
+          skip-github-release: true
 
       - name: Auto-merge release-please PR
         if: steps.release.outputs.prs_created == 'true'
