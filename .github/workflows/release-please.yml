@@ -2,6 +2,16 @@ name: Release Please
 
 on:
   workflow_dispatch:
+    inputs:
+      bump:
+        description: Release bump type
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: write
@@ -13,6 +23,37 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute release-as version
+        id: version
+        run: |
+          set -euo pipefail
+          current="$(jq -r '."."' .release-please-manifest.json)"
+          IFS='.' read -r major minor patch <<< "$current"
+
+          case "${{ github.event.inputs.bump }}" in
+            major)
+              major=$((major + 1))
+              minor=0
+              patch=0
+              ;;
+            minor)
+              minor=$((minor + 1))
+              patch=0
+              ;;
+            patch)
+              patch=$((patch + 1))
+              ;;
+            *)
+              echo "Unsupported bump type: ${{ github.event.inputs.bump }}"
+              exit 1
+              ;;
+          esac
+
+          echo "release_as=${major}.${minor}.${patch}" >> "$GITHUB_OUTPUT"
+
       - name: Run release-please
         id: release
         uses: googleapis/release-please-action@v4
@@ -21,6 +62,7 @@ jobs:
           target-branch: master
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          release-as: ${{ steps.version.outputs.release_as }}
 
       - name: Auto-merge release-please PR
         if: steps.release.outputs.prs_created == 'true'
