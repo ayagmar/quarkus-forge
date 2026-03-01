@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticField;
 import dev.ayagmar.quarkusforge.ui.GitHubVisibility;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -13,6 +16,23 @@ class QuarkusForgeCliTest {
   void helpCommandReturnsSuccessExitCode() {
     int exitCode = QuarkusForgeCli.runWithArgs(new String[] {"--help"});
     assertThat(exitCode).isZero();
+  }
+
+  @Test
+  void versionCommandUsesResolvedBuildVersion() {
+    PrintStream originalOut = System.out;
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    try {
+      System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
+      int exitCode = QuarkusForgeCli.runWithArgs(new String[] {"--version"});
+      assertThat(exitCode).isZero();
+    } finally {
+      System.setOut(originalOut);
+    }
+
+    String versionOutput = output.toString(StandardCharsets.UTF_8).trim();
+    assertThat(versionOutput).contains(CliVersionProvider.resolveVersion());
+    assertThat(versionOutput).doesNotContain("0.1.0-SNAPSHOT");
   }
 
   @Test

@@ -9,6 +9,9 @@
       },
       {
         "pattern": "dev/tamboui/tui/bindings/.*\\.properties$"
+      },
+      {
+        "pattern": "version\\.properties$"
       }
     ]
   }

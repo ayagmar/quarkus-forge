@@ -54,7 +54,7 @@ import picocli.CommandLine.Option;
 
 @Command(
     name = "quarkus-forge",
-    version = "0.1.0-SNAPSHOT",
+    versionProvider = CliVersionProvider.class,
     subcommands = {GenerateCommand.class},
     description = "Quarkus forge terminal UI")
 public final class QuarkusForgeCli implements Callable<Integer> {
