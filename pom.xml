@@ -258,6 +258,7 @@
               <buildArgs>
                 <buildArg>--no-fallback</buildArg>
                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
+                <buildArg>-H:+SharedArenaSupport</buildArg>
                 <buildArg>--enable-url-protocols=http,https</buildArg>
                 <buildArg>${native.access.flag}</buildArg>
               </buildArgs>
