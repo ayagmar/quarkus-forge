@@ -3,13 +3,31 @@
 </footer>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>
-  // Mermaid: render all <pre class="mermaid"> blocks
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
-    flowchart: { useMaxWidth: true, htmlLabels: true }
-  });
-  mermaid.run({ querySelector: '.mermaid' });
+  // Mermaid: render all <pre class="mermaid"> blocks.
+  // Sources are saved before first render so diagrams can be re-processed
+  // when the theme changes (mermaid skips elements marked data-processed).
+  var _mermaidSources = new Map();
+
+  function renderMermaid() {
+    if (!window.mermaid) return;
+    document.querySelectorAll('.mermaid').forEach(function (el) {
+      var saved = _mermaidSources.get(el);
+      if (saved !== undefined) {
+        el.textContent = saved;
+        el.removeAttribute('data-processed');
+      } else {
+        _mermaidSources.set(el, el.textContent);
+      }
+    });
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
+      flowchart: { useMaxWidth: true, htmlLabels: true }
+    });
+    mermaid.run({ querySelector: '.mermaid' });
+  }
+
+  renderMermaid();
 
   const docsThemeToggleBtn = document.getElementById('docs-theme-toggle');
   const docsIconDark = document.getElementById('docs-theme-icon-dark');
@@ -31,6 +49,7 @@
       const isDark = document.documentElement.classList.contains('dark');
       localStorage.setItem('theme', isDark ? 'dark' : 'light');
       updateDocsIcons();
+      renderMermaid();
     });
     updateDocsIcons();
   }

@@ -21,6 +21,7 @@ buildNumber.properties
 /site/node_modules/
 /site/build/
 /site/.cache/
+/site/output.css
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
