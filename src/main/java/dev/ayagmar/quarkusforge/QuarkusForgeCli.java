@@ -204,31 +204,45 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
     }
     RequestOptions defaults = defaultRequestOptions();
     requestOptions.groupId =
-        applyIfDefault(requestOptions.groupId, defaults.groupId, storedPrefill.groupId());
+        applyIfNotExplicit(requestOptions, "--group-id", requestOptions.groupId, defaults.groupId, storedPrefill.groupId());
     requestOptions.artifactId =
-        applyIfDefault(requestOptions.artifactId, defaults.artifactId, storedPrefill.artifactId());
+        applyIfNotExplicit(requestOptions, "--artifact-id", requestOptions.artifactId, defaults.artifactId, storedPrefill.artifactId());
     requestOptions.version =
-        applyIfDefault(requestOptions.version, defaults.version, storedPrefill.version());
+        applyIfNotExplicit(requestOptions, "--project-version", requestOptions.version, defaults.version, storedPrefill.version());
     requestOptions.packageName =
-        applyIfDefault(
-            requestOptions.packageName, defaults.packageName, storedPrefill.packageName());
+        applyIfNotExplicit(
+            requestOptions, "--package-name", requestOptions.packageName, defaults.packageName, storedPrefill.packageName());
     requestOptions.outputDirectory =
-        applyIfDefault(
+        applyIfNotExplicit(
+            requestOptions,
+            "--output-dir",
             requestOptions.outputDirectory,
             defaults.outputDirectory,
             storedPrefill.outputDirectory());
     requestOptions.platformStream =
-        applyIfDefault(
-            requestOptions.platformStream, defaults.platformStream, storedPrefill.platformStream());
+        applyIfNotExplicit(
+            requestOptions, "--platform-stream", requestOptions.platformStream, defaults.platformStream, storedPrefill.platformStream());
     requestOptions.buildTool =
-        applyIfDefault(requestOptions.buildTool, defaults.buildTool, storedPrefill.buildTool());
+        applyIfNotExplicit(requestOptions, "--build-tool", requestOptions.buildTool, defaults.buildTool, storedPrefill.buildTool());
     requestOptions.javaVersion =
-        applyIfDefault(
-            requestOptions.javaVersion, defaults.javaVersion, storedPrefill.javaVersion());
+        applyIfNotExplicit(
+            requestOptions, "--java-version", requestOptions.javaVersion, defaults.javaVersion, storedPrefill.javaVersion());
   }
 
-  private static String applyIfDefault(String current, String defaultValue, String stored) {
-    if (Objects.equals(current, defaultValue) && stored != null && !stored.isBlank()) {
+  /**
+   * Returns the stored value when the option was not explicitly provided on the command line.
+   * Uses {@link RequestOptions#isExplicitlySet} to detect explicit CLI input, which avoids
+   * overriding an intentional default-equal value with old prefill data.
+   */
+  private static String applyIfNotExplicit(
+      RequestOptions requestOptions,
+      String optionName,
+      String current,
+      String defaultValue,
+      String stored) {
+    if (!requestOptions.isExplicitlySet(optionName, current, defaultValue)
+        && stored != null
+        && !stored.isBlank()) {
       return stored;
     }
     return current;
