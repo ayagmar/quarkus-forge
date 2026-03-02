@@ -40,6 +40,7 @@ distributions:
     type: BINARY
     artifacts:
       - path: artifacts/quarkus-forge-jvm.jar
+      - path: artifacts/quarkus-forge-headless.jar
       - path: artifacts/quarkus-forge-linux-x86_64
         platform: linux
       - path: artifacts/quarkus-forge-macos-aarch64

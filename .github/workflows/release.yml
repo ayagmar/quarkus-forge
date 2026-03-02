@@ -40,11 +40,20 @@ jobs:
       - name: Rename JVM artifact
         run: cp target/quarkus-forge.jar target/quarkus-forge-jvm.jar
 
+      - name: Package headless JVM artifact
+        run: mvn -B -ntp clean package -Pheadless
+
       - name: Upload JVM artifact
         uses: actions/upload-artifact@v4
         with:
           name: quarkus-forge-jvm
           path: target/quarkus-forge-jvm.jar
+
+      - name: Upload headless JVM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: quarkus-forge-headless-jvm
+          path: target/quarkus-forge-headless.jar
 
   package-native:
     strategy:

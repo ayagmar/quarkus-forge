@@ -6,6 +6,10 @@
       "java-options": [
         "--enable-native-access=ALL-UNNAMED"
       ]
+    },
+    "quarkus-forge-headless": {
+      "script-ref": "https://github.com/ayagmar/quarkus-forge/releases/latest/download/quarkus-forge-headless.jar",
+      "description": "Quarkus project generator headless CLI (no TUI dependencies)"
     }
   }
 }

@@ -35,8 +35,10 @@ The codebase is organized into focused modules that follow SOLID principles and 
 - **`BodyPanelRenderer`** / **`FooterLinesComposer`** — Layout rendering helpers.
 
 ### CLI Layer (root package)
-- **`QuarkusForgeCli`** — Picocli command entry point, TUI bootstrap, and runtime configuration.
+- **`QuarkusForgeCli`** — Picocli command entry point for TUI mode, runtime configuration, and startup metadata resolution.
+- **`HeadlessCli`** — Lightweight entry point for headless/CI mode (no TUI or terminal dependencies).
 - **`HeadlessGenerationService`** — Decoupled headless generation engine for CI/scripting, with `AsyncFailureHandler` for consistent error handling.
+- **`ExitCodes`** — Central exit code constants shared by both entry points.
 - **`PostTuiActionExecutor`** — Post-generation shell actions (IDE open, GitHub publish, terminal handoff).
 - **`IdeDetector`** — Cross-platform IDE auto-detection (macOS, Linux, Windows).
 - **`ForgefileStore`** — Forgefile persistence (with optional locked section).
@@ -54,11 +56,19 @@ For a complete overview of the internal design, see the [Architecture & Internal
 
 ## Build
 
+### Full build (TUI + headless)
 ```bash
 mvn clean package -DskipTests
 ```
 
 Output: `target/quarkus-forge.jar`
+
+### Headless-only build
+```bash
+mvn clean package -Pheadless
+```
+
+Output: `target/quarkus-forge-headless.jar` — ~40% smaller, no TUI or terminal dependencies.
 
 ## Quick Start
 
@@ -73,6 +83,15 @@ Hit `?` for help, `Ctrl+P` for the command palette, or `/` to jump to extension 
 ### Headless Generate
 ```bash
 java -jar target/quarkus-forge.jar generate \
+  --group-id org.acme \
+  --artifact-id demo \
+  --build-tool maven \
+  --java-version 25
+```
+
+Or with the headless-only jar (no TUI dependencies, ideal for CI):
+```bash
+java -jar target/quarkus-forge-headless.jar generate \
   --group-id org.acme \
   --artifact-id demo \
   --build-tool maven \

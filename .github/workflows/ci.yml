@@ -4,12 +4,14 @@ on:
   pull_request:
     paths:
       - 'src/**'
+      - 'pom.xml'
       - '.github/workflows/ci.yml'
   push:
     branches:
       - master
     paths:
       - 'src/**'
+      - 'pom.xml'
       - '.github/workflows/ci.yml'
   workflow_dispatch:
 
@@ -60,6 +62,9 @@ jobs:
 
       - name: Checkstyle check
         run: mvn -B -ntp checkstyle:check
+
+      - name: Headless profile compile check
+        run: mvn -B -ntp clean compile -Pheadless
 
   tests:
     name: Tests (${{ matrix.os }}, ${{ matrix.suite }})
