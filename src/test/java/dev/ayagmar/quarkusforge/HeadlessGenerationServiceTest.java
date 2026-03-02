@@ -111,11 +111,6 @@ class HeadlessGenerationServiceTest {
     }
 
     @Override
-    public void close() {
-      // No resources to release in this stub.
-    }
-
-    @Override
     CatalogData loadCatalogData(Duration timeout)
         throws ExecutionException, InterruptedException, TimeoutException {
       if (catalogLoadTimeout != null) {
