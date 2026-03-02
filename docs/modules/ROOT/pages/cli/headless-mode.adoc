@@ -35,7 +35,7 @@ java -jar target/quarkus-forge-headless.jar generate \
   --output-dir .
 ----
 
-TIP: The full jar also works: `java -jar target/quarkus-forge-headless.jar generate ...`
+TIP: The full jar also works: `java -jar target/quarkus-forge.jar generate ...`
 
 == Common Examples
 

@@ -1,48 +1,128 @@
 = Troubleshooting
 
+== TUI does not start or shows garbled output
+
+Symptom: blank screen, garbled characters, or immediate crash on launch.
+
+Actions:
+
+. Ensure you are using Java 25+: `java --version`.
+. Run with `--enable-native-access=ALL-UNNAMED` to suppress Panama FFM warnings that can interfere with terminal state:
++
+[source,bash]
+----
+java --enable-native-access=ALL-UNNAMED -jar target/quarkus-forge.jar
+----
+. Verify your terminal supports 256-color or true-color (e.g., `echo $TERM`). Recommended: `xterm-256color`, `alacritty`, `kitty`, or `wezterm`.
+. On Windows, use Windows Terminal or a recent ConEmu/Git Bash with VT mode enabled.
+
 == Metadata fallback on startup
 
 Symptom: startup reports metadata fallback.
 
 Actions:
 
-. Confirm network access to Quarkus endpoints.
+. Confirm network access to Quarkus endpoints (`https://code.quarkus.io`).
 . Retry to verify fallback clears.
-. Continue with snapshot defaults if offline.
+. Continue with snapshot defaults if offline — the bundled snapshot will still let you generate most projects.
 
 == Catalog load failure or timeout
 
-Symptom: extension catalog does not refresh.
+Symptom: extension catalog does not refresh or shows a stale snapshot.
 
 Actions:
 
-. Retry from TUI using `Ctrl+R`.
-. Re-run with `--verbose` to inspect diagnostics.
-. Check endpoint/network health.
+. Retry from the TUI using `Ctrl+R`.
+. Re-run with `--verbose` to inspect diagnostics:
++
+[source,bash]
+----
+java -jar target/quarkus-forge.jar --verbose
+----
+. Check endpoint/network health. Forge will attempt to load from `~/.quarkus-forge/catalog-snapshot.json` as a fallback.
 
 == Validation errors
 
-Symptom: generation is blocked before submit.
+Symptom: generation is blocked before submit; fields show `⚠ error message`.
 
 Actions:
 
-. Verify Maven identifier fields (`groupId`, `artifactId`, `packageName`).
-. Confirm output directory is valid on your OS.
-. Ensure extension IDs are valid for headless mode.
+. Verify Maven identifier fields (`groupId`, `artifactId`, `packageName`) follow standard Maven conventions.
+. Confirm the output directory path is valid on your OS and you have write permissions.
+. For headless mode, ensure extension IDs are from the current catalog (use `--dry-run` first to validate without generating).
 
-== Generation/extraction failure
+== Generation or extraction failure
 
-Symptom: generate fails after submit.
+Symptom: generate fails after submit; `archive` or extraction error shown.
 
 Actions:
 
-. Check output directory permissions and conflicts.
-. Re-run with `--verbose`.
-. Review archive safety messages and retry.
+. Check that the output directory does not already exist. By default Forge refuses to overwrite.
+. Re-run with `--verbose` to see detailed archive safety messages.
+. Verify free disk space.
 
-== Useful command
+== Post-generation hook failure
+
+Symptom: hook command error shown in post-generation menu.
+
+Actions:
+
+. Verify the hook command is valid in your shell.
+. Wrap compound commands in quotes:
++
+[source,bash]
+----
+java -jar target/quarkus-forge.jar \
+  --post-generate-hook="git init && git add . && git commit -m 'chore: init'"
+----
+. Check exit code: the hook runs via your system shell. Any non-zero exit is reported as a failure.
+
+== Native image fails to start
+
+Symptom: native binary crashes or prints `UnsatisfiedLinkError` or SVM error.
+
+Actions:
+
+. Ensure you used the `native` Maven profile when building: `mvn clean package -Pnative`.
+. Verify the binary was built on the same OS/arch as the target. Native images are not cross-platform.
+. Run with verbose logging if available: `QUARKUS_FORGE_LOG_LEVEL=DEBUG ./quarkus-forge-native`.
+
+== Theme not applied
+
+Symptom: custom `.tcss` colors do not appear.
+
+Actions:
+
+. Confirm the theme file path is absolute or resolvable from the current directory.
+. Check the environment variable is set correctly:
++
+[source,bash]
+----
+export QUARKUS_FORGE_THEME=/absolute/path/to/my-theme.tcss
+java -jar target/quarkus-forge.jar
+----
+. Verify token names and values in the file are valid (e.g., `base = #1e1e2e`). Invalid lines are silently ignored.
+
+== Forgefile drift detected (`--lock-check` fails)
+
+Symptom: `--lock-check --dry-run` exits with a non-zero code and reports differences.
+
+Actions:
+
+. Review the reported drift fields in the output.
+. If the drift is intentional (new extension or updated stream), re-lock:
++
+[source,bash]
+----
+java -jar target/quarkus-forge-headless.jar generate --from Forgefile --lock
+----
+. If the drift is unexpected, investigate whether the Quarkus platform stream has been updated or whether an extension was renamed/removed.
+
+== Useful diagnostic command
 
 [source,bash]
 ----
 java -jar target/quarkus-forge.jar --verbose --dry-run
 ----
+
+This validates inputs, resolves catalog and metadata, and prints full diagnostics without generating any files.

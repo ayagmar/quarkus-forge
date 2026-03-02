@@ -4,8 +4,10 @@
 
 [source,bash]
 ----
-java -jar target/quarkus-forge.jar
+java --enable-native-access=ALL-UNNAMED -jar target/quarkus-forge.jar
 ----
+
+NOTE: `--enable-native-access=ALL-UNNAMED` suppresses Panama FFM warnings from the TamboUI terminal backend.
 
 == Core Workflow
 
