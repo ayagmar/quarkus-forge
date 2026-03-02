@@ -6,7 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public final class GenerationQueryBuilder {
+final class GenerationQueryBuilder {
   private GenerationQueryBuilder() {}
 
   public static URI build(URI baseUri, GenerationRequest request) {

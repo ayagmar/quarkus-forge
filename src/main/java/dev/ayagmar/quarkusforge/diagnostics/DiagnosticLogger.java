@@ -62,7 +62,7 @@ public final class DiagnosticLogger {
     for (int i = 0; i < value.length(); i++) {
       char ch = value.charAt(i);
       switch (ch) {
-        case '"' -> sb.append("'");
+        case '"' -> sb.append("\\\"");
         case '\\' -> sb.append("\\\\");
         case '\n' -> sb.append("\\n");
         case '\r' -> sb.append("\\r");

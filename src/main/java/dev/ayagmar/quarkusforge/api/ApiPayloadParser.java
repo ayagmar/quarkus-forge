@@ -14,7 +14,7 @@ import java.util.Set;
  * Stateless codec for parsing Quarkus API JSON payloads into domain DTOs. Extracted from
  * QuarkusApiClient to separate HTTP transport from payload deserialization (SRP).
  */
-public final class ApiPayloadParser {
+final class ApiPayloadParser {
   private ApiPayloadParser() {}
 
   // ── Metadata ──────────────────────────────────────────────────────────
