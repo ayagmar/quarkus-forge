@@ -331,7 +331,7 @@
       <properties>
         <forge.main.class>dev.ayagmar.quarkusforge.HeadlessCli</forge.main.class>
         <forge.jar.name>quarkus-forge-headless</forge.jar.name>
-        <skipTests>true</skipTests>
+        <maven.test.skip>true</maven.test.skip>
       </properties>
       <dependencies>
         <dependency>
@@ -379,7 +379,7 @@
         <native.skip>false</native.skip>
         <forge.main.class>dev.ayagmar.quarkusforge.HeadlessCli</forge.main.class>
         <forge.jar.name>quarkus-forge-headless</forge.jar.name>
-        <skipTests>true</skipTests>
+        <maven.test.skip>true</maven.test.skip>
       </properties>
       <dependencies>
         <dependency>
