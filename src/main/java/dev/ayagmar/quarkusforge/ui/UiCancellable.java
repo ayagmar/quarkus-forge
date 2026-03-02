@@ -1,6 +1,6 @@
 package dev.ayagmar.quarkusforge.ui;
 
 @FunctionalInterface
-public interface UiCancellable {
+interface UiCancellable {
   boolean cancel();
 }

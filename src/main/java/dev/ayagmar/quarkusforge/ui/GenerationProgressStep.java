@@ -1,6 +1,6 @@
 package dev.ayagmar.quarkusforge.ui;
 
-public enum GenerationProgressStep {
+enum GenerationProgressStep {
   REQUESTING_ARCHIVE,
   EXTRACTING_ARCHIVE,
   FINALIZING
