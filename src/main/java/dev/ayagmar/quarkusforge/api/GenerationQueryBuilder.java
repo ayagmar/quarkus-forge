@@ -6,7 +6,6 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 final class GenerationQueryBuilder {
   private GenerationQueryBuilder() {}
@@ -31,7 +30,7 @@ final class GenerationQueryBuilder {
         parameters.stream()
             .filter(parameter -> parameter.value() != null && !parameter.value().isBlank())
             .map(parameter -> urlEncode(parameter.key()) + "=" + urlEncode(parameter.value()))
-            .collect(Collectors.toList());
+            .toList();
 
     String query = String.join("&", queryParts);
     if (query.isBlank()) {

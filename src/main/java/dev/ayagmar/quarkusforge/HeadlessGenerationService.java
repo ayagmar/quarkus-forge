@@ -249,8 +249,6 @@ final class HeadlessGenerationService {
     return List.copyOf(resolved);
   }
 
-  // --- Private helpers ---
-
   private static EffectiveInputs loadEffectiveInputs(GenerateCommand command) {
     RequestOptions requestOptions = command.requestOptions;
     List<String> presetInputs = new ArrayList<>(command.presets);
