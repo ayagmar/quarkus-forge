@@ -190,7 +190,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
       return ExitCodes.VALIDATION;
     }
 
-    runHeadlessSmoke(initialState, 0, runtimeConfig, diagnostics);
+    runHeadlessSmoke(runtimeConfig, diagnostics);
     return ExitCodes.OK;
   }
 
@@ -247,16 +247,8 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
     }
   }
 
-  static void runHeadlessSmoke(
-      ForgeUiState initialState,
-      int searchDebounceMs,
-      RuntimeConfig runtimeConfig,
-      DiagnosticLogger diagnostics) {
-    diagnostics.info(
-        "tui.session.start",
-        of("smokeMode", true),
-        of("searchDebounceMs", Math.max(0, searchDebounceMs)),
-        of("mode", "headless-smoke"));
+  static void runHeadlessSmoke(RuntimeConfig runtimeConfig, DiagnosticLogger diagnostics) {
+    diagnostics.info("tui.session.start", of("smokeMode", true), of("mode", "headless-smoke"));
     try (QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri())) {
       CatalogDataService catalogDataService =
           new CatalogDataService(
