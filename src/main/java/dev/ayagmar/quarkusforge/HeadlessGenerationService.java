@@ -369,14 +369,9 @@ final class HeadlessGenerationService {
     List<String> normalizedPresets =
         inputs.presetInputs().stream().map(ProjectRequestFactory::normalizePresetName).toList();
 
-    // Determine what Forgefile to write (--save-as creates a new one, --from updates existing)
-    Forgefile forgefile;
-    if (inputs.forgefile() != null) {
-      forgefile = inputs.forgefile();
-    } else {
-      forgefile =
-          Forgefile.from(inputs.requestOptions(), normalizedPresets, inputs.extensionInputs());
-    }
+    // Always rebuild from effective inputs so CLI additions are persisted
+    Forgefile forgefile =
+        Forgefile.from(inputs.requestOptions(), normalizedPresets, inputs.extensionInputs());
 
     // Add locked section if --lock was requested
     if (inputs.writeLock()) {

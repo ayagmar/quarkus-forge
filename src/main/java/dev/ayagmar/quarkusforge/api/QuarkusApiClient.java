@@ -22,6 +22,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -114,20 +115,17 @@ public final class QuarkusApiClient implements AutoCloseable {
   private static MetadataDto toMetadata(StreamsMetadata streamsMetadata, List<String> buildTools) {
     List<String> javaVersions = streamsMetadata.javaVersions();
 
-    // Use the recommended stream's Java versions for the compatibility matrix.
-    // Without this, the matrix uses the union of all streams' Java versions,
-    // so a version only supported by one stream appears compatible with all build tools.
-    List<String> recommendedJavaVersions = javaVersions;
+    // Build compatibility matrix from the union of all streams' Java versions.
+    // Stream-specific Java version constraints are enforced separately by
+    // MetadataCompatibilityValidator.validate() via per-stream javaVersions check.
+    LinkedHashSet<String> allJavaVersions = new LinkedHashSet<>(javaVersions);
     for (PlatformStream stream : streamsMetadata.platformStreams()) {
-      if (stream.recommended() && !stream.javaVersions().isEmpty()) {
-        recommendedJavaVersions = stream.javaVersions();
-        break;
-      }
+      allJavaVersions.addAll(stream.javaVersions());
     }
 
     Map<String, List<String>> compatibility = new LinkedHashMap<>();
     for (String buildTool : buildTools) {
-      compatibility.put(buildTool, recommendedJavaVersions);
+      compatibility.put(buildTool, List.copyOf(allJavaVersions));
     }
     return new MetadataDto(
         javaVersions, buildTools, compatibility, streamsMetadata.platformStreams());
