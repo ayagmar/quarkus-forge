@@ -11,7 +11,7 @@ final class ShellExecutor {
   private final ShellProcessRunner processRunner;
 
   ShellExecutor() {
-    this(QuarkusForgeCli::isWindowsOs, ShellExecutor::runWithProcessBuilder);
+    this(PostTuiActionExecutor::isWindowsOs, ShellExecutor::runWithProcessBuilder);
   }
 
   ShellExecutor(BooleanSupplier windowsOs, ShellProcessRunner processRunner) {

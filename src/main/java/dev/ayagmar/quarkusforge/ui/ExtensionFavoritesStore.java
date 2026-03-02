@@ -10,11 +10,13 @@ public interface ExtensionFavoritesStore {
 
   Set<String> loadFavoriteExtensionIds();
 
-  void saveFavoriteExtensionIds(Set<String> favoriteExtensionIds);
-
   List<String> loadRecentExtensionIds();
 
-  void saveRecentExtensionIds(List<String> recentExtensionIds);
+  /**
+   * Atomically persists both favorites and recents in a single write. Callers must always provide
+   * both values to avoid silent data loss from read-merge-write races.
+   */
+  void saveAll(Set<String> favoriteExtensionIds, List<String> recentExtensionIds);
 
   static ExtensionFavoritesStore inMemory() {
     return new InMemoryExtensionFavoritesStore();

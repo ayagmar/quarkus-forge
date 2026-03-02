@@ -17,8 +17,7 @@ class ExtensionFavoritesStoreTest {
     Path favoritesFile = tempDir.resolve("favorites.json");
     ExtensionFavoritesStore writerStore = ExtensionFavoritesStore.fileBacked(favoritesFile);
 
-    writerStore.saveFavoriteExtensionIds(
-        Set.of("io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc"));
+    writerStore.saveAll(Set.of("io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc"), List.of());
 
     ExtensionFavoritesStore readerStore = ExtensionFavoritesStore.fileBacked(favoritesFile);
     assertThat(readerStore.loadFavoriteExtensionIds())
@@ -30,12 +29,25 @@ class ExtensionFavoritesStoreTest {
     Path favoritesFile = tempDir.resolve("favorites.json");
     ExtensionFavoritesStore writerStore = ExtensionFavoritesStore.fileBacked(favoritesFile);
 
-    writerStore.saveRecentExtensionIds(
+    writerStore.saveAll(
+        Set.of(),
         List.of("io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc", "io.quarkus:quarkus-rest"));
 
     ExtensionFavoritesStore readerStore = ExtensionFavoritesStore.fileBacked(favoritesFile);
     assertThat(readerStore.loadRecentExtensionIds())
         .containsExactly("io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc");
+  }
+
+  @Test
+  void fileBackedStoreSaveAllPersistsBothAtomically() {
+    Path favoritesFile = tempDir.resolve("favorites.json");
+    ExtensionFavoritesStore writerStore = ExtensionFavoritesStore.fileBacked(favoritesFile);
+
+    writerStore.saveAll(Set.of("io.quarkus:quarkus-rest"), List.of("io.quarkus:quarkus-arc"));
+
+    ExtensionFavoritesStore readerStore = ExtensionFavoritesStore.fileBacked(favoritesFile);
+    assertThat(readerStore.loadFavoriteExtensionIds()).containsExactly("io.quarkus:quarkus-rest");
+    assertThat(readerStore.loadRecentExtensionIds()).containsExactly("io.quarkus:quarkus-arc");
   }
 
   @Test

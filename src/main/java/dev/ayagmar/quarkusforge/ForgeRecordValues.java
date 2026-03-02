@@ -6,7 +6,7 @@ final class ForgeRecordValues {
   private ForgeRecordValues() {}
 
   static String normalize(String value) {
-    return value == null ? "" : value;
+    return value == null ? "" : value.trim();
   }
 
   static List<String> copyOrEmpty(List<String> values) {

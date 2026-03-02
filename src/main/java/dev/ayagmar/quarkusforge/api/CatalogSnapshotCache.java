@@ -145,15 +145,15 @@ public final class CatalogSnapshotCache {
     public CatalogSnapshotPayload read(Path file) throws IOException {
       Map<String, Object> root = JsonSupport.parseObject(Files.readString(file));
 
-      Integer schemaVersion = readInteger(root.get("schemaVersion"));
-      Long fetchedAtEpochMillis = readLong(root.get("fetchedAtEpochMillis"));
-      Map<String, Object> metadataObject = asObject(root.get("metadata"));
-      List<Object> extensionsArray = asArray(root.get("extensions"));
+      Integer schemaVersion = JsonFieldReader.readInt(root, "schemaVersion");
+      Long fetchedAtEpochMillis = JsonFieldReader.readLong(root, "fetchedAtEpochMillis");
+      Map<String, Object> metadataObject = JsonFieldReader.readObject(root, "metadata");
+      List<Object> extensionsArray = JsonFieldReader.readArray(root, "extensions");
 
       MetadataDto metadata =
-          metadataObject == null ? null : QuarkusApiClient.parseMetadataObject(metadataObject);
+          metadataObject == null ? null : ApiPayloadParser.parseMetadataObject(metadataObject);
       List<ExtensionDto> extensions =
-          extensionsArray == null ? null : QuarkusApiClient.parseExtensionsArray(extensionsArray);
+          extensionsArray == null ? null : ApiPayloadParser.parseExtensionsArray(extensionsArray);
 
       return new CatalogSnapshotPayload(
           schemaVersion == null ? -1 : schemaVersion,
@@ -170,57 +170,6 @@ public final class CatalogSnapshotCache {
       root.put("metadata", toMetadataMap(payload.metadata()));
       root.put("extensions", toExtensionsArray(payload.extensions()));
       return JsonSupport.writeBytes(root);
-    }
-
-    private static Integer readInteger(Object value) {
-      if (value == null) {
-        return null;
-      }
-      if (!(value instanceof Number number)) {
-        throw new ApiContractException("Malformed JSON payload");
-      }
-      long longValue = number.longValue();
-      if (longValue > Integer.MAX_VALUE || longValue < Integer.MIN_VALUE) {
-        throw new ApiContractException("Malformed JSON payload");
-      }
-      return (int) longValue;
-    }
-
-    private static Long readLong(Object value) {
-      if (value == null) {
-        return null;
-      }
-      if (!(value instanceof Number number)) {
-        throw new ApiContractException("Malformed JSON payload");
-      }
-      return number.longValue();
-    }
-
-    private static Map<String, Object> asObject(Object value) {
-      if (value == null) {
-        return null;
-      }
-      if (!(value instanceof Map<?, ?> rawObject)) {
-        throw new ApiContractException("Malformed JSON payload");
-      }
-      Map<String, Object> object = new LinkedHashMap<>();
-      for (Map.Entry<?, ?> entry : rawObject.entrySet()) {
-        if (!(entry.getKey() instanceof String key)) {
-          throw new ApiContractException("Malformed JSON payload");
-        }
-        object.put(key, entry.getValue());
-      }
-      return object;
-    }
-
-    private static List<Object> asArray(Object value) {
-      if (value == null) {
-        return null;
-      }
-      if (!(value instanceof List<?> rawArray)) {
-        throw new ApiContractException("Malformed JSON payload");
-      }
-      return new ArrayList<>(rawArray);
     }
 
     private static Map<String, Object> toMetadataMap(MetadataDto metadata) {

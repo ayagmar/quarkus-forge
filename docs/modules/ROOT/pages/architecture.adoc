@@ -1,19 +1,341 @@
 = Architecture & Internals
 :navtitle: Architecture
+:toc: left
+:toclevels: 3
 
-Quarkus Forge is designed with a strict separation between the core logic, the TUI layer, and the external API interactions.
+Quarkus Forge follows a layered architecture that separates HTTP transport, JSON parsing, domain logic, UI state management, and rendering into focused modules.
 
-== Core Components
+== High-Level Architecture
 
-* **API Layer**: Handles communication with `code.quarkus.io`. Responsible for fetching the extension catalog and downloading the generated project ZIPs.
-* **Domain Model**: Represents the internal state of a generation request (`ProjectRequest`, `ValidationReport`).
-* **TUI (Terminal UI)**: Built on top of a custom, asynchronous rendering engine. Uses `dev.ayagmar.quarkusforge.ui.CoreTuiController` to manage focus routing, keybindings, and state transitions.
-* **Archive & File System**: Handles safe zip extraction with guardrails (`SafeZipExtractor`) to protect against path traversal and zip bomb attacks.
+....
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Entry Points                                │
+│                                                                     │
+│    QuarkusForgeCli ────────────── HeadlessGenerationService         │
+│         │                              │                            │
+│         ▼                              ▼                            │
+│    TuiBootstrapService      ProjectRequestFactory                   │
+│         │                         │                                 │
+│         ▼                         │                                 │
+│    CoreTuiController              │                                 │
+│         │                         │                                 │
+│         │                  HeadlessCatalogClient                     │
+│         │                  HeadlessOutputPrinter                     │
+│         │                  HeadlessTimeouts                          │
+│         │                                                           │
+├─────────┼───────────────────────────────────────────────────────────┤
+│         │         API Layer            │                            │
+│         ▼                              ▼                            │
+│    QuarkusApiClient ───────► ApiPayloadParser                       │
+│         │                       │                                   │
+│         │                       ▼                                   │
+│         │                  JsonFieldReader                          │
+│         │                                                           │
+│         ▼                                                           │
+│    CatalogSnapshotCache ◄──── CatalogDataService                   │
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                       Archive Layer                                 │
+│                                                                     │
+│    ProjectArchiveService ───► SafeZipExtractor                      │
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                    Post-Generation Actions                          │
+│                                                                     │
+│    PostTuiActionExecutor ───► ShellExecutor                         │
+│         │                                                           │
+│         ├── Open IDE (code <path>)                                  │
+│         ├── Open Terminal (interactive shell)                        │
+│         └── Publish to GitHub (gh repo create)                      │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+....
 
-== Data Flow
+== UI Layer Design
 
-1. The user initiates a project creation via TUI or Headless CLI.
-2. The `ProjectRequest` is populated with metadata and selected extensions.
-3. The request is validated by `ProjectRequestValidator`.
-4. A query is built and sent via `QuarkusApiClient`.
-5. The resulting archive is processed by `SafeZipExtractor` to scaffold the project securely in the target directory.
+The TUI layer uses an immediate-mode rendering architecture built on the https://github.com/ayagmar/tamboui[TamboUI] framework.
+
+=== Component Decomposition
+
+....
+CoreTuiController (State Machine)
+    │
+    ├── UiEventRouter           Routes keyboard events through priority chain
+    │       │
+    │       ├── Overlay handlers (command palette, help, post-gen menu)
+    │       ├── Cancel flow (filter unwind priority chain)
+    │       ├── Global shortcuts
+    │       ├── Focus navigation
+    │       └── Input handling
+    │
+    ├── Rendering
+    │       ├── OverlayRenderer          Stateless overlay rendering
+    │       ├── BodyPanelRenderer        Layout: metadata + extensions panels
+    │       └── FooterLinesComposer      Status bar composition
+    │
+    ├── State Managers
+    │       ├── PostGenerationMenuState  Post-gen menu state machine
+    │       ├── MetadataSelectorManager  Platform/build/java selectors
+    │       ├── ExtensionCatalogState    Search, filter, favorites, presets
+    │       ├── CatalogLoadState         Sealed type: Loading → Loaded | Failed
+    │       ├── StartupOverlayTracker    Startup overlay timing
+    │       └── GenerationStateTracker   Generation progress tracking
+    │
+    └── Extracted Helpers
+            ├── ExtensionInteractionHandler  Bridge to catalog interactions
+            ├── CatalogRowBuilder            Pure function: row building
+            ├── UiTextConstants              UI text content
+            ├── AsyncFailureHandler          Reusable async exception mapping
+            └── GenerationFlowCoordinator    Async generation lifecycle
+....
+
+=== State Machine: Generation Flow
+
+....
+         ┌──────┐
+         │ IDLE │◄────────────────────────────────────┐
+         └──┬───┘                                     │
+            │ Enter / Alt+G                           │
+            ▼                                         │
+      ┌───────────┐                                   │
+      │ VALIDATING│──── validation fails ────► ERROR ─┘
+      └─────┬─────┘                                   │
+            │ validation passes                       │
+            ▼                                         │
+       ┌─────────┐                                    │
+       │ LOADING  │──── Esc / Ctrl+C ───► CANCELLED ──┘
+       └────┬─────┘                                   │
+            │ download complete                       │
+            ▼                                         │
+       ┌─────────┐                                    │
+       │ SUCCESS  │──── "Generate Again" ─────────────┘
+       └─────────┘
+            │
+            ▼
+     Post-Generation Menu
+            │
+            ├── Export Forgefile
+            ├── Publish to GitHub ──► Visibility sub-menu
+            ├── Open IDE
+            ├── Open Terminal
+            └── Quit
+....
+
+=== State Machine: Catalog Loading
+
+....
+      ┌─────────────┐
+      │   Initial    │   CatalogLoadState.initial()
+      │ Loaded(snap) │   Loaded("snapshot", false, false)
+      └──────┬───────┘
+             │ loadExtensionCatalogAsync()
+             ▼
+      ┌─────────────┐
+      │   Loading    │   Loading(previous=Initial)
+      │  (previous)  │
+      └──────┬───────┘
+             │
+        ┌────┴────┐
+        │         │
+        ▼         ▼
+   ┌─────────┐  ┌────────┐
+   │  Loaded  │  │ Failed │   If previous was Loaded(live),
+   │  (live)  │  │        │   stays as Loaded (keeps catalog)
+   └─────────┘  └────────┘
+        │
+        │ reload requested
+        ▼
+   ┌─────────────┐
+   │   Loading    │   Loading(previous=Loaded(live))
+   │  (previous)  │
+   └──────┬───────┘
+          │
+     ┌────┴────┐
+     │         │
+     ▼         ▼
+ ┌─────────┐ ┌──────────────┐
+ │  Loaded  │ │ Previous     │   Reload failure preserves
+ │  (new)   │ │ Loaded(live) │   previously loaded catalog
+ └─────────┘ └──────────────┘
+....
+
+=== Extension Cancel Flow (Esc Priority Chain)
+
+When the user presses `Esc` in the extension search or list, the TUI unwinds filters in priority order:
+
+....
+ Esc pressed in extension search/list
+      │
+      ├──[1] Search text not empty? ──► Clear search
+      │
+      ├──[2] Favorites filter on? ──► Disable favorites filter
+      │
+      ├──[3] Preset filter active? ──► Clear preset filter
+      │
+      ├──[4] Category filter active? ──► Clear category filter
+      │
+      ├──[5] In search field? ──► Focus extension list
+      │
+      └──[6] None of the above ──► Fall through to quit flow
+....
+
+== API Layer Design
+
+=== Transport vs Parsing Separation
+
+....
+                    HTTP Request
+                         │
+                         ▼
+              ┌──────────────────┐
+              │ QuarkusApiClient │    Transport only:
+              │                  │    - Retry with backoff
+              │  fetchExtensions │    - Timeout management
+              │  fetchMetadata   │    - HTTP status handling
+              │  downloadZip     │    - Cancellation support
+              └────────┬─────────┘
+                       │ raw JSON string
+                       ▼
+              ┌──────────────────┐
+              │ ApiPayloadParser │    Pure parsing:
+              │                  │    - Extension deserialization
+              │  parseExtensions │    - Metadata extraction
+              │  parseMetadata   │    - Stream/preset parsing
+              │  parseBuildTools │    - OpenAPI contract reading
+              └────────┬─────────┘
+                       │
+                       ▼
+              ┌──────────────────┐
+              │  JsonFieldReader │    Shared JSON helpers:
+              │                  │    - readString, readInt
+              │                  │    - readStringList
+              │                  │    - readNestedObject
+              └──────────────────┘
+....
+
+=== Catalog Freshness Strategy
+
+....
+  Application Start
+       │
+       ▼
+  Load metadata (sync) ─── success ──► MetadataCompatibilityContext
+       │                                  │
+       │ failure                          │ constrains build tool ↔ Java version
+       ▼                                  │
+  Bundled snapshot fallback               ▼
+       │                            Load extensions (async)
+       │                                  │
+       │                          ┌───────┴───────┐
+       │                          │               │
+       │                     Live API         Cache fallback
+       │                          │               │
+       │                          ▼               ▼
+       │                     CatalogSnapshotCache
+       │                     (save for offline use)
+       │                          │
+       ▼                          ▼
+  TUI renders immediately    Catalog replaces default
+  with default extensions    extensions when ready
+....
+
+== Domain Layer
+
+....
+┌─────────────────────────────────────────────────────────┐
+│                    Domain Model                         │
+│                                                         │
+│  ProjectRequest (immutable value object)                │
+│    ├── groupId, artifactId, version                     │
+│    ├── packageName, outputDirectory                     │
+│    ├── platformStream, buildTool, javaVersion           │
+│    └── extensions (list of IDs)                         │
+│                                                         │
+│  ProjectRequestFactory                                  │
+│    ├── fromOptions: RequestOptions → ProjectRequest     │
+│    ├── buildInitialState: validates + creates ForgeUiState │
+│    ├── applyRecommendedPlatformStream                   │
+│    └── mapFailureToExitCode                             │
+│                                                         │
+│  ProjectRequestValidator                                │
+│    └── validates field formats (Maven coordinates, etc) │
+│                                                         │
+│  MetadataCompatibilityContext                           │
+│    └── enforces build tool ↔ Java version constraints   │
+│                                                         │
+│  CliPrefillMapper                                       │
+│    └── maps CLI --options to ProjectRequest fields      │
+│                                                         │
+│  Forgefile + ForgefileLock                              │
+│    ├── Unified template with optional locked section    │
+│    └── ForgefileStore: read/write JSON persistence      │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+....
+
+== Archive Layer
+
+....
+  ZIP Download
+       │
+       ▼
+  ProjectArchiveService
+       │
+       ├── Progress reporting (bytes received)
+       ├── Cancellation check (per entry)
+       │
+       ▼
+  SafeZipExtractor
+       │
+       ├── Zip-Slip protection (path traversal)
+       │     └── canonical path must be under target dir
+       │
+       ├── Zip-Bomb protection
+       │     ├── Max total extracted size
+       │     ├── Max entry count
+       │     └── Compression ratio check
+       │
+       └── Root directory normalization
+             └── strips single root folder if present
+....
+
+== Design Principles
+
+[cols="1,3"]
+|===
+| Principle | Application
+
+| *Single Responsibility*
+| Each class has one reason to change. `QuarkusApiClient` handles HTTP; `ApiPayloadParser` handles JSON; `OverlayRenderer` handles overlay rendering.
+
+| *Sealed Types*
+| `CatalogLoadState` (Loading/Loaded/Failed) and `MenuKeyResult` (Handled/Quit/ExportRecipe/GenerateAgain) make state transitions explicit and exhaustive.
+
+| *Immutable Snapshots*
+| `MetadataPanelSnapshot`, `ExtensionsPanelSnapshot`, `FooterSnapshot` are immutable records passed to renderers — no side effects.
+
+| *DRY*
+| `JsonFieldReader` deduplicates JSON helpers across 5+ classes. `renderCompactField` consolidates two near-identical rendering methods. `AsyncFailureHandler` centralizes 4-exception async failure mapping. `applyFavoritesAndPresetFilters` eliminates duplicate filter pipeline.
+
+| *Derived State Elimination*
+| `successHint` is computed from `PostGenerationMenuState` rather than stored as a separate mutable field.
+
+| *Encapsulation*
+| `PostGenerationMenuState`, `StartupOverlayTracker`, `MetadataSelectorManager` each own their state and expose it through focused APIs.
+
+| *Resource Safety*
+| `QuarkusApiClient` implements `AutoCloseable`; all instantiation sites use try-with-resources or `whenComplete` callbacks to prevent thread pool leaks.
+
+| *Atomic Persistence*
+| `FileBackedExtensionFavoritesStore.saveAll()` writes both favorites and recents in a single file operation, preventing data loss from split read-modify-write.
+|===
+
+== Testing Strategy
+
+* **540 unit tests** with deterministic async harnesses for TUI state machine testing
+* **2 integration tests** using WireMock for API contract verification
+* Dedicated unit tests for extracted state managers: `PostGenerationMenuState`, `MetadataSelectorManager`, `CatalogRowBuilder`, `StartupOverlayTracker`
+* Async TUI tests use `UiScheduler.immediate()` and `Duration.ZERO` debounce for deterministic behavior
+* Property-based tests for ZIP extraction edge cases
+
+See xref:reference/testing-strategy.adoc[Testing Strategy] for details.

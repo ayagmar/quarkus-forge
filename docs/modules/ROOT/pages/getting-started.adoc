@@ -34,14 +34,14 @@ java -jar target/quarkus-forge.jar generate \
   --java-version 25
 ----
 
-Deterministic replay with recipe + lock:
+Deterministic replay with a Forgefile:
 
 [source,bash]
 ----
-java -jar target/quarkus-forge.jar generate --recipe starter.json
+java -jar target/quarkus-forge.jar generate --from Forgefile
 ----
 
-Save a reusable recipe in the machine-local recipes library:
+Save a reusable template in the machine-local recipes library:
 
 [source,bash]
 ----
@@ -51,7 +51,7 @@ java -jar target/quarkus-forge.jar generate \
   --artifact-id demo \
   --build-tool maven \
   --java-version 25 \
-  --write-recipe starter.json
+  --save-as starter.json
 ----
 
 == Install With JBang

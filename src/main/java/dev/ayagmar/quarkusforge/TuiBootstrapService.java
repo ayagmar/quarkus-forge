@@ -38,8 +38,8 @@ final class TuiBootstrapService {
         of("searchDebounceMs", Math.max(0, searchDebounceMs)));
     QuarkusForgeCli.configureTerminalBackendPreference();
     TuiConfig tuiConfig = QuarkusForgeCli.appTuiConfig();
-    try (var tui = TuiRunner.create(tuiConfig)) {
-      QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
+    try (var tui = TuiRunner.create(tuiConfig);
+        QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri())) {
       CatalogDataService catalogDataService =
           new CatalogDataService(
               apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
@@ -68,7 +68,8 @@ final class TuiBootstrapService {
                                         "extracting project archive...");
                               })),
               ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile()),
-              CoreTuiController.defaultFavoritesPersistenceExecutor());
+              CoreTuiController.defaultFavoritesPersistenceExecutor(),
+              IdeDetector.detect());
       controller.setStartupOverlayMinDuration(QuarkusForgeCli.STARTUP_SPLASH_MIN_DURATION);
       controller.loadExtensionCatalogAsync(
           () -> {

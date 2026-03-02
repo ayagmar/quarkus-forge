@@ -385,7 +385,7 @@ class QuarkusApiClientTest {
 
   @Test
   void parseExtensionsPayloadNullIsReportedAsContractError() {
-    assertThatThrownBy(() -> QuarkusApiClient.parseExtensionsPayload(null))
+    assertThatThrownBy(() -> ApiPayloadParser.parseExtensionsPayload(null))
         .isInstanceOf(ApiContractException.class)
         .hasMessage("Malformed JSON payload");
   }

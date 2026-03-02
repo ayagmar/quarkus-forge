@@ -13,17 +13,14 @@ final class InMemoryExtensionFavoritesStore implements ExtensionFavoritesStore {
   }
 
   @Override
-  public synchronized void saveFavoriteExtensionIds(Set<String> favoriteExtensionIds) {
-    this.favoriteExtensionIds = ExtensionFavoriteIds.normalizeSet(favoriteExtensionIds);
-  }
-
-  @Override
   public synchronized List<String> loadRecentExtensionIds() {
     return recentExtensionIds;
   }
 
   @Override
-  public synchronized void saveRecentExtensionIds(List<String> recentExtensionIds) {
+  public synchronized void saveAll(
+      Set<String> favoriteExtensionIds, List<String> recentExtensionIds) {
+    this.favoriteExtensionIds = ExtensionFavoriteIds.normalizeSet(favoriteExtensionIds);
     this.recentExtensionIds = ExtensionFavoriteIds.normalizeList(recentExtensionIds);
   }
 }

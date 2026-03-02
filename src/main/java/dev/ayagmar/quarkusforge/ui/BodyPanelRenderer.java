@@ -6,6 +6,9 @@ import dev.tamboui.layout.Rect;
 import dev.tamboui.style.Overflow;
 import dev.tamboui.style.Style;
 import dev.tamboui.terminal.Frame;
+import dev.tamboui.text.Line;
+import dev.tamboui.text.Span;
+import dev.tamboui.text.Text;
 import dev.tamboui.widgets.block.Block;
 import dev.tamboui.widgets.block.BorderType;
 import dev.tamboui.widgets.block.Borders;
@@ -82,19 +85,33 @@ final class BodyPanelRenderer {
     inputRenderer.renderCompactText(
         frame, rows.get(rowIdx++), "Artifact", snapshot.artifactId(), FocusTarget.ARTIFACT_ID);
     inputRenderer.renderCompactSelector(
-        frame, rows.get(rowIdx++), "Build", snapshot.buildTool(), FocusTarget.BUILD_TOOL);
+        frame,
+        rows.get(rowIdx++),
+        "Build",
+        snapshot.buildTool(),
+        FocusTarget.BUILD_TOOL,
+        snapshot.buildToolInfo().selectedIndex(),
+        snapshot.buildToolInfo().totalOptions());
     inputRenderer.renderCompactSelector(
         frame,
         rows.get(rowIdx++),
         "Platform",
         snapshot.platformStream(),
-        FocusTarget.PLATFORM_STREAM);
+        FocusTarget.PLATFORM_STREAM,
+        snapshot.platformStreamInfo().selectedIndex(),
+        snapshot.platformStreamInfo().totalOptions());
     inputRenderer.renderCompactText(
         frame, rows.get(rowIdx++), "Version", snapshot.version(), FocusTarget.VERSION);
     inputRenderer.renderCompactText(
         frame, rows.get(rowIdx++), "Package", snapshot.packageName(), FocusTarget.PACKAGE_NAME);
     inputRenderer.renderCompactSelector(
-        frame, rows.get(rowIdx++), "Java", snapshot.javaVersion(), FocusTarget.JAVA_VERSION);
+        frame,
+        rows.get(rowIdx++),
+        "Java",
+        snapshot.javaVersion(),
+        FocusTarget.JAVA_VERSION,
+        snapshot.javaVersionInfo().selectedIndex(),
+        snapshot.javaVersionInfo().totalOptions());
     inputRenderer.renderCompactText(
         frame, rows.get(rowIdx), "Output", snapshot.outputDir(), FocusTarget.OUTPUT_DIR);
   }
@@ -128,16 +145,34 @@ final class BodyPanelRenderer {
     inputRenderer.renderCompactText(
         frame, topRow.get(1), "Artifact", snapshot.artifactId(), FocusTarget.ARTIFACT_ID);
     inputRenderer.renderCompactSelector(
-        frame, topRow.get(2), "Build", snapshot.buildTool(), FocusTarget.BUILD_TOOL);
+        frame,
+        topRow.get(2),
+        "Build",
+        snapshot.buildTool(),
+        FocusTarget.BUILD_TOOL,
+        snapshot.buildToolInfo().selectedIndex(),
+        snapshot.buildToolInfo().totalOptions());
     inputRenderer.renderCompactSelector(
-        frame, topRow.get(3), "Platform", snapshot.platformStream(), FocusTarget.PLATFORM_STREAM);
+        frame,
+        topRow.get(3),
+        "Platform",
+        snapshot.platformStream(),
+        FocusTarget.PLATFORM_STREAM,
+        snapshot.platformStreamInfo().selectedIndex(),
+        snapshot.platformStreamInfo().totalOptions());
 
     inputRenderer.renderCompactText(
         frame, bottomRow.get(0), "Version", snapshot.version(), FocusTarget.VERSION);
     inputRenderer.renderCompactText(
         frame, bottomRow.get(1), "Package", snapshot.packageName(), FocusTarget.PACKAGE_NAME);
     inputRenderer.renderCompactSelector(
-        frame, bottomRow.get(2), "Java", snapshot.javaVersion(), FocusTarget.JAVA_VERSION);
+        frame,
+        bottomRow.get(2),
+        "Java",
+        snapshot.javaVersion(),
+        FocusTarget.JAVA_VERSION,
+        snapshot.javaVersionInfo().selectedIndex(),
+        snapshot.javaVersionInfo().totalOptions());
     inputRenderer.renderCompactText(
         frame, bottomRow.get(3), "Output", snapshot.outputDir(), FocusTarget.OUTPUT_DIR);
   }
@@ -180,6 +215,8 @@ final class BodyPanelRenderer {
     boolean showSearchInput = snapshot.searchFocused();
     boolean hasSelected = !snapshot.selectedExtensionIds().isEmpty();
     boolean showSubmitButton = true;
+    boolean showDescription =
+        snapshot.listFocused() && !snapshot.focusedExtensionDescription().isBlank();
 
     List<Constraint> sectionConstraints = new ArrayList<>();
     sectionConstraints.add(Constraint.length(1)); // Search hint
@@ -190,6 +227,9 @@ final class BodyPanelRenderer {
       sectionConstraints.add(Constraint.length(1)); // Selected extensions summary
     }
     sectionConstraints.add(Constraint.fill()); // Extension list
+    if (showDescription) {
+      sectionConstraints.add(Constraint.length(1)); // Extension description
+    }
     if (showSubmitButton) {
       sectionConstraints.add(Constraint.length(1)); // Submit button
     }
@@ -205,6 +245,9 @@ final class BodyPanelRenderer {
     }
     renderExtensionList(
         frame, sections.get(idx++), snapshot, listState, selectedLookup, favoriteLookup);
+    if (showDescription) {
+      renderExtensionDescription(frame, sections.get(idx++), snapshot);
+    }
     if (showSubmitButton) {
       renderSubmitButton(frame, sections.get(idx), snapshot);
     }
@@ -277,7 +320,10 @@ final class BodyPanelRenderer {
 
   private void renderSearchInput(Frame frame, Rect area, ExtensionsPanelSnapshot snapshot) {
     String query = snapshot.searchQuery();
-    String display = "  Search: [ " + query + "_ ]  (Esc to clear)";
+    int filtered = snapshot.filteredExtensionCount();
+    int total = snapshot.totalCatalogExtensionCount();
+    String matchInfo = query.isBlank() ? "" : "  " + filtered + "/" + total + " matches";
+    String display = "  Search: [ " + query + "_ ]" + matchInfo + "  (Esc to clear)";
     Paragraph paragraph =
         Paragraph.builder()
             .text(display)
@@ -313,32 +359,49 @@ final class BodyPanelRenderer {
       }
     }
 
-    StringBuilder summary = new StringBuilder("  Selected: ");
+    List<Span> spans = new ArrayList<>();
+    spans.add(Span.styled("  Selected: ", Style.EMPTY.fg(theme.color("accent"))));
     for (int i = 0; i < maxDisplay; i++) {
       if (i > 0) {
-        summary.append(", ");
+        spans.add(Span.styled(" ", Style.EMPTY));
       }
       String id = selectedIds.get(i);
       String name = visibleNameById.get(id);
       if (name == null || name.isBlank()) {
-        // Fallback: derive a readable-ish label from the id.
         String shortName = id.contains(":") ? id.substring(id.lastIndexOf(':') + 1) : id;
         if (shortName.startsWith("quarkus-")) {
           shortName = shortName.substring(8);
         }
         name = shortName;
       }
-      summary.append(name);
+      spans.add(
+          Span.styled(
+              " " + name + " ", Style.EMPTY.fg(theme.color("base")).bg(theme.color("accent"))));
     }
     if (selectedIds.size() > maxDisplay) {
-      summary.append(" +").append(selectedIds.size() - maxDisplay).append(" more");
+      spans.add(
+          Span.styled(
+              " +" + (selectedIds.size() - maxDisplay) + " more ",
+              Style.EMPTY.fg(theme.color("base")).bg(theme.color("muted"))));
     }
-    summary.append("  [x: clear all]");
+    spans.add(Span.styled("  [x: clear]", Style.EMPTY.fg(theme.color("muted"))));
 
     Paragraph paragraph =
+        Paragraph.builder().text(Text.from(Line.from(spans))).overflow(Overflow.ELLIPSIS).build();
+    frame.renderWidget(paragraph, area);
+  }
+
+  private void renderExtensionDescription(
+      Frame frame, Rect area, ExtensionsPanelSnapshot snapshot) {
+    String description = snapshot.focusedExtensionDescription();
+    int maxLen = Math.max(10, area.width() - 4);
+    if (description.length() > maxLen) {
+      description = description.substring(0, maxLen - 3) + "...";
+    }
+    Paragraph paragraph =
         Paragraph.builder()
-            .text(summary.toString())
-            .style(Style.EMPTY.fg(theme.color("accent")).bold())
+            .text("  " + description)
+            .style(Style.EMPTY.fg(theme.color("muted")).italic())
             .overflow(Overflow.ELLIPSIS)
             .build();
     frame.renderWidget(paragraph, area);
@@ -398,11 +461,17 @@ final class BodyPanelRenderer {
       ExtensionCatalogItem extension = row.extension();
       boolean selected = selectedLookup.matches(extension.id());
       boolean favorite = favoriteLookup.matches(extension.id());
-      // Use clearer visual indicators
       String checkedPrefix = selected ? "[x] " : "[ ] ";
       String favoritePrefix = favorite ? "★ " : "  ";
       String displayLabel = extensionDisplayLabel(extension);
-      items.add(ListItem.from(checkedPrefix + favoritePrefix + displayLabel).toSizedWidget());
+      String query = snapshot.searchQuery();
+      if (query.isBlank()) {
+        items.add(ListItem.from(checkedPrefix + favoritePrefix + displayLabel).toSizedWidget());
+      } else {
+        Line line =
+            buildHighlightedLine(checkedPrefix + favoritePrefix, displayLabel, query, theme);
+        items.add(ListItem.from(line).toSizedWidget());
+      }
     }
 
     boolean extensionError = !snapshot.catalogErrorMessage().isBlank();
@@ -443,9 +512,52 @@ final class BodyPanelRenderer {
     return extension.name();
   }
 
+  private static Line buildHighlightedLine(
+      String prefix, String label, String query, UiTheme theme) {
+    List<Span> spans = new ArrayList<>();
+    spans.add(Span.raw(prefix));
+
+    String lowerLabel = label.toLowerCase(java.util.Locale.ROOT);
+    String lowerQuery = query.toLowerCase(java.util.Locale.ROOT);
+    Style highlightStyle = Style.EMPTY.fg(theme.color("warning")).bold();
+
+    int labelPos = 0;
+    int queryPos = 0;
+    StringBuilder normal = new StringBuilder();
+
+    while (labelPos < label.length() && queryPos < lowerQuery.length()) {
+      if (lowerLabel.charAt(labelPos) == lowerQuery.charAt(queryPos)) {
+        if (!normal.isEmpty()) {
+          spans.add(Span.raw(normal.toString()));
+          normal.setLength(0);
+        }
+        spans.add(Span.styled(String.valueOf(label.charAt(labelPos)), highlightStyle));
+        queryPos++;
+      } else {
+        normal.append(label.charAt(labelPos));
+      }
+      labelPos++;
+    }
+    if (labelPos < label.length()) {
+      normal.append(label.substring(labelPos));
+    }
+    if (!normal.isEmpty()) {
+      spans.add(Span.raw(normal.toString()));
+    }
+
+    return Line.from(spans);
+  }
+
   private static String sectionHeaderLabel(ExtensionCatalogRow row) {
     String prefix = row.collapsed() ? "▶ " : "▼ ";
-    String suffix = row.collapsed() ? " (" + row.hiddenCount() + " hidden)" : "";
+    String suffix;
+    if (row.collapsed()) {
+      suffix = " (" + row.hiddenCount() + " hidden)";
+    } else if (row.totalCount() > 0) {
+      suffix = " (" + row.totalCount() + ")";
+    } else {
+      suffix = "";
+    }
     return prefix + row.label() + suffix;
   }
 }

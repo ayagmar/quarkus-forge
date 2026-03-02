@@ -3,7 +3,6 @@ package dev.ayagmar.quarkusforge.ui;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.ayagmar.quarkusforge.api.ApiHttpException;
-import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.TickEvent;
@@ -120,9 +119,7 @@ class CoreTuiGenerationFlowTest {
 
           assertThat(action.shouldQuit()).isFalse();
           assertThat(controller.postGenerationExitPlan()).isEmpty();
-          assertThat(generated.resolve("forge.lock")).exists();
-          assertThat(ForgeDataPaths.recipesRoot().resolve("forge-app").resolve("Forgefile"))
-              .exists();
+          assertThat(generated.resolve("Forgefile")).exists();
         });
   }
 

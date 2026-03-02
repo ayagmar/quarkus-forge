@@ -1,11 +1,9 @@
 package dev.ayagmar.quarkusforge;
 
 import dev.ayagmar.quarkusforge.api.CatalogData;
-import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
-import dev.ayagmar.quarkusforge.api.ThrowableUnwrapper;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticField;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
@@ -13,6 +11,7 @@ import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ValidationError;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
+import dev.ayagmar.quarkusforge.ui.ExtensionFavoritesStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -21,26 +20,29 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import picocli.CommandLine;
 
 final class HeadlessGenerationService {
-  int run(
-      GenerateCommand command,
-      boolean globalDryRun,
-      boolean verbose,
-      HeadlessGenerationOperations operations) {
+  private static final String PRESET_FAVORITES = "favorites";
+
+  private final HeadlessCatalogClient catalogClient;
+  private final RuntimeConfig runtimeConfig;
+
+  HeadlessGenerationService(HeadlessCatalogClient catalogClient, RuntimeConfig runtimeConfig) {
+    this.catalogClient = catalogClient;
+    this.runtimeConfig = runtimeConfig;
+  }
+
+  int run(GenerateCommand command, boolean globalDryRun, boolean verbose) {
     DiagnosticLogger diagnostics = DiagnosticLogger.create(verbose);
     diagnostics.info(
         "generate.start", df("mode", command.dryRun || globalDryRun ? "dry-run" : "apply"));
 
-    EffectiveGenerateInputs effectiveInputs;
+    EffectiveInputs inputs;
     try {
-      effectiveInputs = loadEffectiveInputs(command);
+      inputs = loadEffectiveInputs(command);
     } catch (IllegalArgumentException illegalArgumentException) {
       diagnostics.error(
           "generate.inputs.failed", df("message", illegalArgumentException.getMessage()));
@@ -48,53 +50,38 @@ final class HeadlessGenerationService {
       return QuarkusForgeCli.EXIT_CODE_VALIDATION;
     }
 
+    Duration catalogTimeout = HeadlessTimeouts.catalogTimeout();
     CatalogData catalogData;
     try {
-      catalogData = operations.loadCatalogData();
+      catalogData = catalogClient.loadCatalogData(catalogTimeout);
       diagnostics.info(
           "catalog.load.success",
           df("source", catalogData.source().label()),
           df("stale", catalogData.stale()),
           df("detail", catalogData.detailMessage()));
-    } catch (CancellationException cancellationException) {
-      diagnostics.error("catalog.load.cancelled", df("phase", "before-start"));
-      System.err.println("Generation cancelled before start.");
-      return QuarkusForgeCli.EXIT_CODE_CANCELLED;
-    } catch (InterruptedException interruptedException) {
-      Thread.currentThread().interrupt();
-      diagnostics.error("catalog.load.cancelled", df("phase", "interrupted"));
-      System.err.println("Generation cancelled before start.");
-      return QuarkusForgeCli.EXIT_CODE_CANCELLED;
-    } catch (TimeoutException timeoutException) {
-      Duration timeout = operations.headlessCatalogTimeout();
-      diagnostics.error("catalog.load.timeout", df("timeoutMs", timeout.toMillis()));
-      System.err.println(
-          "Failed to load extension catalog: request timed out after " + timeout.toMillis() + "ms");
-      return QuarkusForgeCli.EXIT_CODE_NETWORK;
-    } catch (ExecutionException executionException) {
-      Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);
-      diagnostics.error(
-          "catalog.load.failure",
-          df("causeType", cause.getClass().getSimpleName()),
-          df("message", ErrorMessageMapper.userFriendlyError(cause)));
-      System.err.println(
-          "Failed to load extension catalog: " + ErrorMessageMapper.userFriendlyError(cause));
-      return operations.mapHeadlessFailureToExitCode(cause);
+    } catch (Exception e) {
+      return AsyncFailureHandler.handleFailure(
+          e,
+          catalogTimeout,
+          "catalog.load",
+          "Failed to load extension catalog",
+          diagnostics,
+          ProjectRequestFactory::mapFailureToExitCode);
     }
 
-    ProjectRequest request = operations.toProjectRequest(effectiveInputs.requestOptions());
+    ProjectRequest request = ProjectRequestFactory.fromOptions(inputs.requestOptions());
     MetadataCompatibilityContext metadataCompatibility =
         MetadataCompatibilityContext.success(catalogData.metadata());
     ProjectRequest requestWithResolvedStream =
-        operations.applyRecommendedPlatformStream(request, metadataCompatibility);
+        ProjectRequestFactory.applyRecommendedPlatformStream(request, metadataCompatibility);
     ForgeUiState validatedState =
-        operations.buildInitialState(requestWithResolvedStream, metadataCompatibility);
+        ProjectRequestFactory.buildInitialState(requestWithResolvedStream, metadataCompatibility);
     if (!validatedState.canSubmit()) {
       diagnostics.error(
           "generate.validation.failed",
           df("errorCount", validatedState.validation().errors().size()),
           df("catalogSource", catalogData.source().label()));
-      operations.printValidationErrors(
+      HeadlessOutputPrinter.printValidationErrors(
           validatedState.validation(),
           catalogData.source().label() + (catalogData.stale() ? " [stale]" : ""),
           catalogData.detailMessage());
@@ -107,56 +94,39 @@ final class HeadlessGenerationService {
     }
 
     Map<String, List<String>> presetExtensionsByName = Map.of();
-    if (requiresBuiltInPresets(effectiveInputs.presetInputs())) {
+    if (requiresBuiltInPresets(inputs.presetInputs())) {
       try {
         presetExtensionsByName =
-            operations.loadBuiltInPresets(validatedState.request().platformStream());
-      } catch (CancellationException cancellationException) {
-        diagnostics.error("preset.load.cancelled", df("phase", "before-resolution"));
-        System.err.println("Failed to load presets: request cancelled.");
-        return QuarkusForgeCli.EXIT_CODE_CANCELLED;
-      } catch (InterruptedException interruptedException) {
-        Thread.currentThread().interrupt();
-        diagnostics.error("preset.load.cancelled", df("phase", "interrupted"));
-        System.err.println("Failed to load presets: request cancelled.");
-        return QuarkusForgeCli.EXIT_CODE_CANCELLED;
-      } catch (TimeoutException timeoutException) {
-        Duration timeout = operations.headlessCatalogTimeout();
-        diagnostics.error("preset.load.timeout", df("timeoutMs", timeout.toMillis()));
-        System.err.println(
-            "Failed to load presets: request timed out after " + timeout.toMillis() + "ms");
-        return QuarkusForgeCli.EXIT_CODE_NETWORK;
-      } catch (ExecutionException executionException) {
-        Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);
-        diagnostics.error(
-            "preset.load.failure",
-            df("causeType", cause.getClass().getSimpleName()),
-            df("message", ErrorMessageMapper.userFriendlyError(cause)));
-        System.err.println(
-            "Failed to load presets: " + ErrorMessageMapper.userFriendlyError(cause));
-        return operations.mapHeadlessFailureToExitCode(cause);
+            catalogClient.loadBuiltInPresets(
+                validatedState.request().platformStream(), catalogTimeout);
+      } catch (Exception e) {
+        return AsyncFailureHandler.handleFailure(
+            e,
+            catalogTimeout,
+            "preset.load",
+            "Failed to load presets",
+            diagnostics,
+            ProjectRequestFactory::mapFailureToExitCode);
       }
     }
 
     List<String> extensionIds;
     try {
       extensionIds =
-          operations.resolveRequestedExtensions(
-              effectiveInputs.extensionInputs(),
-              effectiveInputs.presetInputs(),
+          resolveRequestedExtensions(
+              inputs.extensionInputs(),
+              inputs.presetInputs(),
               knownExtensionIds,
               presetExtensionsByName);
-      validateLockDrift(
-          effectiveInputs.lock(),
-          effectiveInputs.refreshLock(),
-          validatedState.request(),
-          effectiveInputs.presetInputs(),
-          extensionIds);
+
+      if (inputs.lockCheck()) {
+        validateLockDrift(inputs.forgefile(), validatedState.request(), inputs, extensionIds);
+      }
     } catch (ValidationException validationException) {
       diagnostics.error(
           "generate.extension-validation.failed",
           df("errorCount", validationException.errors().size()));
-      operations.printValidationErrors(
+      HeadlessOutputPrinter.printValidationErrors(
           new ValidationReport(validationException.errors()),
           catalogData.source().label() + (catalogData.stale() ? " [stale]" : ""),
           catalogData.detailMessage());
@@ -170,12 +140,12 @@ final class HeadlessGenerationService {
           df("extensionCount", extensionIds.size()),
           df("catalogSource", catalogData.source().label()),
           df("stale", catalogData.stale()));
-      operations.printDryRunSummary(
+      HeadlessOutputPrinter.printDryRunSummary(
           validatedState.request(),
           extensionIds,
           catalogData.source().label(),
           catalogData.stale());
-      writeRecipeAndLockIfRequested(effectiveInputs, validatedState.request(), extensionIds);
+      saveForgefileIfRequested(inputs, validatedState.request(), extensionIds);
       return CommandLine.ExitCode.OK;
     }
 
@@ -194,94 +164,136 @@ final class HeadlessGenerationService {
             extensionIds);
 
     CompletableFuture<Path> generationFuture =
-        operations.startGeneration(generationRequest, outputPath, System.out::println);
+        catalogClient.startGeneration(generationRequest, outputPath, System.out::println);
+    Duration generationTimeout = HeadlessTimeouts.generationTimeout();
+    diagnostics.info(
+        "generate.execute.start",
+        df("outputPath", outputPath.toString()),
+        df("extensionCount", extensionIds.size()));
     try {
-      Duration generationTimeout = operations.headlessGenerationTimeout();
-      diagnostics.info(
-          "generate.execute.start",
-          df("outputPath", outputPath.toString()),
-          df("extensionCount", extensionIds.size()));
       Path generatedProjectRoot =
           generationFuture.get(generationTimeout.toMillis(), TimeUnit.MILLISECONDS);
       diagnostics.info(
           "generate.execute.success", df("projectRoot", generatedProjectRoot.toString()));
-      writeRecipeAndLockIfRequested(effectiveInputs, validatedState.request(), extensionIds);
+      saveForgefileIfRequested(inputs, validatedState.request(), extensionIds);
       System.out.println(
           "Generation succeeded: " + generatedProjectRoot.toAbsolutePath().normalize());
       return CommandLine.ExitCode.OK;
-    } catch (CancellationException cancellationException) {
-      diagnostics.error("generate.execute.cancelled", df("phase", "execution"));
-      System.err.println("Generation cancelled.");
-      return QuarkusForgeCli.EXIT_CODE_CANCELLED;
-    } catch (InterruptedException interruptedException) {
-      Thread.currentThread().interrupt();
-      diagnostics.error("generate.execute.cancelled", df("phase", "interrupted"));
-      System.err.println("Generation cancelled.");
-      return QuarkusForgeCli.EXIT_CODE_CANCELLED;
-    } catch (TimeoutException timeoutException) {
-      generationFuture.cancel(true);
-      Duration timeout = operations.headlessGenerationTimeout();
-      diagnostics.error("generate.execute.timeout", df("timeoutMs", timeout.toMillis()));
-      System.err.println("Generation failed: request timed out after " + timeout.toMillis() + "ms");
-      return QuarkusForgeCli.EXIT_CODE_NETWORK;
-    } catch (ExecutionException executionException) {
-      Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);
-      int exitCode = operations.mapHeadlessFailureToExitCode(cause);
-      diagnostics.error(
-          "generate.execute.failure",
-          df("causeType", cause.getClass().getSimpleName()),
-          df("message", ErrorMessageMapper.userFriendlyError(cause)),
-          df("exitCode", exitCode));
-      System.err.println("Generation failed: " + ErrorMessageMapper.userFriendlyError(cause));
-      return exitCode;
+    } catch (Exception e) {
+      if (e instanceof java.util.concurrent.TimeoutException) {
+        generationFuture.cancel(true);
+      }
+      return AsyncFailureHandler.handleFailure(
+          e,
+          generationTimeout,
+          "generate.execute",
+          "Generation failed",
+          diagnostics,
+          ProjectRequestFactory::mapFailureToExitCode);
     }
   }
+
+  List<String> resolveRequestedExtensions(
+      List<String> extensionInputs,
+      List<String> presetInputs,
+      Set<String> knownExtensionIds,
+      Map<String, List<String>> presetExtensionsByName) {
+    List<ValidationError> errors = new ArrayList<>();
+    LinkedHashSet<String> resolved = new LinkedHashSet<>();
+
+    for (String presetInput : presetInputs) {
+      String preset = ProjectRequestFactory.normalizePresetName(presetInput);
+      if (preset.isBlank()) {
+        continue;
+      }
+      if (PRESET_FAVORITES.equals(preset)) {
+        resolved.addAll(
+            ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile())
+                .loadFavoriteExtensionIds());
+        continue;
+      }
+      List<String> presetExtensions = presetExtensionsByName.get(preset);
+      if (presetExtensions == null) {
+        String allowedPresets = String.join(", ", presetExtensionsByName.keySet());
+        if (!allowedPresets.isBlank()) {
+          allowedPresets = allowedPresets + ", " + PRESET_FAVORITES;
+        } else {
+          allowedPresets = PRESET_FAVORITES;
+        }
+        errors.add(
+            new ValidationError(
+                "preset", "unknown preset '" + presetInput + "'. Allowed: " + allowedPresets));
+        continue;
+      }
+      resolved.addAll(presetExtensions);
+    }
+
+    for (String extensionInput : extensionInputs) {
+      if (extensionInput == null || extensionInput.isBlank()) {
+        errors.add(new ValidationError("extension", "must not be blank"));
+        continue;
+      }
+      resolved.add(extensionInput.trim());
+    }
+
+    for (String extensionId : resolved) {
+      if (!knownExtensionIds.contains(extensionId)) {
+        errors.add(new ValidationError("extension", "unknown extension id '" + extensionId + "'"));
+      }
+    }
+
+    if (!errors.isEmpty()) {
+      throw new ValidationException(errors);
+    }
+    return List.copyOf(resolved);
+  }
+
+  // --- Private helpers ---
 
   private static DiagnosticField df(String name, Object value) {
     return DiagnosticField.of(name, value);
   }
 
-  private static EffectiveGenerateInputs loadEffectiveInputs(GenerateCommand command) {
+  private static EffectiveInputs loadEffectiveInputs(GenerateCommand command) {
     RequestOptions requestOptions = command.requestOptions;
     List<String> presetInputs = new ArrayList<>(command.presets);
     List<String> extensionInputs = new ArrayList<>(command.extensions);
-    ForgeLock lock = null;
+    Forgefile forgefile = null;
+    Path forgefilePath = null;
 
-    if (command.recipeFile != null && !command.recipeFile.isBlank()) {
-      Path recipePath = resolveRecipeReadPath(command.recipeFile);
-      ForgeRecipe recipe = ForgeRecipeLockStore.loadRecipe(recipePath);
-      requestOptions = recipe.toRequestOptions();
-      presetInputs = new ArrayList<>(recipe.presets());
+    if (command.fromFile != null && !command.fromFile.isBlank()) {
+      forgefilePath = resolveForgefileReadPath(command.fromFile);
+      forgefile = ForgefileStore.load(forgefilePath);
+      requestOptions = forgefile.toRequestOptions();
+      presetInputs = new ArrayList<>(new LinkedHashSet<>(forgefile.presets()));
       presetInputs.addAll(command.presets);
-      extensionInputs = new ArrayList<>(recipe.extensions());
+      extensionInputs = new ArrayList<>(new LinkedHashSet<>(forgefile.extensions()));
       extensionInputs.addAll(command.extensions);
     }
 
-    if (command.lockFile != null && !command.lockFile.isBlank()) {
-      lock = ForgeRecipeLockStore.loadLock(Path.of(command.lockFile).toAbsolutePath().normalize());
+    if (command.lock && forgefile == null && command.saveAsFile == null) {
+      throw new IllegalArgumentException("--lock requires --from or --save-as");
+    }
+    if (command.lockCheck && (forgefile == null || forgefile.locked() == null)) {
+      throw new IllegalArgumentException(
+          "--lock-check requires --from pointing to a Forgefile with a locked section");
     }
 
-    if (command.refreshLock
-        && (command.lockFile == null || command.lockFile.isBlank())
-        && (command.writeLockFile == null || command.writeLockFile.isBlank())) {
-      throw new IllegalArgumentException("--refresh-lock requires --lock or --write-lock");
-    }
-
-    return new EffectiveGenerateInputs(
+    return new EffectiveInputs(
         requestOptions,
         List.copyOf(presetInputs),
         List.copyOf(extensionInputs),
-        lock,
-        command.refreshLock,
-        recipeWritePathOrNull(command.writeRecipeFile),
-        normalizedPathOrNull(command.lockFile),
-        normalizedPathOrNull(command.writeLockFile));
+        forgefile,
+        forgefilePath,
+        command.lock,
+        command.lockCheck,
+        saveAsPathOrNull(command.saveAsFile));
   }
 
   private static boolean requiresBuiltInPresets(List<String> presetInputs) {
     for (String presetInput : presetInputs) {
-      String preset = QuarkusForgeCli.normalizePresetName(presetInput);
-      if (!preset.isBlank() && !"favorites".equals(preset)) {
+      String preset = ProjectRequestFactory.normalizePresetName(presetInput);
+      if (!preset.isBlank() && !PRESET_FAVORITES.equals(preset)) {
         return true;
       }
     }
@@ -289,21 +301,21 @@ final class HeadlessGenerationService {
   }
 
   private static void validateLockDrift(
-      ForgeLock lock,
-      boolean refreshLock,
+      Forgefile forgefile,
       ProjectRequest request,
-      List<String> presetInputs,
+      EffectiveInputs inputs,
       List<String> extensionIds) {
-    if (lock == null || refreshLock) {
+    if (forgefile == null || forgefile.locked() == null) {
       return;
     }
+    ForgefileLock lock = forgefile.locked();
 
     List<ValidationError> errors = new ArrayList<>();
     if (!lock.platformStream().equals(request.platformStream())) {
       errors.add(
           new ValidationError(
-              "lock",
-              "platformStream drift: lock='"
+              "locked",
+              "platformStream drift: locked='"
                   + lock.platformStream()
                   + "', request='"
                   + request.platformStream()
@@ -312,8 +324,8 @@ final class HeadlessGenerationService {
     if (!lock.buildTool().equals(request.buildTool())) {
       errors.add(
           new ValidationError(
-              "lock",
-              "buildTool drift: lock='"
+              "locked",
+              "buildTool drift: locked='"
                   + lock.buildTool()
                   + "', request='"
                   + request.buildTool()
@@ -322,8 +334,8 @@ final class HeadlessGenerationService {
     if (!lock.javaVersion().equals(request.javaVersion())) {
       errors.add(
           new ValidationError(
-              "lock",
-              "javaVersion drift: lock='"
+              "locked",
+              "javaVersion drift: locked='"
                   + lock.javaVersion()
                   + "', request='"
                   + request.javaVersion()
@@ -332,62 +344,66 @@ final class HeadlessGenerationService {
     if (!lock.extensions().equals(extensionIds)) {
       errors.add(
           new ValidationError(
-              "lock", "extensions drift: lock=" + lock.extensions() + ", request=" + extensionIds));
+              "locked",
+              "extensions drift: locked=" + lock.extensions() + ", request=" + extensionIds));
     }
     List<String> normalizedPresets =
-        presetInputs.stream().map(QuarkusForgeCli::normalizePresetName).toList();
+        inputs.presetInputs().stream()
+            .map(ProjectRequestFactory::normalizePresetName)
+            .distinct()
+            .toList();
     if (!lock.presets().equals(normalizedPresets)) {
       errors.add(
           new ValidationError(
-              "lock", "presets drift: lock=" + lock.presets() + ", request=" + normalizedPresets));
+              "locked",
+              "presets drift: locked=" + lock.presets() + ", request=" + normalizedPresets));
     }
 
     if (!errors.isEmpty()) {
       errors.add(
           new ValidationError(
-              "lock", "rerun with --refresh-lock to accept and rewrite lock contents"));
+              "locked", "rerun with --lock to accept and update the locked section"));
       throw new ValidationException(errors);
     }
   }
 
-  private static void writeRecipeAndLockIfRequested(
-      EffectiveGenerateInputs inputs, ProjectRequest request, List<String> extensionIds) {
+  private static void saveForgefileIfRequested(
+      EffectiveInputs inputs, ProjectRequest request, List<String> extensionIds) {
     List<String> normalizedPresets =
-        inputs.presetInputs().stream().map(QuarkusForgeCli::normalizePresetName).toList();
+        inputs.presetInputs().stream()
+            .map(ProjectRequestFactory::normalizePresetName)
+            .distinct()
+            .toList();
 
-    if (inputs.writeRecipeFile() != null) {
-      ForgeRecipe recipe =
-          ForgeRecipe.from(inputs.requestOptions(), normalizedPresets, inputs.extensionInputs());
-      ForgeRecipeLockStore.writeRecipe(inputs.writeRecipeFile(), recipe);
-    }
+    // Always rebuild from effective inputs so CLI additions are persisted
+    Forgefile forgefile =
+        Forgefile.from(inputs.requestOptions(), normalizedPresets, inputs.extensionInputs());
 
-    Path lockPath = null;
-    if (inputs.writeLockFile() != null) {
-      lockPath = inputs.writeLockFile();
-    } else if (inputs.refreshLock() && inputs.lockFile() != null) {
-      lockPath = inputs.lockFile();
-    }
-    if (lockPath != null) {
-      ForgeLock lock =
-          ForgeLock.from(
+    // Add locked section if --lock was requested
+    if (inputs.writeLock()) {
+      ForgefileLock lock =
+          ForgefileLock.of(
               request.platformStream(),
               request.buildTool(),
               request.javaVersion(),
               normalizedPresets,
               extensionIds);
-      ForgeRecipeLockStore.writeLock(lockPath, lock);
+      forgefile = forgefile.withLock(lock);
     }
+
+    // Write to --save-as path, or update --from path in-place
+    Path writePath = inputs.saveAsFile();
+    if (writePath == null && inputs.writeLock() && inputs.forgefilePath() != null) {
+      writePath = inputs.forgefilePath();
+    }
+    if (writePath == null) {
+      return;
+    }
+    ForgefileStore.save(writePath, forgefile);
   }
 
-  private static Path normalizedPathOrNull(String pathValue) {
-    if (pathValue == null || pathValue.isBlank()) {
-      return null;
-    }
-    return Path.of(pathValue).toAbsolutePath().normalize();
-  }
-
-  private static Path resolveRecipeReadPath(String recipeReference) {
-    Path requestedPath = Path.of(recipeReference);
+  private static Path resolveForgefileReadPath(String reference) {
+    Path requestedPath = Path.of(reference);
     Path localPath = requestedPath.toAbsolutePath().normalize();
     if (requestedPath.isAbsolute() || Files.exists(localPath)) {
       return localPath;
@@ -395,7 +411,7 @@ final class HeadlessGenerationService {
     return ForgeDataPaths.recipesRoot().resolve(requestedPath).toAbsolutePath().normalize();
   }
 
-  private static Path recipeWritePathOrNull(String pathValue) {
+  private static Path saveAsPathOrNull(String pathValue) {
     if (pathValue == null || pathValue.isBlank()) {
       return null;
     }
@@ -406,13 +422,13 @@ final class HeadlessGenerationService {
     return ForgeDataPaths.recipesRoot().resolve(requestedPath).toAbsolutePath().normalize();
   }
 
-  private record EffectiveGenerateInputs(
+  private record EffectiveInputs(
       RequestOptions requestOptions,
       List<String> presetInputs,
       List<String> extensionInputs,
-      ForgeLock lock,
-      boolean refreshLock,
-      Path writeRecipeFile,
-      Path lockFile,
-      Path writeLockFile) {}
+      Forgefile forgefile,
+      Path forgefilePath,
+      boolean writeLock,
+      boolean lockCheck,
+      Path saveAsFile) {}
 }

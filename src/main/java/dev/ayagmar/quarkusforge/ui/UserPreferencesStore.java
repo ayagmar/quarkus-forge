@@ -1,8 +1,8 @@
 package dev.ayagmar.quarkusforge.ui;
 
-import dev.ayagmar.quarkusforge.api.ApiContractException;
 import dev.ayagmar.quarkusforge.api.AtomicFileStore;
 import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
+import dev.ayagmar.quarkusforge.api.JsonFieldReader;
 import dev.ayagmar.quarkusforge.api.JsonSupport;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
@@ -73,20 +73,20 @@ public final class UserPreferencesStore {
     }
     try {
       Map<String, Object> root = JsonSupport.parseObject(Files.readString(file));
-      Integer schemaVersion = readInt(root, "schemaVersion");
+      Integer schemaVersion = JsonFieldReader.readInt(root, "schemaVersion");
       if (schemaVersion == null || schemaVersion != SCHEMA_VERSION) {
         return null;
       }
       return new UserPreferencesPayload(
           schemaVersion,
-          readString(root, "groupId"),
-          readString(root, "artifactId"),
-          readString(root, "version"),
-          readString(root, "packageName"),
-          readString(root, "outputDirectory"),
-          readString(root, "platformStream"),
-          readString(root, "buildTool"),
-          readString(root, "javaVersion"));
+          JsonFieldReader.readString(root, "groupId"),
+          JsonFieldReader.readString(root, "artifactId"),
+          JsonFieldReader.readString(root, "version"),
+          JsonFieldReader.readString(root, "packageName"),
+          JsonFieldReader.readString(root, "outputDirectory"),
+          JsonFieldReader.readString(root, "platformStream"),
+          JsonFieldReader.readString(root, "buildTool"),
+          JsonFieldReader.readString(root, "javaVersion"));
     } catch (IOException | RuntimeException ignored) {
       return null;
     }
@@ -104,32 +104,6 @@ public final class UserPreferencesStore {
     root.put("buildTool", payload.buildTool());
     root.put("javaVersion", payload.javaVersion());
     return root;
-  }
-
-  private static Integer readInt(Map<String, Object> root, String key) {
-    Object value = root.get(key);
-    if (value == null) {
-      return null;
-    }
-    if (!(value instanceof Number number)) {
-      throw new ApiContractException("Malformed JSON payload");
-    }
-    long longValue = number.longValue();
-    if (longValue > Integer.MAX_VALUE || longValue < Integer.MIN_VALUE) {
-      throw new ApiContractException("Malformed JSON payload");
-    }
-    return (int) longValue;
-  }
-
-  private static String readString(Map<String, Object> root, String key) {
-    Object value = root.get(key);
-    if (value == null) {
-      return null;
-    }
-    if (value instanceof String stringValue) {
-      return stringValue;
-    }
-    throw new ApiContractException("Malformed JSON payload");
   }
 
   private static String normalize(String value) {

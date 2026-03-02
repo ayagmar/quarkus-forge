@@ -13,7 +13,10 @@ record MetadataPanelSnapshot(
     String outputDir,
     String platformStream,
     String buildTool,
-    String javaVersion) {
+    String javaVersion,
+    SelectorInfo platformStreamInfo,
+    SelectorInfo buildToolInfo,
+    SelectorInfo javaVersionInfo) {
   MetadataPanelSnapshot {
     title = Objects.requireNonNull(title);
     groupId = groupId == null ? "" : groupId;
@@ -24,5 +27,12 @@ record MetadataPanelSnapshot(
     platformStream = platformStream == null ? "" : platformStream;
     buildTool = buildTool == null ? "" : buildTool;
     javaVersion = javaVersion == null ? "" : javaVersion;
+    if (platformStreamInfo == null) platformStreamInfo = SelectorInfo.EMPTY;
+    if (buildToolInfo == null) buildToolInfo = SelectorInfo.EMPTY;
+    if (javaVersionInfo == null) javaVersionInfo = SelectorInfo.EMPTY;
+  }
+
+  record SelectorInfo(int selectedIndex, int totalOptions) {
+    static final SelectorInfo EMPTY = new SelectorInfo(0, 0);
   }
 }

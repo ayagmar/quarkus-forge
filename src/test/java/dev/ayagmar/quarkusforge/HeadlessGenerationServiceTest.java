@@ -8,169 +8,130 @@ import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.api.PlatformStream;
-import dev.ayagmar.quarkusforge.domain.ForgeUiState;
-import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
-import dev.ayagmar.quarkusforge.domain.ProjectRequest;
-import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import picocli.CommandLine;
 
 class HeadlessGenerationServiceTest {
+  @TempDir Path tempDir;
+
+  private static final MetadataDto METADATA =
+      new MetadataDto(
+          List.of("21"),
+          List.of("maven"),
+          Map.of("maven", List.of("21")),
+          List.of(new PlatformStream("io.quarkus.platform:3.31", "3.31", true, List.of("21"))));
+  private static final CatalogData CATALOG_DATA =
+      new CatalogData(
+          METADATA,
+          List.of(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest")),
+          CatalogSource.LIVE,
+          false,
+          "");
+
   @Test
   void dryRunSkipsGenerationExecution() {
-    TestOperations operations = new TestOperations();
+    StubCatalogClient client = new StubCatalogClient();
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
-    int exitCode =
-        new HeadlessGenerationService().run(new GenerateCommand(), true, false, operations);
+    GenerateCommand command = commandWithOutput();
+    int exitCode = service.run(command, true, false);
 
     assertThat(exitCode).isEqualTo(CommandLine.ExitCode.OK);
-    assertThat(operations.printDryRunSummaryCalls).isEqualTo(1);
-    assertThat(operations.startGenerationCalls).isZero();
+    assertThat(client.startGenerationCalls).isZero();
   }
 
   @Test
   void generationTimeoutCancelsRunningFuture() {
-    TestOperations operations = new TestOperations();
-    operations.generationTimeout = Duration.ofMillis(1);
-    operations.generationFuture = new CompletableFuture<>();
+    StubCatalogClient client = new StubCatalogClient();
+    client.generationFuture = new CompletableFuture<>();
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
-    int exitCode =
-        new HeadlessGenerationService().run(new GenerateCommand(), false, false, operations);
-
-    assertThat(exitCode).isEqualTo(QuarkusForgeCli.EXIT_CODE_NETWORK);
-    assertThat(operations.startGenerationCalls).isEqualTo(1);
-    assertThat(operations.generationFuture.isCancelled()).isTrue();
+    GenerateCommand command = commandWithOutput();
+    System.setProperty("quarkus.forge.headless.generation-timeout-ms", "1");
+    try {
+      int exitCode = service.run(command, false, false);
+      assertThat(exitCode).isEqualTo(QuarkusForgeCli.EXIT_CODE_NETWORK);
+      assertThat(client.startGenerationCalls).isEqualTo(1);
+      assertThat(client.generationFuture.isCancelled()).isTrue();
+    } finally {
+      System.clearProperty("quarkus.forge.headless.generation-timeout-ms");
+    }
   }
 
   @Test
   void catalogTimeoutReturnsNetworkExitCodeBeforeValidation() {
-    TestOperations operations = new TestOperations();
-    operations.catalogLoadTimeout = new TimeoutException("timeout");
+    StubCatalogClient client = new StubCatalogClient();
+    client.catalogLoadTimeout = new TimeoutException("timeout");
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
-    int exitCode =
-        new HeadlessGenerationService().run(new GenerateCommand(), false, false, operations);
+    GenerateCommand command = commandWithOutput();
+    int exitCode = service.run(command, false, false);
 
     assertThat(exitCode).isEqualTo(QuarkusForgeCli.EXIT_CODE_NETWORK);
-    assertThat(operations.startGenerationCalls).isZero();
-    assertThat(operations.printValidationErrorsCalls).isZero();
+    assertThat(client.startGenerationCalls).isZero();
   }
 
-  private static final class TestOperations implements HeadlessGenerationOperations {
-    private final MetadataDto metadata =
-        new MetadataDto(
-            List.of("21"),
-            List.of("maven"),
-            Map.of(),
-            List.of(new PlatformStream("io.quarkus.platform:3.31", "3.31", true, List.of("21"))));
-    private final CatalogData catalogData =
-        new CatalogData(
-            metadata,
-            List.of(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest")),
-            CatalogSource.LIVE,
-            false,
-            "");
-    private final ProjectRequest request =
-        new ProjectRequest(
-            "com.example",
-            "demo-app",
-            "1.0.0-SNAPSHOT",
-            "com.example.demo",
-            "output",
-            "io.quarkus.platform:3.31",
-            "maven",
-            "21");
-    private final ForgeUiState validatedState =
-        new ForgeUiState(
-            request,
-            new ValidationReport(List.of()),
-            MetadataCompatibilityContext.success(metadata));
+  private GenerateCommand commandWithOutput() {
+    GenerateCommand cmd = new GenerateCommand();
+    cmd.requestOptions = new RequestOptions();
+    cmd.requestOptions.groupId = "com.example";
+    cmd.requestOptions.artifactId = "demo-app";
+    cmd.requestOptions.version = "1.0.0-SNAPSHOT";
+    cmd.requestOptions.outputDirectory = tempDir.toString();
+    cmd.requestOptions.platformStream = "io.quarkus.platform:3.31";
+    cmd.requestOptions.buildTool = "maven";
+    cmd.requestOptions.javaVersion = "21";
+    return cmd;
+  }
 
-    private TimeoutException catalogLoadTimeout;
-    private Duration generationTimeout = Duration.ofSeconds(1);
-    private CompletableFuture<Path> generationFuture =
+  private RuntimeConfig stubRuntimeConfig() {
+    return new RuntimeConfig(
+        java.net.URI.create("https://code.quarkus.io"),
+        tempDir.resolve("cache.json"),
+        tempDir.resolve("preferences.json"),
+        tempDir.resolve("favorites.json"));
+  }
+
+  private static final class StubCatalogClient extends HeadlessCatalogClient {
+    TimeoutException catalogLoadTimeout;
+    CompletableFuture<Path> generationFuture =
         CompletableFuture.completedFuture(Path.of("output/demo-app"));
-    private int startGenerationCalls;
-    private int printDryRunSummaryCalls;
-    private int printValidationErrorsCalls;
+    int startGenerationCalls;
+
+    StubCatalogClient() {
+      super(
+          new RuntimeConfig(
+              java.net.URI.create("https://code.quarkus.io"),
+              Path.of("/tmp/cache.json"),
+              Path.of("/tmp/prefs.json"),
+              Path.of("/tmp/favs.json")));
+    }
 
     @Override
-    public CatalogData loadCatalogData()
+    CatalogData loadCatalogData(Duration timeout)
         throws ExecutionException, InterruptedException, TimeoutException {
       if (catalogLoadTimeout != null) {
         throw catalogLoadTimeout;
       }
-      return catalogData;
+      return CATALOG_DATA;
     }
 
     @Override
-    public ProjectRequest toProjectRequest(RequestOptions options) {
-      return request;
-    }
-
-    @Override
-    public ProjectRequest applyRecommendedPlatformStream(
-        ProjectRequest request, MetadataCompatibilityContext metadataCompatibility) {
-      return request;
-    }
-
-    @Override
-    public ForgeUiState buildInitialState(
-        ProjectRequest request, MetadataCompatibilityContext metadataCompatibility) {
-      return validatedState;
-    }
-
-    @Override
-    public List<String> resolveRequestedExtensions(
-        List<String> extensionInputs,
-        List<String> presetInputs,
-        Set<String> knownExtensionIds,
-        Map<String, List<String>> presetExtensionsByName) {
-      return List.of("io.quarkus:quarkus-rest");
-    }
-
-    @Override
-    public Map<String, List<String>> loadBuiltInPresets(String platformStream) {
+    Map<String, List<String>> loadBuiltInPresets(String platformStream, Duration timeout) {
       return Map.of("web", List.of("io.quarkus:quarkus-rest"));
     }
 
     @Override
-    public void printValidationErrors(
-        ValidationReport validation, String sourceLabel, String sourceDetail) {
-      printValidationErrorsCalls++;
-    }
-
-    @Override
-    public void printDryRunSummary(
-        ProjectRequest request, List<String> extensionIds, String sourceLabel, boolean stale) {
-      printDryRunSummaryCalls++;
-    }
-
-    @Override
-    public Duration headlessCatalogTimeout() {
-      return Duration.ofSeconds(20);
-    }
-
-    @Override
-    public Duration headlessGenerationTimeout() {
-      return generationTimeout;
-    }
-
-    @Override
-    public int mapHeadlessFailureToExitCode(Throwable throwable) {
-      return QuarkusForgeCli.EXIT_CODE_ARCHIVE;
-    }
-
-    @Override
-    public CompletableFuture<Path> startGeneration(
+    CompletableFuture<Path> startGeneration(
         GenerationRequest generationRequest,
         Path outputPath,
         Consumer<String> progressLineConsumer) {

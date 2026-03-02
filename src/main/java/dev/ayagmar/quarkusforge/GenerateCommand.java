@@ -27,30 +27,31 @@ public final class GenerateCommand implements Callable<Integer> {
   List<String> presets = new ArrayList<>();
 
   @Option(
-      names = "--recipe",
+      names = "--from",
       description =
-          "Path or recipe name for Forge recipe file. "
+          "Path or name for a Forgefile template. "
               + "If local path is missing, resolves from ~/.quarkus-forge/recipes")
-  String recipeFile;
+  String fromFile;
 
   @Option(
-      names = "--write-recipe",
+      names = "--save-as",
       description =
-          "Write effective recipe to this path. "
+          "Write the Forgefile to this path after generation. "
               + "Simple names are written under ~/.quarkus-forge/recipes")
-  String writeRecipeFile;
-
-  @Option(names = "--lock", description = "Path to lock file (example: forge.lock)")
-  String lockFile;
-
-  @Option(names = "--write-lock", description = "Write lock file to this path")
-  String writeLockFile;
+  String saveAsFile;
 
   @Option(
-      names = "--refresh-lock",
+      names = "--lock",
       defaultValue = "false",
-      description = "Allow lock drift and rewrite lock (requires --lock or --write-lock)")
-  boolean refreshLock;
+      description =
+          "Write or update the locked section in the Forgefile (requires --from or --save-as)")
+  boolean lock;
+
+  @Option(
+      names = "--lock-check",
+      defaultValue = "false",
+      description = "Verify no drift against the locked section (requires --from)")
+  boolean lockCheck;
 
   @Option(
       names = "--dry-run",

@@ -385,7 +385,7 @@ class QuarkusForgeGenerateCommandTest {
     stubCatalogEndpoints();
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
     ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile())
-        .saveFavoriteExtensionIds(Set.of("io.quarkus:quarkus-jdbc-postgresql"));
+        .saveAll(Set.of("io.quarkus:quarkus-jdbc-postgresql"), List.of());
     Path outputDir = tempDir.resolve("dry-run-output");
 
     CliCommandTestSupport.CommandResult result =
@@ -424,7 +424,7 @@ class QuarkusForgeGenerateCommandTest {
     stubDownloadEndpoint("headless-app");
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
     ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile())
-        .saveFavoriteExtensionIds(Set.of("io.quarkus:quarkus-jdbc-postgresql"));
+        .saveAll(Set.of("io.quarkus:quarkus-jdbc-postgresql"), List.of());
     Path outputDir = tempDir.resolve("parity-output");
 
     CliCommandTestSupport.CommandResult dryRunResult =
@@ -510,11 +510,10 @@ class QuarkusForgeGenerateCommandTest {
   void dryRunCanLoadRecipeAndWriteRecipeAndLock() throws Exception {
     stubCatalogEndpoints();
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
-    Path recipePath = tempDir.resolve("Forgefile");
-    Path writtenRecipe = tempDir.resolve("written-forgefile.json");
-    Path writtenLock = tempDir.resolve("forge.lock");
+    Path forgefilePath = tempDir.resolve("Forgefile");
+    Path writtenForgefile = tempDir.resolve("written-forgefile.json");
     Files.writeString(
-        recipePath,
+        forgefilePath,
         """
         {
           "groupId": "com.example",
@@ -533,18 +532,19 @@ class QuarkusForgeGenerateCommandTest {
             runtimeConfig,
             "generate",
             "--dry-run",
-            "--recipe",
-            recipePath.toString(),
-            "--write-recipe",
-            writtenRecipe.toString(),
-            "--write-lock",
-            writtenLock.toString());
+            "--from",
+            forgefilePath.toString(),
+            "--save-as",
+            writtenForgefile.toString(),
+            "--lock");
 
     assertThat(result.exitCode()).isZero();
-    assertThat(Files.readString(writtenRecipe))
+    String writtenContent = Files.readString(writtenForgefile);
+    assertThat(writtenContent)
         .contains("\"artifactId\" : \"recipe-app\"")
         .contains("\"presets\" : [ \"web\" ]");
-    assertThat(Files.readString(writtenLock))
+    assertThat(writtenContent)
+        .contains("\"locked\"")
         .contains("\"javaVersion\" : \"25\"")
         .contains("io.quarkus:quarkus-rest")
         .contains("io.quarkus:quarkus-hibernate-orm-panache");
@@ -581,14 +581,7 @@ class QuarkusForgeGenerateCommandTest {
                       })
                   .doesNotThrowAnyException();
 
-              return runCommand(
-                  runtimeConfig,
-                  "generate",
-                  "--dry-run",
-                  "--recipe",
-                  "starter.json",
-                  "--write-lock",
-                  tempDir.resolve("generated.lock").toString());
+              return runCommand(runtimeConfig, "generate", "--dry-run", "--from", "starter.json");
             });
 
     assertThat(result.exitCode()).isZero();
@@ -613,7 +606,7 @@ class QuarkusForgeGenerateCommandTest {
                     "com.example",
                     "--artifact-id",
                     "headless-app",
-                    "--write-recipe",
+                    "--save-as",
                     "team-web.json"));
 
     assertThat(result.exitCode()).isZero();
@@ -621,19 +614,27 @@ class QuarkusForgeGenerateCommandTest {
   }
 
   @Test
-  void lockDriftBlocksUntilRefreshLockIsProvided() throws Exception {
+  void lockDriftBlocksUntilLockIsRewritten() throws Exception {
     stubCatalogEndpoints();
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
-    Path lockPath = tempDir.resolve("forge.lock");
+    Path forgefilePath = tempDir.resolve("Forgefile");
     Files.writeString(
-        lockPath,
+        forgefilePath,
         """
         {
-          "platformStream": "io.quarkus.platform:3.31",
+          "groupId": "com.example",
+          "artifactId": "headless-app",
           "buildTool": "maven",
-          "javaVersion": "21",
+          "javaVersion": "25",
           "presets": ["web"],
-          "extensions": ["io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc"]
+          "extensions": [],
+          "locked": {
+            "platformStream": "io.quarkus.platform:3.31",
+            "buildTool": "maven",
+            "javaVersion": "21",
+            "presets": ["web"],
+            "extensions": ["io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc"]
+          }
         }
         """);
 
@@ -642,14 +643,11 @@ class QuarkusForgeGenerateCommandTest {
             runtimeConfig,
             "generate",
             "--dry-run",
-            "--group-id",
-            "com.example",
-            "--artifact-id",
-            "headless-app",
+            "--from",
+            forgefilePath.toString(),
             "--preset",
             "web",
-            "--lock",
-            lockPath.toString());
+            "--lock-check");
 
     assertThat(driftResult.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_VALIDATION);
     assertThat(driftResult.standardError()).contains("javaVersion drift");
@@ -659,18 +657,16 @@ class QuarkusForgeGenerateCommandTest {
             runtimeConfig,
             "generate",
             "--dry-run",
-            "--group-id",
-            "com.example",
-            "--artifact-id",
-            "headless-app",
+            "--from",
+            forgefilePath.toString(),
             "--preset",
             "web",
-            "--lock",
-            lockPath.toString(),
-            "--refresh-lock");
+            "--lock");
 
     assertThat(refreshResult.exitCode()).isZero();
-    assertThat(Files.readString(lockPath)).contains("\"javaVersion\" : \"25\"");
+    String updatedContent = Files.readString(forgefilePath);
+    assertThat(updatedContent).contains("\"javaVersion\" : \"25\"");
+    assertThat(updatedContent).contains("\"locked\"");
   }
 
   private RuntimeConfig runtimeConfig(URI baseUri) {

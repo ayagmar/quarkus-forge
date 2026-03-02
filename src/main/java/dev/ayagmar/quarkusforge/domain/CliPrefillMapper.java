@@ -50,7 +50,7 @@ public final class CliPrefillMapper {
         segment = "x" + segment;
       }
 
-      if (normalized.length() > 0) {
+      if (!normalized.isEmpty()) {
         normalized.append('.');
       }
       normalized.append(segment);

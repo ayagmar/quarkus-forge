@@ -42,16 +42,28 @@ java -jar target/quarkus-forge.jar generate \
   --extension io.quarkus:quarkus-smallrye-health
 ----
 
-Recipe + lock replay:
+Generate from a Forgefile template:
 
 [source,bash]
 ----
-java -jar target/quarkus-forge.jar generate \
-  --recipe ./Forgefile \
-  --lock forge.lock
+java -jar target/quarkus-forge.jar generate --from ./Forgefile
 ----
 
-Save a reusable recipe by name into `~/.quarkus-forge/recipes`:
+Generate and write/update the locked section:
+
+[source,bash]
+----
+java -jar target/quarkus-forge.jar generate --from ./Forgefile --lock
+----
+
+Verify no drift against the locked section:
+
+[source,bash]
+----
+java -jar target/quarkus-forge.jar generate --from ./Forgefile --lock-check --dry-run
+----
+
+Save a reusable template by name into `~/.quarkus-forge/recipes`:
 
 [source,bash]
 ----
@@ -61,25 +73,14 @@ java -jar target/quarkus-forge.jar generate \
   --artifact-id demo \
   --build-tool maven \
   --java-version 25 \
-  --write-recipe starter.json
+  --save-as starter.json
 ----
 
-Reuse that recipe later by name:
-
-[source,bash]
-----
-java -jar target/quarkus-forge.jar generate --recipe starter.json
-----
-
-Refresh lock after intentional changes:
+Reuse that template later by name:
 
 [source,bash]
 ----
-java -jar target/quarkus-forge.jar generate \
-  --recipe ./Forgefile \
-  --lock forge.lock \
-  --refresh-lock \
-  --dry-run
+java -jar target/quarkus-forge.jar generate --from starter.json
 ----
 
 == Key Flags
@@ -90,7 +91,7 @@ java -jar target/quarkus-forge.jar generate \
 * Presets: `--preset` (repeatable; keys resolved from `code.quarkus.io/api/presets`, plus `favorites`)
 * Validation only: `--dry-run`
 * Diagnostics: `--verbose`
-* Recipe/lock: `--recipe`, `--write-recipe`, `--lock`, `--write-lock`, `--refresh-lock`
+* Forgefile: `--from`, `--save-as`, `--lock`, `--lock-check`
 
 == Exit Codes
 
@@ -100,12 +101,40 @@ java -jar target/quarkus-forge.jar generate \
 * `4`: archive/extraction/output-path error
 * `130`: cancelled/interrupted
 
+== The Forgefile
+
+A Forgefile is a shareable JSON template that captures all inputs needed to reproduce a Quarkus project generation.
+
+[source,json]
+----
+{
+  "groupId": "com.acme",
+  "artifactId": "my-service",
+  "buildTool": "maven",
+  "javaVersion": "25",
+  "extensions": ["io.quarkus:quarkus-rest"],
+  "presets": ["web"],
+  "locked": {
+    "platformStream": "io.quarkus.platform:3.31",
+    "buildTool": "maven",
+    "javaVersion": "25",
+    "extensions": ["io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc"],
+    "presets": ["web"]
+  }
+}
+----
+
+The optional `locked` section pins exact resolved values for deterministic builds:
+
+* `--lock` writes or updates the locked section after generation
+* `--lock-check` verifies no drift between current inputs and locked values
+* If drift is detected, the build fails with a validation error listing the differences
+
 == Notes
 
 * Output path resolves to `<output-dir>/<artifact-id>`.
 * Extension IDs are validated against the loaded catalog.
-* When `--recipe` is set, request metadata fields come from the recipe file; CLI `--preset` and `--extension` are appended.
-* A provided lock file enforces deterministic platform/build/java/preset/extension resolution unless `--refresh-lock` is set.
-* `--recipe <name>` falls back to `~/.quarkus-forge/recipes/<name>` when no local file exists.
-* `--write-recipe <name>` writes to `~/.quarkus-forge/recipes/<name>` when `<name>` has no path separators.
+* When `--from` is set, request metadata fields come from the Forgefile; CLI `--preset` and `--extension` are appended.
+* `--from <name>` falls back to `~/.quarkus-forge/recipes/<name>` when no local file exists.
+* `--save-as <name>` writes to `~/.quarkus-forge/recipes/<name>` when `<name>` has no path separators.
 * Source mode is surfaced in diagnostics (`live`, `cache`, `snapshot`).
