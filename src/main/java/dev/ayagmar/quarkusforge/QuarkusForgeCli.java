@@ -1,5 +1,7 @@
 package dev.ayagmar.quarkusforge;
 
+import static dev.ayagmar.quarkusforge.diagnostics.DiagnosticField.of;
+
 import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogDataService;
 import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
@@ -7,7 +9,6 @@ import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
 import dev.ayagmar.quarkusforge.api.ThrowableUnwrapper;
-import dev.ayagmar.quarkusforge.diagnostics.DiagnosticField;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
@@ -97,7 +98,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
   @Override
   public Integer call() throws Exception {
     DiagnosticLogger diagnostics = DiagnosticLogger.create(verbose);
-    diagnostics.info("cli.start", df("mode", dryRun ? "dry-run" : "tui"));
+    diagnostics.info("cli.start", of("mode", dryRun ? "dry-run" : "tui"));
 
     UserPreferencesStore preferencesStore =
         UserPreferencesStore.fileBacked(runtimeConfig.preferencesFile());
@@ -114,7 +115,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
             requestWithResolvedStream, startupMetadataSelection.metadataCompatibility());
     if (!initialState.canSubmit() && shouldBlockOnStartupValidation(dryRun)) {
       diagnostics.error(
-          "cli.validation.failed", df("errorCount", initialState.validation().errors().size()));
+          "cli.validation.failed", of("errorCount", initialState.validation().errors().size()));
       HeadlessOutputPrinter.printValidationErrors(
           initialState.validation(),
           startupMetadataSelection.sourceLabel(),
@@ -124,7 +125,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
 
     if (dryRun) {
       diagnostics.info(
-          "cli.dry-run.validated", df("metadataSource", startupMetadataSelection.sourceLabel()));
+          "cli.dry-run.validated", of("metadataSource", startupMetadataSelection.sourceLabel()));
       printPrefillSummary(
           initialState.request(),
           startupMetadataSelection.sourceLabel(),
@@ -132,7 +133,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
       return ExitCodes.OK;
     }
 
-    diagnostics.info("cli.tui.launch", df("searchDebounceMs", searchDebounceMs));
+    diagnostics.info("cli.tui.launch", of("searchDebounceMs", searchDebounceMs));
     TuiSessionSummary summary = runTui(initialState, searchDebounceMs, runtimeConfig, diagnostics);
     preferencesStore.saveLastRequest(summary.finalRequest());
     POST_TUI_ACTION_EXECUTOR.execute(summary, postGenerateHookCommand, diagnostics);
@@ -169,7 +170,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
 
   int runSmokeForTest(boolean verbose) {
     DiagnosticLogger diagnostics = DiagnosticLogger.create(verbose);
-    diagnostics.info("cli.start", df("mode", "smoke-test"));
+    diagnostics.info("cli.start", of("mode", "smoke-test"));
 
     ProjectRequest request = ProjectRequestFactory.fromOptions(defaultRequestOptions());
     StartupMetadataSelection startupMetadataSelection = loadStartupMetadataSelection(diagnostics);
@@ -181,7 +182,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
             requestWithResolvedStream, startupMetadataSelection.metadataCompatibility());
     if (!initialState.canSubmit()) {
       diagnostics.error(
-          "cli.validation.failed", df("errorCount", initialState.validation().errors().size()));
+          "cli.validation.failed", of("errorCount", initialState.validation().errors().size()));
       HeadlessOutputPrinter.printValidationErrors(
           initialState.validation(),
           startupMetadataSelection.sourceLabel(),
@@ -253,16 +254,16 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
       DiagnosticLogger diagnostics) {
     diagnostics.info(
         "tui.session.start",
-        df("smokeMode", true),
-        df("searchDebounceMs", Math.max(0, searchDebounceMs)),
-        df("mode", "headless-smoke"));
+        of("smokeMode", true),
+        of("searchDebounceMs", Math.max(0, searchDebounceMs)),
+        of("mode", "headless-smoke"));
     try (QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri())) {
       CatalogDataService catalogDataService =
           new CatalogDataService(
               apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
-      diagnostics.info("catalog.load.start", df("mode", "tui"));
+      diagnostics.info("catalog.load.start", of("mode", "tui"));
       catalogDataService.load().handle(catalogLoadDiagnostics(diagnostics)).join();
-      diagnostics.info("tui.session.exit", df("outcome", "completed"));
+      diagnostics.info("tui.session.exit", of("outcome", "completed"));
     }
   }
 
@@ -272,21 +273,21 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
       if (throwable == null) {
         diagnostics.info(
             "catalog.load.success",
-            df("mode", "tui"),
-            df("source", catalogData.source().label()),
-            df("stale", catalogData.stale()),
-            df("detail", catalogData.detailMessage()));
+            of("mode", "tui"),
+            of("source", catalogData.source().label()),
+            of("stale", catalogData.stale()),
+            of("detail", catalogData.detailMessage()));
         return toExtensionCatalogLoadResult(catalogData);
       }
       Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(throwable);
       if (cause instanceof CancellationException) {
-        diagnostics.error("catalog.load.cancelled", df("mode", "tui"));
+        diagnostics.error("catalog.load.cancelled", of("mode", "tui"));
       } else {
         diagnostics.error(
             "catalog.load.failure",
-            df("mode", "tui"),
-            df("causeType", cause.getClass().getSimpleName()),
-            df("message", ErrorMessageMapper.userFriendlyError(cause)));
+            of("mode", "tui"),
+            of("causeType", cause.getClass().getSimpleName()),
+            of("message", ErrorMessageMapper.userFriendlyError(cause)));
       }
       throw new CompletionException(cause);
     };
@@ -327,7 +328,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
           apiClient
               .fetchMetadata()
               .get(STARTUP_METADATA_REFRESH_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-      diagnostics.info("metadata.load.success", df("source", "live"));
+      diagnostics.info("metadata.load.success", of("source", "live"));
       return new StartupMetadataSelection(
           MetadataCompatibilityContext.success(metadata), "live", "");
     } catch (InterruptedException interruptedException) {
@@ -336,8 +337,8 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
           snapshotFallbackSelection("Live metadata refresh interrupted");
       diagnostics.error(
           "metadata.load.fallback",
-          df("source", selection.sourceLabel()),
-          df("detail", selection.detailMessage()));
+          of("source", selection.sourceLabel()),
+          of("detail", selection.detailMessage()));
       return selection;
     } catch (TimeoutException timeoutException) {
       StartupMetadataSelection selection =
@@ -347,8 +348,8 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
                   + "ms");
       diagnostics.error(
           "metadata.load.fallback",
-          df("source", selection.sourceLabel()),
-          df("detail", selection.detailMessage()));
+          of("source", selection.sourceLabel()),
+          of("detail", selection.detailMessage()));
       return selection;
     } catch (ExecutionException executionException) {
       Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);
@@ -358,9 +359,9 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
                   .formatted(ErrorMessageMapper.userFriendlyError(cause)));
       diagnostics.error(
           "metadata.load.fallback",
-          df("source", selection.sourceLabel()),
-          df("detail", selection.detailMessage()),
-          df("causeType", cause.getClass().getSimpleName()));
+          of("source", selection.sourceLabel()),
+          of("detail", selection.detailMessage()),
+          of("causeType", cause.getClass().getSimpleName()));
       return selection;
     }
   }
@@ -378,9 +379,5 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
   @Override
   public int runHeadlessGenerate(GenerateCommand command) {
     return headlessGenerationService.run(command, dryRun, verbose);
-  }
-
-  private static DiagnosticField df(String name, Object value) {
-    return DiagnosticField.of(name, value);
   }
 }

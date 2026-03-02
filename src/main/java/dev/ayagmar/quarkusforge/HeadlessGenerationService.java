@@ -1,11 +1,12 @@
 package dev.ayagmar.quarkusforge;
 
+import static dev.ayagmar.quarkusforge.diagnostics.DiagnosticField.of;
+
 import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
-import dev.ayagmar.quarkusforge.diagnostics.DiagnosticField;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
 import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
@@ -38,14 +39,14 @@ final class HeadlessGenerationService {
   int run(GenerateCommand command, boolean globalDryRun, boolean verbose) {
     DiagnosticLogger diagnostics = DiagnosticLogger.create(verbose);
     diagnostics.info(
-        "generate.start", df("mode", command.dryRun || globalDryRun ? "dry-run" : "apply"));
+        "generate.start", of("mode", command.dryRun || globalDryRun ? "dry-run" : "apply"));
 
     EffectiveInputs inputs;
     try {
       inputs = loadEffectiveInputs(command);
     } catch (IllegalArgumentException illegalArgumentException) {
       diagnostics.error(
-          "generate.inputs.failed", df("message", illegalArgumentException.getMessage()));
+          "generate.inputs.failed", of("message", illegalArgumentException.getMessage()));
       System.err.println(illegalArgumentException.getMessage());
       return ExitCodes.VALIDATION;
     }
@@ -56,9 +57,9 @@ final class HeadlessGenerationService {
       catalogData = catalogClient.loadCatalogData(catalogTimeout);
       diagnostics.info(
           "catalog.load.success",
-          df("source", catalogData.source().label()),
-          df("stale", catalogData.stale()),
-          df("detail", catalogData.detailMessage()));
+          of("source", catalogData.source().label()),
+          of("stale", catalogData.stale()),
+          of("detail", catalogData.detailMessage()));
     } catch (Exception e) {
       return AsyncFailureHandler.handleFailure(
           e,
@@ -79,8 +80,8 @@ final class HeadlessGenerationService {
     if (!validatedState.canSubmit()) {
       diagnostics.error(
           "generate.validation.failed",
-          df("errorCount", validatedState.validation().errors().size()),
-          df("catalogSource", catalogData.source().label()));
+          of("errorCount", validatedState.validation().errors().size()),
+          of("catalogSource", catalogData.source().label()));
       HeadlessOutputPrinter.printValidationErrors(
           validatedState.validation(),
           catalogData.source().label() + (catalogData.stale() ? " [stale]" : ""),
@@ -125,7 +126,7 @@ final class HeadlessGenerationService {
     } catch (ValidationException validationException) {
       diagnostics.error(
           "generate.extension-validation.failed",
-          df("errorCount", validationException.errors().size()));
+          of("errorCount", validationException.errors().size()));
       HeadlessOutputPrinter.printValidationErrors(
           new ValidationReport(validationException.errors()),
           catalogData.source().label() + (catalogData.stale() ? " [stale]" : ""),
@@ -137,9 +138,9 @@ final class HeadlessGenerationService {
     if (dryRunRequested) {
       diagnostics.info(
           "generate.dry-run.validated",
-          df("extensionCount", extensionIds.size()),
-          df("catalogSource", catalogData.source().label()),
-          df("stale", catalogData.stale()));
+          of("extensionCount", extensionIds.size()),
+          of("catalogSource", catalogData.source().label()),
+          of("stale", catalogData.stale()));
       HeadlessOutputPrinter.printDryRunSummary(
           validatedState.request(),
           extensionIds,
@@ -168,13 +169,13 @@ final class HeadlessGenerationService {
     Duration generationTimeout = HeadlessTimeouts.generationTimeout();
     diagnostics.info(
         "generate.execute.start",
-        df("outputPath", outputPath.toString()),
-        df("extensionCount", extensionIds.size()));
+        of("outputPath", outputPath.toString()),
+        of("extensionCount", extensionIds.size()));
     try {
       Path generatedProjectRoot =
           generationFuture.get(generationTimeout.toMillis(), TimeUnit.MILLISECONDS);
       diagnostics.info(
-          "generate.execute.success", df("projectRoot", generatedProjectRoot.toString()));
+          "generate.execute.success", of("projectRoot", generatedProjectRoot.toString()));
       saveForgefileIfRequested(inputs, validatedState.request(), extensionIds);
       System.out.println(
           "Generation succeeded: " + generatedProjectRoot.toAbsolutePath().normalize());
@@ -249,10 +250,6 @@ final class HeadlessGenerationService {
   }
 
   // --- Private helpers ---
-
-  private static DiagnosticField df(String name, Object value) {
-    return DiagnosticField.of(name, value);
-  }
 
   private static EffectiveInputs loadEffectiveInputs(GenerateCommand command) {
     RequestOptions requestOptions = command.requestOptions;

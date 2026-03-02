@@ -1,8 +1,9 @@
 package dev.ayagmar.quarkusforge;
 
+import static dev.ayagmar.quarkusforge.diagnostics.DiagnosticField.of;
+
 import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
 import dev.ayagmar.quarkusforge.api.ThrowableUnwrapper;
-import dev.ayagmar.quarkusforge.diagnostics.DiagnosticField;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import java.time.Duration;
 import java.util.concurrent.CancellationException;
@@ -37,18 +38,18 @@ final class AsyncFailureHandler {
       Function<Throwable, Integer> failureExitCodeMapper) {
     return switch (exception) {
       case CancellationException _ -> {
-        diagnostics.error(diagnosticPrefix + ".cancelled", df("phase", "execution"));
+        diagnostics.error(diagnosticPrefix + ".cancelled", of("phase", "execution"));
         System.err.println(userMessagePrefix + ": cancelled.");
         yield ExitCodes.CANCELLED;
       }
       case InterruptedException _ -> {
         Thread.currentThread().interrupt();
-        diagnostics.error(diagnosticPrefix + ".cancelled", df("phase", "interrupted"));
+        diagnostics.error(diagnosticPrefix + ".cancelled", of("phase", "interrupted"));
         System.err.println(userMessagePrefix + ": cancelled.");
         yield ExitCodes.CANCELLED;
       }
       case TimeoutException _ -> {
-        diagnostics.error(diagnosticPrefix + ".timeout", df("timeoutMs", timeout.toMillis()));
+        diagnostics.error(diagnosticPrefix + ".timeout", of("timeoutMs", timeout.toMillis()));
         System.err.println(
             userMessagePrefix + ": request timed out after " + timeout.toMillis() + "ms");
         yield ExitCodes.NETWORK;
@@ -57,17 +58,13 @@ final class AsyncFailureHandler {
         Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);
         diagnostics.error(
             diagnosticPrefix + ".failure",
-            df("causeType", cause.getClass().getSimpleName()),
-            df("message", ErrorMessageMapper.userFriendlyError(cause)));
+            of("causeType", cause.getClass().getSimpleName()),
+            of("message", ErrorMessageMapper.userFriendlyError(cause)));
         System.err.println(userMessagePrefix + ": " + ErrorMessageMapper.userFriendlyError(cause));
         yield failureExitCodeMapper.apply(cause);
       }
       default ->
           throw new IllegalArgumentException("Unexpected exception type: " + exception.getClass());
     };
-  }
-
-  private static DiagnosticField df(String name, Object value) {
-    return DiagnosticField.of(name, value);
   }
 }
