@@ -6,6 +6,9 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Array;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -152,11 +155,11 @@ public final class JsonSupport {
       generator.writeNumber(doubleValue);
       return;
     }
-    if (value instanceof java.math.BigInteger bigIntegerValue) {
+    if (value instanceof BigInteger bigIntegerValue) {
       generator.writeNumber(bigIntegerValue);
       return;
     }
-    if (value instanceof java.math.BigDecimal bigDecimalValue) {
+    if (value instanceof BigDecimal bigDecimalValue) {
       generator.writeNumber(bigDecimalValue);
       return;
     }
@@ -183,9 +186,9 @@ public final class JsonSupport {
     }
     if (value.getClass().isArray()) {
       generator.writeStartArray();
-      int length = java.lang.reflect.Array.getLength(value);
+      int length = Array.getLength(value);
       for (int index = 0; index < length; index++) {
-        writeValue(generator, java.lang.reflect.Array.get(value, index));
+        writeValue(generator, Array.get(value, index));
       }
       generator.writeEndArray();
       return;

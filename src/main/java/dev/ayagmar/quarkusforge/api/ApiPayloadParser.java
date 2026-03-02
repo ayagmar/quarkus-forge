@@ -1,6 +1,7 @@
 package dev.ayagmar.quarkusforge.api;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -221,7 +222,7 @@ final class ApiPayloadParser {
       throw new ApiContractException("Malformed JSON payload");
     }
     try {
-      return new java.math.BigDecimal(number.toString()).intValueExact();
+      return new BigDecimal(number.toString()).intValueExact();
     } catch (ArithmeticException | NumberFormatException e) {
       throw new ApiContractException("Malformed JSON payload");
     }

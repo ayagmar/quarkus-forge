@@ -1,8 +1,10 @@
 package dev.ayagmar.quarkusforge.api;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -13,7 +15,7 @@ final class GenerationQueryBuilder {
     URI endpoint = downloadEndpoint(baseUri);
 
     List<GenerationQueryParameter> parameters =
-        new java.util.ArrayList<>(
+        new ArrayList<>(
             List.of(
                 new GenerationQueryParameter("S", request.platformStream()),
                 new GenerationQueryParameter("g", request.groupId()),
@@ -54,7 +56,7 @@ final class GenerationQueryBuilder {
           endpointPath,
           null,
           null);
-    } catch (java.net.URISyntaxException syntaxException) {
+    } catch (URISyntaxException syntaxException) {
       throw new IllegalArgumentException("Invalid base URI: " + baseUri, syntaxException);
     }
   }

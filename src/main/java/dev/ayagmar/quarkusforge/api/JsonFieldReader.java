@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge.api;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -126,7 +127,7 @@ public final class JsonFieldReader {
 
   private static int toExactInt(Number number) {
     try {
-      return new java.math.BigDecimal(number.toString()).intValueExact();
+      return new BigDecimal(number.toString()).intValueExact();
     } catch (ArithmeticException | NumberFormatException e) {
       throw new ApiContractException("Malformed JSON payload");
     }
@@ -134,7 +135,7 @@ public final class JsonFieldReader {
 
   private static long toExactLong(Number number) {
     try {
-      return new java.math.BigDecimal(number.toString()).longValueExact();
+      return new BigDecimal(number.toString()).longValueExact();
     } catch (ArithmeticException | NumberFormatException e) {
       throw new ApiContractException("Malformed JSON payload");
     }
