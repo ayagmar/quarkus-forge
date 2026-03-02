@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Detects installed IDEs on the current system (macOS, Linux, Windows). Returns a list of detected
@@ -14,6 +15,8 @@ import java.util.Locale;
  */
 public final class IdeDetector {
   public record DetectedIde(String name, String command) {}
+
+  private static final long COMMAND_CHECK_TIMEOUT_SECONDS = 3;
 
   private IdeDetector() {}
 
@@ -61,20 +64,7 @@ public final class IdeDetector {
       add(result, seen, new DetectedIde("Eclipse", "eclipse"));
     }
 
-    // Cursor
-    if (commandExists("cursor")) {
-      add(result, seen, new DetectedIde("Cursor", "cursor"));
-    }
-
-    // Zed
-    if (commandExists("zed")) {
-      add(result, seen, new DetectedIde("Zed", "zed"));
-    }
-
-    // Neovim
-    if (commandExists("nvim")) {
-      add(result, seen, new DetectedIde("Neovim", "nvim"));
-    }
+    detectCommonEditors(result, seen);
   }
 
   private static void detectLinux(List<DetectedIde> result, LinkedHashSet<String> seen) {
@@ -90,41 +80,57 @@ public final class IdeDetector {
       add(result, seen, new DetectedIde("VS Code", "code"));
     }
 
-    // Cursor
-    if (commandExists("cursor")) {
-      add(result, seen, new DetectedIde("Cursor", "cursor"));
-    }
-
     // Eclipse
     if (commandExists("eclipse")) {
       add(result, seen, new DetectedIde("Eclipse", "eclipse"));
     }
 
-    // Zed
-    if (commandExists("zed")) {
-      add(result, seen, new DetectedIde("Zed", "zed"));
-    }
-
-    // Neovim
-    if (commandExists("nvim")) {
-      add(result, seen, new DetectedIde("Neovim", "nvim"));
-    }
+    detectCommonEditors(result, seen);
   }
 
   private static void detectWindows(List<DetectedIde> result, LinkedHashSet<String> seen) {
-    // IntelliJ IDEA
-    if (commandExists("idea64.exe") || commandExists("idea.exe")) {
+    // IntelliJ IDEA — JetBrains Toolbox adds idea64.exe to PATH
+    if (commandExists("idea64.exe")) {
       add(result, seen, new DetectedIde("IntelliJ IDEA", "idea64.exe"));
+    } else if (commandExists("idea.exe")) {
+      add(result, seen, new DetectedIde("IntelliJ IDEA", "idea.exe"));
     }
 
-    // VS Code
-    if (commandExists("code.cmd") || commandExists("code")) {
+    // VS Code — installer adds code.cmd to PATH
+    if (commandExists("code.cmd")) {
       add(result, seen, new DetectedIde("VS Code", "code.cmd"));
+    } else if (commandExists("code")) {
+      add(result, seen, new DetectedIde("VS Code", "code"));
     }
 
     // Eclipse
     if (commandExists("eclipse.exe")) {
       add(result, seen, new DetectedIde("Eclipse", "eclipse.exe"));
+    }
+
+    // Cursor
+    if (commandExists("cursor.cmd")) {
+      add(result, seen, new DetectedIde("Cursor", "cursor.cmd"));
+    } else if (commandExists("cursor")) {
+      add(result, seen, new DetectedIde("Cursor", "cursor"));
+    }
+
+    // Neovim
+    if (commandExists("nvim.exe")) {
+      add(result, seen, new DetectedIde("Neovim", "nvim.exe"));
+    }
+  }
+
+  /** Editors available on all Unix-like systems (macOS, Linux). */
+  private static void detectCommonEditors(List<DetectedIde> result, LinkedHashSet<String> seen) {
+    if (commandExists("cursor")) {
+      add(result, seen, new DetectedIde("Cursor", "cursor"));
+    }
+    if (commandExists("zed")) {
+      add(result, seen, new DetectedIde("Zed", "zed"));
+    }
+    if (commandExists("nvim")) {
+      add(result, seen, new DetectedIde("Neovim", "nvim"));
     }
   }
 
@@ -141,18 +147,24 @@ public final class IdeDetector {
   private static boolean commandExists(String command) {
     try {
       String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-      ProcessBuilder pb;
-      if (os.contains("win")) {
-        pb = new ProcessBuilder("where", command);
-      } else {
-        pb = new ProcessBuilder("which", command);
-      }
+      ProcessBuilder pb =
+          os.contains("win")
+              ? new ProcessBuilder("where", command)
+              : new ProcessBuilder("which", command);
       pb.redirectErrorStream(true);
       Process process = pb.start();
-      int exitCode = process.waitFor();
-      process.destroyForcibly();
-      return exitCode == 0;
+      // Consume output to prevent pipe buffer blocking
+      process.getInputStream().readAllBytes();
+      boolean finished = process.waitFor(COMMAND_CHECK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+      if (!finished) {
+        process.destroyForcibly();
+        return false;
+      }
+      return process.exitValue() == 0;
     } catch (IOException | InterruptedException e) {
+      if (e instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
       return false;
     }
   }
