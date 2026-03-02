@@ -35,7 +35,7 @@ jobs:
         run: cp target/quarkus-forge.jar target/quarkus-forge-jvm.jar
 
       - name: Upload JVM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: quarkus-forge-jvm
           path: target/quarkus-forge-jvm.jar
@@ -44,7 +44,7 @@ jobs:
         run: ./mvnw clean package -Pheadless
 
       - name: Upload headless JVM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: quarkus-forge-headless-jvm
           path: target/quarkus-forge-headless.jar
@@ -117,7 +117,7 @@ jobs:
         run: chmod +x target/${{ matrix.binary_name }}-${{ matrix.platform }}${{ matrix.ext }}
 
       - name: Upload native artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.binary_name }}-native-${{ matrix.platform }}
           path: target/${{ matrix.binary_name }}-${{ matrix.platform }}${{ matrix.ext }}
@@ -143,13 +143,13 @@ jobs:
         run: cp dist/jbang-catalog.json dist/jbang-catalog-org.json
 
       - name: Upload JBang catalog
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: quarkus-forge-jbang-catalog
           path: dist/jbang-catalog.json
 
       - name: Upload org-level JBang catalog
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: quarkus-forge-jbang-catalog-org
           path: dist/jbang-catalog-org.json
