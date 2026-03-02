@@ -143,7 +143,7 @@ class QuarkusForgeCliTest {
   @Test
   void isCommandAvailableReturnsFalseForMissingBinary() {
     String missing = "missing-" + UUID.randomUUID();
-    assertThat(PostTuiActionExecutor.isCommandAvailable(missing)).isFalse();
+    assertThat(CommandUtils.isCommandAvailable(missing)).isFalse();
   }
 
   @Test

@@ -6,7 +6,7 @@ Thank you for your interest in contributing! This guide covers everything you ne
 
 | Tool | Version |
 |------|---------|
-| Java | 25+ (use `.sdkmanrc` with [SDKMAN!](https://sdkman.io/)) |
+| Java | 25 only (`[25,26)` enforced by Maven Enforcer; use `.sdkmanrc` with [SDKMAN!](https://sdkman.io/)) |
 | Maven | 3.9+ (wrapper included — `./mvnw`) |
 | Git | any recent |
 | just | optional ([install](https://github.com/casey/just)) |
@@ -38,7 +38,7 @@ java -jar target/quarkus-forge-headless.jar generate \
 
 ## Project Structure
 
-```
+```text
 src/main/java/dev/ayagmar/quarkusforge/
 ├── api/          HTTP transport, JSON parsing, catalog caching
 ├── archive/      ZIP download, extraction, Zip-Bomb and Zip-Slip protection
@@ -73,7 +73,7 @@ Or use Maven directly (`./mvnw` or `mvn`):
 
 ```bash
 ./mvnw test                          # unit tests only
-./mvnw verify                        # unit + integration tests + coverage
+./mvnw clean verify                  # unit + integration tests + coverage reports
 ./mvnw verify -DskipTests -DskipITs=false  # integration tests only (skip unit, keep ITs)
 ```
 
@@ -93,7 +93,7 @@ Or use Maven directly (`./mvnw` or `mvn`):
 ### View coverage report
 
 ```bash
-./mvnw verify
+./mvnw clean verify
 open target/site/jacoco/index.html       # unit test coverage
 open target/site/jacoco-it/index.html    # integration test coverage
 ```
@@ -128,7 +128,7 @@ open target/site/jacoco-it/index.html    # integration test coverage
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
-```
+```text
 feat(ui): add keyboard shortcut for export Forgefile
 fix(api): tolerate missing extension shortName
 docs: update headless CLI examples

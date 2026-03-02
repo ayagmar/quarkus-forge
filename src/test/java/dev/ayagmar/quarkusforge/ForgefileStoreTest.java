@@ -128,6 +128,17 @@ class ForgefileStoreTest {
   }
 
   @Test
+  void loadUnreadablePathThrowsReadError() throws Exception {
+    Path directory = tempDir.resolve("as-directory");
+    Files.createDirectory(directory);
+
+    assertThatThrownBy(() -> ForgefileStore.load(directory))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Failed to read Forgefile '")
+        .hasMessageContaining("as-directory");
+  }
+
+  @Test
   void saveCreatesParentDirectories() {
     Path nested = tempDir.resolve("a/b/c/Forgefile");
     Forgefile forgefile =

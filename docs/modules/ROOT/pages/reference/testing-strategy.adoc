@@ -35,11 +35,11 @@
 
 [source,bash]
 ----
-mvn -q spotless:check
-mvn -q checkstyle:check
-mvn -q test
-mvn -q verify -DskipTests=true
-mvn -q clean compile -Pheadless  # verify headless profile compiles
+./mvnw -q spotless:check
+./mvnw -q checkstyle:check
+./mvnw -q test
+./mvnw -q verify -DskipTests=true
+./mvnw -q clean compile -Pheadless  # verify headless profile compiles
 ----
 
 Or using the included https://github.com/casey/just[justfile]:
@@ -56,23 +56,25 @@ just verify            # format-check + headless-check + test
 
 == Coverage
 
-JaCoCo is configured as part of the standard build lifecycle.
-Coverage reports are generated automatically during `mvn test` and `mvn verify`:
+JaCoCo reports are generated during a full `./mvnw clean verify` run.
 
-* Unit test report: `target/site/jacoco/index.html`
-* Integration test report: `target/site/jacoco-it/index.html`
-* Machine-readable XML (for Codecov): `target/site/jacoco/jacoco.xml` and `target/site/jacoco-it/jacoco.xml`
+* `./mvnw test` (unit-only) does not publish JaCoCo site reports.
+* `./mvnw verify -DskipTests=true` (integration-only) does not publish JaCoCo site reports.
+* `./mvnw clean verify` publishes both reports:
+** Unit HTML/XML: `target/site/jacoco/index.html` and `target/site/jacoco/jacoco.xml`
+** Integration HTML/XML: `target/site/jacoco-it/index.html` and `target/site/jacoco-it/jacoco.xml`
 
-In CI, a dedicated `coverage` job runs `mvn verify` on Linux, generates both reports, and uploads them to Codecov and as GitHub Actions artifacts (14-day retention).
+In CI, a dedicated `coverage` job runs `./mvnw clean verify` on Linux, generates both reports, and uploads them to Codecov and as GitHub Actions artifacts (14-day retention).
 
 To generate coverage locally:
 
 [source,bash]
 ----
-mvn verify
+./mvnw clean verify
 # or: just coverage
 open target/site/jacoco/index.html  # macOS
 x-www-browser target/site/jacoco/index.html  # Linux
+start target/site/jacoco/index.html  # Windows (cmd.exe)
 ----
 
 == Platform Independence

@@ -18,7 +18,7 @@
 
 ## Testing
 
-- [ ] `mvn clean verify` passes locally
+- [ ] `./mvnw clean verify` passes locally
 - [ ] New / updated tests cover the change
 - [ ] Manually tested in TUI mode
 - [ ] Manually tested in headless mode

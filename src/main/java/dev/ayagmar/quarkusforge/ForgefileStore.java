@@ -16,28 +16,42 @@ public final class ForgefileStore {
   private ForgefileStore() {}
 
   public static Forgefile load(Path file) {
+    String content;
     try {
-      Map<String, Object> root = JsonSupport.parseObject(Files.readString(file));
-      ForgefileLock locked = readLockedSection(root);
-      return new Forgefile(
-          JsonFieldReader.readStringOrEmpty(root, "groupId"),
-          JsonFieldReader.readStringOrEmpty(root, "artifactId"),
-          JsonFieldReader.readStringOrEmpty(root, "version"),
-          JsonFieldReader.readStringOrEmpty(root, "packageName"),
-          JsonFieldReader.readStringOrEmpty(root, "outputDirectory"),
-          JsonFieldReader.readStringOrEmpty(root, "platformStream"),
-          JsonFieldReader.readStringOrEmpty(root, "buildTool"),
-          JsonFieldReader.readStringOrEmpty(root, "javaVersion"),
-          JsonFieldReader.readStringListOrEmpty(root, "presets"),
-          JsonFieldReader.readStringListOrEmpty(root, "extensions"),
-          locked);
+      content = Files.readString(file);
     } catch (NoSuchFileException noSuchFileException) {
       throw new IllegalArgumentException(
           "Forgefile not found: '" + file + "'", noSuchFileException);
-    } catch (IOException | RuntimeException exception) {
+    } catch (IOException ioException) {
       throw new IllegalArgumentException(
-          "Failed to parse Forgefile '" + file + "': " + exception.getMessage(), exception);
+          "Failed to read Forgefile '" + file + "': " + ioException.getMessage(), ioException);
     }
+
+    Map<String, Object> root;
+    try {
+      root = JsonSupport.parseObject(content);
+    } catch (IOException ioException) {
+      throw new IllegalArgumentException(
+          "Failed to parse Forgefile '" + file + "': " + ioException.getMessage(), ioException);
+    } catch (RuntimeException runtimeException) {
+      throw new IllegalArgumentException(
+          "Failed to parse Forgefile '" + file + "': " + runtimeException.getMessage(),
+          runtimeException);
+    }
+
+    ForgefileLock locked = readLockedSection(root);
+    return new Forgefile(
+        JsonFieldReader.readStringOrEmpty(root, "groupId"),
+        JsonFieldReader.readStringOrEmpty(root, "artifactId"),
+        JsonFieldReader.readStringOrEmpty(root, "version"),
+        JsonFieldReader.readStringOrEmpty(root, "packageName"),
+        JsonFieldReader.readStringOrEmpty(root, "outputDirectory"),
+        JsonFieldReader.readStringOrEmpty(root, "platformStream"),
+        JsonFieldReader.readStringOrEmpty(root, "buildTool"),
+        JsonFieldReader.readStringOrEmpty(root, "javaVersion"),
+        JsonFieldReader.readStringListOrEmpty(root, "presets"),
+        JsonFieldReader.readStringListOrEmpty(root, "extensions"),
+        locked);
   }
 
   public static void save(Path file, Forgefile forgefile) {

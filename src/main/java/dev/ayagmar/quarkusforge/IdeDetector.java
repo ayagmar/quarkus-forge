@@ -158,6 +158,6 @@ public final class IdeDetector {
   }
 
   private static boolean commandExists(String command) {
-    return PostTuiActionExecutor.isCommandAvailable(command);
+    return CommandUtils.isCommandAvailable(command);
   }
 }

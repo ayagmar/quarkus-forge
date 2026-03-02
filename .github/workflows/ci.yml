@@ -69,9 +69,9 @@ jobs:
         suite: [unit, integration]
         include:
           - suite: unit
-            command: ./mvnw test
+            command: ./mvnw test -Djacoco.skip=true
           - suite: integration
-            command: ./mvnw verify -DskipTests=true
+            command: ./mvnw verify -DskipTests=true -Djacoco.skip=true
 
     steps:
       - name: Checkout
@@ -107,7 +107,12 @@ jobs:
           cache: 'maven'
 
       - name: Run tests with coverage
-        run: ./mvnw verify
+        run: ./mvnw clean verify
+
+      - name: Verify coverage files exist
+        run: |
+          test -s target/site/jacoco/jacoco.xml
+          test -s target/site/jacoco-it/jacoco.xml
 
       - name: Upload unit test coverage report
         uses: actions/upload-artifact@v4
@@ -115,6 +120,7 @@ jobs:
           name: jacoco-unit-report
           path: target/site/jacoco/
           retention-days: 14
+          if-no-files-found: error
 
       - name: Upload integration test coverage report
         uses: actions/upload-artifact@v4
@@ -122,6 +128,7 @@ jobs:
           name: jacoco-it-report
           path: target/site/jacoco-it/
           retention-days: 14
+          if-no-files-found: error
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
