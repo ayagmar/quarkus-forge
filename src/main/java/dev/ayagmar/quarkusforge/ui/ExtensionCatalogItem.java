@@ -3,7 +3,7 @@ package dev.ayagmar.quarkusforge.ui;
 import java.util.Locale;
 import java.util.Objects;
 
-public record ExtensionCatalogItem(
+record ExtensionCatalogItem(
     String id,
     String name,
     String shortName,

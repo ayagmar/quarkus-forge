@@ -1,6 +1,6 @@
 package dev.ayagmar.quarkusforge.archive;
 
-public record ArchiveSafetyPolicy(
+record ArchiveSafetyPolicy(
     int maxEntries,
     long maxTotalUncompressedBytes,
     double maxCompressionRatio,
