@@ -30,6 +30,7 @@
     <maven.shade.plugin.version>3.6.1</maven.shade.plugin.version>
     <spotless.plugin.version>3.2.1</spotless.plugin.version>
     <graalvm.native.plugin.version>0.11.4</graalvm.native.plugin.version>
+    <jacoco.plugin.version>0.8.13</jacoco.plugin.version>
     <native.skip>true</native.skip>
   </properties>
 
@@ -166,7 +167,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>${maven.surefire.plugin.version}</version>
         <configuration>
-          <argLine>--enable-native-access=ALL-UNNAMED</argLine>
+          <argLine>@{argLine} --enable-native-access=ALL-UNNAMED</argLine>
           <includes>
             <include>**/*Test.java</include>
           </includes>
@@ -181,7 +182,7 @@
         <artifactId>maven-failsafe-plugin</artifactId>
         <version>${maven.failsafe.plugin.version}</version>
         <configuration>
-          <argLine>--enable-native-access=ALL-UNNAMED</argLine>
+          <argLine>@{argLine} --enable-native-access=ALL-UNNAMED</argLine>
           <includes>
             <include>**/*IT.java</include>
           </includes>
@@ -207,6 +208,50 @@
             </googleJavaFormat>
           </java>
         </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>${jacoco.plugin.version}</version>
+        <executions>
+          <!-- Injects JaCoCo agent into ${argLine} for unit tests -->
+          <execution>
+            <id>prepare-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <!-- Generates unit test coverage report after test phase -->
+          <execution>
+            <id>report</id>
+            <phase>test</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.reporting.outputDirectory}/jacoco</outputDirectory>
+            </configuration>
+          </execution>
+          <!-- Injects JaCoCo agent into ${argLine} for integration tests -->
+          <execution>
+            <id>prepare-agent-integration</id>
+            <goals>
+              <goal>prepare-agent-integration</goal>
+            </goals>
+          </execution>
+          <!-- Generates integration test coverage report after verify phase -->
+          <execution>
+            <id>report-integration</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>report-integration</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.reporting.outputDirectory}/jacoco-it</outputDirectory>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
 
       <plugin>
