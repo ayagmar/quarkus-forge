@@ -40,9 +40,6 @@ public final class HeadlessCli implements Callable<Integer>, HeadlessRunner {
 
   @Override
   public Integer call() {
-    // No subcommand provided — print help and exit successfully.
-    // Returning a non-zero code here would break `if [ $? -eq 0 ]` wrappers that
-    // invoke the jar with no arguments just to inspect the help text.
     spec.commandLine().usage(System.out);
     return ExitCodes.OK;
   }

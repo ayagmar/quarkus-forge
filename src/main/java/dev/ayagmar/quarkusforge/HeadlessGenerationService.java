@@ -349,12 +349,8 @@ final class HeadlessGenerationService implements AutoCloseable {
   private static void saveForgefileIfRequested(
       EffectiveInputs inputs, ProjectRequest request, List<String> extensionIds) {
     List<String> normalizedPresets = normalizePresets(inputs.presetInputs());
-
-    // Always rebuild from effective inputs so CLI additions are persisted
     Forgefile forgefile =
         Forgefile.from(inputs.requestOptions(), normalizedPresets, inputs.extensionInputs());
-
-    // Add locked section if --lock was requested
     if (inputs.writeLock()) {
       ForgefileLock lock =
           ForgefileLock.of(
@@ -366,7 +362,6 @@ final class HeadlessGenerationService implements AutoCloseable {
       forgefile = forgefile.withLock(lock);
     }
 
-    // Write to --save-as path, or update --from path in-place
     Path writePath = inputs.saveAsFile();
     if (writePath == null && inputs.writeLock() && inputs.forgefilePath() != null) {
       writePath = inputs.forgefilePath();
