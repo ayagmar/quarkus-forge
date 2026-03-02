@@ -9,6 +9,7 @@ import dev.ayagmar.quarkusforge.ui.PostGenerationExitPlan;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -143,7 +144,8 @@ final class PostTuiActionExecutor {
     if (custom != null && !custom.isBlank()) {
       return custom.strip();
     }
-    return "code .";
+    List<IdeDetector.DetectedIde> detected = IdeDetector.detect();
+    return detected.isEmpty() ? "code ." : detected.get(0).command();
   }
 
   static boolean isWindowsOs() {
