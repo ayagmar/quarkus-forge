@@ -202,8 +202,8 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
     return RequestOptions.defaults();
   }
 
-  private static void applyStoredRequestDefaults(
-      RequestOptions requestOptions, CliPrefill storedPrefill) {
+  /** Package-private for testing. */
+  static void applyStoredRequestDefaults(RequestOptions requestOptions, CliPrefill storedPrefill) {
     if (storedPrefill == null) {
       return;
     }
@@ -211,56 +211,56 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
     requestOptions.groupId =
         applyIfNotExplicit(
             requestOptions,
-            "--group-id",
+            RequestOptions.OPT_GROUP_ID,
             requestOptions.groupId,
             defaults.groupId,
             storedPrefill.groupId());
     requestOptions.artifactId =
         applyIfNotExplicit(
             requestOptions,
-            "--artifact-id",
+            RequestOptions.OPT_ARTIFACT_ID,
             requestOptions.artifactId,
             defaults.artifactId,
             storedPrefill.artifactId());
     requestOptions.version =
         applyIfNotExplicit(
             requestOptions,
-            "--project-version",
+            RequestOptions.OPT_VERSION,
             requestOptions.version,
             defaults.version,
             storedPrefill.version());
     requestOptions.packageName =
         applyIfNotExplicit(
             requestOptions,
-            "--package-name",
+            RequestOptions.OPT_PACKAGE_NAME,
             requestOptions.packageName,
             defaults.packageName,
             storedPrefill.packageName());
     requestOptions.outputDirectory =
         applyIfNotExplicit(
             requestOptions,
-            "--output-dir",
+            RequestOptions.OPT_OUTPUT_DIR,
             requestOptions.outputDirectory,
             defaults.outputDirectory,
             storedPrefill.outputDirectory());
     requestOptions.platformStream =
         applyIfNotExplicit(
             requestOptions,
-            "--platform-stream",
+            RequestOptions.OPT_PLATFORM_STREAM,
             requestOptions.platformStream,
             defaults.platformStream,
             storedPrefill.platformStream());
     requestOptions.buildTool =
         applyIfNotExplicit(
             requestOptions,
-            "--build-tool",
+            RequestOptions.OPT_BUILD_TOOL,
             requestOptions.buildTool,
             defaults.buildTool,
             storedPrefill.buildTool());
     requestOptions.javaVersion =
         applyIfNotExplicit(
             requestOptions,
-            "--java-version",
+            RequestOptions.OPT_JAVA_VERSION,
             requestOptions.javaVersion,
             defaults.javaVersion,
             storedPrefill.javaVersion());

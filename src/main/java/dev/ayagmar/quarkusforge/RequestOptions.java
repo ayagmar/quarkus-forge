@@ -20,49 +20,58 @@ final class RequestOptions {
   static final String DEFAULT_BUILD_TOOL = "maven";
   static final String DEFAULT_JAVA_VERSION = "25";
 
+  static final String OPT_GROUP_ID = "--group-id";
+  static final String OPT_ARTIFACT_ID = "--artifact-id";
+  static final String OPT_VERSION = "--project-version";
+  static final String OPT_PACKAGE_NAME = "--package-name";
+  static final String OPT_OUTPUT_DIR = "--output-dir";
+  static final String OPT_PLATFORM_STREAM = "--platform-stream";
+  static final String OPT_BUILD_TOOL = "--build-tool";
+  static final String OPT_JAVA_VERSION = "--java-version";
+
   @Option(
-      names = {"-g", "--group-id"},
+      names = {"-g", OPT_GROUP_ID},
       defaultValue = DEFAULT_GROUP_ID,
       description = "Maven group id")
   String groupId;
 
   @Option(
-      names = {"-a", "--artifact-id"},
+      names = {"-a", OPT_ARTIFACT_ID},
       defaultValue = DEFAULT_ARTIFACT_ID,
       description = "Maven artifact id")
   String artifactId;
 
   @Option(
-      names = {"-v", "--project-version"},
+      names = {"-v", OPT_VERSION},
       defaultValue = DEFAULT_VERSION,
       description = "Project version")
   String version;
 
   @Option(
-      names = {"-p", "--package-name"},
+      names = {"-p", OPT_PACKAGE_NAME},
       description = "Base package name (defaults from group/artifact)")
   String packageName;
 
   @Option(
-      names = {"-o", "--output-dir"},
+      names = {"-o", OPT_OUTPUT_DIR},
       defaultValue = DEFAULT_OUTPUT_DIRECTORY,
       description = "Output parent directory (project path resolves to <output-dir>/<artifact-id>)")
   String outputDirectory;
 
   @Option(
-      names = {"-S", "--platform-stream"},
+      names = {"-S", OPT_PLATFORM_STREAM},
       defaultValue = DEFAULT_PLATFORM_STREAM,
       description = "Quarkus platform stream key (metadata-driven, optional)")
   String platformStream;
 
   @Option(
-      names = {"-b", "--build-tool"},
+      names = {"-b", OPT_BUILD_TOOL},
       defaultValue = DEFAULT_BUILD_TOOL,
       description = "Build tool (metadata-driven)")
   String buildTool;
 
   @Option(
-      names = {"-j", "--java-version"},
+      names = {"-j", OPT_JAVA_VERSION},
       defaultValue = DEFAULT_JAVA_VERSION,
       description = "Java version for generated project (metadata-driven)")
   String javaVersion;

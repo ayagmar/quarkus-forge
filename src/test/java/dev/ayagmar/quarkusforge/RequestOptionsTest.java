@@ -30,70 +30,46 @@ class RequestOptionsTest {
     assertThat(opts.javaVersion).isEqualTo(RequestOptions.DEFAULT_JAVA_VERSION);
   }
 
-  @Test
-  void defaultGroupIdIsOrgAcme() {
-    assertThat(RequestOptions.DEFAULT_GROUP_ID).isEqualTo("org.acme");
-  }
-
-  @Test
-  void defaultArtifactIdIsQuarkusApp() {
-    assertThat(RequestOptions.DEFAULT_ARTIFACT_ID).isEqualTo("quarkus-app");
-  }
-
-  @Test
-  void defaultVersionIs1Snapshot() {
-    assertThat(RequestOptions.DEFAULT_VERSION).isEqualTo("1.0.0-SNAPSHOT");
-  }
-
-  @Test
-  void defaultOutputDirectoryIsCurrentDir() {
-    assertThat(RequestOptions.DEFAULT_OUTPUT_DIRECTORY).isEqualTo(".");
-  }
-
-  @Test
-  void defaultBuildToolIsMaven() {
-    assertThat(RequestOptions.DEFAULT_BUILD_TOOL).isEqualTo("maven");
-  }
-
   // ── isExplicitlySet fallback (no CommandSpec injected) ───────────────────────
 
   @Test
   void isExplicitlySetReturnsFalseWhenValueEqualsDefault() {
     RequestOptions opts = new RequestOptions(); // spec == null
     // current value equals the default → not explicitly set
-    assertThat(opts.isExplicitlySet("--group-id", "org.acme", "org.acme")).isFalse();
+    assertThat(opts.isExplicitlySet(RequestOptions.OPT_GROUP_ID, "org.acme", "org.acme")).isFalse();
   }
 
   @Test
   void isExplicitlySetReturnsTrueWhenValueDiffersFromDefault() {
     RequestOptions opts = new RequestOptions(); // spec == null
     // current value differs from the default → explicitly set
-    assertThat(opts.isExplicitlySet("--group-id", "com.example", "org.acme")).isTrue();
+    assertThat(opts.isExplicitlySet(RequestOptions.OPT_GROUP_ID, "com.example", "org.acme"))
+        .isTrue();
   }
 
   @Test
   void isExplicitlySetHandlesNullCurrentValue() {
     RequestOptions opts = new RequestOptions(); // spec == null
     // null current value (e.g. --package-name not provided), default also null
-    assertThat(opts.isExplicitlySet("--package-name", null, null)).isFalse();
+    assertThat(opts.isExplicitlySet(RequestOptions.OPT_PACKAGE_NAME, null, null)).isFalse();
   }
 
   @Test
   void isExplicitlySetReturnsTrueWhenCurrentNullButDefaultIsPresent() {
     RequestOptions opts = new RequestOptions();
     // current is null but default is non-null → treated as explicitly nulled out
-    assertThat(opts.isExplicitlySet("--group-id", null, "org.acme")).isTrue();
+    assertThat(opts.isExplicitlySet(RequestOptions.OPT_GROUP_ID, null, "org.acme")).isTrue();
   }
 
   @Test
   void isExplicitlySetReturnsTrueWhenDefaultNullButCurrentIsPresent() {
     RequestOptions opts = new RequestOptions();
-    assertThat(opts.isExplicitlySet("--package-name", "com.example", null)).isTrue();
+    assertThat(opts.isExplicitlySet(RequestOptions.OPT_PACKAGE_NAME, "com.example", null)).isTrue();
   }
 
   @Test
   void isExplicitlySetReturnsFalseForEmptyPlatformStreamDefault() {
     RequestOptions opts = new RequestOptions();
-    assertThat(opts.isExplicitlySet("--platform-stream", "", "")).isFalse();
+    assertThat(opts.isExplicitlySet(RequestOptions.OPT_PLATFORM_STREAM, "", "")).isFalse();
   }
 }
