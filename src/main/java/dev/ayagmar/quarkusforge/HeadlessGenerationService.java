@@ -307,18 +307,20 @@ final class HeadlessGenerationService implements AutoCloseable {
     checkDrift(errors, "platformStream", lock.platformStream(), request.platformStream());
     checkDrift(errors, "buildTool", lock.buildTool(), request.buildTool());
     checkDrift(errors, "javaVersion", lock.javaVersion(), request.javaVersion());
-    if (!lock.extensions().equals(extensionIds)) {
+    List<String> lockedExtensions = lock.extensions() == null ? List.of() : lock.extensions();
+    if (!lockedExtensions.equals(extensionIds)) {
       errors.add(
           new ValidationError(
               "locked",
-              "extensions drift: locked=" + lock.extensions() + ", request=" + extensionIds));
+              "extensions drift: locked=" + lockedExtensions + ", request=" + extensionIds));
     }
     List<String> normalizedPresets = normalizePresets(inputs.presetInputs());
-    if (!lock.presets().equals(normalizedPresets)) {
+    List<String> lockedPresets = lock.presets() == null ? List.of() : lock.presets();
+    if (!lockedPresets.equals(normalizedPresets)) {
       errors.add(
           new ValidationError(
               "locked",
-              "presets drift: locked=" + lock.presets() + ", request=" + normalizedPresets));
+              "presets drift: locked=" + lockedPresets + ", request=" + normalizedPresets));
     }
 
     if (!errors.isEmpty()) {

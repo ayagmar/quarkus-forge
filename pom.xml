@@ -30,7 +30,7 @@
     <maven.shade.plugin.version>3.6.1</maven.shade.plugin.version>
     <spotless.plugin.version>3.2.1</spotless.plugin.version>
     <graalvm.native.plugin.version>0.11.4</graalvm.native.plugin.version>
-    <jacoco.plugin.version>0.8.13</jacoco.plugin.version>
+    <jacoco.plugin.version>0.8.14</jacoco.plugin.version>
     <native.skip>true</native.skip>
   </properties>
 
@@ -214,6 +214,9 @@
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
         <version>${jacoco.plugin.version}</version>
+        <configuration>
+          <skip>${skipTests}</skip>
+        </configuration>
         <executions>
           <!-- Injects JaCoCo agent into ${argLine} for unit tests -->
           <execution>
@@ -222,10 +225,10 @@
               <goal>prepare-agent</goal>
             </goals>
           </execution>
-          <!-- Generates unit test coverage report after test phase -->
+          <!-- Generates unit test coverage report during verify (full build) -->
           <execution>
             <id>report</id>
-            <phase>test</phase>
+            <phase>verify</phase>
             <goals>
               <goal>report</goal>
             </goals>

@@ -178,7 +178,7 @@ java -jar target/quarkus-forge-headless.jar generate --save-as my-template.json 
 
 ### Theming
 Create a `.tcss` file with semantic color tokens (one `token = value` per line):
-```
+```ini
 base = #1e1e2e
 text = #cdd6f4
 accent = #f38ba8
@@ -280,6 +280,6 @@ just format              # auto-format
 
 Or without `just`: `./mvnw clean verify` and `./mvnw spotless:apply`.
 
-Coverage reports: `target/site/jacoco/index.html` (unit) and `target/site/jacoco-it/index.html` (integration).
+Coverage reports (after `./mvnw clean verify`): `target/site/jacoco/index.html` (unit) and `target/site/jacoco-it/index.html` (integration).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for full setup guide, code style, testing conventions, and commit format. PRs welcome.

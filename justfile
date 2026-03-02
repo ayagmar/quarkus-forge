@@ -34,8 +34,9 @@ test-unit:
 test-it:
     {{mvn}} verify -DskipTests=true
 
-# Run tests and print coverage report paths
-coverage: test
+# Run a full clean verify and print coverage report paths
+coverage:
+    {{mvn}} clean verify
     @echo "Unit coverage:  target/site/jacoco/index.html"
     @echo "IT coverage:    target/site/jacoco-it/index.html"
 
