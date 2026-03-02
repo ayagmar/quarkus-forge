@@ -1,0 +1,5 @@
+# Quarkus Forge SDK versions — run `sdk env install` to install all
+java=25.0.1-tem
+# java=25.0.1-graal   # use for native-image builds
+maven=3.9.9
+jbang=0.124.0
