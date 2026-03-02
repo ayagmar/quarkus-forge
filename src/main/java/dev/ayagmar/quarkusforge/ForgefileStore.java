@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge;
 
+import dev.ayagmar.quarkusforge.api.AtomicFileStore;
 import dev.ayagmar.quarkusforge.api.JsonFieldReader;
 import dev.ayagmar.quarkusforge.api.JsonSupport;
 import java.io.IOException;
@@ -41,7 +42,6 @@ public final class ForgefileStore {
 
   public static void save(Path file, Forgefile forgefile) {
     try {
-      createParentDirectories(file);
       Map<String, Object> root = new LinkedHashMap<>();
       root.put("groupId", forgefile.groupId());
       root.put("artifactId", forgefile.artifactId());
@@ -56,7 +56,8 @@ public final class ForgefileStore {
       if (forgefile.locked() != null) {
         root.put("locked", lockedToMap(forgefile.locked()));
       }
-      Files.writeString(file, JsonSupport.writePrettyString(root), StandardCharsets.UTF_8);
+      byte[] bytes = JsonSupport.writePrettyString(root).getBytes(StandardCharsets.UTF_8);
+      AtomicFileStore.writeBytes(file, bytes, "forgefile-");
     } catch (IOException exception) {
       throw new IllegalArgumentException(
           "Failed to write Forgefile '" + file + "': " + exception.getMessage(), exception);
@@ -95,12 +96,5 @@ public final class ForgefileStore {
     map.put("presets", lock.presets());
     map.put("extensions", lock.extensions());
     return map;
-  }
-
-  private static void createParentDirectories(Path file) throws IOException {
-    Path parent = file.toAbsolutePath().normalize().getParent();
-    if (parent != null) {
-      Files.createDirectories(parent);
-    }
   }
 }

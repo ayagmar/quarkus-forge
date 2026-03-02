@@ -111,7 +111,7 @@ final class TuiBootstrapService {
       controller.loadExtensionCatalogAsync(
           () -> {
             diagnostics.info("catalog.load.start", of("mode", "tui"));
-            String presetStreamKey = initialState.request().platformStream();
+            String presetStreamKey = controller.request().platformStream();
             CompletableFuture<CatalogData> catalogLoadFuture =
                 firstCatalogLoad.getAndSet(false)
                     ? catalogDataService.loadForStartup()
