@@ -116,7 +116,7 @@ jobs:
             maven-${{ runner.os }}-
 
       - name: Build native artifact
-        run: mvn -B -ntp ${{ matrix.profiles }} "-Dnative.skip=false" "-DskipTests" package
+        run: mvn -B -ntp "${{ matrix.profiles }}" "-Dnative.skip=false" "-DskipTests" package
 
       - name: Rename native artifact
         shell: bash
