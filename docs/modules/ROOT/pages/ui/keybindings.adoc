@@ -34,3 +34,11 @@
 * `Ctrl+E`: toggle expanded error details.
 * `Enter` or `Alt+G`: submit generation.
 * `Ctrl+C`: quit.
+
+== Context: Extension Search
+
+When the extension search field has focus:
+
+* Type: filter extensions by name.
+* `Down`: move focus to the extension list.
+* `Esc`: clear the current filter, or return to the list if the filter is already empty.
