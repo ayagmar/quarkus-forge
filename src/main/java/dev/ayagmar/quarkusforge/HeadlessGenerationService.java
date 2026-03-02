@@ -22,7 +22,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import picocli.CommandLine;
 
 final class HeadlessGenerationService {
   private static final String PRESET_FAVORITES = "favorites";
@@ -47,7 +46,7 @@ final class HeadlessGenerationService {
       diagnostics.error(
           "generate.inputs.failed", df("message", illegalArgumentException.getMessage()));
       System.err.println(illegalArgumentException.getMessage());
-      return QuarkusForgeCli.EXIT_CODE_VALIDATION;
+      return ExitCodes.VALIDATION;
     }
 
     Duration catalogTimeout = HeadlessTimeouts.catalogTimeout();
@@ -85,7 +84,7 @@ final class HeadlessGenerationService {
           validatedState.validation(),
           catalogData.source().label() + (catalogData.stale() ? " [stale]" : ""),
           catalogData.detailMessage());
-      return QuarkusForgeCli.EXIT_CODE_VALIDATION;
+      return ExitCodes.VALIDATION;
     }
 
     Set<String> knownExtensionIds = new LinkedHashSet<>();
@@ -130,7 +129,7 @@ final class HeadlessGenerationService {
           new ValidationReport(validationException.errors()),
           catalogData.source().label() + (catalogData.stale() ? " [stale]" : ""),
           catalogData.detailMessage());
-      return QuarkusForgeCli.EXIT_CODE_VALIDATION;
+      return ExitCodes.VALIDATION;
     }
 
     boolean dryRunRequested = command.dryRun || globalDryRun;
@@ -146,7 +145,7 @@ final class HeadlessGenerationService {
           catalogData.source().label(),
           catalogData.stale());
       saveForgefileIfRequested(inputs, validatedState.request(), extensionIds);
-      return CommandLine.ExitCode.OK;
+      return ExitCodes.OK;
     }
 
     Path outputPath =
@@ -178,7 +177,7 @@ final class HeadlessGenerationService {
       saveForgefileIfRequested(inputs, validatedState.request(), extensionIds);
       System.out.println(
           "Generation succeeded: " + generatedProjectRoot.toAbsolutePath().normalize());
-      return CommandLine.ExitCode.OK;
+      return ExitCodes.OK;
     } catch (Exception e) {
       if (e instanceof java.util.concurrent.TimeoutException) {
         generationFuture.cancel(true);

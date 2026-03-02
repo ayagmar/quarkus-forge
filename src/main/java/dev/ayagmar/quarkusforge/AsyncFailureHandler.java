@@ -38,19 +38,19 @@ final class AsyncFailureHandler {
       case CancellationException _ -> {
         diagnostics.error(diagnosticPrefix + ".cancelled", df("phase", "execution"));
         System.err.println(userMessagePrefix + ": cancelled.");
-        yield QuarkusForgeCli.EXIT_CODE_CANCELLED;
+        yield ExitCodes.CANCELLED;
       }
       case InterruptedException _ -> {
         Thread.currentThread().interrupt();
         diagnostics.error(diagnosticPrefix + ".cancelled", df("phase", "interrupted"));
         System.err.println(userMessagePrefix + ": cancelled.");
-        yield QuarkusForgeCli.EXIT_CODE_CANCELLED;
+        yield ExitCodes.CANCELLED;
       }
       case TimeoutException _ -> {
         diagnostics.error(diagnosticPrefix + ".timeout", df("timeoutMs", timeout.toMillis()));
         System.err.println(
             userMessagePrefix + ": request timed out after " + timeout.toMillis() + "ms");
-        yield QuarkusForgeCli.EXIT_CODE_NETWORK;
+        yield ExitCodes.NETWORK;
       }
       case ExecutionException executionException -> {
         Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);

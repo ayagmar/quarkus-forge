@@ -126,19 +126,19 @@ class ProjectRequestFactoryTest {
     assertThat(
             ProjectRequestFactory.mapFailureToExitCode(
                 new java.util.concurrent.CancellationException()))
-        .isEqualTo(QuarkusForgeCli.EXIT_CODE_CANCELLED);
+        .isEqualTo(ExitCodes.CANCELLED);
 
     assertThat(
             ProjectRequestFactory.mapFailureToExitCode(
                 new dev.ayagmar.quarkusforge.api.ApiClientException("fail", null)))
-        .isEqualTo(QuarkusForgeCli.EXIT_CODE_NETWORK);
+        .isEqualTo(ExitCodes.NETWORK);
 
     assertThat(
             ProjectRequestFactory.mapFailureToExitCode(
                 new dev.ayagmar.quarkusforge.archive.ArchiveException("fail")))
-        .isEqualTo(QuarkusForgeCli.EXIT_CODE_ARCHIVE);
+        .isEqualTo(ExitCodes.ARCHIVE);
 
     assertThat(ProjectRequestFactory.mapFailureToExitCode(new RuntimeException("unknown")))
-        .isEqualTo(QuarkusForgeCli.EXIT_CODE_ARCHIVE);
+        .isEqualTo(ExitCodes.ARCHIVE);
   }
 }

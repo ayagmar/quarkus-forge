@@ -19,6 +19,9 @@
     <assertj.version>3.27.7</assertj.version>
     <wiremock.version>3.13.2</wiremock.version>
 
+    <forge.main.class>dev.ayagmar.quarkusforge.QuarkusForgeCli</forge.main.class>
+    <forge.jar.name>quarkus-forge</forge.jar.name>
+
     <maven.compiler.plugin.version>3.15.0</maven.compiler.plugin.version>
     <maven.enforcer.plugin.version>3.6.2</maven.enforcer.plugin.version>
     <maven.jar.plugin.version>3.5.0</maven.jar.plugin.version>
@@ -233,13 +236,13 @@
               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                  <mainClass>dev.ayagmar.quarkusforge.QuarkusForgeCli</mainClass>
+                  <mainClass>${forge.main.class}</mainClass>
                   <manifestEntries>
                     <Implementation-Version>${project.version}</Implementation-Version>
                   </manifestEntries>
                 </transformer>
               </transformers>
-              <finalName>quarkus-forge</finalName>
+              <finalName>${forge.jar.name}</finalName>
             </configuration>
           </execution>
         </executions>
@@ -273,8 +276,8 @@
             </executions>
             <configuration>
               <skip>${native.skip}</skip>
-              <imageName>quarkus-forge</imageName>
-              <mainClass>dev.ayagmar.quarkusforge.QuarkusForgeCli</mainClass>
+              <imageName>${forge.jar.name}</imageName>
+              <mainClass>${forge.main.class}</mainClass>
               <buildArgs>
                 <buildArg>--no-fallback</buildArg>
                 <buildArg>-Os</buildArg>
