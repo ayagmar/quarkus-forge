@@ -40,5 +40,6 @@ final class HeadlessCliTest {
         CliCommandTestSupport.runHeadlessCommand(config, "--version");
 
     assertThat(result.exitCode()).isEqualTo(ExitCodes.OK);
+    assertThat(result.standardOut()).containsPattern("\\d+\\.\\d+");
   }
 }
