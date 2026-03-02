@@ -24,6 +24,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 final class HeadlessGenerationService {
   private static final String PRESET_FAVORITES = "favorites";
@@ -83,16 +84,14 @@ final class HeadlessGenerationService {
           of("errorCount", validatedState.validation().errors().size()),
           of("catalogSource", catalogData.source().label()));
       HeadlessOutputPrinter.printValidationErrors(
-          validatedState.validation(),
-          catalogData.source().label() + (catalogData.stale() ? " [stale]" : ""),
-          catalogData.detailMessage());
+          validatedState.validation(), catalogData.sourceLabel(), catalogData.detailMessage());
       return ExitCodes.VALIDATION;
     }
 
-    Set<String> knownExtensionIds = new LinkedHashSet<>();
-    for (ExtensionDto extension : catalogData.extensions()) {
-      knownExtensionIds.add(extension.id());
-    }
+    Set<String> knownExtensionIds =
+        catalogData.extensions().stream()
+            .map(ExtensionDto::id)
+            .collect(Collectors.toCollection(LinkedHashSet::new));
 
     Map<String, List<String>> presetExtensionsByName = Map.of();
     if (requiresBuiltInPresets(inputs.presetInputs())) {
@@ -129,7 +128,7 @@ final class HeadlessGenerationService {
           of("errorCount", validationException.errors().size()));
       HeadlessOutputPrinter.printValidationErrors(
           new ValidationReport(validationException.errors()),
-          catalogData.source().label() + (catalogData.stale() ? " [stale]" : ""),
+          catalogData.sourceLabel(),
           catalogData.detailMessage());
       return ExitCodes.VALIDATION;
     }
@@ -142,10 +141,7 @@ final class HeadlessGenerationService {
           of("catalogSource", catalogData.source().label()),
           of("stale", catalogData.stale()));
       HeadlessOutputPrinter.printDryRunSummary(
-          validatedState.request(),
-          extensionIds,
-          catalogData.source().label(),
-          catalogData.stale());
+          validatedState.request(), extensionIds, catalogData.sourceLabel());
       saveForgefileIfRequested(inputs, validatedState.request(), extensionIds);
       return ExitCodes.OK;
     }

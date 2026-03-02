@@ -16,7 +16,6 @@ import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.ui.ExtensionCatalogLoadResult;
 import dev.ayagmar.quarkusforge.ui.UserPreferencesStore;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.Callable;
@@ -126,7 +125,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
     if (dryRun) {
       diagnostics.info(
           "cli.dry-run.validated", of("metadataSource", startupMetadataSelection.sourceLabel()));
-      printPrefillSummary(
+      HeadlessOutputPrinter.printPrefillSummary(
           initialState.request(),
           startupMetadataSelection.sourceLabel(),
           startupMetadataSelection.detailMessage());
@@ -213,38 +212,35 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
       return;
     }
     RequestOptions defaults = defaultRequestOptions();
-    if (Objects.equals(requestOptions.groupId, defaults.groupId)
-        && !storedPrefill.groupId().isBlank()) {
-      requestOptions.groupId = storedPrefill.groupId();
+    requestOptions.groupId =
+        applyIfDefault(requestOptions.groupId, defaults.groupId, storedPrefill.groupId());
+    requestOptions.artifactId =
+        applyIfDefault(requestOptions.artifactId, defaults.artifactId, storedPrefill.artifactId());
+    requestOptions.version =
+        applyIfDefault(requestOptions.version, defaults.version, storedPrefill.version());
+    requestOptions.packageName =
+        applyIfDefault(
+            requestOptions.packageName, defaults.packageName, storedPrefill.packageName());
+    requestOptions.outputDirectory =
+        applyIfDefault(
+            requestOptions.outputDirectory,
+            defaults.outputDirectory,
+            storedPrefill.outputDirectory());
+    requestOptions.platformStream =
+        applyIfDefault(
+            requestOptions.platformStream, defaults.platformStream, storedPrefill.platformStream());
+    requestOptions.buildTool =
+        applyIfDefault(requestOptions.buildTool, defaults.buildTool, storedPrefill.buildTool());
+    requestOptions.javaVersion =
+        applyIfDefault(
+            requestOptions.javaVersion, defaults.javaVersion, storedPrefill.javaVersion());
+  }
+
+  private static String applyIfDefault(String current, String defaultValue, String stored) {
+    if (Objects.equals(current, defaultValue) && stored != null && !stored.isBlank()) {
+      return stored;
     }
-    if (Objects.equals(requestOptions.artifactId, defaults.artifactId)
-        && !storedPrefill.artifactId().isBlank()) {
-      requestOptions.artifactId = storedPrefill.artifactId();
-    }
-    if (Objects.equals(requestOptions.version, defaults.version)
-        && !storedPrefill.version().isBlank()) {
-      requestOptions.version = storedPrefill.version();
-    }
-    if ((requestOptions.packageName == null || requestOptions.packageName.isBlank())
-        && !storedPrefill.packageName().isBlank()) {
-      requestOptions.packageName = storedPrefill.packageName();
-    }
-    if (Objects.equals(requestOptions.outputDirectory, defaults.outputDirectory)
-        && !storedPrefill.outputDirectory().isBlank()) {
-      requestOptions.outputDirectory = storedPrefill.outputDirectory();
-    }
-    if (Objects.equals(requestOptions.platformStream, defaults.platformStream)
-        && !storedPrefill.platformStream().isBlank()) {
-      requestOptions.platformStream = storedPrefill.platformStream();
-    }
-    if (Objects.equals(requestOptions.buildTool, defaults.buildTool)
-        && !storedPrefill.buildTool().isBlank()) {
-      requestOptions.buildTool = storedPrefill.buildTool();
-    }
-    if (Objects.equals(requestOptions.javaVersion, defaults.javaVersion)
-        && !storedPrefill.javaVersion().isBlank()) {
-      requestOptions.javaVersion = storedPrefill.javaVersion();
-    }
+    return current;
   }
 
   static void runHeadlessSmoke(RuntimeConfig runtimeConfig, DiagnosticLogger diagnostics) {
@@ -292,26 +288,6 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
         catalogData.stale(),
         catalogData.detailMessage(),
         catalogData.metadata());
-  }
-
-  private static void printPrefillSummary(
-      ProjectRequest request, String sourceLabel, String sourceDetail) {
-    Path generatedProjectDirectory =
-        Path.of(request.outputDirectory()).resolve(request.artifactId()).normalize();
-    System.out.println("Prefill validated successfully:");
-    System.out.println(" - groupId: " + request.groupId());
-    System.out.println(" - artifactId: " + request.artifactId());
-    System.out.println(" - version: " + request.version());
-    System.out.println(" - packageName: " + request.packageName());
-    System.out.println(" - outputDirectory: " + request.outputDirectory());
-    System.out.println(" - platformStream: " + request.platformStream());
-    System.out.println(" - buildTool: " + request.buildTool());
-    System.out.println(" - javaVersion: " + request.javaVersion());
-    System.out.println(" - metadataSource: " + sourceLabel);
-    if (sourceDetail != null && !sourceDetail.isBlank()) {
-      System.out.println(" - metadataDetail: " + sourceDetail);
-    }
-    System.out.println(" - generatedProjectDirectory: " + generatedProjectDirectory);
   }
 
   private StartupMetadataSelection loadStartupMetadataSelection(DiagnosticLogger diagnostics) {

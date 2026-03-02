@@ -27,6 +27,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -156,7 +157,7 @@ public final class QuarkusApiClient implements AutoCloseable {
     HttpRequest request = newGetRequest(uri, "application/zip, application/octet-stream");
     Path temporaryArchive =
         destinationFile.resolveSibling(
-            destinationFile.getFileName() + ".part-" + java.util.UUID.randomUUID());
+            destinationFile.getFileName() + ".part-" + UUID.randomUUID());
 
     return sendWithRetry(
             request,
