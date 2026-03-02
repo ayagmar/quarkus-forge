@@ -42,7 +42,8 @@ final class PostTuiActionExecutor {
 
     switch (exitPlan.action()) {
       case OPEN_IDE -> {
-        String ideCommand = resolveIdeCommand();
+        String ideCommand =
+            exitPlan.ideCommand() != null ? exitPlan.ideCommand() : resolveIdeCommand();
         diagnostics.info(
             "tui.post-action.start",
             df("action", "open-ide"),

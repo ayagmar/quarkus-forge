@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge.ui;
 
 import dev.tamboui.tui.event.KeyEvent;
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * Encapsulates the post-generation action menu state and key handling. Manages the action selection
@@ -15,6 +16,17 @@ final class PostGenerationMenuState {
   private Path lastGeneratedProjectPath;
   private String lastGeneratedNextCommand = "";
   private PostGenerationExitPlan exitPlan;
+  private List<UiTextConstants.PostGenerationAction> actions = List.of();
+  private List<String> actionLabels = List.of();
+
+  void setActions(List<UiTextConstants.PostGenerationAction> actions) {
+    this.actions = actions;
+    this.actionLabels = UiTextConstants.postGenerationActionLabels(actions);
+  }
+
+  List<String> actionLabels() {
+    return actionLabels;
+  }
 
   boolean isVisible() {
     return visible;
@@ -123,7 +135,7 @@ final class PostGenerationMenuState {
     }
     if (UiKeyMatchers.isDigitKey(keyEvent)) {
       int selected = Character.digit(keyEvent.character(), 10) - 1;
-      if (selected >= 0 && selected < UiTextConstants.POST_GENERATION_ACTION_LABELS.size()) {
+      if (selected >= 0 && selected < actionLabels.size()) {
         actionSelection = selected;
         return executeSelection();
       }
@@ -177,10 +189,12 @@ final class PostGenerationMenuState {
   }
 
   private MenuKeyResult executeSelection() {
+    UiTextConstants.PostGenerationAction selected =
+        (actionSelection >= 0 && actionSelection < actions.size())
+            ? actions.get(actionSelection)
+            : null;
     PostGenerationExitAction action =
-        (actionSelection >= 0 && actionSelection < UiTextConstants.POST_GENERATION_ACTIONS.size())
-            ? UiTextConstants.POST_GENERATION_ACTIONS.get(actionSelection).action()
-            : PostGenerationExitAction.QUIT;
+        selected != null ? selected.action() : PostGenerationExitAction.QUIT;
     if (action == PostGenerationExitAction.EXPORT_RECIPE_LOCK) {
       return MenuKeyResult.exportRecipe();
     }
@@ -193,12 +207,12 @@ final class PostGenerationMenuState {
       reset();
       return MenuKeyResult.generateAgain();
     }
-    selectExit(action);
+    selectExit(action, selected != null ? selected.ideCommand() : null);
     return MenuKeyResult.quit();
   }
 
   private void moveActionSelection(int delta) {
-    int size = UiTextConstants.POST_GENERATION_ACTION_LABELS.size();
+    int size = actionLabels.size();
     if (size > 0) {
       actionSelection = Math.floorMod(actionSelection + delta, size);
     }
@@ -220,17 +234,26 @@ final class PostGenerationMenuState {
   }
 
   private void selectExit(PostGenerationExitAction action) {
-    selectExit(action, GitHubVisibility.PRIVATE);
+    selectExit(action, GitHubVisibility.PRIVATE, null);
+  }
+
+  private void selectExit(PostGenerationExitAction action, String ideCommand) {
+    selectExit(action, GitHubVisibility.PRIVATE, ideCommand);
   }
 
   private void selectExit(PostGenerationExitAction action, GitHubVisibility visibility) {
+    selectExit(action, visibility, null);
+  }
+
+  private void selectExit(
+      PostGenerationExitAction action, GitHubVisibility visibility, String ideCommand) {
     visible = false;
     actionSelection = 0;
     githubVisibilityMenuVisible = false;
     githubVisibilitySelection = 0;
     exitPlan =
         new PostGenerationExitPlan(
-            action, lastGeneratedProjectPath, lastGeneratedNextCommand, visibility);
+            action, lastGeneratedProjectPath, lastGeneratedNextCommand, visibility, ideCommand);
   }
 
   /** Result of handling a key event in the post-generation menu. */

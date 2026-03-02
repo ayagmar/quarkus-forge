@@ -7,6 +7,7 @@ import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.KeyModifiers;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,7 @@ class PostGenerationMenuStateTest {
   @BeforeEach
   void setUp() {
     state = new PostGenerationMenuState();
+    state.setActions(UiTextConstants.postGenerationActions(List.of()));
   }
 
   @Test
@@ -95,7 +97,7 @@ class PostGenerationMenuStateTest {
     void upKeyWrapsToLast() {
       MenuKeyResult result = state.handleKey(KeyEvent.ofKey(KeyCode.UP));
       assertThat(result).isInstanceOf(MenuKeyResult.Handled.class);
-      int lastIndex = UiTextConstants.POST_GENERATION_ACTION_LABELS.size() - 1;
+      int lastIndex = state.actionLabels().size() - 1;
       assertThat(state.actionSelection()).isEqualTo(lastIndex);
     }
 

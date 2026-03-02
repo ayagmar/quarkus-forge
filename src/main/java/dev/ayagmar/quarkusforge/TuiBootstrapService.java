@@ -68,7 +68,8 @@ final class TuiBootstrapService {
                                         "extracting project archive...");
                               })),
               ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile()),
-              CoreTuiController.defaultFavoritesPersistenceExecutor());
+              CoreTuiController.defaultFavoritesPersistenceExecutor(),
+              IdeDetector.detect());
       controller.setStartupOverlayMinDuration(QuarkusForgeCli.STARTUP_SPLASH_MIN_DURATION);
       controller.loadExtensionCatalogAsync(
           () -> {

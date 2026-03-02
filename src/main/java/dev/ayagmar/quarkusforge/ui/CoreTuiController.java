@@ -3,6 +3,7 @@ package dev.ayagmar.quarkusforge.ui;
 import dev.ayagmar.quarkusforge.Forgefile;
 import dev.ayagmar.quarkusforge.ForgefileLock;
 import dev.ayagmar.quarkusforge.ForgefileStore;
+import dev.ayagmar.quarkusforge.IdeDetector;
 import dev.ayagmar.quarkusforge.api.BuildToolCodec;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
@@ -101,7 +102,8 @@ public final class CoreTuiController
       Duration debounceDelay,
       ProjectGenerationRunner projectGenerationRunner,
       ExtensionFavoritesStore favoritesStore,
-      Executor favoritesPersistenceExecutor) {
+      Executor favoritesPersistenceExecutor,
+      List<IdeDetector.DetectedIde> detectedIdes) {
     Objects.requireNonNull(initialState);
     Objects.requireNonNull(scheduler);
     Objects.requireNonNull(debounceDelay);
@@ -139,6 +141,7 @@ public final class CoreTuiController
     inputStates.get(FocusTarget.PACKAGE_NAME).setText(request.packageName());
     inputStates.get(FocusTarget.OUTPUT_DIR).setText(request.outputDirectory());
     syncMetadataSelectors();
+    postGenerationMenu.setActions(UiTextConstants.postGenerationActions(detectedIdes));
     for (FocusTarget target : FOCUS_ORDER) {
       if (isTextInputFocus(target)) {
         inputStates.get(target).moveCursorToEnd();
@@ -204,7 +207,26 @@ public final class CoreTuiController
         debounceDelay,
         projectGenerationRunner,
         favoritesStore,
-        favoritesPersistenceExecutor);
+        favoritesPersistenceExecutor,
+        List.of());
+  }
+
+  public static CoreTuiController from(
+      ForgeUiState initialState,
+      UiScheduler scheduler,
+      Duration debounceDelay,
+      ProjectGenerationRunner projectGenerationRunner,
+      ExtensionFavoritesStore favoritesStore,
+      Executor favoritesPersistenceExecutor,
+      List<IdeDetector.DetectedIde> detectedIdes) {
+    return new CoreTuiController(
+        initialState,
+        scheduler,
+        debounceDelay,
+        projectGenerationRunner,
+        favoritesStore,
+        favoritesPersistenceExecutor,
+        detectedIdes);
   }
 
   public static Executor defaultFavoritesPersistenceExecutor() {
@@ -980,7 +1002,7 @@ public final class CoreTuiController
         frame,
         viewport,
         theme,
-        UiTextConstants.POST_GENERATION_ACTION_LABELS,
+        postGenerationMenu.actionLabels(),
         postGenerationMenu.actionSelection());
   }
 

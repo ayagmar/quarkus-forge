@@ -1,5 +1,7 @@
 package dev.ayagmar.quarkusforge.ui;
 
+import dev.ayagmar.quarkusforge.IdeDetector;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -40,20 +42,41 @@ final class UiTextConstants {
           new CommandPaletteEntry(
               "Toggle error details", "Ctrl+E", CommandPaletteAction.TOGGLE_ERROR_DETAILS));
 
-  record PostGenerationAction(String label, PostGenerationExitAction action) {}
+  record PostGenerationAction(String label, PostGenerationExitAction action, String ideCommand) {
+    PostGenerationAction(String label, PostGenerationExitAction action) {
+      this(label, action, null);
+    }
+  }
 
-  static final List<PostGenerationAction> POST_GENERATION_ACTIONS =
-      List.of(
-          new PostGenerationAction("Export Forgefile", PostGenerationExitAction.EXPORT_RECIPE_LOCK),
-          new PostGenerationAction(
-              "Publish to GitHub (requires gh)", PostGenerationExitAction.PUBLISH_GITHUB),
-          new PostGenerationAction("Open in IDE", PostGenerationExitAction.OPEN_IDE),
-          new PostGenerationAction("Open in terminal", PostGenerationExitAction.OPEN_TERMINAL),
-          new PostGenerationAction("Generate again", PostGenerationExitAction.GENERATE_AGAIN),
-          new PostGenerationAction("Quit", PostGenerationExitAction.QUIT));
+  static List<PostGenerationAction> postGenerationActions(
+      List<IdeDetector.DetectedIde> detectedIdes) {
+    var actions = new ArrayList<PostGenerationAction>();
+    actions.add(
+        new PostGenerationAction("Export Forgefile", PostGenerationExitAction.EXPORT_RECIPE_LOCK));
+    actions.add(
+        new PostGenerationAction(
+            "Publish to GitHub (requires gh)", PostGenerationExitAction.PUBLISH_GITHUB));
+    if (detectedIdes.isEmpty()) {
+      actions.add(new PostGenerationAction("Open in IDE", PostGenerationExitAction.OPEN_IDE));
+    } else {
+      for (var ide : detectedIdes) {
+        actions.add(
+            new PostGenerationAction(
+                "Open in " + ide.name(), PostGenerationExitAction.OPEN_IDE, ide.command()));
+      }
+    }
+    actions.add(
+        new PostGenerationAction("Open in terminal", PostGenerationExitAction.OPEN_TERMINAL));
+    actions.add(
+        new PostGenerationAction("Generate again", PostGenerationExitAction.GENERATE_AGAIN));
+    actions.add(new PostGenerationAction("Quit", PostGenerationExitAction.QUIT));
+    return List.copyOf(actions);
+  }
 
-  static final List<String> POST_GENERATION_ACTION_LABELS =
-      POST_GENERATION_ACTIONS.stream().map(PostGenerationAction::label).toList();
+  static List<String> postGenerationActionLabels(
+      List<UiTextConstants.PostGenerationAction> actions) {
+    return actions.stream().map(PostGenerationAction::label).toList();
+  }
 
   static final List<String> GITHUB_VISIBILITY_LABELS =
       List.of("Private repo", "Public repo", "Internal repo (GitHub Enterprise)");

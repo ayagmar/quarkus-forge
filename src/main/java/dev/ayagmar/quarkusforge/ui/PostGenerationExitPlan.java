@@ -7,7 +7,8 @@ public record PostGenerationExitPlan(
     PostGenerationExitAction action,
     Path projectDirectory,
     String nextCommand,
-    GitHubVisibility githubVisibility) {
+    GitHubVisibility githubVisibility,
+    String ideCommand) {
   public PostGenerationExitPlan {
     action = Objects.requireNonNull(action);
     nextCommand = nextCommand == null ? "" : nextCommand.strip();
@@ -16,6 +17,6 @@ public record PostGenerationExitPlan(
 
   public PostGenerationExitPlan(
       PostGenerationExitAction action, Path projectDirectory, String nextCommand) {
-    this(action, projectDirectory, nextCommand, GitHubVisibility.PRIVATE);
+    this(action, projectDirectory, nextCommand, GitHubVisibility.PRIVATE, null);
   }
 }
