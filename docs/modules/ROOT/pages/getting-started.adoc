@@ -12,6 +12,8 @@
 [source,bash]
 ----
 mvn -q -DskipTests package
+# or: just build
+# or: ./mvnw -DskipTests package
 ----
 
 This creates `target/quarkus-forge.jar`.
@@ -21,9 +23,13 @@ This creates `target/quarkus-forge.jar`.
 [source,bash]
 ----
 mvn -q clean package -Pheadless
+# or: just build-headless
+# or: ./mvnw clean package -Pheadless
 ----
 
 This creates `target/quarkus-forge-headless.jar` — a smaller jar without TUI/terminal dependencies, ideal for CI pipelines and containers.
+
+TIP: A https://github.com/casey/just[justfile] is included with common recipes. Run `just` to see all available commands. A Maven Wrapper (`./mvnw`) is also included — no global Maven install required.
 
 == Choose Your Mode
 
@@ -31,21 +37,12 @@ TUI mode (interactive):
 
 [source,bash]
 ----
-java -jar target/quarkus-forge.jar
+java --enable-native-access=ALL-UNNAMED -jar target/quarkus-forge.jar
 ----
+
+NOTE: `--enable-native-access=ALL-UNNAMED` suppresses Panama FFM warnings from the TamboUI terminal backend.
 
 Headless mode (automation/CI):
-
-[source,bash]
-----
-java -jar target/quarkus-forge.jar generate \
-  --group-id org.acme \
-  --artifact-id demo \
-  --build-tool maven \
-  --java-version 25
-----
-
-Or with the headless-only jar (no TUI dependencies):
 
 [source,bash]
 ----
@@ -56,18 +53,20 @@ java -jar target/quarkus-forge-headless.jar generate \
   --java-version 25
 ----
 
+NOTE: The full jar (`quarkus-forge.jar`) also supports the `generate` subcommand. The headless-only jar is preferred for CI/containers as it carries no TUI or terminal dependencies.
+
 Deterministic replay with a Forgefile:
 
 [source,bash]
 ----
-java -jar target/quarkus-forge.jar generate --from Forgefile
+java -jar target/quarkus-forge-headless.jar generate --from Forgefile
 ----
 
 Save a reusable template in the machine-local recipes library:
 
 [source,bash]
 ----
-java -jar target/quarkus-forge.jar generate \
+java -jar target/quarkus-forge-headless.jar generate \
   --dry-run \
   --group-id org.acme \
   --artifact-id demo \

@@ -66,3 +66,40 @@ A `Forgefile` is a single JSON file that serves as both a project template and a
 == TUI Export
 
 After generating a project in the TUI, the "Export Forgefile" post-generation action writes a complete Forgefile (with locked section) to the generated project directory.
+
+== CI Pipeline Integration
+
+=== GitHub Actions
+
+[source,yaml]
+----
+- name: Generate Quarkus project
+  run: |
+    java -jar quarkus-forge-headless.jar generate \
+      --from Forgefile \
+      --lock-check \
+      --output-dir .
+----
+
+Use `--lock-check` to detect drift between the Forgefile and the locked section, failing the build if any difference is found.
+
+=== Lock workflow
+
+[source,bash]
+----
+# 1. Developer configures project
+java -jar quarkus-forge-headless.jar generate \
+  --group-id com.acme --artifact-id my-service \
+  --build-tool maven --java-version 25 \
+  --extension io.quarkus:quarkus-rest \
+  --save-as Forgefile --lock
+
+# 2. CI verifies no drift
+java -jar quarkus-forge-headless.jar generate \
+  --from Forgefile --lock-check --dry-run
+----
+
+=== Offline / air-gapped environments
+
+Forge falls back to `~/.quarkus-forge/catalog-snapshot.json` when the API is unreachable.
+Pre-populate the snapshot on a connected build agent and copy it to the air-gapped environment.

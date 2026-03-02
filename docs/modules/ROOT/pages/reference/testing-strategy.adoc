@@ -42,6 +42,39 @@ mvn -q verify -DskipTests=true
 mvn -q clean compile -Pheadless  # verify headless profile compiles
 ----
 
+Or using the included https://github.com/casey/just[justfile]:
+
+[source,bash]
+----
+just format-check      # spotless:check
+just test-unit         # unit tests only
+just test-it           # integration tests only
+just test              # unit + integration (verify)
+just headless-check    # headless profile compile
+just verify            # format-check + headless-check + test
+----
+
+== Coverage
+
+JaCoCo is configured as part of the standard build lifecycle.
+Coverage reports are generated automatically during `mvn test` and `mvn verify`:
+
+* Unit test report: `target/site/jacoco/index.html`
+* Integration test report: `target/site/jacoco-it/index.html`
+* Machine-readable XML (for Codecov): `target/site/jacoco/jacoco.xml` and `target/site/jacoco-it/jacoco.xml`
+
+In CI, a dedicated `coverage` job runs `mvn verify` on Linux, generates both reports, and uploads them to Codecov and as GitHub Actions artifacts (14-day retention).
+
+To generate coverage locally:
+
+[source,bash]
+----
+mvn verify
+# or: just coverage
+open target/site/jacoco/index.html  # macOS
+x-www-browser target/site/jacoco/index.html  # Linux
+----
+
 == Platform Independence
 
 * Path assertions use `Path.toString()` instead of hard-coded forward slashes.

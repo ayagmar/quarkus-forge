@@ -1,23 +1,55 @@
 = Quarkus Forge Docs
 :description: User documentation for Quarkus Forge, a keyboard-first TUI for generating Quarkus projects.
 
-Quarkus Forge is a keyboard-first terminal UI and headless CLI to generate Quarkus projects quickly.
+Quarkus Forge is a keyboard-first terminal UI and headless CLI to generate Quarkus projects quickly — an offline-capable, CI-ready alternative to `quarkus create`.
 
 == Start Here
 
 * xref:getting-started.adoc[Install and run]
 * xref:usage/tui.adoc[Use the TUI effectively]
-* xref:ui/keybindings.adoc[Use the TUI with keyboard shortcuts]
+* xref:ui/keybindings.adoc[Keyboard shortcuts]
 * xref:cli/headless-mode.adoc[Generate projects non-interactively]
-* xref:reference/forge-files-and-state.adoc[Understand Forge files and state]
+* xref:reference/forge-files-and-state.adoc[Forge files, state, and CI integration]
 * xref:troubleshooting.adoc[Fix common issues]
+
+== Modes at a Glance
+
+[cols="1,1,1", options="header"]
+|===
+| | TUI (interactive) | Headless (`generate`)
+
+| Best for
+| Local development, exploration
+| CI pipelines, scripting, containers
+
+| Jar
+| `quarkus-forge.jar`
+| `quarkus-forge-headless.jar`
+
+| Interaction
+| Keyboard-driven UI
+| Flags only, non-interactive
+
+| Extension browsing
+| Live fuzzy search + favorites
+| `--extension` / `--preset` flags
+
+| Forgefile
+| Export via post-gen menu
+| `--from`, `--save-as`, `--lock`
+
+| JVM flag needed
+| `--enable-native-access=ALL-UNNAMED`
+| none
+|===
 
 == Core Capabilities
 
 * Guided TUI with fast extension search, fuzzy highlighting, and chip-style selection badges.
 * Extension descriptions shown inline from the Quarkus API.
-* Headless command for CI and scripts.
-* Unified Forgefile format for shareable, deterministic project templates.
-* Safe archive extraction and deterministic fallback behavior for metadata/catalog loading.
+* Headless `generate` command for CI and scripts; identical output to TUI.
+* Unified Forgefile format: shareable template + optional `locked` section for deterministic builds.
+* Safe archive extraction with Zip-Bomb and Zip-Slip protection.
 * Configurable theming and IDE command for terminal readability.
-* Session persistence (remembers your last selections).
+* Session persistence — remembers your last selections across launches.
+* JBang catalog integration for zero-install runs.
