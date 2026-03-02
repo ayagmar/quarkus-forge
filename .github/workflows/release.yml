@@ -204,7 +204,7 @@ jobs:
         run: chmod +x artifacts/quarkus-forge-linux-* artifacts/quarkus-forge-macos-* artifacts/quarkus-forge-headless-linux-* artifacts/quarkus-forge-headless-macos-* || true
 
       - name: Attest release artifact provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: artifacts/*
 
