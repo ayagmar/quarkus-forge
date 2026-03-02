@@ -44,7 +44,9 @@ Quarkus Forge follows a layered architecture that separates HTTP transport, JSON
 │                                                                     │
 │    PostTuiActionExecutor ───► ShellExecutor                         │
 │         │                                                           │
-│         ├── Open IDE (code <path>)                                  │
+│    IdeDetector (cross-platform IDE auto-detection)                  │
+│         │                                                           │
+│         ├── Open in IDE (auto-detected or QUARKUS_FORGE_IDE_COMMAND)│
 │         ├── Open Terminal (interactive shell)                        │
 │         └── Publish to GitHub (gh repo create)                      │
 │                                                                     │
@@ -116,7 +118,7 @@ CoreTuiController (State Machine)
             │
             ├── Export Forgefile
             ├── Publish to GitHub ──► Visibility sub-menu
-            ├── Open IDE
+            ├── Open in <detected IDE>  (one entry per auto-detected IDE)
             ├── Open Terminal
             └── Quit
 ....

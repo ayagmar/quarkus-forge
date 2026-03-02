@@ -4,12 +4,12 @@ Quarkus Forge is a keyboard-first terminal UI (TUI) and headless CLI for generat
 
 ## Why use Quarkus Forge?
 
-- **Keyboard-First TUI:** Zero-mouse, Vim-like bindings for navigating catalogs, toggling extensions, and validating inputs. Inline validation hints, search match counts, and animated progress feedback.
+- **Keyboard-First TUI:** Zero-mouse, Vim-like bindings for navigating catalogs, toggling extensions, and validating inputs. Fuzzy search highlighting, chip-style selected extensions, selector arrows with position hints, and animated progress feedback.
 - **Speed & Caching:** Background loading and local snapshot caching mean you don't wait for the network to start configuring your project.
 - **Headless & CI-Ready:** Powerful non-interactive modes for generating applications identically across local environments and CI pipelines.
 - **Deterministic State:** Supports `Forgefile` with an optional `locked` section for exact reproduction of generated applications, much like standard dependency managers.
-- **Customizable:** Theming via `.tcss` files, configurable IDE command via `QUARKUS_FORGE_IDE_COMMAND`, post-generation hooks.
-- **Workflow Enhancers:** Post-generation handoffs allow you to drop straight into VS Code, an interactive shell, or automatically publish to GitHub.
+- **Customizable:** Theming via `.tcss` files, IDE auto-detection with `QUARKUS_FORGE_IDE_COMMAND` override, post-generation hooks.
+- **Workflow Enhancers:** Post-generation handoffs let you open in your auto-detected IDE, drop into a shell, or publish to GitHub — all from the keyboard.
 
 ## Architecture
 
@@ -38,6 +38,7 @@ The codebase is organized into focused modules that follow SOLID principles and 
 - **`QuarkusForgeCli`** — Picocli command entry point, TUI bootstrap, and runtime configuration.
 - **`HeadlessGenerationService`** — Decoupled headless generation engine for CI/scripting, with `AsyncFailureHandler` for consistent error handling.
 - **`PostTuiActionExecutor`** — Post-generation shell actions (IDE open, GitHub publish, terminal handoff).
+- **`IdeDetector`** — Cross-platform IDE auto-detection (macOS, Linux, Windows).
 - **`ForgefileStore`** — Forgefile persistence (with optional locked section).
 
 ### Archive Layer (`archive/`)
@@ -124,12 +125,13 @@ export QUARKUS_FORGE_THEME=/path/to/my-theme.tcss
 java -Dquarkus.forge.theme=/path/to/my-theme.tcss -jar target/quarkus-forge.jar
 ```
 
-### IDE Command
-The "Open in IDE" post-generation action defaults to `code .` (VS Code). Override via:
+### IDE Auto-Detection
+After generating a project, Quarkus Forge auto-detects installed IDEs (IntelliJ IDEA, VS Code, Eclipse, Cursor, Zed, Neovim) and shows one menu entry per detected IDE.
+
+To override auto-detection, set `QUARKUS_FORGE_IDE_COMMAND`:
 ```bash
-export QUARKUS_FORGE_IDE_COMMAND="idea ."        # IntelliJ
-export QUARKUS_FORGE_IDE_COMMAND="nvim ."        # Neovim
-export QUARKUS_FORGE_IDE_COMMAND="cursor ."      # Cursor
+export QUARKUS_FORGE_IDE_COMMAND="idea ."        # Force IntelliJ
+export QUARKUS_FORGE_IDE_COMMAND="code-insiders ."  # VS Code Insiders
 ```
 
 ## Where Files Live
