@@ -50,7 +50,9 @@ java -jar target/quarkus-forge-headless.jar generate \
   --group-id org.acme \
   --artifact-id demo \
   --build-tool maven \
-  --java-version 25
+  --java-version 25 \
+  --preset web \
+  --extension io.quarkus:quarkus-smallrye-health
 ----
 
 NOTE: The full jar (`quarkus-forge.jar`) also supports the `generate` subcommand. The headless-only jar is preferred for CI/containers as it carries no TUI or terminal dependencies.

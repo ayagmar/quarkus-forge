@@ -135,16 +135,21 @@ java -jar target/quarkus-forge-headless.jar generate \
   --group-id org.acme \
   --artifact-id demo \
   --build-tool maven \
-  --java-version 25
+  --java-version 25 \
+  --preset web \
+  --extension io.quarkus:quarkus-smallrye-health
 ```
 
 > The full jar (`quarkus-forge.jar`) also supports the `generate` subcommand. The headless-only jar is preferred for CI/containers — no TUI or terminal dependencies.
 
 ### Dry-Run
 ```bash
-java -jar target/quarkus-forge-headless.jar generate --dry-run \
+java -jar target/quarkus-forge-headless.jar generate \
   --group-id org.acme \
-  --artifact-id demo
+  --artifact-id demo \
+  --preset web \
+  --extension io.quarkus:quarkus-smallrye-health \
+  --dry-run
 ```
 
 ### Post-Generation Hooks

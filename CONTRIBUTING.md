@@ -31,7 +31,9 @@ java --enable-native-access=ALL-UNNAMED -jar target/quarkus-forge.jar
 Run headless:
 
 ```bash
-java -jar target/quarkus-forge-headless.jar generate --group-id org.acme --artifact-id demo --dry-run
+java -jar target/quarkus-forge-headless.jar generate \
+  --group-id org.acme --artifact-id demo \
+  --preset web --dry-run
 ```
 
 ## Project Structure
