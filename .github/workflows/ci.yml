@@ -25,6 +25,7 @@ concurrency:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -35,6 +36,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+          cache: 'maven'
 
       - name: Set up Node 24
         uses: actions/setup-node@v4
@@ -43,14 +45,6 @@ jobs:
           cache: npm
           cache-dependency-path: site/package-lock.json
 
-      - name: Cache Maven repository
-        uses: actions/cache@v4
-        with:
-          path: .m2/repository
-          key: maven-${{ runner.os }}-${{ hashFiles('pom.xml', '.mvn/maven.config') }}
-          restore-keys: |
-            maven-${{ runner.os }}-
-
       - name: Install docs dependencies
         run: npm ci --prefix site
 
@@ -58,15 +52,16 @@ jobs:
         run: npm run docs:build --prefix site
 
       - name: Spotless check
-        run: mvn -B -ntp spotless:check
+        run: ./mvnw spotless:check
 
       - name: Headless profile compile check
-        run: mvn -B -ntp clean compile -Pheadless
+        run: ./mvnw clean compile -Pheadless
 
   tests:
     name: Tests (${{ matrix.os }}, ${{ matrix.suite }})
     needs: quality
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -74,9 +69,9 @@ jobs:
         suite: [unit, integration]
         include:
           - suite: unit
-            command: mvn -B -ntp test
+            command: ./mvnw test
           - suite: integration
-            command: mvn -B -ntp verify -DskipTests=true
+            command: ./mvnw verify -DskipTests=true
 
     steps:
       - name: Checkout
@@ -87,14 +82,66 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
-
-      - name: Cache Maven repository
-        uses: actions/cache@v4
-        with:
-          path: .m2/repository
-          key: maven-${{ runner.os }}-${{ hashFiles('pom.xml', '.mvn/maven.config') }}
-          restore-keys: |
-            maven-${{ runner.os }}-
+          cache: 'maven'
 
       - name: Run ${{ matrix.suite }} tests
         run: ${{ matrix.command }}
+
+  coverage:
+    name: Coverage
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: 'maven'
+
+      - name: Run tests with coverage
+        run: ./mvnw verify
+
+      - name: Upload unit test coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-unit-report
+          path: target/site/jacoco/
+          retention-days: 14
+
+      - name: Upload integration test coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-it-report
+          path: target/site/jacoco-it/
+          retention-days: 14
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: target/site/jacoco/jacoco.xml,target/site/jacoco-it/jacoco.xml
+          fail_ci_if_error: false
+          verbose: false
+
+  ci-status:
+    name: CI Status
+    if: always()
+    needs: [quality, tests, coverage]
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Check CI results
+        run: |
+          if [[ "${{ needs.quality.result }}" != "success" || "${{ needs.tests.result }}" != "success" || "${{ needs.coverage.result }}" != "success" ]]; then
+            echo "CI failed — see individual job logs above."
+            exit 1
+          fi
+          echo "All CI checks passed."
