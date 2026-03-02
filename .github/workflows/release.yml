@@ -63,12 +63,33 @@ jobs:
           - os: ubuntu-latest
             platform: linux-x86_64
             ext: ''
+            profiles: -Pnative
+            binary_name: quarkus-forge
           - os: macos-latest
             platform: macos-aarch64
             ext: ''
+            profiles: -Pnative
+            binary_name: quarkus-forge
           - os: windows-latest
             platform: windows-x86_64
             ext: '.exe'
+            profiles: -Pnative
+            binary_name: quarkus-forge
+          - os: ubuntu-latest
+            platform: linux-x86_64
+            ext: ''
+            profiles: -Pheadless,headless-native
+            binary_name: quarkus-forge-headless
+          - os: macos-latest
+            platform: macos-aarch64
+            ext: ''
+            profiles: -Pheadless,headless-native
+            binary_name: quarkus-forge-headless
+          - os: windows-latest
+            platform: windows-x86_64
+            ext: '.exe'
+            profiles: -Pheadless,headless-native
+            binary_name: quarkus-forge-headless
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -95,22 +116,22 @@ jobs:
             maven-${{ runner.os }}-
 
       - name: Build native artifact
-        run: mvn -B -ntp -Pnative "-Dnative.skip=false" "-DskipTests" package
+        run: mvn -B -ntp ${{ matrix.profiles }} "-Dnative.skip=false" "-DskipTests" package
 
       - name: Rename native artifact
         shell: bash
         run: |
-          cp target/quarkus-forge${{ matrix.ext }} target/quarkus-forge-${{ matrix.platform }}${{ matrix.ext }}
+          cp target/${{ matrix.binary_name }}${{ matrix.ext }} target/${{ matrix.binary_name }}-${{ matrix.platform }}${{ matrix.ext }}
 
       - name: Make native artifact executable
         if: runner.os != 'Windows'
-        run: chmod +x target/quarkus-forge-${{ matrix.platform }}${{ matrix.ext }}
+        run: chmod +x target/${{ matrix.binary_name }}-${{ matrix.platform }}${{ matrix.ext }}
 
       - name: Upload native artifact
         uses: actions/upload-artifact@v4
         with:
-          name: quarkus-forge-native-${{ matrix.platform }}
-          path: target/quarkus-forge-${{ matrix.platform }}${{ matrix.ext }}
+          name: ${{ matrix.binary_name }}-native-${{ matrix.platform }}
+          path: target/${{ matrix.binary_name }}-${{ matrix.platform }}${{ matrix.ext }}
 
   package-jbang-catalog:
     runs-on: ubuntu-latest
@@ -185,7 +206,7 @@ jobs:
           merge-multiple: true
 
       - name: Make native artifacts executable
-        run: chmod +x artifacts/quarkus-forge-linux-* artifacts/quarkus-forge-macos-* || true
+        run: chmod +x artifacts/quarkus-forge-linux-* artifacts/quarkus-forge-macos-* artifacts/quarkus-forge-headless-linux-* artifacts/quarkus-forge-headless-macos-* || true
 
       - name: Derive release version from git tag
         run: echo "JRELEASER_PROJECT_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"

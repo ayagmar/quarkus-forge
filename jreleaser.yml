@@ -40,7 +40,6 @@ distributions:
     type: BINARY
     artifacts:
       - path: artifacts/quarkus-forge-jvm.jar
-      - path: artifacts/quarkus-forge-headless.jar
       - path: artifacts/quarkus-forge-linux-x86_64
         platform: linux
       - path: artifacts/quarkus-forge-macos-aarch64
@@ -48,3 +47,14 @@ distributions:
       - path: artifacts/quarkus-forge-windows-x86_64.exe
         platform: windows
       - path: artifacts/jbang-catalog.json
+
+  quarkus-forge-headless:
+    type: BINARY
+    artifacts:
+      - path: artifacts/quarkus-forge-headless.jar
+      - path: artifacts/quarkus-forge-headless-linux-x86_64
+        platform: linux
+      - path: artifacts/quarkus-forge-headless-macos-aarch64
+        platform: osx
+      - path: artifacts/quarkus-forge-headless-windows-x86_64.exe
+        platform: windows
