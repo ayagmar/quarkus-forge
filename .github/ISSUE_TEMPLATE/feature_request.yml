@@ -1,0 +1,54 @@
+name: Feature Request
+description: Suggest an improvement or new capability
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Quarkus Forge. Please describe the feature you'd like to see.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the tool does this affect?
+      options:
+        - TUI (interactive mode)
+        - Headless CLI (`generate` subcommand)
+        - Forgefile / lock workflow
+        - Catalog / API / caching
+        - Theming / customization
+        - IDE detection / post-generation
+        - Build / packaging / native image
+        - Documentation
+        - CI / release workflow
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or motivation
+      description: What problem does this feature solve? Why do you need it?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe your preferred approach or API, if you have one.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any other approaches you've thought about?
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I'd be willing to submit a PR for this
