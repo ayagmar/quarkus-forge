@@ -72,7 +72,7 @@ Or use Maven directly (`./mvnw` or `mvn`):
 ```bash
 ./mvnw test                          # unit tests only
 ./mvnw verify                        # unit + integration tests + coverage
-./mvnw verify -DskipTests=true       # integration tests only
+./mvnw verify -DskipTests -DskipITs=false  # integration tests only (skip unit, keep ITs)
 ```
 
 ### Format code

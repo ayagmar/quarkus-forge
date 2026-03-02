@@ -1,8 +1,16 @@
 package dev.ayagmar.quarkusforge;
 
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Spec;
 
 final class RequestOptions {
+
+  /**
+   * Injected by Picocli after parsing; null when the object is constructed manually (e.g. in
+   * tests or when calling {@link #defaults()}).
+   */
+  @Spec CommandSpec spec;
   static final String DEFAULT_GROUP_ID = "org.acme";
   static final String DEFAULT_ARTIFACT_ID = "quarkus-app";
   static final String DEFAULT_VERSION = "1.0.0-SNAPSHOT";
@@ -70,5 +78,21 @@ final class RequestOptions {
     defaults.buildTool = DEFAULT_BUILD_TOOL;
     defaults.javaVersion = DEFAULT_JAVA_VERSION;
     return defaults;
+  }
+
+  /**
+   * Returns {@code true} when the user explicitly supplied the option on the command line.
+   * Falls back to value-equality detection when {@link #spec} is not available (tests, defaults()).
+   *
+   * @param optionName canonical option name, e.g. {@code "--group-id"}
+   * @param currentValue the current field value
+   * @param defaultValue the compiled-in default value
+   */
+  boolean isExplicitlySet(String optionName, String currentValue, String defaultValue) {
+    if (spec != null && spec.commandLine() != null && spec.commandLine().getParseResult() != null) {
+      return spec.commandLine().getParseResult().hasMatchedOption(optionName);
+    }
+    // Fallback: treat value != default as "explicitly set"
+    return !java.util.Objects.equals(currentValue, defaultValue);
   }
 }
