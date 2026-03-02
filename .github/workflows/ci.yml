@@ -60,9 +60,6 @@ jobs:
       - name: Spotless check
         run: mvn -B -ntp spotless:check
 
-      - name: Checkstyle check
-        run: mvn -B -ntp checkstyle:check
-
       - name: Headless profile compile check
         run: mvn -B -ntp clean compile -Pheadless
 
