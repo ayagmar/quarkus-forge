@@ -211,15 +211,12 @@ final class HeadlessGenerationService {
       }
       List<String> presetExtensions = presetExtensionsByName.get(preset);
       if (presetExtensions == null) {
-        String allowedPresets = String.join(", ", presetExtensionsByName.keySet());
-        if (!allowedPresets.isBlank()) {
-          allowedPresets = allowedPresets + ", " + PRESET_FAVORITES;
-        } else {
-          allowedPresets = PRESET_FAVORITES;
-        }
+        List<String> allowed = new ArrayList<>(presetExtensionsByName.keySet());
+        allowed.add(PRESET_FAVORITES);
         errors.add(
             new ValidationError(
-                "preset", "unknown preset '" + presetInput + "'. Allowed: " + allowedPresets));
+                "preset",
+                "unknown preset '" + presetInput + "'. Allowed: " + String.join(", ", allowed)));
         continue;
       }
       resolved.addAll(presetExtensions);
@@ -302,47 +299,16 @@ final class HeadlessGenerationService {
     ForgefileLock lock = forgefile.locked();
 
     List<ValidationError> errors = new ArrayList<>();
-    if (!lock.platformStream().equals(request.platformStream())) {
-      errors.add(
-          new ValidationError(
-              "locked",
-              "platformStream drift: locked='"
-                  + lock.platformStream()
-                  + "', request='"
-                  + request.platformStream()
-                  + "'"));
-    }
-    if (!lock.buildTool().equals(request.buildTool())) {
-      errors.add(
-          new ValidationError(
-              "locked",
-              "buildTool drift: locked='"
-                  + lock.buildTool()
-                  + "', request='"
-                  + request.buildTool()
-                  + "'"));
-    }
-    if (!lock.javaVersion().equals(request.javaVersion())) {
-      errors.add(
-          new ValidationError(
-              "locked",
-              "javaVersion drift: locked='"
-                  + lock.javaVersion()
-                  + "', request='"
-                  + request.javaVersion()
-                  + "'"));
-    }
+    checkDrift(errors, "platformStream", lock.platformStream(), request.platformStream());
+    checkDrift(errors, "buildTool", lock.buildTool(), request.buildTool());
+    checkDrift(errors, "javaVersion", lock.javaVersion(), request.javaVersion());
     if (!lock.extensions().equals(extensionIds)) {
       errors.add(
           new ValidationError(
               "locked",
               "extensions drift: locked=" + lock.extensions() + ", request=" + extensionIds));
     }
-    List<String> normalizedPresets =
-        inputs.presetInputs().stream()
-            .map(ProjectRequestFactory::normalizePresetName)
-            .distinct()
-            .toList();
+    List<String> normalizedPresets = normalizePresets(inputs.presetInputs());
     if (!lock.presets().equals(normalizedPresets)) {
       errors.add(
           new ValidationError(
@@ -358,13 +324,25 @@ final class HeadlessGenerationService {
     }
   }
 
+  private static void checkDrift(
+      List<ValidationError> errors, String field, String locked, String actual) {
+    if (!locked.equals(actual)) {
+      errors.add(
+          new ValidationError(
+              "locked", field + " drift: locked='" + locked + "', request='" + actual + "'"));
+    }
+  }
+
+  private static List<String> normalizePresets(List<String> presetInputs) {
+    return presetInputs.stream()
+        .map(ProjectRequestFactory::normalizePresetName)
+        .distinct()
+        .toList();
+  }
+
   private static void saveForgefileIfRequested(
       EffectiveInputs inputs, ProjectRequest request, List<String> extensionIds) {
-    List<String> normalizedPresets =
-        inputs.presetInputs().stream()
-            .map(ProjectRequestFactory::normalizePresetName)
-            .distinct()
-            .toList();
+    List<String> normalizedPresets = normalizePresets(inputs.presetInputs());
 
     // Always rebuild from effective inputs so CLI additions are persisted
     Forgefile forgefile =
