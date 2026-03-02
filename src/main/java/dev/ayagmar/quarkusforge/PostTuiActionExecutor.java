@@ -4,8 +4,10 @@ import dev.ayagmar.quarkusforge.diagnostics.DiagnosticField;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.ui.GitHubVisibility;
 import dev.ayagmar.quarkusforge.ui.PostGenerationExitPlan;
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 
 /**
  * Executes post-TUI actions (IDE open, GitHub publish, terminal open, shell hooks) after the TUI
@@ -144,7 +146,7 @@ final class PostTuiActionExecutor {
 
   static boolean isWindowsOs() {
     String osName = System.getProperty("os.name", "");
-    return osName.toLowerCase(java.util.Locale.ROOT).contains("win");
+    return osName.toLowerCase(Locale.ROOT).contains("win");
   }
 
   static boolean isCommandAvailable(String command) {
@@ -157,7 +159,7 @@ final class PostTuiActionExecutor {
     }
 
     String executable = command.strip();
-    String[] pathEntries = path.split(java.io.File.pathSeparator);
+    String[] pathEntries = path.split(File.pathSeparator);
     boolean windows = isWindowsOs();
     for (String pathEntry : pathEntries) {
       if (pathEntry == null || pathEntry.isBlank()) {

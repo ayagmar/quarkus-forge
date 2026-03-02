@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge;
 
+import dev.ayagmar.quarkusforge.api.ApiClientException;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.api.ThrowableUnwrapper;
 import dev.ayagmar.quarkusforge.archive.ArchiveException;
@@ -80,7 +81,7 @@ final class ProjectRequestFactory {
     Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(throwable);
     return switch (cause) {
       case CancellationException ignored -> ExitCodes.CANCELLED;
-      case dev.ayagmar.quarkusforge.api.ApiClientException ignored -> ExitCodes.NETWORK;
+      case ApiClientException ignored -> ExitCodes.NETWORK;
       case ArchiveException ignored -> ExitCodes.ARCHIVE;
       default -> ExitCodes.ARCHIVE;
     };

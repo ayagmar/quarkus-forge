@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 
 /**
  * Maps the 4 standard async exceptions to exit codes with consistent diagnostics and stderr output.
@@ -33,7 +34,7 @@ final class AsyncFailureHandler {
       String diagnosticPrefix,
       String userMessagePrefix,
       DiagnosticLogger diagnostics,
-      java.util.function.Function<Throwable, Integer> failureExitCodeMapper) {
+      Function<Throwable, Integer> failureExitCodeMapper) {
     return switch (exception) {
       case CancellationException _ -> {
         diagnostics.error(diagnosticPrefix + ".cancelled", df("phase", "execution"));

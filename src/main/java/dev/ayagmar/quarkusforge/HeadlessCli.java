@@ -12,7 +12,7 @@ import picocli.CommandLine.Option;
     subcommands = {GenerateCommand.class},
     description = "Quarkus forge headless CLI")
 public final class HeadlessCli implements Callable<Integer>, HeadlessRunner {
-  private final HeadlessGenerationService headlessService;
+  private final HeadlessGenerationService headlessGenerationService;
 
   @Option(
       names = "--verbose",
@@ -31,7 +31,7 @@ public final class HeadlessCli implements Callable<Integer>, HeadlessRunner {
   }
 
   HeadlessCli(RuntimeConfig runtimeConfig) {
-    this.headlessService =
+    this.headlessGenerationService =
         new HeadlessGenerationService(new HeadlessCatalogClient(runtimeConfig), runtimeConfig);
   }
 
@@ -43,7 +43,7 @@ public final class HeadlessCli implements Callable<Integer>, HeadlessRunner {
 
   @Override
   public int runHeadlessGenerate(GenerateCommand command) {
-    return headlessService.run(command, dryRun, verbose);
+    return headlessGenerationService.run(command, dryRun, verbose);
   }
 
   public static int runWithArgs(String[] args) {

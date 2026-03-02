@@ -24,6 +24,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BiFunction;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
@@ -265,8 +266,8 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
     }
   }
 
-  static java.util.function.BiFunction<CatalogData, Throwable, ExtensionCatalogLoadResult>
-      catalogLoadDiagnostics(DiagnosticLogger diagnostics) {
+  static BiFunction<CatalogData, Throwable, ExtensionCatalogLoadResult> catalogLoadDiagnostics(
+      DiagnosticLogger diagnostics) {
     return (catalogData, throwable) -> {
       if (throwable == null) {
         diagnostics.info(

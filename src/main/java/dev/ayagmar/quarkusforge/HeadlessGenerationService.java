@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 final class HeadlessGenerationService {
   private static final String PRESET_FAVORITES = "favorites";
@@ -179,7 +180,7 @@ final class HeadlessGenerationService {
           "Generation succeeded: " + generatedProjectRoot.toAbsolutePath().normalize());
       return ExitCodes.OK;
     } catch (Exception e) {
-      if (e instanceof java.util.concurrent.TimeoutException) {
+      if (e instanceof TimeoutException) {
         generationFuture.cancel(true);
       }
       return AsyncFailureHandler.handleFailure(
@@ -192,7 +193,7 @@ final class HeadlessGenerationService {
     }
   }
 
-  List<String> resolveRequestedExtensions(
+  private List<String> resolveRequestedExtensions(
       List<String> extensionInputs,
       List<String> presetInputs,
       Set<String> knownExtensionIds,

@@ -408,7 +408,6 @@
                 <buildArg>--emit build-report</buildArg>
                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
                 <buildArg>--enable-url-protocols=http,https</buildArg>
-                <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
               </buildArgs>
             </configuration>
           </plugin>
