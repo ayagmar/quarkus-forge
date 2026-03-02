@@ -1,7 +1,16 @@
 <footer class="footer">
   <p>Quarkus Forge documentation built with Antora.</p>
 </footer>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>
+  // Mermaid: render all <pre class="mermaid"> blocks
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
+    flowchart: { useMaxWidth: true, htmlLabels: true }
+  });
+  mermaid.run({ querySelector: '.mermaid' });
+
   const docsThemeToggleBtn = document.getElementById('docs-theme-toggle');
   const docsIconDark = document.getElementById('docs-theme-icon-dark');
   const docsIconLight = document.getElementById('docs-theme-icon-light');
