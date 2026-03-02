@@ -108,26 +108,31 @@
             <div class="p-6 font-mono text-sm leading-loose bg-[#0c111c]/80 min-h-[300px] text-slate-300">
               <div class="flex gap-4">
                 <span class="text-tui-pink">❯</span>
-                <span>quarkus-forge generate <span class="text-slate-500">--interactive</span></span>
+                <span>quarkus-forge</span>
               </div>
               <div class="mt-4 flex gap-4 text-slate-400">
                 <span>[INFO]</span>
-                <span>Initializing Forge TUI...</span>
+                <span>Loading extension catalog...</span>
               </div>
               <div class="mt-4 border border-tui-cyan/30 rounded px-4 py-3 bg-tui-cyan/5">
-                <div class="text-tui-cyan font-bold mb-2">? Select Extensions (Type to filter)</div>
+                <div class="text-tui-cyan font-bold mb-2">Extensions  Search: [ rest_ ]  3/400 matches</div>
                 <div class="flex items-center gap-2 text-white bg-white/10 px-2 py-1 rounded">
-                  <span class="text-tui-pink">◉</span> resteasy-reactive-jackson
+                  <span class="text-tui-pink">[x]</span> <span class="text-amber-400">★</span> REST
                 </div>
                 <div class="flex items-center gap-2 px-2 py-1">
-                  <span class="text-slate-500">◯</span> hibernate-orm-panache
+                  <span class="text-slate-500">[ ]</span> <span class="text-slate-500">&nbsp;&nbsp;</span> REST Client
                 </div>
                 <div class="flex items-center gap-2 px-2 py-1">
-                  <span class="text-slate-500">◯</span> jdbc-postgresql
+                  <span class="text-slate-500">[ ]</span> <span class="text-slate-500">&nbsp;&nbsp;</span> REST Jackson
                 </div>
               </div>
-              <div class="mt-4 flex gap-4 text-emerald-400">
-                <span class="animate-pulse">_</span>
+              <div class="mt-2 text-slate-400 italic text-xs">
+                A Jakarta REST implementation utilizing build time processing and Vert.x.
+              </div>
+              <div class="mt-2">
+                <span class="text-slate-500">Selected:</span>
+                <span class="px-2 py-0.5 bg-tui-cyan/20 text-tui-cyan rounded text-xs ml-1">REST</span>
+                <span class="px-2 py-0.5 bg-tui-cyan/20 text-tui-cyan rounded text-xs ml-1">Hibernate ORM</span>
               </div>
             </div>
           </div>
@@ -152,8 +157,8 @@
             <i class="ph-bold ph-keyboard text-2xl"></i>
           </div>
           <div>
-            <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2 transition-colors duration-300">TUI Workflow</h3>
-            <p class="text-slate-600 dark:text-slate-400 leading-relaxed text-sm transition-colors duration-300">Focus routing, instantaneous extension filtering, and Vim-style shortcuts for every action.</p>
+            <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2 transition-colors duration-300">Keyboard-First TUI</h3>
+            <p class="text-slate-600 dark:text-slate-400 leading-relaxed text-sm transition-colors duration-300">Vim-style shortcuts, fuzzy search with match highlighting, inline descriptions, chip-style selection badges, and animated progress feedback.</p>
           </div>
         </div>
 
@@ -166,12 +171,26 @@
             <i class="ph-bold ph-cpu text-2xl"></i>
           </div>
           <div>
-            <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2 transition-colors duration-300">Headless Generate</h3>
-            <p class="text-slate-600 dark:text-slate-400 leading-relaxed text-sm transition-colors duration-300">Use <code>generate</code> in CI pipelines with strict validation, metadata overriding, and diagnostics.</p>
+            <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2 transition-colors duration-300">Headless &amp; CI-Ready</h3>
+            <p class="text-slate-600 dark:text-slate-400 leading-relaxed text-sm transition-colors duration-300">Use <code>generate</code> in CI pipelines with strict validation, extension presets, and structured JSON diagnostics.</p>
           </div>
         </div>
 
         <!-- Feature 3 -->
+        <div class="glass-panel p-8 rounded-3xl flex flex-col gap-6 hover:bg-slate-100 dark:hover:bg-white/[0.02] transition-colors relative overflow-hidden group">
+          <div class="absolute top-0 right-0 p-8 opacity-5 dark:opacity-10 group-hover:opacity-10 dark:group-hover:opacity-20 transition-opacity">
+             <i class="ph-bold ph-file-code text-8xl text-amber-500"></i>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20 text-amber-600 dark:text-amber-400">
+            <i class="ph-bold ph-file-code text-2xl"></i>
+          </div>
+          <div>
+            <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2 transition-colors duration-300">Shareable Templates</h3>
+            <p class="text-slate-600 dark:text-slate-400 leading-relaxed text-sm transition-colors duration-300">Unified Forgefile format with optional locked section for deterministic builds. Share templates across teams and CI environments.</p>
+          </div>
+        </div>
+
+        <!-- Feature 4 -->
         <div class="glass-panel p-8 rounded-3xl flex flex-col gap-6 hover:bg-slate-100 dark:hover:bg-white/[0.02] transition-colors relative overflow-hidden group">
           <div class="absolute top-0 right-0 p-8 opacity-5 dark:opacity-10 group-hover:opacity-10 dark:group-hover:opacity-20 transition-opacity">
              <i class="ph-bold ph-shield-check text-8xl text-emerald-500"></i>
@@ -181,7 +200,35 @@
           </div>
           <div>
             <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2 transition-colors duration-300">Safe Extraction</h3>
-            <p class="text-slate-600 dark:text-slate-400 leading-relaxed text-sm transition-colors duration-300">Archive generation utilizes strict guardrails against path traversal, zip bombs, and handles clean atomic file writes.</p>
+            <p class="text-slate-600 dark:text-slate-400 leading-relaxed text-sm transition-colors duration-300">Zip-slip and zip-bomb protection with path traversal guards, compression ratio checks, and atomic file writes.</p>
+          </div>
+        </div>
+
+        <!-- Feature 5 -->
+        <div class="glass-panel p-8 rounded-3xl flex flex-col gap-6 hover:bg-slate-100 dark:hover:bg-white/[0.02] transition-colors relative overflow-hidden group">
+          <div class="absolute top-0 right-0 p-8 opacity-5 dark:opacity-10 group-hover:opacity-10 dark:group-hover:opacity-20 transition-opacity">
+             <i class="ph-bold ph-git-branch text-8xl text-violet-500"></i>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center border border-violet-500/20 text-violet-600 dark:text-violet-400">
+            <i class="ph-bold ph-git-branch text-2xl"></i>
+          </div>
+          <div>
+            <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2 transition-colors duration-300">Workflow Handoffs</h3>
+            <p class="text-slate-600 dark:text-slate-400 leading-relaxed text-sm transition-colors duration-300">After generation, publish to GitHub, open in your IDE, or drop into a shell — all from the post-generation menu.</p>
+          </div>
+        </div>
+
+        <!-- Feature 6 -->
+        <div class="glass-panel p-8 rounded-3xl flex flex-col gap-6 hover:bg-slate-100 dark:hover:bg-white/[0.02] transition-colors relative overflow-hidden group">
+          <div class="absolute top-0 right-0 p-8 opacity-5 dark:opacity-10 group-hover:opacity-10 dark:group-hover:opacity-20 transition-opacity">
+             <i class="ph-bold ph-palette text-8xl text-rose-500"></i>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-rose-500/10 flex items-center justify-center border border-rose-500/20 text-rose-600 dark:text-rose-400">
+            <i class="ph-bold ph-palette text-2xl"></i>
+          </div>
+          <div>
+            <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2 transition-colors duration-300">Themeable &amp; Customizable</h3>
+            <p class="text-slate-600 dark:text-slate-400 leading-relaxed text-sm transition-colors duration-300">Custom color themes via <code>.tcss</code> files, configurable IDE command, extension favorites, and session persistence.</p>
           </div>
         </div>
       </div>
