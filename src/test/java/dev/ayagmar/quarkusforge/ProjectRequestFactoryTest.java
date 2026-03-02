@@ -1,0 +1,144 @@
+package dev.ayagmar.quarkusforge;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import dev.ayagmar.quarkusforge.api.MetadataDto;
+import dev.ayagmar.quarkusforge.api.PlatformStream;
+import dev.ayagmar.quarkusforge.domain.ForgeUiState;
+import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
+import dev.ayagmar.quarkusforge.domain.ProjectRequest;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+
+class ProjectRequestFactoryTest {
+  private static final MetadataDto METADATA =
+      new MetadataDto(
+          List.of("21", "25"),
+          List.of("maven", "gradle"),
+          Map.of("maven", List.of("21", "25"), "gradle", List.of("21", "25")),
+          List.of(
+              new PlatformStream("io.quarkus.platform:3.31", "3.31", true, List.of("21", "25"))));
+
+  @Test
+  void fromOptionsCreatesProjectRequest() {
+    RequestOptions options = new RequestOptions();
+    options.groupId = "com.example";
+    options.artifactId = "demo";
+    options.version = "2.0.0";
+    options.buildTool = "gradle";
+    options.javaVersion = "21";
+
+    ProjectRequest request = ProjectRequestFactory.fromOptions(options);
+
+    assertThat(request.groupId()).isEqualTo("com.example");
+    assertThat(request.artifactId()).isEqualTo("demo");
+    assertThat(request.version()).isEqualTo("2.0.0");
+    assertThat(request.buildTool()).isEqualTo("gradle");
+    assertThat(request.javaVersion()).isEqualTo("21");
+  }
+
+  @Test
+  void buildInitialStateValidatesRequest() {
+    ProjectRequest valid =
+        new ProjectRequest(
+            "com.example",
+            "demo",
+            "1.0.0",
+            "com.example.demo",
+            ".",
+            "io.quarkus.platform:3.31",
+            "maven",
+            "21");
+    MetadataCompatibilityContext ctx = MetadataCompatibilityContext.success(METADATA);
+
+    ForgeUiState state = ProjectRequestFactory.buildInitialState(valid, ctx);
+
+    assertThat(state.canSubmit()).isTrue();
+    assertThat(state.validation().errors()).isEmpty();
+  }
+
+  @Test
+  void buildInitialStateDetectsInvalidBuildTool() {
+    ProjectRequest invalid =
+        new ProjectRequest(
+            "com.example",
+            "demo",
+            "1.0.0",
+            "com.example.demo",
+            ".",
+            "io.quarkus.platform:3.31",
+            "ant",
+            "21");
+    MetadataCompatibilityContext ctx = MetadataCompatibilityContext.success(METADATA);
+
+    ForgeUiState state = ProjectRequestFactory.buildInitialState(invalid, ctx);
+
+    assertThat(state.canSubmit()).isFalse();
+    assertThat(state.validation().errors())
+        .anyMatch(e -> e.field().equals("buildTool") && e.message().contains("ant"));
+  }
+
+  @Test
+  void applyRecommendedPlatformStreamSetsStreamWhenBlank() {
+    ProjectRequest request =
+        new ProjectRequest("com.example", "demo", "1.0.0", "", ".", "", "maven", "21");
+    MetadataCompatibilityContext ctx = MetadataCompatibilityContext.success(METADATA);
+
+    ProjectRequest result = ProjectRequestFactory.applyRecommendedPlatformStream(request, ctx);
+
+    assertThat(result.platformStream()).isEqualTo("io.quarkus.platform:3.31");
+  }
+
+  @Test
+  void applyRecommendedPlatformStreamPreservesExplicitStream() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example", "demo", "1.0.0", "", ".", "io.quarkus.platform:3.15", "maven", "21");
+    MetadataCompatibilityContext ctx = MetadataCompatibilityContext.success(METADATA);
+
+    ProjectRequest result = ProjectRequestFactory.applyRecommendedPlatformStream(request, ctx);
+
+    assertThat(result.platformStream()).isEqualTo("io.quarkus.platform:3.15");
+  }
+
+  @Test
+  void applyRecommendedPlatformStreamHandlesLoadError() {
+    ProjectRequest request =
+        new ProjectRequest("com.example", "demo", "1.0.0", "", ".", "", "maven", "21");
+    MetadataCompatibilityContext ctx = MetadataCompatibilityContext.failure("network error");
+
+    ProjectRequest result = ProjectRequestFactory.applyRecommendedPlatformStream(request, ctx);
+
+    assertThat(result.platformStream()).isEmpty();
+  }
+
+  @Test
+  void normalizePresetNameTrimsAndLowercases() {
+    assertThat(ProjectRequestFactory.normalizePresetName("  Web  ")).isEqualTo("web");
+    assertThat(ProjectRequestFactory.normalizePresetName("DATA")).isEqualTo("data");
+    assertThat(ProjectRequestFactory.normalizePresetName(null)).isEmpty();
+    assertThat(ProjectRequestFactory.normalizePresetName("")).isEmpty();
+  }
+
+  @Test
+  void mapFailureToExitCodeCategorizes() {
+    assertThat(
+            ProjectRequestFactory.mapFailureToExitCode(
+                new java.util.concurrent.CancellationException()))
+        .isEqualTo(QuarkusForgeCli.EXIT_CODE_CANCELLED);
+
+    assertThat(
+            ProjectRequestFactory.mapFailureToExitCode(
+                new dev.ayagmar.quarkusforge.api.ApiClientException("fail", null)))
+        .isEqualTo(QuarkusForgeCli.EXIT_CODE_NETWORK);
+
+    assertThat(
+            ProjectRequestFactory.mapFailureToExitCode(
+                new dev.ayagmar.quarkusforge.archive.ArchiveException("fail")))
+        .isEqualTo(QuarkusForgeCli.EXIT_CODE_ARCHIVE);
+
+    assertThat(ProjectRequestFactory.mapFailureToExitCode(new RuntimeException("unknown")))
+        .isEqualTo(QuarkusForgeCli.EXIT_CODE_ARCHIVE);
+  }
+}
