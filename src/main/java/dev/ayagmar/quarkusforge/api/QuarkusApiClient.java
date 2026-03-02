@@ -1,6 +1,7 @@
 package dev.ayagmar.quarkusforge.api;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -28,6 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -181,8 +183,7 @@ public final class QuarkusApiClient implements AutoCloseable {
       HttpRequest request, BodyHandler<T> bodyHandler, int attempt) {
     return httpClient
         .sendAsync(request, bodyHandler)
-        .orTimeout(
-            retryPolicy.requestTimeout().toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS)
+        .orTimeout(retryPolicy.requestTimeout().toMillis(), TimeUnit.MILLISECONDS)
         .handle(
             (response, throwable) -> {
               Throwable cause = ThrowableUnwrapper.unwrapCompletionCause(throwable);
@@ -203,8 +204,7 @@ public final class QuarkusApiClient implements AutoCloseable {
   private <T> CompletableFuture<HttpResponse<T>> handleFailure(
       HttpRequest request, BodyHandler<T> bodyHandler, int attempt, Throwable cause) {
     if (attempt < retryPolicy.maxAttempts() && isRetryableFailure(cause)) {
-      Duration delay =
-          computeRetryDelay(attempt, HttpHeaders.of(java.util.Map.of(), (a, b) -> true));
+      Duration delay = computeRetryDelay(attempt, HttpHeaders.of(Map.of(), (a, b) -> true));
       return scheduleRetry(request, bodyHandler, attempt, delay);
     }
 
@@ -318,7 +318,7 @@ public final class QuarkusApiClient implements AutoCloseable {
           if (!Files.exists(path)) {
             yield "";
           }
-          try (java.io.InputStream inputStream = Files.newInputStream(path)) {
+          try (InputStream inputStream = Files.newInputStream(path)) {
             byte[] bytes = inputStream.readNBytes(MAX_ERROR_BODY_BYTES);
             yield decodeBytesAsUtf8OrBinary(bytes);
           }

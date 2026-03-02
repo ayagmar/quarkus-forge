@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -517,8 +518,8 @@ final class BodyPanelRenderer {
     List<Span> spans = new ArrayList<>();
     spans.add(Span.raw(prefix));
 
-    String lowerLabel = label.toLowerCase(java.util.Locale.ROOT);
-    String lowerQuery = query.toLowerCase(java.util.Locale.ROOT);
+    String lowerLabel = label.toLowerCase(Locale.ROOT);
+    String lowerQuery = query.toLowerCase(Locale.ROOT);
     Style highlightStyle = Style.EMPTY.fg(theme.color("warning")).bold();
 
     int labelPos = 0;

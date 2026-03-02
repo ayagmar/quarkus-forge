@@ -3,6 +3,7 @@ package dev.ayagmar.quarkusforge.ui;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -45,7 +46,7 @@ public record ExtensionCatalogLoadResult(
     if (presetExtensionsByName == null || presetExtensionsByName.isEmpty()) {
       return Map.of();
     }
-    java.util.LinkedHashMap<String, List<String>> normalized = new java.util.LinkedHashMap<>();
+    LinkedHashMap<String, List<String>> normalized = new LinkedHashMap<>();
     for (Map.Entry<String, List<String>> entry : presetExtensionsByName.entrySet()) {
       if (entry.getKey() == null || entry.getKey().isBlank()) {
         continue;
