@@ -36,7 +36,6 @@ public final class DiagnosticLogger {
   }
 
   private void log(String level, String event, DiagnosticField... fields) {
-    // INFO events are gated behind --verbose; WARN and ERROR always emit to stderr.
     if (!enabled && level.equals("INFO")) {
       return;
     }
