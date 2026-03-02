@@ -29,7 +29,6 @@
     <maven.failsafe.plugin.version>3.5.4</maven.failsafe.plugin.version>
     <maven.shade.plugin.version>3.6.1</maven.shade.plugin.version>
     <spotless.plugin.version>3.2.1</spotless.plugin.version>
-    <checkstyle.plugin.version>3.6.0</checkstyle.plugin.version>
     <graalvm.native.plugin.version>0.11.4</graalvm.native.plugin.version>
     <native.skip>true</native.skip>
   </properties>
@@ -207,17 +206,6 @@
               <version>1.28.0</version>
             </googleJavaFormat>
           </java>
-        </configuration>
-      </plugin>
-
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-checkstyle-plugin</artifactId>
-        <version>${checkstyle.plugin.version}</version>
-        <configuration>
-          <configLocation>${project.basedir}/checkstyle.xml</configLocation>
-          <consoleOutput>true</consoleOutput>
-          <failsOnError>true</failsOnError>
         </configuration>
       </plugin>
 

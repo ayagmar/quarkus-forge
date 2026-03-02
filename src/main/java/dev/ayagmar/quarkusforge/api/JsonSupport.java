@@ -36,7 +36,7 @@ public final class JsonSupport {
     throw new IOException("JSON payload must be an array");
   }
 
-  public static Object parseValue(String payload) throws IOException {
+  private static Object parseValue(String payload) throws IOException {
     try (JsonParser parser = JSON_FACTORY.createParser(payload)) {
       JsonToken token = parser.nextToken();
       if (token == null) {
