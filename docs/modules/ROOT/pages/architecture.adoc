@@ -7,51 +7,64 @@ Quarkus Forge follows a layered architecture that separates HTTP transport, JSON
 
 == High-Level Architecture
 
-....
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Entry Points                                │
-│                                                                     │
-│    QuarkusForgeCli ────────────── HeadlessGenerationService         │
-│         │                              │                            │
-│         ▼                              ▼                            │
-│    TuiBootstrapService      ProjectRequestFactory                   │
-│         │                         │                                 │
-│         ▼                         │                                 │
-│    CoreTuiController              │                                 │
-│         │                         │                                 │
-│         │                  HeadlessCatalogClient                     │
-│         │                  HeadlessOutputPrinter                     │
-│         │                  HeadlessTimeouts                          │
-│         │                                                           │
-├─────────┼───────────────────────────────────────────────────────────┤
-│         │         API Layer            │                            │
-│         ▼                              ▼                            │
-│    QuarkusApiClient ───────► ApiPayloadParser                       │
-│         │                       │                                   │
-│         │                       ▼                                   │
-│         │                  JsonFieldReader                          │
-│         │                                                           │
-│         ▼                                                           │
-│    CatalogSnapshotCache ◄──── CatalogDataService                   │
-│                                                                     │
-├─────────────────────────────────────────────────────────────────────┤
-│                       Archive Layer                                 │
-│                                                                     │
-│    ProjectArchiveService ───► SafeZipExtractor                      │
-│                                                                     │
-├─────────────────────────────────────────────────────────────────────┤
-│                    Post-Generation Actions                          │
-│                                                                     │
-│    PostTuiActionExecutor ───► ShellExecutor                         │
-│         │                                                           │
-│    IdeDetector (cross-platform IDE auto-detection)                  │
-│         │                                                           │
-│         ├── Open in IDE (auto-detected or QUARKUS_FORGE_IDE_COMMAND)│
-│         ├── Open Terminal (interactive shell)                        │
-│         └── Publish to GitHub (gh repo create)                      │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
-....
+++++
+<pre class="mermaid">
+graph TD
+    subgraph Entry["Entry Points"]
+        CLI[QuarkusForgeCli]
+        HGS[HeadlessGenerationService]
+    end
+
+    subgraph TUI["TUI Layer"]
+        TBS[TuiBootstrapService]
+        CTC[CoreTuiController]
+    end
+
+    subgraph Headless["Headless Layer"]
+        PRF[ProjectRequestFactory]
+        HCC[HeadlessCatalogClient]
+        HOP[HeadlessOutputPrinter]
+        HT[HeadlessTimeouts]
+    end
+
+    subgraph API["API Layer"]
+        QAC[QuarkusApiClient]
+        APP[ApiPayloadParser]
+        JFR[JsonFieldReader]
+        CSC[CatalogSnapshotCache]
+        CDS[CatalogDataService]
+    end
+
+    subgraph Archive["Archive Layer"]
+        PAS[ProjectArchiveService]
+        SZE[SafeZipExtractor]
+    end
+
+    subgraph PostGen["Post-Generation"]
+        PTA[PostTuiActionExecutor]
+        SE[ShellExecutor]
+        ID[IdeDetector]
+    end
+
+    CLI --> TBS
+    CLI --> HGS
+    HGS --> PRF
+    HGS --> HCC
+    HGS --> HOP
+    HGS --> HT
+    TBS --> CTC
+    CTC --> QAC
+    HCC --> QAC
+    QAC --> APP
+    APP --> JFR
+    QAC --> CDS
+    CDS --> CSC
+    QAC --> PAS
+    PAS --> SZE
+    PTA --> SE
+    PTA --> ID
+</pre>
+++++
 
 == UI Layer Design
 
@@ -93,73 +106,52 @@ CoreTuiController (State Machine)
 
 === State Machine: Generation Flow
 
-....
-         ┌──────┐
-         │ IDLE │◄────────────────────────────────────┐
-         └──┬───┘                                     │
-            │ Enter / Alt+G                           │
-            ▼                                         │
-      ┌───────────┐                                   │
-      │ VALIDATING│──── validation fails ────► ERROR ─┘
-      └─────┬─────┘                                   │
-            │ validation passes                       │
-            ▼                                         │
-       ┌─────────┐                                    │
-       │ LOADING  │──── Esc / Ctrl+C ───► CANCELLED ──┘
-       └────┬─────┘                                   │
-            │ download complete                       │
-            ▼                                         │
-       ┌─────────┐                                    │
-       │ SUCCESS  │──── "Generate Again" ─────────────┘
-       └─────────┘
-            │
-            ▼
-     Post-Generation Menu
-            │
-            ├── Export Forgefile
-            ├── Publish to GitHub ──► Visibility sub-menu
-            ├── Open in <detected IDE>  (one entry per auto-detected IDE)
-            ├── Open Terminal
-            └── Quit
-....
+++++
+<pre class="mermaid">
+stateDiagram-v2
+    [*] --> IDLE
+    IDLE --> VALIDATING: Enter / Alt+G
+    VALIDATING --> ERROR: validation fails
+    VALIDATING --> LOADING: validation passes
+    LOADING --> CANCELLED: Esc / Ctrl+C
+    LOADING --> SUCCESS: download complete
+    ERROR --> IDLE: dismissed
+    CANCELLED --> IDLE: dismissed
+    SUCCESS --> PostGenMenu: show menu
+    PostGenMenu --> IDLE: Generate Again
+
+    state PostGenMenu {
+        [*] --> ActionList
+        ActionList --> ExportForgefile
+        ActionList --> PublishGitHub
+        ActionList --> OpenIDE
+        ActionList --> OpenTerminal
+        ActionList --> Quit
+        PublishGitHub --> VisibilitySubMenu
+    }
+</pre>
+++++
 
 === State Machine: Catalog Loading
 
-....
-      ┌─────────────┐
-      │   Initial    │   CatalogLoadState.initial()
-      │ Loaded(snap) │   Loaded("snapshot", false, false)
-      └──────┬───────┘
-             │ loadExtensionCatalogAsync()
-             ▼
-      ┌─────────────┐
-      │   Loading    │   Loading(previous=Initial)
-      │  (previous)  │
-      └──────┬───────┘
-             │
-        ┌────┴────┐
-        │         │
-        ▼         ▼
-   ┌─────────┐  ┌────────┐
-   │  Loaded  │  │ Failed │   If previous was Loaded(live),
-   │  (live)  │  │        │   stays as Loaded (keeps catalog)
-   └─────────┘  └────────┘
-        │
-        │ reload requested
-        ▼
-   ┌─────────────┐
-   │   Loading    │   Loading(previous=Loaded(live))
-   │  (previous)  │
-   └──────┬───────┘
-          │
-     ┌────┴────┐
-     │         │
-     ▼         ▼
- ┌─────────┐ ┌──────────────┐
- │  Loaded  │ │ Previous     │   Reload failure preserves
- │  (new)   │ │ Loaded(live) │   previously loaded catalog
- └─────────┘ └──────────────┘
-....
+++++
+<pre class="mermaid">
+stateDiagram-v2
+    [*] --> Initial: CatalogLoadState.initial()
+    Initial --> Loading1: loadExtensionCatalogAsync()
+    state Loading1 <<choice>>
+    Loading1 --> Loaded_live: success
+    Loading1 --> Failed: failure
+    Loaded_live --> Loading2: reload requested
+    state Loading2 <<choice>>
+    Loading2 --> Loaded_new: success
+    Loading2 --> Loaded_live: failure (preserves catalog)
+
+    note right of Initial: Loaded("snapshot", false, false)
+    note right of Loading1: Loading(previous=Initial)
+    note right of Loading2: Loading(previous=Loaded_live)
+</pre>
+++++
 
 === Extension Cancel Flow (Esc Priority Chain)
 
@@ -185,121 +177,88 @@ When the user presses `Esc` in the extension search or list, the TUI unwinds fil
 
 === Transport vs Parsing Separation
 
-....
-                    HTTP Request
-                         │
-                         ▼
-              ┌──────────────────┐
-              │ QuarkusApiClient │    Transport only:
-              │                  │    - Retry with backoff
-              │  fetchExtensions │    - Timeout management
-              │  fetchMetadata   │    - HTTP status handling
-              │  downloadZip     │    - Cancellation support
-              └────────┬─────────┘
-                       │ raw JSON string
-                       ▼
-              ┌──────────────────┐
-              │ ApiPayloadParser │    Pure parsing:
-              │                  │    - Extension deserialization
-              │  parseExtensions │    - Metadata extraction
-              │  parseMetadata   │    - Stream/preset parsing
-              │  parseBuildTools │    - OpenAPI contract reading
-              └────────┬─────────┘
-                       │
-                       ▼
-              ┌──────────────────┐
-              │  JsonFieldReader │    Shared JSON helpers:
-              │                  │    - readString, readInt
-              │                  │    - readStringList
-              │                  │    - readNestedObject
-              └──────────────────┘
-....
+++++
+<pre class="mermaid">
+graph TD
+    REQ[HTTP Request] --> QAC
+    subgraph QAC["QuarkusApiClient (Transport)"]
+        direction TB
+        R[Retry with backoff]
+        T[Timeout management]
+        H[HTTP status handling]
+        C[Cancellation support]
+    end
+    QAC -->|raw JSON| APP
+    subgraph APP["ApiPayloadParser (Pure Parsing)"]
+        direction TB
+        E[Extension deserialization]
+        M[Metadata extraction]
+        S[Stream/preset parsing]
+    end
+    APP --> JFR
+    subgraph JFR["JsonFieldReader (Shared)"]
+        direction TB
+        RS[readString / readInt]
+        RL[readStringList]
+        RO[readNestedObject]
+    end
+</pre>
+++++
 
 === Catalog Freshness Strategy
 
-....
-  Application Start
-       │
-       ▼
-  Load metadata (sync) ─── success ──► MetadataCompatibilityContext
-       │                                  │
-       │ failure                          │ constrains build tool ↔ Java version
-       ▼                                  │
-  Bundled snapshot fallback               ▼
-       │                            Load extensions (async)
-       │                                  │
-       │                          ┌───────┴───────┐
-       │                          │               │
-       │                     Live API         Cache fallback
-       │                          │               │
-       │                          ▼               ▼
-       │                     CatalogSnapshotCache
-       │                     (save for offline use)
-       │                          │
-       ▼                          ▼
-  TUI renders immediately    Catalog replaces default
-  with default extensions    extensions when ready
-....
+++++
+<pre class="mermaid">
+graph TD
+    START[Application Start] --> LM[Load metadata sync]
+    LM -->|success| MCC[MetadataCompatibilityContext]
+    LM -->|failure| BSF[Bundled snapshot fallback]
+    MCC -->|constrains build/java| LE[Load extensions async]
+    LE --> LIVE[Live API]
+    LE --> CACHE[Cache fallback]
+    LIVE --> CSC[CatalogSnapshotCache]
+    CACHE --> CSC
+    BSF --> RENDER[TUI renders immediately<br/>with default extensions]
+    CSC --> REPLACE[Catalog replaces defaults<br/>when ready]
+</pre>
+++++
 
 == Domain Layer
 
-....
-┌─────────────────────────────────────────────────────────┐
-│                    Domain Model                         │
-│                                                         │
-│  ProjectRequest (immutable value object)                │
-│    ├── groupId, artifactId, version                     │
-│    ├── packageName, outputDirectory                     │
-│    ├── platformStream, buildTool, javaVersion           │
-│    └── extensions (list of IDs)                         │
-│                                                         │
-│  ProjectRequestFactory                                  │
-│    ├── fromOptions: RequestOptions → ProjectRequest     │
-│    ├── buildInitialState: validates + creates ForgeUiState │
-│    ├── applyRecommendedPlatformStream                   │
-│    └── mapFailureToExitCode                             │
-│                                                         │
-│  ProjectRequestValidator                                │
-│    └── validates field formats (Maven coordinates, etc) │
-│                                                         │
-│  MetadataCompatibilityContext                           │
-│    └── enforces build tool ↔ Java version constraints   │
-│                                                         │
-│  CliPrefillMapper                                       │
-│    └── maps CLI --options to ProjectRequest fields      │
-│                                                         │
-│  Forgefile + ForgefileLock                              │
-│    ├── Unified template with optional locked section    │
-│    └── ForgefileStore: read/write JSON persistence      │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-....
+++++
+<pre class="mermaid">
+graph LR
+    subgraph Domain["Domain Model"]
+        PR["ProjectRequest<br/>(immutable)"]
+        PRF["ProjectRequestFactory"]
+        PRV["ProjectRequestValidator"]
+        MCC["MetadataCompatibilityContext"]
+        CPM["CliPrefillMapper"]
+        FF["Forgefile + ForgefileLock"]
+        FFS["ForgefileStore"]
+    end
+
+    PRF -->|creates| PR
+    PRV -->|validates| PR
+    MCC -->|constrains| PR
+    CPM -->|maps CLI options| PR
+    FFS -->|read/write| FF
+</pre>
+++++
 
 == Archive Layer
 
-....
-  ZIP Download
-       │
-       ▼
-  ProjectArchiveService
-       │
-       ├── Progress reporting (bytes received)
-       ├── Cancellation check (per entry)
-       │
-       ▼
-  SafeZipExtractor
-       │
-       ├── Zip-Slip protection (path traversal)
-       │     └── canonical path must be under target dir
-       │
-       ├── Zip-Bomb protection
-       │     ├── Max total extracted size
-       │     ├── Max entry count
-       │     └── Compression ratio check
-       │
-       └── Root directory normalization
-             └── strips single root folder if present
-....
+++++
+<pre class="mermaid">
+graph TD
+    ZIP[ZIP Download] --> PAS[ProjectArchiveService]
+    PAS -->|progress reporting| SZE[SafeZipExtractor]
+    PAS -->|cancellation check| SZE
+    SZE --> ZS["Zip-Slip protection<br/>(path traversal guard)"]
+    SZE --> ZB["Zip-Bomb protection<br/>(size + ratio + entry count)"]
+    SZE --> ROOT["Root directory normalization<br/>(strips single root folder)"]
+</pre>
+++++
 
 == Design Principles
 
