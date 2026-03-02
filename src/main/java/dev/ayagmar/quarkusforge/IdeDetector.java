@@ -1,13 +1,11 @@
 package dev.ayagmar.quarkusforge;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Detects installed IDEs on the current system (macOS, Linux, Windows). Returns a list of detected
@@ -15,8 +13,6 @@ import java.util.concurrent.TimeUnit;
  */
 public final class IdeDetector {
   public record DetectedIde(String name, String command) {}
-
-  private static final long COMMAND_CHECK_TIMEOUT_SECONDS = 3;
 
   private IdeDetector() {}
 
@@ -145,27 +141,6 @@ public final class IdeDetector {
   }
 
   private static boolean commandExists(String command) {
-    try {
-      String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-      ProcessBuilder pb =
-          os.contains("win")
-              ? new ProcessBuilder("where", command)
-              : new ProcessBuilder("which", command);
-      pb.redirectErrorStream(true);
-      Process process = pb.start();
-      // Consume output to prevent pipe buffer blocking
-      process.getInputStream().readAllBytes();
-      boolean finished = process.waitFor(COMMAND_CHECK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-      if (!finished) {
-        process.destroyForcibly();
-        return false;
-      }
-      return process.exitValue() == 0;
-    } catch (IOException | InterruptedException e) {
-      if (e instanceof InterruptedException) {
-        Thread.currentThread().interrupt();
-      }
-      return false;
-    }
+    return PostTuiActionExecutor.isCommandAvailable(command);
   }
 }
