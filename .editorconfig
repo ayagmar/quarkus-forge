@@ -1,0 +1,23 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.java]
+indent_size = 2
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.{json,js,ts}]
+indent_size = 2
+
+[*.xml]
+indent_size = 2
+
+[*.{md,adoc}]
+trim_trailing_whitespace = false
