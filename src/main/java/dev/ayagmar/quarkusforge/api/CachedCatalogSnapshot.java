@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 
-public record CachedCatalogSnapshot(
+record CachedCatalogSnapshot(
     MetadataDto metadata, List<ExtensionDto> extensions, Instant fetchedAt, boolean stale) {
   public CachedCatalogSnapshot {
     metadata = Objects.requireNonNull(metadata);

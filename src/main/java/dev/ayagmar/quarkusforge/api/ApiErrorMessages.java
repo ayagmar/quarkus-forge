@@ -1,6 +1,6 @@
 package dev.ayagmar.quarkusforge.api;
 
-public final class ApiErrorMessages {
+final class ApiErrorMessages {
   private static final int HTTP_ERROR_DETAIL_MAX_LENGTH = 200;
 
   private ApiErrorMessages() {}

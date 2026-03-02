@@ -1,6 +1,6 @@
 package dev.ayagmar.quarkusforge.api;
 
-public record CacheWriteOutcome(boolean written, boolean rejected, String detail) {
+record CacheWriteOutcome(boolean written, boolean rejected, String detail) {
   public CacheWriteOutcome {
     detail = detail == null ? "" : detail.strip();
   }
