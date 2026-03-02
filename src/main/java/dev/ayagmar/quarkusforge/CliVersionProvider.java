@@ -17,7 +17,7 @@ final class CliVersionProvider implements CommandLine.IVersionProvider {
   }
 
   static String resolveVersion() {
-    String implementationVersion = QuarkusForgeCli.class.getPackage().getImplementationVersion();
+    String implementationVersion = CliVersionProvider.class.getPackage().getImplementationVersion();
     if (isUsableVersion(implementationVersion)) {
       return implementationVersion.strip();
     }
