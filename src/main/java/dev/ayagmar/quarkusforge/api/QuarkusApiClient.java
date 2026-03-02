@@ -142,15 +142,6 @@ public final class QuarkusApiClient implements AutoCloseable {
     }
   }
 
-  public CompletableFuture<byte[]> generateProjectZip(GenerationRequest generationRequest) {
-    URI uri = GenerationQueryBuilder.build(baseUri, generationRequest);
-    HttpRequest request = newGetRequest(uri, "application/zip, application/octet-stream");
-
-    return sendWithRetry(request, BodyHandlers.ofByteArray(), 1)
-        .thenApply(this::assertSuccessful)
-        .thenApply(HttpResponse::body);
-  }
-
   public CompletableFuture<Path> downloadProjectZipToFile(
       GenerationRequest generationRequest, Path destinationFile) {
     URI uri = GenerationQueryBuilder.build(baseUri, generationRequest);

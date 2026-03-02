@@ -1,7 +1,6 @@
 package dev.ayagmar.quarkusforge.api;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
-import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
@@ -512,24 +511,6 @@ class QuarkusApiClientTest {
         .containsExactlyInAnyOrder("maven", "gradle", "gradle-kotlin-dsl");
     assertThat(metadata.compatibility().keySet())
         .containsExactlyInAnyOrder("maven", "gradle", "gradle-kotlin-dsl");
-  }
-
-  @Test
-  void generateProjectZipRequestsZipContentType() {
-    stubFor(
-        get(urlPathEqualTo("/api/download"))
-            .willReturn(aResponse().withStatus(200).withBody("zip-data")));
-
-    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
-    GenerationRequest request =
-        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
-
-    byte[] payload = client.generateProjectZip(request).join();
-
-    assertThat(payload).isEqualTo("zip-data".getBytes(java.nio.charset.StandardCharsets.UTF_8));
-    verify(
-        getRequestedFor(urlPathEqualTo("/api/download"))
-            .withHeader("Accept", equalTo("application/zip, application/octet-stream")));
   }
 
   @Test

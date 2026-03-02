@@ -10,13 +10,30 @@ import java.util.Locale;
 /**
  * Detects installed IDEs on the current system (macOS, Linux, Windows). Returns a list of detected
  * IDEs with their launch commands, ordered by preference.
+ *
+ * <p>Detection results are cached after the first call; IDE availability does not change during a
+ * session.
  */
 public final class IdeDetector {
   public record DetectedIde(String name, String command) {}
 
+  private static volatile List<DetectedIde> cachedResult;
+
   private IdeDetector() {}
 
   public static List<DetectedIde> detect() {
+    if (cachedResult != null) {
+      return cachedResult;
+    }
+    synchronized (IdeDetector.class) {
+      if (cachedResult == null) {
+        cachedResult = detectNow();
+      }
+    }
+    return cachedResult;
+  }
+
+  private static List<DetectedIde> detectNow() {
     var result = new ArrayList<DetectedIde>();
     var seen = new LinkedHashSet<String>();
 

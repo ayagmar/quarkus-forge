@@ -5,6 +5,7 @@ import dev.ayagmar.quarkusforge.api.JsonSupport;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -29,9 +30,12 @@ public final class ForgefileStore {
           JsonFieldReader.readStringListOrEmpty(root, "presets"),
           JsonFieldReader.readStringListOrEmpty(root, "extensions"),
           locked);
+    } catch (NoSuchFileException noSuchFileException) {
+      throw new IllegalArgumentException(
+          "Forgefile not found: '" + file + "'", noSuchFileException);
     } catch (IOException | RuntimeException exception) {
       throw new IllegalArgumentException(
-          "Failed to read Forgefile '" + file + "': " + exception.getMessage(), exception);
+          "Failed to parse Forgefile '" + file + "': " + exception.getMessage(), exception);
     }
   }
 
@@ -42,9 +46,9 @@ public final class ForgefileStore {
       root.put("groupId", forgefile.groupId());
       root.put("artifactId", forgefile.artifactId());
       root.put("version", forgefile.version());
-      root.put("packageName", forgefile.packageName());
-      root.put("outputDirectory", forgefile.outputDirectory());
-      root.put("platformStream", forgefile.platformStream());
+      putIfNotBlank(root, "packageName", forgefile.packageName());
+      putIfNotBlank(root, "outputDirectory", forgefile.outputDirectory());
+      putIfNotBlank(root, "platformStream", forgefile.platformStream());
       root.put("buildTool", forgefile.buildTool());
       root.put("javaVersion", forgefile.javaVersion());
       root.put("presets", forgefile.presets());
@@ -56,6 +60,12 @@ public final class ForgefileStore {
     } catch (IOException exception) {
       throw new IllegalArgumentException(
           "Failed to write Forgefile '" + file + "': " + exception.getMessage(), exception);
+    }
+  }
+
+  private static void putIfNotBlank(Map<String, Object> map, String key, String value) {
+    if (value != null && !value.isBlank()) {
+      map.put(key, value);
     }
   }
 

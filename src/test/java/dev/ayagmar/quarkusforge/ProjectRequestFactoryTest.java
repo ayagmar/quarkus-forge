@@ -139,6 +139,6 @@ class ProjectRequestFactoryTest {
         .isEqualTo(ExitCodes.ARCHIVE);
 
     assertThat(ProjectRequestFactory.mapFailureToExitCode(new RuntimeException("unknown")))
-        .isEqualTo(ExitCodes.ARCHIVE);
+        .isEqualTo(ExitCodes.INTERNAL);
   }
 }

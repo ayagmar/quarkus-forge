@@ -83,7 +83,7 @@ final class ProjectRequestFactory {
       case CancellationException ignored -> ExitCodes.CANCELLED;
       case ApiClientException ignored -> ExitCodes.NETWORK;
       case ArchiveException ignored -> ExitCodes.ARCHIVE;
-      default -> ExitCodes.ARCHIVE;
+      default -> ExitCodes.INTERNAL;
     };
   }
 }

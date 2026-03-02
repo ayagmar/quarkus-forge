@@ -6,6 +6,11 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.util.Objects;
 
+/**
+ * Immutable configuration bundle passed through the application. Holds all file paths and the API
+ * base URI so that tests can redirect to a local server or temp directory without altering global
+ * state.
+ */
 record RuntimeConfig(
     URI apiBaseUri, Path catalogCacheFile, Path favoritesFile, Path preferencesFile) {
   RuntimeConfig {

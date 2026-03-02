@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
-final class HeadlessGenerationService {
+final class HeadlessGenerationService implements AutoCloseable {
   private static final String PRESET_FAVORITES = "favorites";
 
   private final HeadlessCatalogClient catalogClient;
@@ -36,6 +36,11 @@ final class HeadlessGenerationService {
   HeadlessGenerationService(HeadlessCatalogClient catalogClient, RuntimeConfig runtimeConfig) {
     this.catalogClient = catalogClient;
     this.runtimeConfig = runtimeConfig;
+  }
+
+  @Override
+  public void close() {
+    catalogClient.close();
   }
 
   int run(GenerateCommand command, boolean globalDryRun, boolean verbose) {
