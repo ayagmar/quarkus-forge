@@ -11,6 +11,7 @@ import java.io.PrintStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.concurrent.Callable;
 
 final class CliCommandTestSupport {
   private CliCommandTestSupport() {}
@@ -35,7 +36,7 @@ final class CliCommandTestSupport {
     return captureCommandOutput(() -> new QuarkusForgeCli(runtimeConfig).runSmokeForTest(verbose));
   }
 
-  private static CommandResult captureCommandOutput(java.util.concurrent.Callable<Integer> action) {
+  private static CommandResult captureCommandOutput(Callable<Integer> action) {
     PrintStream originalOut = System.out;
     PrintStream originalErr = System.err;
     ByteArrayOutputStream stdout = new ByteArrayOutputStream();

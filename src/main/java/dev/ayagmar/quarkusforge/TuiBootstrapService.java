@@ -5,6 +5,7 @@ import static dev.ayagmar.quarkusforge.diagnostics.DiagnosticField.of;
 import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogDataService;
 import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
+import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
 import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
 import dev.ayagmar.quarkusforge.archive.OverwritePolicy;
@@ -86,7 +87,7 @@ final class TuiBootstrapService {
           CoreTuiController.from(
               initialState,
               UiScheduler.fromScheduledExecutor(tui.scheduler(), tui::runOnRenderThread),
-              java.time.Duration.ofMillis(Math.max(0, searchDebounceMs)),
+              Duration.ofMillis(Math.max(0, searchDebounceMs)),
               (generationRequest, outputDirectory, cancelled, progressListener) ->
                   projectArchiveService.downloadAndExtract(
                       generationRequest,
@@ -164,9 +165,7 @@ final class TuiBootstrapService {
       diagnostics.error(
           "tui.session.failure",
           of("causeType", exception.getClass().getSimpleName()),
-          of(
-              "message",
-              dev.ayagmar.quarkusforge.api.ErrorMessageMapper.userFriendlyError(exception)));
+          of("message", ErrorMessageMapper.userFriendlyError(exception)));
       throw exception;
     }
   }
