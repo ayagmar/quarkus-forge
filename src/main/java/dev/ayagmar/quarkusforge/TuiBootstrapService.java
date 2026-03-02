@@ -20,12 +20,48 @@ import dev.ayagmar.quarkusforge.ui.UiAction;
 import dev.ayagmar.quarkusforge.ui.UiScheduler;
 import dev.tamboui.tui.TuiConfig;
 import dev.tamboui.tui.TuiRunner;
+import dev.tamboui.tui.bindings.Bindings;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 final class TuiBootstrapService {
+  private static final String BACKEND_PROPERTY_NAME = "tamboui.backend";
+  private static final String BACKEND_ENV_NAME = "TAMBOUI_BACKEND";
+  private static final String PANAMA_BACKEND = "panama";
+  static final Duration STARTUP_SPLASH_MIN_DURATION = Duration.ofMillis(450);
+  private static final Duration TUI_TICK_RATE = Duration.ofMillis(40);
+
+  static Bindings appBindingsProfile() {
+    return AppBindingsProfile.bindings();
+  }
+
+  static TuiConfig appTuiConfig() {
+    return TuiConfig.builder().tickRate(TUI_TICK_RATE).bindings(appBindingsProfile()).build();
+  }
+
+  static String defaultBackendPreference() {
+    return PANAMA_BACKEND;
+  }
+
+  private static void configureTerminalBackendPreference() {
+    if (isBackendPreferenceExplicitlyConfigured()) {
+      return;
+    }
+    System.setProperty(BACKEND_PROPERTY_NAME, defaultBackendPreference());
+  }
+
+  private static boolean isBackendPreferenceExplicitlyConfigured() {
+    String propertyValue = System.getProperty(BACKEND_PROPERTY_NAME);
+    if (propertyValue != null && !propertyValue.isBlank()) {
+      return true;
+    }
+    String envValue = System.getenv(BACKEND_ENV_NAME);
+    return envValue != null && !envValue.isBlank();
+  }
+
   TuiSessionSummary run(
       ForgeUiState initialState,
       int searchDebounceMs,
@@ -36,8 +72,8 @@ final class TuiBootstrapService {
         "tui.session.start",
         of("smokeMode", false),
         of("searchDebounceMs", Math.max(0, searchDebounceMs)));
-    QuarkusForgeCli.configureTerminalBackendPreference();
-    TuiConfig tuiConfig = QuarkusForgeCli.appTuiConfig();
+    configureTerminalBackendPreference();
+    TuiConfig tuiConfig = appTuiConfig();
     try (var tui = TuiRunner.create(tuiConfig);
         QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri())) {
       CatalogDataService catalogDataService =
@@ -70,7 +106,7 @@ final class TuiBootstrapService {
               ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile()),
               CoreTuiController.defaultFavoritesPersistenceExecutor(),
               IdeDetector.detect());
-      controller.setStartupOverlayMinDuration(QuarkusForgeCli.STARTUP_SPLASH_MIN_DURATION);
+      controller.setStartupOverlayMinDuration(STARTUP_SPLASH_MIN_DURATION);
       controller.loadExtensionCatalogAsync(
           () -> {
             diagnostics.info("catalog.load.start", of("mode", "tui"));

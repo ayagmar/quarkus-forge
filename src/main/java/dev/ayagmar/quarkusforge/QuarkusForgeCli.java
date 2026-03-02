@@ -15,8 +15,6 @@ import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.ui.ExtensionCatalogLoadResult;
 import dev.ayagmar.quarkusforge.ui.UserPreferencesStore;
-import dev.tamboui.tui.TuiConfig;
-import dev.tamboui.tui.bindings.Bindings;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Objects;
@@ -37,13 +35,8 @@ import picocli.CommandLine.Option;
     subcommands = {GenerateCommand.class},
     description = "Quarkus forge terminal UI")
 public final class QuarkusForgeCli implements Callable<Integer> {
-  private static final String BACKEND_PROPERTY_NAME = "tamboui.backend";
-  private static final String BACKEND_ENV_NAME = "TAMBOUI_BACKEND";
-  private static final String PANAMA_BACKEND = "panama";
 
   private static final Duration STARTUP_METADATA_REFRESH_TIMEOUT = Duration.ofSeconds(2);
-  static final Duration STARTUP_SPLASH_MIN_DURATION = Duration.ofMillis(450);
-  private static final Duration TUI_TICK_RATE = Duration.ofMillis(40);
   private static final ShellExecutor SHELL_EXECUTOR = new ShellExecutor();
   private static final PostTuiActionExecutor POST_TUI_ACTION_EXECUTOR =
       new PostTuiActionExecutor(SHELL_EXECUTOR);
@@ -305,34 +298,6 @@ public final class QuarkusForgeCli implements Callable<Integer> {
         catalogData.stale(),
         catalogData.detailMessage(),
         catalogData.metadata());
-  }
-
-  static void configureTerminalBackendPreference() {
-    if (isBackendPreferenceExplicitlyConfigured()) {
-      return;
-    }
-    System.setProperty(BACKEND_PROPERTY_NAME, defaultBackendPreference());
-  }
-
-  static Bindings appBindingsProfile() {
-    return AppBindingsProfile.bindings();
-  }
-
-  static TuiConfig appTuiConfig() {
-    return TuiConfig.builder().tickRate(TUI_TICK_RATE).bindings(appBindingsProfile()).build();
-  }
-
-  static String defaultBackendPreference() {
-    return PANAMA_BACKEND;
-  }
-
-  private static boolean isBackendPreferenceExplicitlyConfigured() {
-    String propertyValue = System.getProperty(BACKEND_PROPERTY_NAME);
-    if (propertyValue != null && !propertyValue.isBlank()) {
-      return true;
-    }
-    String envValue = System.getenv(BACKEND_ENV_NAME);
-    return envValue != null && !envValue.isBlank();
   }
 
   private static void printPrefillSummary(

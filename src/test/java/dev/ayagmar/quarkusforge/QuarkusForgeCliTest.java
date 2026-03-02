@@ -109,7 +109,7 @@ class QuarkusForgeCliTest {
 
   @Test
   void backendPreferenceUsesPanamaOnly() {
-    String preference = QuarkusForgeCli.defaultBackendPreference();
+    String preference = TuiBootstrapService.defaultBackendPreference();
     assertThat(preference).isEqualTo("panama");
   }
 
