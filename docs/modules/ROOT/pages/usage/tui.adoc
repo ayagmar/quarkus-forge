@@ -23,6 +23,8 @@ java -jar target/quarkus-forge.jar
 * **Search match count**: active search shows `5/400 matches (Esc to clear)`.
 * **Animated spinner**: braille dot animation during generation.
 * **Inline validation**: fields show `⚠ error message` inline.
+* **Selector arrows**: selector fields show `◀ maven ▶ (1/3)` when focused, `maven ◀▶` when unfocused.
+* **IDE auto-detection**: post-generation menu shows detected IDEs (IntelliJ, VS Code, etc.).
 
 == Focus and Navigation
 
@@ -46,7 +48,7 @@ java -jar target/quarkus-forge.jar
 * After success, use the post-generation menu to:
 ** Export a `Forgefile` (with locked section) into the generated project directory.
 ** Publish to GitHub (`gh` CLI required).
-** Open in IDE (configurable via `QUARKUS_FORGE_IDE_COMMAND`).
+** Open in your detected IDE (auto-detected from PATH, or configurable via `QUARKUS_FORGE_IDE_COMMAND`).
 ** Open a terminal shell in the generated project.
 * `Esc`: clear active search/filter context first, then exit.
 * `Ctrl+C`: quit immediately.
@@ -54,3 +56,41 @@ java -jar target/quarkus-forge.jar
 == Session Persistence
 
 Your last selections (platform stream, build tool, java version, etc.) are saved in `~/.quarkus-forge/preferences.json` and restored on next launch.
+
+== IDE Auto-Detection
+
+After generating a project, the post-generation menu shows one entry per detected IDE.
+Quarkus Forge scans your system for installed editors:
+
+[cols="1,1", options="header"]
+|===
+| IDE
+| Detection Method
+
+| IntelliJ IDEA
+| macOS app bundle or `idea` on PATH
+
+| VS Code
+| macOS app bundle or `code` on PATH
+
+| Eclipse
+| macOS app bundle or `eclipse` on PATH
+
+| Cursor
+| `cursor` on PATH
+
+| Zed
+| `zed` on PATH
+
+| Neovim
+| `nvim` on PATH
+|===
+
+To override auto-detection, set the `QUARKUS_FORGE_IDE_COMMAND` environment variable:
+
+[source,bash]
+----
+export QUARKUS_FORGE_IDE_COMMAND="code-insiders ."
+----
+
+The custom command appears first in the menu as "Custom (code-insiders .)".

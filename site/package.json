@@ -4,6 +4,7 @@
   "scripts": {
     "docs:build:antora": "antora antora-playbook.yml",
     "docs:build:css": "tailwindcss -i input.css -o build/pages/output.css",
+    "docs:dev:css": "tailwindcss -i input.css -o output.css --watch",
     "docs:assemble": "rm -rf build/pages && mkdir -p build/pages && cp -R build/site/. build/pages/ && cp index.html build/pages/index.html && npm run docs:build:css",
     "docs:build": "npm run docs:build:antora && npm run docs:assemble",
     "docs:serve": "http-server build/pages -p 8080 -c-1",
