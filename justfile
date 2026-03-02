@@ -30,9 +30,9 @@ test:
 test-unit:
     {{mvn}} test
 
-# Run integration tests only
+# Run verify with integration tests enabled
 test-it:
-    {{mvn}} verify -DskipTests=true
+    {{mvn}} verify -DskipTests=false -DskipITs=false
 
 # Run a full clean verify and print coverage report paths
 coverage:

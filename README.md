@@ -76,21 +76,21 @@ Full keybindings: [docs/modules/ROOT/pages/ui/keybindings.adoc](docs/modules/ROO
 
 ### Full build (TUI + headless)
 ```bash
-mvn clean package -DskipTests
+./mvnw clean package -DskipTests
 ```
 
 Output: `target/quarkus-forge.jar`
 
 ### Headless-only build
 ```bash
-mvn clean package -Pheadless
+./mvnw clean package -Pheadless
 ```
 
 Output: `target/quarkus-forge-headless.jar` — ~40% smaller, no TUI or terminal dependencies.
 
 ### Native image build
 ```bash
-mvn clean package -Pnative
+./mvnw clean package -Pnative
 ```
 
 Output: `target/quarkus-forge-native` — standalone binary, no JVM required at runtime.

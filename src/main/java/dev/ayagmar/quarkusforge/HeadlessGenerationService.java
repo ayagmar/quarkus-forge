@@ -64,7 +64,7 @@ final class HeadlessGenerationService implements AutoCloseable {
       catalogData = catalogClient.loadCatalogData(catalogTimeout);
       diagnostics.info(
           "catalog.load.success",
-          of("source", catalogData.source().label()),
+          of("source", catalogData.sourceLabel()),
           of("stale", catalogData.stale()),
           of("detail", catalogData.detailMessage()));
     } catch (Exception e) {
@@ -88,7 +88,7 @@ final class HeadlessGenerationService implements AutoCloseable {
       diagnostics.error(
           "generate.validation.failed",
           of("errorCount", validatedState.validation().errors().size()),
-          of("catalogSource", catalogData.source().label()),
+          of("catalogSource", catalogData.sourceLabel()),
           of("stale", catalogData.stale()));
       HeadlessOutputPrinter.printValidationErrors(
           validatedState.validation(), catalogData.sourceLabel(), catalogData.detailMessage());
@@ -145,7 +145,7 @@ final class HeadlessGenerationService implements AutoCloseable {
       diagnostics.info(
           "generate.dry-run.validated",
           of("extensionCount", extensionIds.size()),
-          of("catalogSource", catalogData.source().label()),
+          of("catalogSource", catalogData.sourceLabel()),
           of("stale", catalogData.stale()));
       HeadlessOutputPrinter.printDryRunSummary(
           validatedState.request(), extensionIds, catalogData.sourceLabel());

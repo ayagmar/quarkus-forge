@@ -147,6 +147,14 @@ class QuarkusForgeCliTest {
   }
 
   @Test
+  void isCommandAvailableIgnoresInvalidPathEntries() {
+    String missing = "missing-" + UUID.randomUUID();
+    String pathWithInvalidEntry = "\0invalid";
+
+    assertThat(CommandUtils.isCommandAvailable(missing, pathWithInvalidEntry)).isFalse();
+  }
+
+  @Test
   void githubPublishCommandIncludesVisibilityFlag() {
     assertThat(PostTuiActionExecutor.githubPublishCommand(GitHubVisibility.PRIVATE))
         .contains("git init")
