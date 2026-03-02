@@ -1,5 +1,7 @@
 package dev.ayagmar.quarkusforge;
 
+import static dev.ayagmar.quarkusforge.diagnostics.DiagnosticField.of;
+
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticField;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.ui.GitHubVisibility;
@@ -48,8 +50,8 @@ final class PostTuiActionExecutor {
             exitPlan.ideCommand() != null ? exitPlan.ideCommand() : resolveIdeCommand();
         diagnostics.info(
             "tui.post-action.start",
-            df("action", "open-ide"),
-            df("directory", generatedProjectDir.toString()));
+            of("action", "open-ide"),
+            of("directory", generatedProjectDir.toString()));
         executeShellCommand(ideCommand, generatedProjectDir, diagnostics, "open-ide");
       }
       case PUBLISH_GITHUB -> {
@@ -59,13 +61,13 @@ final class PostTuiActionExecutor {
                 : exitPlan.githubVisibility();
         diagnostics.info(
             "tui.post-action.start",
-            df("action", "publish-github"),
-            df("directory", generatedProjectDir.toString()),
-            df("visibility", visibility.cliFlag()));
+            of("action", "publish-github"),
+            of("directory", generatedProjectDir.toString()),
+            of("visibility", visibility.cliFlag()));
         if (!isCommandAvailable("git")) {
           String message = "Publish to GitHub requires 'git' on PATH. Install it and rerun.";
           diagnostics.error(
-              "tui.post-action.failure", df("action", "publish-github"), df("message", message));
+              "tui.post-action.failure", of("action", "publish-github"), of("message", message));
           System.err.println(message);
           break;
         }
@@ -73,7 +75,7 @@ final class PostTuiActionExecutor {
           String message =
               "Publish to GitHub requires GitHub CLI ('gh') on PATH. Install it and rerun.";
           diagnostics.error(
-              "tui.post-action.failure", df("action", "publish-github"), df("message", message));
+              "tui.post-action.failure", of("action", "publish-github"), of("message", message));
           System.err.println(message);
           break;
         }
@@ -83,8 +85,8 @@ final class PostTuiActionExecutor {
       case OPEN_TERMINAL -> {
         diagnostics.info(
             "tui.post-action.start",
-            df("action", "open-terminal"),
-            df("directory", generatedProjectDir.toString()));
+            of("action", "open-terminal"),
+            of("directory", generatedProjectDir.toString()));
         openInteractiveShell(generatedProjectDir, exitPlan.nextCommand(), diagnostics);
       }
       case EXPORT_RECIPE_LOCK -> {
@@ -123,13 +125,13 @@ final class PostTuiActionExecutor {
         new ShellExecutorDiagnostics() {
           @Override
           public void success(String action) {
-            diagnostics.info("tui.post-action.success", df("action", action));
+            diagnostics.info("tui.post-action.success", of("action", action));
           }
 
           @Override
           public void error(String action, String message) {
             diagnostics.error(
-                "tui.post-action.failure", df("action", action), df("message", message));
+                "tui.post-action.failure", of("action", action), of("message", message));
           }
         });
   }
@@ -190,9 +192,9 @@ final class PostTuiActionExecutor {
 
   static DiagnosticField[] postHookDiagnosticFields(Path generatedProjectDir, String command) {
     return new DiagnosticField[] {
-      df("directory", generatedProjectDir.toString()),
-      df("command", "<redacted>"),
-      df("commandLength", command.length())
+      of("directory", generatedProjectDir.toString()),
+      of("command", "<redacted>"),
+      of("commandLength", command.length())
     };
   }
 
@@ -211,9 +213,5 @@ final class PostTuiActionExecutor {
       return false;
     }
     return windows || Files.isExecutable(path);
-  }
-
-  private static DiagnosticField df(String name, Object value) {
-    return DiagnosticField.of(name, value);
   }
 }
