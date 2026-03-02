@@ -121,6 +121,16 @@ final class MetadataSelectorManager {
     };
   }
 
+  /** Returns selector position info for a given focus target. */
+  MetadataPanelSnapshot.SelectorInfo selectorInfo(FocusTarget target, String currentValue) {
+    List<String> options = optionsFor(target);
+    if (options.isEmpty()) {
+      return MetadataPanelSnapshot.SelectorInfo.EMPTY;
+    }
+    int index = indexOfOption(options, currentValue);
+    return new MetadataPanelSnapshot.SelectorInfo(Math.max(0, index), options.size());
+  }
+
   static boolean isSelectorFocus(FocusTarget focusTarget) {
     return focusTarget == FocusTarget.PLATFORM_STREAM
         || focusTarget == FocusTarget.BUILD_TOOL

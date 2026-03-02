@@ -85,19 +85,33 @@ final class BodyPanelRenderer {
     inputRenderer.renderCompactText(
         frame, rows.get(rowIdx++), "Artifact", snapshot.artifactId(), FocusTarget.ARTIFACT_ID);
     inputRenderer.renderCompactSelector(
-        frame, rows.get(rowIdx++), "Build", snapshot.buildTool(), FocusTarget.BUILD_TOOL);
+        frame,
+        rows.get(rowIdx++),
+        "Build",
+        snapshot.buildTool(),
+        FocusTarget.BUILD_TOOL,
+        snapshot.buildToolInfo().selectedIndex(),
+        snapshot.buildToolInfo().totalOptions());
     inputRenderer.renderCompactSelector(
         frame,
         rows.get(rowIdx++),
         "Platform",
         snapshot.platformStream(),
-        FocusTarget.PLATFORM_STREAM);
+        FocusTarget.PLATFORM_STREAM,
+        snapshot.platformStreamInfo().selectedIndex(),
+        snapshot.platformStreamInfo().totalOptions());
     inputRenderer.renderCompactText(
         frame, rows.get(rowIdx++), "Version", snapshot.version(), FocusTarget.VERSION);
     inputRenderer.renderCompactText(
         frame, rows.get(rowIdx++), "Package", snapshot.packageName(), FocusTarget.PACKAGE_NAME);
     inputRenderer.renderCompactSelector(
-        frame, rows.get(rowIdx++), "Java", snapshot.javaVersion(), FocusTarget.JAVA_VERSION);
+        frame,
+        rows.get(rowIdx++),
+        "Java",
+        snapshot.javaVersion(),
+        FocusTarget.JAVA_VERSION,
+        snapshot.javaVersionInfo().selectedIndex(),
+        snapshot.javaVersionInfo().totalOptions());
     inputRenderer.renderCompactText(
         frame, rows.get(rowIdx), "Output", snapshot.outputDir(), FocusTarget.OUTPUT_DIR);
   }
@@ -131,16 +145,34 @@ final class BodyPanelRenderer {
     inputRenderer.renderCompactText(
         frame, topRow.get(1), "Artifact", snapshot.artifactId(), FocusTarget.ARTIFACT_ID);
     inputRenderer.renderCompactSelector(
-        frame, topRow.get(2), "Build", snapshot.buildTool(), FocusTarget.BUILD_TOOL);
+        frame,
+        topRow.get(2),
+        "Build",
+        snapshot.buildTool(),
+        FocusTarget.BUILD_TOOL,
+        snapshot.buildToolInfo().selectedIndex(),
+        snapshot.buildToolInfo().totalOptions());
     inputRenderer.renderCompactSelector(
-        frame, topRow.get(3), "Platform", snapshot.platformStream(), FocusTarget.PLATFORM_STREAM);
+        frame,
+        topRow.get(3),
+        "Platform",
+        snapshot.platformStream(),
+        FocusTarget.PLATFORM_STREAM,
+        snapshot.platformStreamInfo().selectedIndex(),
+        snapshot.platformStreamInfo().totalOptions());
 
     inputRenderer.renderCompactText(
         frame, bottomRow.get(0), "Version", snapshot.version(), FocusTarget.VERSION);
     inputRenderer.renderCompactText(
         frame, bottomRow.get(1), "Package", snapshot.packageName(), FocusTarget.PACKAGE_NAME);
     inputRenderer.renderCompactSelector(
-        frame, bottomRow.get(2), "Java", snapshot.javaVersion(), FocusTarget.JAVA_VERSION);
+        frame,
+        bottomRow.get(2),
+        "Java",
+        snapshot.javaVersion(),
+        FocusTarget.JAVA_VERSION,
+        snapshot.javaVersionInfo().selectedIndex(),
+        snapshot.javaVersionInfo().totalOptions());
     inputRenderer.renderCompactText(
         frame, bottomRow.get(3), "Output", snapshot.outputDir(), FocusTarget.OUTPUT_DIR);
   }

@@ -709,7 +709,13 @@ public final class CoreTuiController
             selectorValue(FocusTarget.PLATFORM_STREAM),
             metadataCompatibility.metadataSnapshot()),
         selectorValue(FocusTarget.BUILD_TOOL),
-        selectorValue(FocusTarget.JAVA_VERSION));
+        selectorValue(FocusTarget.JAVA_VERSION),
+        metadataSelectors.selectorInfo(
+            FocusTarget.PLATFORM_STREAM, selectorValue(FocusTarget.PLATFORM_STREAM)),
+        metadataSelectors.selectorInfo(
+            FocusTarget.BUILD_TOOL, selectorValue(FocusTarget.BUILD_TOOL)),
+        metadataSelectors.selectorInfo(
+            FocusTarget.JAVA_VERSION, selectorValue(FocusTarget.JAVA_VERSION)));
   }
 
   private ExtensionsPanelSnapshot extensionsPanelSnapshot() {
@@ -737,8 +743,24 @@ public final class CoreTuiController
 
   @Override
   public void renderCompactSelector(
-      Frame frame, Rect area, String label, String value, FocusTarget target) {
+      Frame frame,
+      Rect area,
+      String label,
+      String value,
+      FocusTarget target,
+      int selectedIndex,
+      int totalOptions) {
     String displayValue = value.isBlank() ? "default" : value;
+    boolean focused = focusTarget == target;
+
+    String positionHint =
+        totalOptions > 1 ? " (" + (selectedIndex + 1) + "/" + totalOptions + ")" : "";
+    if (focused) {
+      displayValue = "◀ " + displayValue + " ▶" + positionHint;
+    } else if (totalOptions > 1) {
+      displayValue = displayValue + " ◀▶";
+    }
+
     renderCompactField(frame, area, label, displayValue, target, "]");
   }
 
