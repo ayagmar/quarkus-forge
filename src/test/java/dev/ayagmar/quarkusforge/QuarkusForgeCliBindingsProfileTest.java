@@ -12,15 +12,15 @@ import org.junit.jupiter.api.Test;
 class QuarkusForgeCliBindingsProfileTest {
   @Test
   void appTuiConfigUsesAppBindingsProfile() {
-    assertThat(QuarkusForgeCli.appTuiConfig().tickRate())
+    assertThat(TuiBootstrapService.appTuiConfig().tickRate())
         .isEqualTo(java.time.Duration.ofMillis(40));
-    assertThat(QuarkusForgeCli.appTuiConfig().bindings().describeBindings(Actions.MOVE_DOWN))
+    assertThat(TuiBootstrapService.appTuiConfig().bindings().describeBindings(Actions.MOVE_DOWN))
         .contains("j");
   }
 
   @Test
   void profilePreservesNavigationBindings() {
-    Bindings bindings = QuarkusForgeCli.appBindingsProfile();
+    Bindings bindings = TuiBootstrapService.appBindingsProfile();
 
     assertThat(bindings.actionFor(KeyEvent.ofChar('j'))).contains(Actions.MOVE_DOWN);
     assertThat(bindings.actionFor(KeyEvent.ofChar('k'))).contains(Actions.MOVE_UP);
@@ -32,7 +32,7 @@ class QuarkusForgeCliBindingsProfileTest {
 
   @Test
   void profilePreservesGlobalShortcutBindings() {
-    Bindings bindings = QuarkusForgeCli.appBindingsProfile();
+    Bindings bindings = TuiBootstrapService.appBindingsProfile();
 
     assertThat(bindings.actionFor(KeyEvent.ofChar('/')))
         .contains(AppKeyActions.FOCUS_EXTENSION_SEARCH);
@@ -50,7 +50,7 @@ class QuarkusForgeCliBindingsProfileTest {
 
   @Test
   void profilePreservesExtensionShortcutBindings() {
-    Bindings bindings = QuarkusForgeCli.appBindingsProfile();
+    Bindings bindings = TuiBootstrapService.appBindingsProfile();
 
     assertThat(bindings.actionFor(KeyEvent.ofChar('v')))
         .contains(AppKeyActions.CATEGORY_FILTER_CYCLE);
