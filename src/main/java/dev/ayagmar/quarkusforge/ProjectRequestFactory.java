@@ -79,11 +79,11 @@ final class ProjectRequestFactory {
   static int mapFailureToExitCode(Throwable throwable) {
     Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(throwable);
     return switch (cause) {
-      case CancellationException ignored -> QuarkusForgeCli.EXIT_CODE_CANCELLED;
+      case CancellationException ignored -> ExitCodes.CANCELLED;
       case dev.ayagmar.quarkusforge.api.ApiClientException ignored ->
-          QuarkusForgeCli.EXIT_CODE_NETWORK;
-      case ArchiveException ignored -> QuarkusForgeCli.EXIT_CODE_ARCHIVE;
-      default -> QuarkusForgeCli.EXIT_CODE_ARCHIVE;
+          ExitCodes.NETWORK;
+      case ArchiveException ignored -> ExitCodes.ARCHIVE;
+      default -> ExitCodes.ARCHIVE;
     };
   }
 }

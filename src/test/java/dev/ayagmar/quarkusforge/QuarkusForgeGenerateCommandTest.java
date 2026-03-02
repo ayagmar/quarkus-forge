@@ -149,7 +149,7 @@ class QuarkusForgeGenerateCommandTest {
             "--platform-stream",
             "io.quarkus.platform:does-not-exist");
 
-    assertThat(result.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_VALIDATION);
+    assertThat(result.exitCode()).isEqualTo(ExitCodes.VALIDATION);
     assertThat(result.standardError()).contains("unsupported platform stream");
     assertThatCode(() -> wireMockServer.verify(0, getRequestedFor(urlPathEqualTo("/api/download"))))
         .doesNotThrowAnyException();
@@ -172,7 +172,7 @@ class QuarkusForgeGenerateCommandTest {
             "--extension",
             "io.quarkus:quarkus-not-real");
 
-    assertThat(result.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_VALIDATION);
+    assertThat(result.exitCode()).isEqualTo(ExitCodes.VALIDATION);
     assertThat(result.standardError()).contains("unknown extension id");
     assertThatCode(() -> wireMockServer.verify(0, getRequestedFor(urlPathEqualTo("/api/download"))))
         .doesNotThrowAnyException();
@@ -192,7 +192,7 @@ class QuarkusForgeGenerateCommandTest {
             "--artifact-id",
             "headless-app");
 
-    assertThat(result.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_NETWORK);
+    assertThat(result.exitCode()).isEqualTo(ExitCodes.NETWORK);
     assertThat(result.standardError()).contains("Failed to load extension catalog");
   }
 
@@ -233,7 +233,7 @@ class QuarkusForgeGenerateCommandTest {
             "--artifact-id",
             "headless-app");
 
-    assertThat(result.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_NETWORK);
+    assertThat(result.exitCode()).isEqualTo(ExitCodes.NETWORK);
     assertThat(result.standardError()).contains("\"event\":\"catalog.load.failure\"");
     assertThat(result.standardError()).contains("\"causeType\":\"ApiClientException\"");
   }
@@ -257,7 +257,7 @@ class QuarkusForgeGenerateCommandTest {
             "--output-dir",
             outputDir.toString());
 
-    assertThat(result.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_ARCHIVE);
+    assertThat(result.exitCode()).isEqualTo(ExitCodes.ARCHIVE);
     assertThat(result.standardError()).contains("Output directory already exists");
   }
 
@@ -276,7 +276,7 @@ class QuarkusForgeGenerateCommandTest {
             "--artifact-id",
             "headless-app");
 
-    assertThat(result.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_NETWORK);
+    assertThat(result.exitCode()).isEqualTo(ExitCodes.NETWORK);
     assertThat(result.standardError()).contains("Quarkus API request failed (HTTP 503)");
   }
 
@@ -346,7 +346,7 @@ class QuarkusForgeGenerateCommandTest {
                     "--artifact-id",
                     "headless-app"));
 
-    assertThat(result.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_NETWORK);
+    assertThat(result.exitCode()).isEqualTo(ExitCodes.NETWORK);
     assertThat(result.standardError()).contains("timed out");
   }
 
@@ -376,7 +376,7 @@ class QuarkusForgeGenerateCommandTest {
                     "--artifact-id",
                     "headless-app"));
 
-    assertThat(result.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_NETWORK);
+    assertThat(result.exitCode()).isEqualTo(ExitCodes.NETWORK);
     assertThat(result.standardError()).contains("timed out");
   }
 
@@ -649,7 +649,7 @@ class QuarkusForgeGenerateCommandTest {
             "web",
             "--lock-check");
 
-    assertThat(driftResult.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_VALIDATION);
+    assertThat(driftResult.exitCode()).isEqualTo(ExitCodes.VALIDATION);
     assertThat(driftResult.standardError()).contains("javaVersion drift");
 
     CliCommandTestSupport.CommandResult refreshResult =

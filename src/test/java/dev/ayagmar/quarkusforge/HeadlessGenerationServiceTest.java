@@ -18,7 +18,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import picocli.CommandLine;
 
 class HeadlessGenerationServiceTest {
   @TempDir Path tempDir;
@@ -45,7 +44,7 @@ class HeadlessGenerationServiceTest {
     GenerateCommand command = commandWithOutput();
     int exitCode = service.run(command, true, false);
 
-    assertThat(exitCode).isEqualTo(CommandLine.ExitCode.OK);
+    assertThat(exitCode).isEqualTo(ExitCodes.OK);
     assertThat(client.startGenerationCalls).isZero();
   }
 
@@ -59,7 +58,7 @@ class HeadlessGenerationServiceTest {
     System.setProperty("quarkus.forge.headless.generation-timeout-ms", "1");
     try {
       int exitCode = service.run(command, false, false);
-      assertThat(exitCode).isEqualTo(QuarkusForgeCli.EXIT_CODE_NETWORK);
+      assertThat(exitCode).isEqualTo(ExitCodes.NETWORK);
       assertThat(client.startGenerationCalls).isEqualTo(1);
       assertThat(client.generationFuture.isCancelled()).isTrue();
     } finally {
@@ -76,7 +75,7 @@ class HeadlessGenerationServiceTest {
     GenerateCommand command = commandWithOutput();
     int exitCode = service.run(command, false, false);
 
-    assertThat(exitCode).isEqualTo(QuarkusForgeCli.EXIT_CODE_NETWORK);
+    assertThat(exitCode).isEqualTo(ExitCodes.NETWORK);
     assertThat(client.startGenerationCalls).isZero();
   }
 

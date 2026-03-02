@@ -37,10 +37,6 @@ import picocli.CommandLine.Option;
     subcommands = {GenerateCommand.class},
     description = "Quarkus forge terminal UI")
 public final class QuarkusForgeCli implements Callable<Integer> {
-  static final int EXIT_CODE_VALIDATION = 2;
-  static final int EXIT_CODE_NETWORK = 3;
-  static final int EXIT_CODE_ARCHIVE = 4;
-  static final int EXIT_CODE_CANCELLED = 130;
   private static final String BACKEND_PROPERTY_NAME = "tamboui.backend";
   private static final String BACKEND_ENV_NAME = "TAMBOUI_BACKEND";
   private static final String PANAMA_BACKEND = "panama";
@@ -129,7 +125,7 @@ public final class QuarkusForgeCli implements Callable<Integer> {
           initialState.validation(),
           startupMetadataSelection.sourceLabel(),
           startupMetadataSelection.detailMessage());
-      return CommandLine.ExitCode.USAGE;
+      return ExitCodes.VALIDATION;
     }
 
     if (dryRun) {
@@ -139,14 +135,14 @@ public final class QuarkusForgeCli implements Callable<Integer> {
           initialState.request(),
           startupMetadataSelection.sourceLabel(),
           startupMetadataSelection.detailMessage());
-      return CommandLine.ExitCode.OK;
+      return ExitCodes.OK;
     }
 
     diagnostics.info("cli.tui.launch", df("searchDebounceMs", searchDebounceMs));
     TuiSessionSummary summary = runTui(initialState, searchDebounceMs, runtimeConfig, diagnostics);
     preferencesStore.saveLastRequest(summary.finalRequest());
     POST_TUI_ACTION_EXECUTOR.execute(summary, postGenerateHookCommand, diagnostics);
-    return CommandLine.ExitCode.OK;
+    return ExitCodes.OK;
   }
 
   public static int runWithArgs(String[] args) {
@@ -196,11 +192,11 @@ public final class QuarkusForgeCli implements Callable<Integer> {
           initialState.validation(),
           startupMetadataSelection.sourceLabel(),
           startupMetadataSelection.detailMessage());
-      return CommandLine.ExitCode.USAGE;
+      return ExitCodes.VALIDATION;
     }
 
     runHeadlessSmoke(initialState, 0, runtimeConfig, diagnostics);
-    return CommandLine.ExitCode.OK;
+    return ExitCodes.OK;
   }
 
   private static RequestOptions defaultRequestOptions() {

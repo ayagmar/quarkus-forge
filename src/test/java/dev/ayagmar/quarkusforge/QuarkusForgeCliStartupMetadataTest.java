@@ -47,7 +47,7 @@ class QuarkusForgeCliStartupMetadataTest {
             "--build-tool",
             "gradle");
 
-    assertThat(result.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_VALIDATION);
+    assertThat(result.exitCode()).isEqualTo(ExitCodes.VALIDATION);
     assertThat(result.standardError()).contains("metadataSource: live");
     assertThat(result.standardError()).contains("unsupported build tool 'gradle'");
   }
@@ -157,7 +157,7 @@ class QuarkusForgeCliStartupMetadataTest {
             "--java-version",
             "25");
 
-    assertThat(result.exitCode()).isEqualTo(QuarkusForgeCli.EXIT_CODE_VALIDATION);
+    assertThat(result.exitCode()).isEqualTo(ExitCodes.VALIDATION);
     assertThat(result.standardError()).contains("metadataSource: snapshot fallback");
     assertThat(result.standardError())
         .contains(
