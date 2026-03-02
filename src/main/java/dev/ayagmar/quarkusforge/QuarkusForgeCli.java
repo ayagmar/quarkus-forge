@@ -34,7 +34,7 @@ import picocli.CommandLine.Option;
     versionProvider = CliVersionProvider.class,
     subcommands = {GenerateCommand.class},
     description = "Quarkus forge terminal UI")
-public final class QuarkusForgeCli implements Callable<Integer> {
+public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner {
 
   private static final Duration STARTUP_METADATA_REFRESH_TIMEOUT = Duration.ofSeconds(2);
   private static final ShellExecutor SHELL_EXECUTOR = new ShellExecutor();
@@ -374,7 +374,8 @@ public final class QuarkusForgeCli implements Callable<Integer> {
     return new StartupMetadataSelection(snapshotCompatibility, "snapshot fallback", detailMessage);
   }
 
-  Integer runHeadlessGenerate(GenerateCommand command) {
+  @Override
+  public int runHeadlessGenerate(GenerateCommand command) {
     return headlessGenerationService.run(command, dryRun, verbose);
   }
 
