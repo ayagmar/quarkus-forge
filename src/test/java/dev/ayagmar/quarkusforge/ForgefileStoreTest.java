@@ -113,7 +113,8 @@ class ForgefileStoreTest {
     Path missing = tempDir.resolve("nonexistent");
     assertThatThrownBy(() -> ForgefileStore.load(missing))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("Failed to read Forgefile");
+        .hasMessageContaining("Forgefile not found: '")
+        .hasMessageContaining("nonexistent");
   }
 
   @Test
@@ -122,7 +123,8 @@ class ForgefileStoreTest {
     Files.writeString(file, "not json");
     assertThatThrownBy(() -> ForgefileStore.load(file))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("Failed to read Forgefile");
+        .hasMessageContaining("Failed to parse Forgefile '")
+        .hasMessageContaining("bad.json");
   }
 
   @Test

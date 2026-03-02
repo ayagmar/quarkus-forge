@@ -27,12 +27,17 @@ public final class DiagnosticLogger {
     log("INFO", event, fields);
   }
 
+  public void warn(String event, DiagnosticField... fields) {
+    log("WARN", event, fields);
+  }
+
   public void error(String event, DiagnosticField... fields) {
     log("ERROR", event, fields);
   }
 
   private void log(String level, String event, DiagnosticField... fields) {
-    if (!enabled) {
+    // INFO events are gated behind --verbose; WARN and ERROR always emit to stderr.
+    if (!enabled && level.equals("INFO")) {
       return;
     }
     Map<String, Object> payload = new LinkedHashMap<>();

@@ -345,7 +345,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
       Thread.currentThread().interrupt();
       StartupMetadataSelection selection =
           snapshotFallbackSelection("Live metadata refresh interrupted");
-      diagnostics.error(
+      diagnostics.warn(
           "metadata.load.fallback",
           of("source", selection.sourceLabel()),
           of("detail", selection.detailMessage()));
@@ -356,7 +356,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
               "Live metadata refresh timed out after "
                   + STARTUP_METADATA_REFRESH_TIMEOUT.toMillis()
                   + "ms");
-      diagnostics.error(
+      diagnostics.warn(
           "metadata.load.fallback",
           of("source", selection.sourceLabel()),
           of("detail", selection.detailMessage()));
@@ -367,7 +367,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
           snapshotFallbackSelection(
               "Live metadata unavailable (%s)"
                   .formatted(ErrorMessageMapper.userFriendlyError(cause)));
-      diagnostics.error(
+      diagnostics.warn(
           "metadata.load.fallback",
           of("source", selection.sourceLabel()),
           of("detail", selection.detailMessage()),
@@ -388,6 +388,10 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
 
   @Override
   public int runHeadlessGenerate(GenerateCommand command) {
-    return headlessGenerationService.run(command, dryRun, verbose);
+    try {
+      return headlessGenerationService.run(command, dryRun, verbose);
+    } finally {
+      headlessGenerationService.close();
+    }
   }
 }

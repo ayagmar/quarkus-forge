@@ -11,13 +11,13 @@ final class HeadlessCliTest {
   @TempDir Path tempDir;
 
   @Test
-  void noSubcommandPrintsUsageAndExitsWithValidation() {
+  void noSubcommandPrintsUsageAndExitsOk() {
     RuntimeConfig config =
         CliCommandTestSupport.runtimeConfig(tempDir, URI.create("http://unused"));
     CliCommandTestSupport.CommandResult result = CliCommandTestSupport.runHeadlessCommand(config);
 
-    assertThat(result.exitCode()).isEqualTo(ExitCodes.VALIDATION);
-    assertThat(result.standardError()).contains("No subcommand specified");
+    assertThat(result.exitCode()).isEqualTo(ExitCodes.OK);
+    assertThat(result.standardOut()).contains("Usage:");
   }
 
   @Test

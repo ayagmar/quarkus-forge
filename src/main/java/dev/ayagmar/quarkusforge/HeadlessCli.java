@@ -4,6 +4,7 @@ import java.util.concurrent.Callable;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Spec;
 
 @Command(
     name = "quarkus-forge",
@@ -13,6 +14,8 @@ import picocli.CommandLine.Option;
     description = "Quarkus forge headless CLI")
 public final class HeadlessCli implements Callable<Integer>, HeadlessRunner {
   private final HeadlessGenerationService headlessGenerationService;
+
+  @Spec CommandLine.Model.CommandSpec spec;
 
   @Option(
       names = "--verbose",
@@ -37,8 +40,11 @@ public final class HeadlessCli implements Callable<Integer>, HeadlessRunner {
 
   @Override
   public Integer call() {
-    System.err.println("No subcommand specified. Use 'generate' to create a project.");
-    return ExitCodes.VALIDATION;
+    // No subcommand provided — print help and exit successfully.
+    // Returning a non-zero code here would break `if [ $? -eq 0 ]` wrappers that
+    // invoke the jar with no arguments just to inspect the help text.
+    spec.commandLine().usage(System.out);
+    return ExitCodes.OK;
   }
 
   @Override

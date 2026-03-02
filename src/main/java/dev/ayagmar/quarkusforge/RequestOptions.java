@@ -18,6 +18,12 @@ final class RequestOptions {
   static final String DEFAULT_OUTPUT_DIRECTORY = ".";
   static final String DEFAULT_PLATFORM_STREAM = "";
   static final String DEFAULT_BUILD_TOOL = "maven";
+
+  /**
+   * Default Java version. Update this constant each release when the recommended LTS advances. The
+   * live metadata from {@code code.quarkus.io} is used at runtime to recommend the appropriate
+   * stream, but this value is the fallback when metadata is unavailable.
+   */
   static final String DEFAULT_JAVA_VERSION = "25";
 
   static final String OPT_GROUP_ID = "--group-id";
