@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -82,7 +83,8 @@ final class HeadlessGenerationService {
       diagnostics.error(
           "generate.validation.failed",
           of("errorCount", validatedState.validation().errors().size()),
-          of("catalogSource", catalogData.source().label()));
+          of("catalogSource", catalogData.source().label()),
+          of("stale", catalogData.stale()));
       HeadlessOutputPrinter.printValidationErrors(
           validatedState.validation(), catalogData.sourceLabel(), catalogData.detailMessage());
       return ExitCodes.VALIDATION;
@@ -146,10 +148,7 @@ final class HeadlessGenerationService {
       return ExitCodes.OK;
     }
 
-    Path outputPath =
-        Path.of(validatedState.request().outputDirectory())
-            .resolve(validatedState.request().artifactId())
-            .normalize();
+    Path outputPath = HeadlessOutputPrinter.resolveProjectDirectory(validatedState.request());
     GenerationRequest generationRequest =
         new GenerationRequest(
             validatedState.request().groupId(),
@@ -213,6 +212,7 @@ final class HeadlessGenerationService {
       if (presetExtensions == null) {
         List<String> allowed = new ArrayList<>(presetExtensionsByName.keySet());
         allowed.add(PRESET_FAVORITES);
+        allowed.sort(String::compareTo);
         errors.add(
             new ValidationError(
                 "preset",
@@ -326,7 +326,7 @@ final class HeadlessGenerationService {
 
   private static void checkDrift(
       List<ValidationError> errors, String field, String locked, String actual) {
-    if (!locked.equals(actual)) {
+    if (!Objects.equals(locked, actual)) {
       errors.add(
           new ValidationError(
               "locked", field + " drift: locked='" + locked + "', request='" + actual + "'"));
@@ -336,6 +336,7 @@ final class HeadlessGenerationService {
   private static List<String> normalizePresets(List<String> presetInputs) {
     return presetInputs.stream()
         .map(ProjectRequestFactory::normalizePresetName)
+        .filter(s -> !s.isEmpty())
         .distinct()
         .toList();
   }
