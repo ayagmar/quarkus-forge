@@ -26,7 +26,9 @@ final class HeadlessOutputPrinter {
   static void printPrefillSummary(ProjectRequest request, String sourceLabel, String sourceDetail) {
     System.out.println("Prefill validated successfully:");
     printRequestFields(request);
-    System.out.println(" - metadataSource: " + sourceLabel);
+    if (sourceLabel != null && !sourceLabel.isBlank()) {
+      System.out.println(" - metadataSource: " + sourceLabel);
+    }
     if (sourceDetail != null && !sourceDetail.isBlank()) {
       System.out.println(" - metadataDetail: " + sourceDetail);
     }
@@ -55,7 +57,7 @@ final class HeadlessOutputPrinter {
     System.out.println(" - javaVersion: " + request.javaVersion());
   }
 
-  private static Path resolveProjectDirectory(ProjectRequest request) {
+  static Path resolveProjectDirectory(ProjectRequest request) {
     return Path.of(request.outputDirectory()).resolve(request.artifactId()).normalize();
   }
 }

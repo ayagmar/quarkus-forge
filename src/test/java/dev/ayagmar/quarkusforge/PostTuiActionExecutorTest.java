@@ -103,7 +103,7 @@ class PostTuiActionExecutorTest {
   }
 
   @Test
-  void nullActionDoesNotInvokeShell() {
+  void nullHookCommandDoesNotInvokeShell() {
     PostGenerationExitPlan plan =
         new PostGenerationExitPlan(PostGenerationExitAction.QUIT, Path.of("/tmp/project"), "");
     TuiSessionSummary summary = new TuiSessionSummary(dummyRequest(), plan);
@@ -128,9 +128,7 @@ class PostTuiActionExecutorTest {
     }
     String output = stdout.toString(StandardCharsets.UTF_8);
     // Without a console (CI/tests), it prints terminal handoff instructions
-    // OR opens interactive shell depending on System.console()
-    // Either way, the test shouldn't crash
-    assertThat(output).isNotNull();
+    assertThat(output).contains("Terminal handoff:");
   }
 
   private static ProjectRequest dummyRequest() {
