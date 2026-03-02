@@ -35,7 +35,7 @@ java -jar target/quarkus-forge-headless.jar generate \
   --output-dir .
 ----
 
-TIP: The full jar also works: `java -jar target/quarkus-forge.jar generate ...`
+TIP: The full jar also works: `java -jar target/quarkus-forge-headless.jar generate ...`
 
 == Common Examples
 
@@ -43,7 +43,7 @@ Dry-run validation only:
 
 [source,bash]
 ----
-java -jar target/quarkus-forge.jar generate \
+java -jar target/quarkus-forge-headless.jar generate \
   --group-id org.acme \
   --artifact-id demo \
   --build-tool maven \
@@ -55,7 +55,7 @@ Use extensions and preset together:
 
 [source,bash]
 ----
-java -jar target/quarkus-forge.jar generate \
+java -jar target/quarkus-forge-headless.jar generate \
   --group-id org.acme \
   --artifact-id demo \
   --build-tool maven \
@@ -68,28 +68,28 @@ Generate from a Forgefile template:
 
 [source,bash]
 ----
-java -jar target/quarkus-forge.jar generate --from ./Forgefile
+java -jar target/quarkus-forge-headless.jar generate --from ./Forgefile
 ----
 
 Generate and write/update the locked section:
 
 [source,bash]
 ----
-java -jar target/quarkus-forge.jar generate --from ./Forgefile --lock
+java -jar target/quarkus-forge-headless.jar generate --from ./Forgefile --lock
 ----
 
 Verify no drift against the locked section:
 
 [source,bash]
 ----
-java -jar target/quarkus-forge.jar generate --from ./Forgefile --lock-check --dry-run
+java -jar target/quarkus-forge-headless.jar generate --from ./Forgefile --lock-check --dry-run
 ----
 
 Save a reusable template by name into `~/.quarkus-forge/recipes`:
 
 [source,bash]
 ----
-java -jar target/quarkus-forge.jar generate \
+java -jar target/quarkus-forge-headless.jar generate \
   --dry-run \
   --group-id org.acme \
   --artifact-id demo \
@@ -102,8 +102,10 @@ Reuse that template later by name:
 
 [source,bash]
 ----
-java -jar target/quarkus-forge.jar generate --from starter.json
+java -jar target/quarkus-forge-headless.jar generate --from starter.json
 ----
+
+NOTE: All examples above also work with the full jar (`quarkus-forge.jar`). The headless jar is preferred for CI/containers as it has no TUI or terminal dependencies.
 
 == Key Flags
 
