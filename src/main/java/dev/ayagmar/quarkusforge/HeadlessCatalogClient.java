@@ -33,9 +33,20 @@ class HeadlessCatalogClient implements AutoCloseable {
     this.apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
   }
 
+  /**
+   * Constructor for subclasses that override all methods and manage their own resources. Does not
+   * create a {@link QuarkusApiClient}; {@link #close()} is a no-op unless overridden.
+   */
+  HeadlessCatalogClient() {
+    this.runtimeConfig = null;
+    this.apiClient = null;
+  }
+
   @Override
   public void close() {
-    apiClient.close();
+    if (apiClient != null) {
+      apiClient.close();
+    }
   }
 
   CatalogData loadCatalogData(Duration timeout)

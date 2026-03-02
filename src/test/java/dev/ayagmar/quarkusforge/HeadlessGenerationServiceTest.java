@@ -107,12 +107,12 @@ class HeadlessGenerationServiceTest {
     int startGenerationCalls;
 
     StubCatalogClient() {
-      super(
-          new RuntimeConfig(
-              java.net.URI.create("https://code.quarkus.io"),
-              Path.of("/tmp/cache.json"),
-              Path.of("/tmp/prefs.json"),
-              Path.of("/tmp/favs.json")));
+      // Use the no-arg constructor: no real HttpClient is created.
+    }
+
+    @Override
+    public void close() {
+      // No resources to release in this stub.
     }
 
     @Override

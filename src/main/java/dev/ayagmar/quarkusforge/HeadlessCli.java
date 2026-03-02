@@ -49,7 +49,11 @@ public final class HeadlessCli implements Callable<Integer>, HeadlessRunner {
 
   @Override
   public int runHeadlessGenerate(GenerateCommand command) {
-    return headlessGenerationService.run(command, dryRun, verbose);
+    try {
+      return headlessGenerationService.run(command, dryRun, verbose);
+    } finally {
+      headlessGenerationService.close();
+    }
   }
 
   public static int runWithArgs(String[] args) {
