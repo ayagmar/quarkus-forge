@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge;
 
 import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
+import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticField;
@@ -11,7 +12,6 @@ import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ValidationError;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
-import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;

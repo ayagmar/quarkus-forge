@@ -80,8 +80,7 @@ final class ProjectRequestFactory {
     Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(throwable);
     return switch (cause) {
       case CancellationException ignored -> ExitCodes.CANCELLED;
-      case dev.ayagmar.quarkusforge.api.ApiClientException ignored ->
-          ExitCodes.NETWORK;
+      case dev.ayagmar.quarkusforge.api.ApiClientException ignored -> ExitCodes.NETWORK;
       case ArchiveException ignored -> ExitCodes.ARCHIVE;
       default -> ExitCodes.ARCHIVE;
     };

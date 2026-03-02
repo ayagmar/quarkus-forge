@@ -3,7 +3,6 @@ package dev.ayagmar.quarkusforge;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
 
 @Command(
@@ -14,8 +13,6 @@ import picocli.CommandLine.Option;
     description = "Quarkus forge headless CLI")
 public final class HeadlessCli implements Callable<Integer>, HeadlessRunner {
   private final HeadlessGenerationService headlessService;
-
-  @Mixin RequestOptions requestOptions = new RequestOptions();
 
   @Option(
       names = "--verbose",

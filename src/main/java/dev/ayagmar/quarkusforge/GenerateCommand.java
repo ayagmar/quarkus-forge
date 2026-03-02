@@ -8,7 +8,10 @@ import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 
-@Command(name = "generate", description = "Generate a Quarkus project without starting the TUI")
+@Command(
+    name = "generate",
+    mixinStandardHelpOptions = true,
+    description = "Generate a Quarkus project without starting the TUI")
 public final class GenerateCommand implements Callable<Integer> {
   @ParentCommand private HeadlessRunner rootCommand;
 
