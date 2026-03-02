@@ -46,7 +46,6 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
   @Mixin private RequestOptions requestOptions = new RequestOptions();
 
   private final RuntimeConfig runtimeConfig;
-  private final HeadlessGenerationService headlessGenerationService;
 
   @Option(
       names = "--dry-run",
@@ -90,8 +89,6 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
 
   QuarkusForgeCli(RuntimeConfig runtimeConfig) {
     this.runtimeConfig = Objects.requireNonNull(runtimeConfig);
-    this.headlessGenerationService =
-        new HeadlessGenerationService(new HeadlessCatalogClient(runtimeConfig), runtimeConfig);
   }
 
   @Override
@@ -388,10 +385,9 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
 
   @Override
   public int runHeadlessGenerate(GenerateCommand command) {
-    try {
-      return headlessGenerationService.run(command, dryRun, verbose);
-    } finally {
-      headlessGenerationService.close();
+    try (HeadlessGenerationService service =
+        new HeadlessGenerationService(new HeadlessCatalogClient(runtimeConfig), runtimeConfig)) {
+      return service.run(command, dryRun, verbose);
     }
   }
 }

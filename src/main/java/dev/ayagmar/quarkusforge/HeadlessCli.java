@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge;
 
+import java.util.Objects;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -13,7 +14,7 @@ import picocli.CommandLine.Spec;
     subcommands = {GenerateCommand.class},
     description = "Quarkus forge headless CLI")
 public final class HeadlessCli implements Callable<Integer>, HeadlessRunner {
-  private final HeadlessGenerationService headlessGenerationService;
+  private final RuntimeConfig runtimeConfig;
 
   @Spec CommandLine.Model.CommandSpec spec;
 
@@ -34,8 +35,7 @@ public final class HeadlessCli implements Callable<Integer>, HeadlessRunner {
   }
 
   HeadlessCli(RuntimeConfig runtimeConfig) {
-    this.headlessGenerationService =
-        new HeadlessGenerationService(new HeadlessCatalogClient(runtimeConfig), runtimeConfig);
+    this.runtimeConfig = Objects.requireNonNull(runtimeConfig);
   }
 
   @Override
@@ -49,10 +49,9 @@ public final class HeadlessCli implements Callable<Integer>, HeadlessRunner {
 
   @Override
   public int runHeadlessGenerate(GenerateCommand command) {
-    try {
-      return headlessGenerationService.run(command, dryRun, verbose);
-    } finally {
-      headlessGenerationService.close();
+    try (HeadlessGenerationService service =
+        new HeadlessGenerationService(new HeadlessCatalogClient(runtimeConfig), runtimeConfig)) {
+      return service.run(command, dryRun, verbose);
     }
   }
 
