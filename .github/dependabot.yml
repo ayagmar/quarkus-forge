@@ -1,0 +1,38 @@
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    groups:
+      junit:
+        patterns:
+          - "org.junit.*"
+      jackson:
+        patterns:
+          - "com.fasterxml.jackson.*"
+      wiremock:
+        patterns:
+          - "org.wiremock*"
+      tamboui:
+        patterns:
+          - "dev.tamboui*"
+      maven-plugins:
+        patterns:
+          - "org.apache.maven.plugins*"
+          - "com.diffplug.spotless*"
+          - "org.graalvm.buildtools*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - ci
