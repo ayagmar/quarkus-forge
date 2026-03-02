@@ -1,8 +1,7 @@
 package dev.ayagmar.quarkusforge;
 
 import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
-import dev.ayagmar.quarkusforge.ui.ExtensionFavoritesStore;
-import dev.ayagmar.quarkusforge.ui.UserPreferencesStore;
+import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -20,7 +19,7 @@ record RuntimeConfig(
     return new RuntimeConfig(
         URI.create("https://code.quarkus.io"),
         CatalogSnapshotCache.defaultCacheFile(),
-        ExtensionFavoritesStore.defaultFile(),
-        UserPreferencesStore.defaultFile());
+        ForgeDataPaths.favoritesFile(),
+        ForgeDataPaths.preferencesFile());
   }
 }

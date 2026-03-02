@@ -15,6 +15,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
+import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 
 final class ExtensionCatalogState {
   private static final List<ExtensionCatalogItem> DEFAULT_EXTENSIONS =

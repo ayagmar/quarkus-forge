@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
-import dev.ayagmar.quarkusforge.ui.ExtensionFavoritesStore;
+import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;

@@ -1,6 +1,7 @@
 package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
+import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
 import java.time.Duration;

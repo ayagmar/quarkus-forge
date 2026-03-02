@@ -11,7 +11,7 @@ import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ValidationError;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
-import dev.ayagmar.quarkusforge.ui.ExtensionFavoritesStore;
+import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
