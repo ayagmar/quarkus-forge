@@ -7,6 +7,7 @@ import dev.ayagmar.quarkusforge.IdeDetector;
 import dev.ayagmar.quarkusforge.api.BuildToolCodec;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
+import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.api.ThrowableUnwrapper;
@@ -40,7 +41,6 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
-import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 
 public final class CoreTuiController
     implements CompactInputRenderer, UiRoutingContext, GenerationFlowCallbacks {

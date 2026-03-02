@@ -1,6 +1,5 @@
 package dev.ayagmar.quarkusforge.api;
 
-import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;

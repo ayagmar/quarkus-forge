@@ -12,9 +12,9 @@ final class HeadlessCliTest {
 
   @Test
   void noSubcommandPrintsUsageAndExitsWithValidation() {
-    RuntimeConfig config = CliCommandTestSupport.runtimeConfig(tempDir, URI.create("http://unused"));
-    CliCommandTestSupport.CommandResult result =
-        CliCommandTestSupport.runHeadlessCommand(config);
+    RuntimeConfig config =
+        CliCommandTestSupport.runtimeConfig(tempDir, URI.create("http://unused"));
+    CliCommandTestSupport.CommandResult result = CliCommandTestSupport.runHeadlessCommand(config);
 
     assertThat(result.exitCode()).isEqualTo(ExitCodes.VALIDATION);
     assertThat(result.standardError()).contains("No subcommand specified");
@@ -22,7 +22,8 @@ final class HeadlessCliTest {
 
   @Test
   void helpFlagExitsCleanly() {
-    RuntimeConfig config = CliCommandTestSupport.runtimeConfig(tempDir, URI.create("http://unused"));
+    RuntimeConfig config =
+        CliCommandTestSupport.runtimeConfig(tempDir, URI.create("http://unused"));
     CliCommandTestSupport.CommandResult result =
         CliCommandTestSupport.runHeadlessCommand(config, "--help");
 
@@ -33,7 +34,8 @@ final class HeadlessCliTest {
 
   @Test
   void versionFlagExitsCleanly() {
-    RuntimeConfig config = CliCommandTestSupport.runtimeConfig(tempDir, URI.create("http://unused"));
+    RuntimeConfig config =
+        CliCommandTestSupport.runtimeConfig(tempDir, URI.create("http://unused"));
     CliCommandTestSupport.CommandResult result =
         CliCommandTestSupport.runHeadlessCommand(config, "--version");
 

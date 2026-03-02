@@ -1,10 +1,10 @@
 package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
+import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;

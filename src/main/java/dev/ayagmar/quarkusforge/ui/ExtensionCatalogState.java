@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge.ui;
 
+import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.widgets.list.ListState;
 import java.time.Duration;
@@ -15,7 +16,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
-import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 
 final class ExtensionCatalogState {
   private static final List<ExtensionCatalogItem> DEFAULT_EXTENSIONS =
