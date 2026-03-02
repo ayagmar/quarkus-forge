@@ -12,6 +12,7 @@ Quarkus Forge follows a layered architecture that separates HTTP transport, JSON
 graph TD
     subgraph Entry["Entry Points"]
         CLI[QuarkusForgeCli]
+        HCLI[HeadlessCli]
         HGS[HeadlessGenerationService]
     end
 
@@ -48,6 +49,7 @@ graph TD
 
     CLI --> TBS
     CLI --> HGS
+    HCLI --> HGS
     HGS --> PRF
     HGS --> HCC
     HGS --> HOP
@@ -267,7 +269,7 @@ graph TD
 | Principle | Application
 
 | *Single Responsibility*
-| Each class has one reason to change. `QuarkusApiClient` handles HTTP; `ApiPayloadParser` handles JSON; `OverlayRenderer` handles overlay rendering.
+| Each class has one reason to change. `QuarkusApiClient` handles HTTP; `ApiPayloadParser` handles JSON; `OverlayRenderer` handles overlay rendering. `QuarkusForgeCli` owns TUI bootstrap; `HeadlessCli` owns headless-only entry.
 
 | *Sealed Types*
 | `CatalogLoadState` (Loading/Loaded/Failed) and `MenuKeyResult` (Handled/Quit/ExportRecipe/GenerateAgain) make state transitions explicit and exhaustive.
@@ -293,7 +295,7 @@ graph TD
 
 == Testing Strategy
 
-* **540 unit tests** with deterministic async harnesses for TUI state machine testing
+* **547 unit tests** with deterministic async harnesses for TUI state machine testing
 * **2 integration tests** using WireMock for API contract verification
 * Dedicated unit tests for extracted state managers: `PostGenerationMenuState`, `MetadataSelectorManager`, `CatalogRowBuilder`, `StartupOverlayTracker`
 * Async TUI tests use `UiScheduler.immediate()` and `Duration.ZERO` debounce for deterministic behavior

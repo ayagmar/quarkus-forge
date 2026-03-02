@@ -1,12 +1,32 @@
 = CLI Headless Mode
 
+== Overview
+
+Quarkus Forge supports two entry points:
+
+* *`quarkus-forge.jar`* (full) — includes TUI and headless `generate` subcommand
+* *`quarkus-forge-headless.jar`* (headless-only) — smaller jar without TUI/terminal dependencies, ideal for CI
+
+Both jars share the same `generate` subcommand with identical flags and behavior.
+
+== Build
+
+[source,bash]
+----
+# Full jar (TUI + headless)
+mvn clean package -DskipTests
+
+# Headless-only jar
+mvn clean package -Pheadless
+----
+
 == Command
 
 Use `generate` for non-interactive project generation:
 
 [source,bash]
 ----
-java -jar target/quarkus-forge.jar generate \
+java -jar target/quarkus-forge-headless.jar generate \
   --group-id org.acme \
   --artifact-id demo \
   --project-version 1.0.0-SNAPSHOT \
@@ -14,6 +34,8 @@ java -jar target/quarkus-forge.jar generate \
   --java-version 25 \
   --output-dir .
 ----
+
+TIP: The full jar also works: `java -jar target/quarkus-forge.jar generate ...`
 
 == Common Examples
 

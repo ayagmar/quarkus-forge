@@ -2,10 +2,11 @@
 
 == Test Layers
 
-* **Unit tests** (516+): parsing, validation, state machines, and extracted class behavior.
+* **Unit tests** (547+): parsing, validation, state machines, and extracted class behavior.
 * **Integration tests** (2): WireMock-based API contract verification and E2E generation.
 * **Deterministic async harnesses**: TUI state machine tests use `UiScheduler.immediate()` and `Duration.ZERO` debounce.
 * **Property-based tests**: ZIP extraction edge cases (path traversal, large archives).
+* **Headless CLI tests** (3): `HeadlessCli` entry point smoke tests (no-subcommand, help, version).
 
 == Dedicated Test Suites for Extracted Classes
 
@@ -38,6 +39,7 @@ mvn -q spotless:check
 mvn -q checkstyle:check
 mvn -q test
 mvn -q verify -DskipTests=true
+mvn -q clean compile -Pheadless  # verify headless profile compiles
 ----
 
 == Platform Independence
