@@ -45,23 +45,23 @@ public final class IdeDetector {
   private static void detectMacOs(List<DetectedIde> result, LinkedHashSet<String> seen) {
     // IntelliJ IDEA
     if (macAppExists("IntelliJ IDEA Ultimate")) {
-      add(result, seen, new DetectedIde("IntelliJ IDEA Ultimate", "idea"));
+      add(result, seen, new DetectedIde("IntelliJ IDEA Ultimate", "idea ."));
     } else if (macAppExists("IntelliJ IDEA CE")) {
-      add(result, seen, new DetectedIde("IntelliJ IDEA CE", "idea"));
+      add(result, seen, new DetectedIde("IntelliJ IDEA CE", "idea ."));
     } else if (commandExists("idea")) {
-      add(result, seen, new DetectedIde("IntelliJ IDEA", "idea"));
+      add(result, seen, new DetectedIde("IntelliJ IDEA", "idea ."));
     }
 
     // VS Code
     if (macAppExists("Visual Studio Code")) {
-      add(result, seen, new DetectedIde("VS Code", "code"));
+      add(result, seen, new DetectedIde("VS Code", "code ."));
     } else if (commandExists("code")) {
-      add(result, seen, new DetectedIde("VS Code", "code"));
+      add(result, seen, new DetectedIde("VS Code", "code ."));
     }
 
     // Eclipse
     if (macAppExists("Eclipse")) {
-      add(result, seen, new DetectedIde("Eclipse", "eclipse"));
+      add(result, seen, new DetectedIde("Eclipse", "eclipse ."));
     }
 
     detectCommonEditors(result, seen);
@@ -70,19 +70,19 @@ public final class IdeDetector {
   private static void detectLinux(List<DetectedIde> result, LinkedHashSet<String> seen) {
     // IntelliJ IDEA
     if (commandExists("idea")) {
-      add(result, seen, new DetectedIde("IntelliJ IDEA", "idea"));
+      add(result, seen, new DetectedIde("IntelliJ IDEA", "idea ."));
     } else if (commandExists("idea.sh")) {
-      add(result, seen, new DetectedIde("IntelliJ IDEA", "idea.sh"));
+      add(result, seen, new DetectedIde("IntelliJ IDEA", "idea.sh ."));
     }
 
     // VS Code
     if (commandExists("code")) {
-      add(result, seen, new DetectedIde("VS Code", "code"));
+      add(result, seen, new DetectedIde("VS Code", "code ."));
     }
 
     // Eclipse
     if (commandExists("eclipse")) {
-      add(result, seen, new DetectedIde("Eclipse", "eclipse"));
+      add(result, seen, new DetectedIde("Eclipse", "eclipse ."));
     }
 
     detectCommonEditors(result, seen);
@@ -91,46 +91,46 @@ public final class IdeDetector {
   private static void detectWindows(List<DetectedIde> result, LinkedHashSet<String> seen) {
     // IntelliJ IDEA — JetBrains Toolbox adds idea64.exe to PATH
     if (commandExists("idea64.exe")) {
-      add(result, seen, new DetectedIde("IntelliJ IDEA", "idea64.exe"));
+      add(result, seen, new DetectedIde("IntelliJ IDEA", "idea64.exe ."));
     } else if (commandExists("idea.exe")) {
-      add(result, seen, new DetectedIde("IntelliJ IDEA", "idea.exe"));
+      add(result, seen, new DetectedIde("IntelliJ IDEA", "idea.exe ."));
     }
 
     // VS Code — installer adds code.cmd to PATH
     if (commandExists("code.cmd")) {
-      add(result, seen, new DetectedIde("VS Code", "code.cmd"));
+      add(result, seen, new DetectedIde("VS Code", "code.cmd ."));
     } else if (commandExists("code")) {
-      add(result, seen, new DetectedIde("VS Code", "code"));
+      add(result, seen, new DetectedIde("VS Code", "code ."));
     }
 
     // Eclipse
     if (commandExists("eclipse.exe")) {
-      add(result, seen, new DetectedIde("Eclipse", "eclipse.exe"));
+      add(result, seen, new DetectedIde("Eclipse", "eclipse.exe ."));
     }
 
     // Cursor
     if (commandExists("cursor.cmd")) {
-      add(result, seen, new DetectedIde("Cursor", "cursor.cmd"));
+      add(result, seen, new DetectedIde("Cursor", "cursor.cmd ."));
     } else if (commandExists("cursor")) {
-      add(result, seen, new DetectedIde("Cursor", "cursor"));
+      add(result, seen, new DetectedIde("Cursor", "cursor ."));
     }
 
-    // Neovim
+    // Neovim — opens terminal-based, so open current dir
     if (commandExists("nvim.exe")) {
-      add(result, seen, new DetectedIde("Neovim", "nvim.exe"));
+      add(result, seen, new DetectedIde("Neovim", "nvim.exe ."));
     }
   }
 
   /** Editors available on all Unix-like systems (macOS, Linux). */
   private static void detectCommonEditors(List<DetectedIde> result, LinkedHashSet<String> seen) {
     if (commandExists("cursor")) {
-      add(result, seen, new DetectedIde("Cursor", "cursor"));
+      add(result, seen, new DetectedIde("Cursor", "cursor ."));
     }
     if (commandExists("zed")) {
-      add(result, seen, new DetectedIde("Zed", "zed"));
+      add(result, seen, new DetectedIde("Zed", "zed ."));
     }
     if (commandExists("nvim")) {
-      add(result, seen, new DetectedIde("Neovim", "nvim"));
+      add(result, seen, new DetectedIde("Neovim", "nvim ."));
     }
   }
 

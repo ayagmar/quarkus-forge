@@ -131,7 +131,7 @@ final class OverlayRenderer {
             .split(inner);
 
     String spinner =
-        SPINNER_FRAMES[(int) ((System.nanoTime() / 100_000_000L) % SPINNER_FRAMES.length)];
+        SPINNER_FRAMES[Math.floorMod(System.nanoTime() / 100_000_000L, SPINNER_FRAMES.length)];
     Paragraph phaseLine =
         Paragraph.builder()
             .text("  " + spinner + " " + progressPhase)

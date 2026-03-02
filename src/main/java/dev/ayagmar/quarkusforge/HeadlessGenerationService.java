@@ -396,12 +396,10 @@ final class HeadlessGenerationService {
     if (writePath == null && inputs.writeLock() && inputs.forgefilePath() != null) {
       writePath = inputs.forgefilePath();
     }
-    if (writePath == null && inputs.saveAsFile() == null) {
-      return; // Nothing to write
+    if (writePath == null) {
+      return;
     }
-    if (writePath != null) {
-      ForgefileStore.save(writePath, forgefile);
-    }
+    ForgefileStore.save(writePath, forgefile);
   }
 
   private static Path resolveForgefileReadPath(String reference) {

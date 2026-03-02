@@ -72,12 +72,7 @@ final class PostGenerationMenuState {
   }
 
   void resetForNewGeneration() {
-    visible = false;
-    githubVisibilityMenuVisible = false;
-    githubVisibilitySelection = 0;
-    exitPlan = null;
-    lastGeneratedProjectPath = null;
-    lastGeneratedNextCommand = "";
+    reset();
   }
 
   void showAfterSuccess(Path generatedPath, String nextCommand) {
