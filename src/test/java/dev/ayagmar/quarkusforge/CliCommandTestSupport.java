@@ -27,6 +27,10 @@ final class CliCommandTestSupport {
     return captureCommandOutput(() -> QuarkusForgeCli.runWithArgs(args, runtimeConfig));
   }
 
+  static CommandResult runHeadlessCommand(RuntimeConfig runtimeConfig, String... args) {
+    return captureCommandOutput(() -> HeadlessCli.runWithArgs(args, runtimeConfig));
+  }
+
   static CommandResult runSmoke(RuntimeConfig runtimeConfig, boolean verbose) {
     return captureCommandOutput(() -> new QuarkusForgeCli(runtimeConfig).runSmokeForTest(verbose));
   }
