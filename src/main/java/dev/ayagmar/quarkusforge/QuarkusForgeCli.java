@@ -193,6 +193,11 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
     return ExitCodes.OK;
   }
 
+  /** Package-private for testing. */
+  RequestOptions requestOptions() {
+    return requestOptions;
+  }
+
   private static RequestOptions defaultRequestOptions() {
     return RequestOptions.defaults();
   }
@@ -204,14 +209,33 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
     }
     RequestOptions defaults = defaultRequestOptions();
     requestOptions.groupId =
-        applyIfNotExplicit(requestOptions, "--group-id", requestOptions.groupId, defaults.groupId, storedPrefill.groupId());
+        applyIfNotExplicit(
+            requestOptions,
+            "--group-id",
+            requestOptions.groupId,
+            defaults.groupId,
+            storedPrefill.groupId());
     requestOptions.artifactId =
-        applyIfNotExplicit(requestOptions, "--artifact-id", requestOptions.artifactId, defaults.artifactId, storedPrefill.artifactId());
+        applyIfNotExplicit(
+            requestOptions,
+            "--artifact-id",
+            requestOptions.artifactId,
+            defaults.artifactId,
+            storedPrefill.artifactId());
     requestOptions.version =
-        applyIfNotExplicit(requestOptions, "--project-version", requestOptions.version, defaults.version, storedPrefill.version());
+        applyIfNotExplicit(
+            requestOptions,
+            "--project-version",
+            requestOptions.version,
+            defaults.version,
+            storedPrefill.version());
     requestOptions.packageName =
         applyIfNotExplicit(
-            requestOptions, "--package-name", requestOptions.packageName, defaults.packageName, storedPrefill.packageName());
+            requestOptions,
+            "--package-name",
+            requestOptions.packageName,
+            defaults.packageName,
+            storedPrefill.packageName());
     requestOptions.outputDirectory =
         applyIfNotExplicit(
             requestOptions,
@@ -221,18 +245,31 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
             storedPrefill.outputDirectory());
     requestOptions.platformStream =
         applyIfNotExplicit(
-            requestOptions, "--platform-stream", requestOptions.platformStream, defaults.platformStream, storedPrefill.platformStream());
+            requestOptions,
+            "--platform-stream",
+            requestOptions.platformStream,
+            defaults.platformStream,
+            storedPrefill.platformStream());
     requestOptions.buildTool =
-        applyIfNotExplicit(requestOptions, "--build-tool", requestOptions.buildTool, defaults.buildTool, storedPrefill.buildTool());
+        applyIfNotExplicit(
+            requestOptions,
+            "--build-tool",
+            requestOptions.buildTool,
+            defaults.buildTool,
+            storedPrefill.buildTool());
     requestOptions.javaVersion =
         applyIfNotExplicit(
-            requestOptions, "--java-version", requestOptions.javaVersion, defaults.javaVersion, storedPrefill.javaVersion());
+            requestOptions,
+            "--java-version",
+            requestOptions.javaVersion,
+            defaults.javaVersion,
+            storedPrefill.javaVersion());
   }
 
   /**
-   * Returns the stored value when the option was not explicitly provided on the command line.
-   * Uses {@link RequestOptions#isExplicitlySet} to detect explicit CLI input, which avoids
-   * overriding an intentional default-equal value with old prefill data.
+   * Returns the stored value when the option was not explicitly provided on the command line. Uses
+   * {@link RequestOptions#isExplicitlySet} to detect explicit CLI input, which avoids overriding an
+   * intentional default-equal value with old prefill data.
    */
   private static String applyIfNotExplicit(
       RequestOptions requestOptions,
