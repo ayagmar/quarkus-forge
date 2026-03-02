@@ -13,7 +13,7 @@ import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
 import dev.ayagmar.quarkusforge.ui.CoreTuiController;
 import dev.ayagmar.quarkusforge.ui.ExtensionCatalogLoadResult;
-import dev.ayagmar.quarkusforge.ui.ExtensionFavoritesStore;
+import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.ui.GenerationProgressUpdate;
 import dev.ayagmar.quarkusforge.ui.PostGenerationExitPlan;
 import dev.ayagmar.quarkusforge.ui.UiAction;

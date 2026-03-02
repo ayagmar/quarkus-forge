@@ -40,6 +40,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
+import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 
 public final class CoreTuiController
     implements CompactInputRenderer, UiRoutingContext, GenerationFlowCallbacks {

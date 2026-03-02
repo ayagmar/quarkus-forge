@@ -1,4 +1,4 @@
-package dev.ayagmar.quarkusforge.ui;
+package dev.ayagmar.quarkusforge.api;
 
 import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
 import java.nio.file.Path;
