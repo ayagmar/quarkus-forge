@@ -196,7 +196,7 @@ final class PostTuiActionExecutor {
   private static void printTerminalHandoff(Path generatedProjectDir, String nextCommand) {
     System.out.println();
     System.out.println("Terminal handoff:");
-    System.out.println("  cd " + generatedProjectDir);
+    System.out.println("  cd \"" + generatedProjectDir + "\"");
     if (nextCommand != null && !nextCommand.isBlank()) {
       System.out.println("  " + nextCommand);
     }

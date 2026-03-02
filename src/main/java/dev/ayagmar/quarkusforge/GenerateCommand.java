@@ -43,7 +43,8 @@ public final class GenerateCommand implements Callable<Integer> {
   @Option(
       names = "--lock",
       defaultValue = "false",
-      description = "Write or update the locked section in the Forgefile (requires --from)")
+      description =
+          "Write or update the locked section in the Forgefile (requires --from or --save-as)")
   boolean lock;
 
   @Option(

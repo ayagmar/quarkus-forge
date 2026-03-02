@@ -265,9 +265,9 @@ final class HeadlessGenerationService {
       forgefilePath = resolveForgefileReadPath(command.fromFile);
       forgefile = ForgefileStore.load(forgefilePath);
       requestOptions = forgefile.toRequestOptions();
-      presetInputs = new ArrayList<>(forgefile.presets());
+      presetInputs = new ArrayList<>(new LinkedHashSet<>(forgefile.presets()));
       presetInputs.addAll(command.presets);
-      extensionInputs = new ArrayList<>(forgefile.extensions());
+      extensionInputs = new ArrayList<>(new LinkedHashSet<>(forgefile.extensions()));
       extensionInputs.addAll(command.extensions);
     }
 
@@ -348,7 +348,10 @@ final class HeadlessGenerationService {
               "extensions drift: locked=" + lock.extensions() + ", request=" + extensionIds));
     }
     List<String> normalizedPresets =
-        inputs.presetInputs().stream().map(ProjectRequestFactory::normalizePresetName).toList();
+        inputs.presetInputs().stream()
+            .map(ProjectRequestFactory::normalizePresetName)
+            .distinct()
+            .toList();
     if (!lock.presets().equals(normalizedPresets)) {
       errors.add(
           new ValidationError(
@@ -367,7 +370,10 @@ final class HeadlessGenerationService {
   private static void saveForgefileIfRequested(
       EffectiveInputs inputs, ProjectRequest request, List<String> extensionIds) {
     List<String> normalizedPresets =
-        inputs.presetInputs().stream().map(ProjectRequestFactory::normalizePresetName).toList();
+        inputs.presetInputs().stream()
+            .map(ProjectRequestFactory::normalizePresetName)
+            .distinct()
+            .toList();
 
     // Always rebuild from effective inputs so CLI additions are persisted
     Forgefile forgefile =

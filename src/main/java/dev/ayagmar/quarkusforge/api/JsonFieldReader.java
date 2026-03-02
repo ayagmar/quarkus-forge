@@ -99,7 +99,7 @@ public final class JsonFieldReader {
       }
       object.put(key, entry.getValue());
     }
-    return Map.copyOf(object);
+    return Collections.unmodifiableMap(object);
   }
 
   public static List<Object> readArray(Map<String, Object> source, String fieldName) {
@@ -110,7 +110,7 @@ public final class JsonFieldReader {
     if (!(value instanceof List<?> rawArray)) {
       throw new ApiContractException("Malformed JSON payload");
     }
-    return List.copyOf(rawArray);
+    return Collections.unmodifiableList(new ArrayList<>(rawArray));
   }
 
   public static Boolean readBoolean(Map<String, Object> source, String fieldName) {

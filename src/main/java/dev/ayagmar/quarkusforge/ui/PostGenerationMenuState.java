@@ -71,6 +71,7 @@ final class PostGenerationMenuState {
   void showAfterSuccess(Path generatedPath, String nextCommand) {
     lastGeneratedProjectPath = generatedPath;
     lastGeneratedNextCommand = nextCommand == null ? "" : nextCommand;
+    exitPlan = null;
     visible = true;
     actionSelection = 0;
     githubVisibilityMenuVisible = false;

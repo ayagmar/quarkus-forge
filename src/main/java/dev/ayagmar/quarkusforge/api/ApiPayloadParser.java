@@ -178,7 +178,11 @@ public final class ApiPayloadParser {
         throw new ApiContractException("Preset payload field 'key' must not be blank");
       }
       List<String> presetExtensions = copyStringList(readArray(preset, "extensions"), "extensions");
-      presetsByName.put(key, presetExtensions);
+      List<String> previous = presetsByName.putIfAbsent(key, presetExtensions);
+      if (previous != null) {
+        throw new ApiContractException(
+            "Preset payload contains duplicate key '" + key + "' after normalization");
+      }
     }
     return Map.copyOf(presetsByName);
   }

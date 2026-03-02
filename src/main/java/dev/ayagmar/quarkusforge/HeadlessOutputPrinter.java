@@ -37,7 +37,9 @@ final class HeadlessOutputPrinter {
     System.out.println(" - buildTool: " + request.buildTool());
     System.out.println(" - javaVersion: " + request.javaVersion());
     System.out.println(" - extensions: " + extensionIds);
-    System.out.println(" - catalogSource: " + sourceLabel + (stale ? " [stale]" : ""));
+    String effectiveSourceLabel =
+        (sourceLabel == null || sourceLabel.isBlank()) ? "unknown" : sourceLabel;
+    System.out.println(" - catalogSource: " + effectiveSourceLabel + (stale ? " [stale]" : ""));
     System.out.println(" - generatedProjectDirectory: " + generatedProjectDirectory);
   }
 }

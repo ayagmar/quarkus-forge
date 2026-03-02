@@ -253,7 +253,7 @@ When the user presses `Esc` in the extension search or list, the TUI unwinds fil
 │                                                         │
 │  ProjectRequestFactory                                  │
 │    ├── fromOptions: RequestOptions → ProjectRequest     │
-│    ├── buildInitialState: validates + creates ForgeUiSt │
+│    ├── buildInitialState: validates + creates ForgeUiState │
 │    ├── applyRecommendedPlatformStream                   │
 │    └── mapFailureToExitCode                             │
 │                                                         │
@@ -332,7 +332,7 @@ When the user presses `Esc` in the extension search or list, the TUI unwinds fil
 
 == Testing Strategy
 
-* **516 unit tests** with deterministic async harnesses for TUI state machine testing
+* **540 unit tests** with deterministic async harnesses for TUI state machine testing
 * **2 integration tests** using WireMock for API contract verification
 * Dedicated unit tests for extracted state managers: `PostGenerationMenuState`, `MetadataSelectorManager`, `CatalogRowBuilder`, `StartupOverlayTracker`
 * Async TUI tests use `UiScheduler.immediate()` and `Duration.ZERO` debounce for deterministic behavior

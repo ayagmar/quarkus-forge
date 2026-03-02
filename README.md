@@ -109,7 +109,7 @@ java -jar target/quarkus-forge.jar generate --save-as my-template.json --lock \
 
 ### Theming
 Create a `.tcss` file with semantic color tokens:
-```
+```properties
 # my-theme.tcss
 base = #1e1e2e
 text = #cdd6f4
