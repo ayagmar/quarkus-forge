@@ -124,7 +124,7 @@ class CoreTuiThemePolishTest {
     CoreTuiController controller =
         CoreTuiController.from(
             UiTestFixtureFactory.defaultForgeUiState(), UiScheduler.immediate(), Duration.ZERO);
-    controller.setStartupOverlayMinDuration(Duration.ofMillis(5));
+    controller.setStartupOverlayMinDuration(Duration.ofMillis(150));
     controller.loadExtensionCatalogAsync(
         () ->
             CompletableFuture.completedFuture(
@@ -133,8 +133,8 @@ class CoreTuiThemePolishTest {
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 10)))));
     assertThat(UiControllerTestHarness.renderToString(controller, 120, 32)).contains("Startup");
 
-    Thread.sleep(20);
-    UiAction tickAction = controller.onEvent(TickEvent.of(1, Duration.ofMillis(40)));
+    Thread.sleep(220);
+    UiAction tickAction = controller.onEvent(TickEvent.of(1, Duration.ofMillis(250)));
     assertThat(tickAction.handled()).isTrue();
     assertThat(UiControllerTestHarness.renderToString(controller, 120, 32))
         .doesNotContain("Startup");

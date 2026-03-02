@@ -85,6 +85,7 @@ jobs:
           cache: 'maven'
 
       - name: Run ${{ matrix.suite }} tests
+        shell: bash
         run: ${{ matrix.command }}
 
   coverage:
