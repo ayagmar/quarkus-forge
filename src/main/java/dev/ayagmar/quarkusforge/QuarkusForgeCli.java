@@ -194,16 +194,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
   }
 
   private static RequestOptions defaultRequestOptions() {
-    RequestOptions defaults = new RequestOptions();
-    defaults.groupId = "org.acme";
-    defaults.artifactId = "quarkus-app";
-    defaults.version = "1.0.0-SNAPSHOT";
-    defaults.packageName = null;
-    defaults.outputDirectory = ".";
-    defaults.platformStream = "";
-    defaults.buildTool = "maven";
-    defaults.javaVersion = "25";
-    return defaults;
+    return RequestOptions.defaults();
   }
 
   private static void applyStoredRequestDefaults(

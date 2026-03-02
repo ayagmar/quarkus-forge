@@ -80,14 +80,15 @@ public record Forgefile(
 
   RequestOptions toRequestOptions() {
     RequestOptions options = new RequestOptions();
-    options.groupId = valueOrDefault(groupId, "org.acme");
-    options.artifactId = valueOrDefault(artifactId, "quarkus-app");
-    options.version = valueOrDefault(version, "1.0.0-SNAPSHOT");
+    options.groupId = valueOrDefault(groupId, RequestOptions.DEFAULT_GROUP_ID);
+    options.artifactId = valueOrDefault(artifactId, RequestOptions.DEFAULT_ARTIFACT_ID);
+    options.version = valueOrDefault(version, RequestOptions.DEFAULT_VERSION);
     options.packageName = packageName.isBlank() ? null : packageName;
-    options.outputDirectory = valueOrDefault(outputDirectory, ".");
+    options.outputDirectory =
+        valueOrDefault(outputDirectory, RequestOptions.DEFAULT_OUTPUT_DIRECTORY);
     options.platformStream = platformStream;
-    options.buildTool = valueOrDefault(buildTool, "maven");
-    options.javaVersion = valueOrDefault(javaVersion, "25");
+    options.buildTool = valueOrDefault(buildTool, RequestOptions.DEFAULT_BUILD_TOOL);
+    options.javaVersion = valueOrDefault(javaVersion, RequestOptions.DEFAULT_JAVA_VERSION);
     return options;
   }
 
