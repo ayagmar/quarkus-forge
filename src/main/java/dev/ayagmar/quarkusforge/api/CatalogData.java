@@ -22,4 +22,9 @@ public record CatalogData(
       throw new IllegalArgumentException("Only cache-sourced catalog data can be stale");
     }
   }
+
+  /** Returns the source label with a "[stale]" suffix when applicable. */
+  public String sourceLabel() {
+    return stale ? source.label() + " [stale]" : source.label();
+  }
 }

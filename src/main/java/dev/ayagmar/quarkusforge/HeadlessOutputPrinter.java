@@ -23,11 +23,28 @@ final class HeadlessOutputPrinter {
     }
   }
 
+  static void printPrefillSummary(ProjectRequest request, String sourceLabel, String sourceDetail) {
+    System.out.println("Prefill validated successfully:");
+    printRequestFields(request);
+    System.out.println(" - metadataSource: " + sourceLabel);
+    if (sourceDetail != null && !sourceDetail.isBlank()) {
+      System.out.println(" - metadataDetail: " + sourceDetail);
+    }
+    System.out.println(" - generatedProjectDirectory: " + resolveProjectDirectory(request));
+  }
+
   static void printDryRunSummary(
-      ProjectRequest request, List<String> extensionIds, String sourceLabel, boolean stale) {
-    Path generatedProjectDirectory =
-        Path.of(request.outputDirectory()).resolve(request.artifactId()).normalize();
+      ProjectRequest request, List<String> extensionIds, String sourceLabel) {
     System.out.println("Dry-run validated successfully:");
+    printRequestFields(request);
+    System.out.println(" - extensions: " + extensionIds);
+    String effectiveSourceLabel =
+        (sourceLabel == null || sourceLabel.isBlank()) ? "unknown" : sourceLabel;
+    System.out.println(" - catalogSource: " + effectiveSourceLabel);
+    System.out.println(" - generatedProjectDirectory: " + resolveProjectDirectory(request));
+  }
+
+  private static void printRequestFields(ProjectRequest request) {
     System.out.println(" - groupId: " + request.groupId());
     System.out.println(" - artifactId: " + request.artifactId());
     System.out.println(" - version: " + request.version());
@@ -36,10 +53,9 @@ final class HeadlessOutputPrinter {
     System.out.println(" - platformStream: " + request.platformStream());
     System.out.println(" - buildTool: " + request.buildTool());
     System.out.println(" - javaVersion: " + request.javaVersion());
-    System.out.println(" - extensions: " + extensionIds);
-    String effectiveSourceLabel =
-        (sourceLabel == null || sourceLabel.isBlank()) ? "unknown" : sourceLabel;
-    System.out.println(" - catalogSource: " + effectiveSourceLabel + (stale ? " [stale]" : ""));
-    System.out.println(" - generatedProjectDirectory: " + generatedProjectDirectory);
+  }
+
+  private static Path resolveProjectDirectory(ProjectRequest request) {
+    return Path.of(request.outputDirectory()).resolve(request.artifactId()).normalize();
   }
 }
