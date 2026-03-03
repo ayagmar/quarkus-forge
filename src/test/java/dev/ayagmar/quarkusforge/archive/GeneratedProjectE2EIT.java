@@ -131,9 +131,10 @@ class GeneratedProjectE2EIT {
   }
 
   private static void assertStartsInDevMode(Path generatedProject) throws Exception {
+    String mavenCommand = isWindowsOs() ? "mvn.cmd" : "mvn";
     ProcessBuilder processBuilder =
         new ProcessBuilder(
-            "mvn",
+            mavenCommand,
             "-DskipTests",
             "-Dquarkus.console.enabled=false",
             "-Dquarkus.enforceBuildGoal=false",
@@ -198,6 +199,11 @@ class GeneratedProjectE2EIT {
             "Generated project did not start in dev mode within %s%s. Last output:%n%s",
             DEV_MODE_START_TIMEOUT, exitDetail, tail(outputLines, 80))
         .isTrue();
+  }
+
+  private static boolean isWindowsOs() {
+    String osName = System.getProperty("os.name", "");
+    return osName.toLowerCase(java.util.Locale.ROOT).contains("win");
   }
 
   private static boolean isDevModeReadyLine(String line) {
