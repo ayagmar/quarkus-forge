@@ -31,4 +31,4 @@ jobs:
           config-file: .release-please-config.json
           manifest-file: .release-please-manifest.json
           target-branch: master
-          release-as: ${{ inputs.release_as }}
+          release-as: ${{ github.event.inputs.release_as }}
