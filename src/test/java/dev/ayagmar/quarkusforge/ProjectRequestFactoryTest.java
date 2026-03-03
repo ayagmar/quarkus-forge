@@ -141,4 +141,66 @@ class ProjectRequestFactoryTest {
     assertThat(ProjectRequestFactory.mapFailureToExitCode(new RuntimeException("unknown")))
         .isEqualTo(ExitCodes.INTERNAL);
   }
+
+  @Test
+  void applyRecommendedPlatformStreamShortCircuitsOnLoadError() {
+    ProjectRequest request =
+        new ProjectRequest("com.example", "demo", "1.0.0", "", ".", "", "maven", "21");
+    // Failure context should short-circuit recommendation logic
+    MetadataCompatibilityContext ctx = MetadataCompatibilityContext.failure("timeout");
+
+    ProjectRequest result = ProjectRequestFactory.applyRecommendedPlatformStream(request, ctx);
+
+    // Request remains unchanged because load error stops recommendation
+    assertThat(result.platformStream()).isEmpty();
+  }
+
+  @Test
+  void fromOptionsAppliesPackageNameOutputDirectoryAndPlatformStream() {
+    RequestOptions options = new RequestOptions();
+    options.groupId = "io.acme";
+    options.artifactId = "svc";
+    options.version = "3.0.0";
+    options.packageName = "io.acme.svc";
+    options.outputDirectory = "/projects";
+    options.platformStream = "io.quarkus.platform:3.31";
+    options.buildTool = "gradle";
+    options.javaVersion = "25";
+
+    ProjectRequest request = ProjectRequestFactory.fromOptions(options);
+
+    assertThat(request.packageName()).isEqualTo("io.acme.svc");
+    assertThat(request.outputDirectory()).isEqualTo("/projects");
+    assertThat(request.platformStream()).isEqualTo("io.quarkus.platform:3.31");
+  }
+
+  @Test
+  void mapFailureToExitCodeUnwrapsCompletionException() {
+    // Wrap in CompletionException to test the unwrapper
+    assertThat(
+            ProjectRequestFactory.mapFailureToExitCode(
+                new java.util.concurrent.CompletionException(
+                    new dev.ayagmar.quarkusforge.api.ApiClientException("wrapped", null))))
+        .isEqualTo(ExitCodes.NETWORK);
+  }
+
+  @Test
+  void buildInitialStateDetectsIncompatibleJavaVersion() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example",
+            "demo",
+            "1.0.0",
+            "com.example.demo",
+            ".",
+            "io.quarkus.platform:3.31",
+            "maven",
+            "11");
+    MetadataCompatibilityContext ctx = MetadataCompatibilityContext.success(METADATA);
+
+    ForgeUiState state = ProjectRequestFactory.buildInitialState(request, ctx);
+
+    assertThat(state.canSubmit()).isFalse();
+    assertThat(state.validation().errors()).anyMatch(e -> e.field().equals("javaVersion"));
+  }
 }

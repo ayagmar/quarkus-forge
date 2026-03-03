@@ -131,9 +131,10 @@ class GeneratedProjectE2EIT {
   }
 
   private static void assertStartsInDevMode(Path generatedProject) throws Exception {
+    String mavenCommand = isWindowsOs() ? "mvn.cmd" : "mvn";
     ProcessBuilder processBuilder =
         new ProcessBuilder(
-            "mvn",
+            mavenCommand,
             "-DskipTests",
             "-Dquarkus.console.enabled=false",
             "-Dquarkus.enforceBuildGoal=false",
@@ -200,6 +201,11 @@ class GeneratedProjectE2EIT {
         .isTrue();
   }
 
+  private static boolean isWindowsOs() {
+    String osName = System.getProperty("os.name", "");
+    return osName.toLowerCase(java.util.Locale.ROOT).contains("win");
+  }
+
   private static boolean isDevModeReadyLine(String line) {
     return line.contains("Listening on:")
         || line.contains("Profile dev activated.")
@@ -208,15 +214,36 @@ class GeneratedProjectE2EIT {
   }
 
   private static void terminateProcess(Process process) throws InterruptedException {
-    if (!process.isAlive()) {
+    ProcessHandle rootHandle = process.toHandle();
+    terminateProcessTree(rootHandle, false);
+    if (!waitForProcessExit(process, 10)) {
+      terminateProcessTree(rootHandle, true);
+      waitForProcessExit(process, 10);
+    }
+  }
+
+  private static void terminateProcessTree(ProcessHandle rootHandle, boolean force) {
+    List<ProcessHandle> descendants = rootHandle.descendants().toList();
+    for (int index = descendants.size() - 1; index >= 0; index--) {
+      terminateHandle(descendants.get(index), force);
+    }
+    terminateHandle(rootHandle, force);
+  }
+
+  private static void terminateHandle(ProcessHandle handle, boolean force) {
+    if (!handle.isAlive()) {
       return;
     }
-    process.destroy();
-    if (process.waitFor(10, TimeUnit.SECONDS)) {
-      return;
+    if (force) {
+      handle.destroyForcibly();
+    } else {
+      handle.destroy();
     }
-    process.destroyForcibly();
-    process.waitFor(10, TimeUnit.SECONDS);
+  }
+
+  private static boolean waitForProcessExit(Process process, long timeoutSeconds)
+      throws InterruptedException {
+    return process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
   }
 
   private static String tail(List<String> lines, int maxLines) {

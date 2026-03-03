@@ -222,4 +222,156 @@ class ProjectRequestValidatorTest {
 
     assertThat(report.errors()).extracting(ValidationError::field).contains("outputDirectory");
   }
+
+  @Test
+  void rejectsWindowsReservedNameWithExtension() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example", "forge-app", "1.0.0", "com.example.forge", "tmp/CON.txt", "maven", "25");
+
+    ValidationReport report = validator.validate(request);
+
+    assertThat(report.errors()).extracting(ValidationError::field).contains("outputDirectory");
+    assertThat(
+            report.errors().stream()
+                .filter(error -> "outputDirectory".equals(error.field()))
+                .map(ValidationError::message))
+        .anyMatch(msg -> msg.contains("reserved name"));
+  }
+
+  @Test
+  void rejectsOutputDirectorySegmentWithTrailingDot() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example",
+            "forge-app",
+            "1.0.0",
+            "com.example.forge",
+            "tmp/dirname.",
+            "maven",
+            "25");
+
+    ValidationReport report = validator.validate(request);
+
+    assertThat(report.errors()).extracting(ValidationError::field).contains("outputDirectory");
+    assertThat(
+            report.errors().stream()
+                .filter(error -> "outputDirectory".equals(error.field()))
+                .map(ValidationError::message))
+        .anyMatch(
+            msg ->
+                msg.contains("trailing dot/space") || msg.contains("unsupported path characters"));
+  }
+
+  @Test
+  void rejectsOutputDirectorySegmentWithTrailingSpace() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example",
+            "forge-app",
+            "1.0.0",
+            "com.example.forge",
+            "tmp/dirname ",
+            "maven",
+            "25");
+
+    ValidationReport report = validator.validate(request);
+
+    assertThat(report.errors()).extracting(ValidationError::field).contains("outputDirectory");
+    assertThat(
+            report.errors().stream()
+                .filter(error -> "outputDirectory".equals(error.field()))
+                .map(ValidationError::message))
+        .anyMatch(
+            msg ->
+                msg.contains("trailing dot/space") || msg.contains("unsupported path characters"));
+  }
+
+  @Test
+  void acceptsWindowsDriveLetterAsFirstSegment() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example",
+            "forge-app",
+            "1.0.0",
+            "com.example.forge",
+            "C:/Users/project",
+            "maven",
+            "25");
+
+    ValidationReport report = validator.validate(request);
+
+    assertThat(report.errors())
+        .extracting(ValidationError::field)
+        .doesNotContain("outputDirectory");
+  }
+
+  @Test
+  void rejectsBlankOutputDirectory() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example", "forge-app", "1.0.0", "com.example.forge", "", "maven", "25");
+
+    ValidationReport report = validator.validate(request);
+
+    assertThat(report.errors()).extracting(ValidationError::field).contains("outputDirectory");
+    assertThat(
+            report.errors().stream()
+                .filter(error -> "outputDirectory".equals(error.field()))
+                .map(ValidationError::message))
+        .anyMatch(msg -> msg.contains("must not be blank"));
+  }
+
+  @Test
+  void acceptsValidPlatformStreamFormat() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example",
+            "forge-app",
+            "1.0.0",
+            "com.example.forge",
+            "./out",
+            "io.quarkus.platform:3.31",
+            "maven",
+            "25");
+
+    ValidationReport report = validator.validate(request);
+
+    assertThat(report.errors()).extracting(ValidationError::field).doesNotContain("platformStream");
+  }
+
+  @Test
+  void rejectsNullOutputDirectory() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example", "forge-app", "1.0.0", "com.example.forge", null, "maven", "25");
+
+    ValidationReport report = validator.validate(request);
+
+    assertThat(report.errors()).extracting(ValidationError::field).contains("outputDirectory");
+  }
+
+  @Test
+  void rejectsBlankGroupIdAndArtifactId() {
+    ProjectRequest request =
+        new ProjectRequest("", "", "1.0.0", "com.example.app", "./out", "maven", "25");
+
+    ValidationReport report = validator.validate(request);
+
+    assertThat(report.errors())
+        .extracting(ValidationError::field)
+        .contains("groupId", "artifactId");
+  }
+
+  @Test
+  void rejectsNullGroupIdAndArtifactId() {
+    ProjectRequest request =
+        new ProjectRequest(null, null, "1.0.0", "com.example.app", "./out", "maven", "25");
+
+    ValidationReport report = validator.validate(request);
+
+    assertThat(report.errors())
+        .extracting(ValidationError::field)
+        .contains("groupId", "artifactId");
+  }
 }

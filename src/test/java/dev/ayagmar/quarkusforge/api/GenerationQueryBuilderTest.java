@@ -97,4 +97,44 @@ class GenerationQueryBuilderTest {
         .isInstanceOf(NullPointerException.class)
         .hasMessage("extensions must not be null");
   }
+
+  @Test
+  void buildReturnsEndpointWithoutQueryWhenAllValuesAreBlank() {
+    GenerationRequest request = new GenerationRequest("", "", "", "", "", List.of());
+
+    URI uri = GenerationQueryBuilder.build(URI.create("https://code.quarkus.io"), request);
+
+    assertThat(uri.toString()).isEqualTo("https://code.quarkus.io/api/download");
+    assertThat(uri.getQuery()).isNull();
+  }
+
+  @Test
+  void buildHandlesBaseUriWithNullPath() {
+    GenerationRequest request =
+        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+
+    URI uri = GenerationQueryBuilder.build(URI.create("https://code.quarkus.io"), request);
+
+    assertThat(uri.getPath()).isEqualTo("/api/download");
+  }
+
+  @Test
+  void buildExcludesNullPlatformStream() {
+    GenerationRequest request =
+        new GenerationRequest("com.example", "demo", "1.0.0", null, "maven", "25", List.of());
+
+    URI uri = GenerationQueryBuilder.build(URI.create("https://code.quarkus.io"), request);
+
+    assertThat(uri.toString()).doesNotContain("S=");
+  }
+
+  @Test
+  void buildIncludesOnlyNonBlankParameters() {
+    GenerationRequest request =
+        new GenerationRequest("com.example", "", "1.0.0", "maven", "25", List.of());
+
+    URI uri = GenerationQueryBuilder.build(URI.create("https://code.quarkus.io"), request);
+
+    assertThat(uri.toString()).contains("g=com.example").doesNotContain("a=");
+  }
 }

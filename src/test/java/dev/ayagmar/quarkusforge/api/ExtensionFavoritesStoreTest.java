@@ -66,4 +66,35 @@ class ExtensionFavoritesStoreTest {
     assertThat(store.loadFavoriteExtensionIds()).isEmpty();
     assertThat(store.loadRecentExtensionIds()).isEmpty();
   }
+
+  @Test
+  void inMemoryStoreWorksIsolated() {
+    ExtensionFavoritesStore store = ExtensionFavoritesStore.inMemory();
+    assertThat(store.loadFavoriteExtensionIds()).isEmpty();
+    assertThat(store.loadRecentExtensionIds()).isEmpty();
+
+    store.saveAll(Set.of("io.quarkus:quarkus-rest"), List.of("io.quarkus:quarkus-arc"));
+
+    assertThat(store.loadFavoriteExtensionIds()).containsExactly("io.quarkus:quarkus-rest");
+    assertThat(store.loadRecentExtensionIds()).containsExactly("io.quarkus:quarkus-arc");
+  }
+
+  @Test
+  void fileBackedStoreLoadsEmptyFromNonExistentFile() {
+    Path favoritesFile = tempDir.resolve("nonexistent-favorites.json");
+    ExtensionFavoritesStore store = ExtensionFavoritesStore.fileBacked(favoritesFile);
+
+    assertThat(store.loadFavoriteExtensionIds()).isEmpty();
+    assertThat(store.loadRecentExtensionIds()).isEmpty();
+  }
+
+  @Test
+  void fileBackedStoreLoadsEmptyFromCorruptFile() throws Exception {
+    Path favoritesFile = tempDir.resolve("corrupt-favorites.json");
+    Files.writeString(favoritesFile, "not valid json");
+
+    ExtensionFavoritesStore store = ExtensionFavoritesStore.fileBacked(favoritesFile);
+    assertThat(store.loadFavoriteExtensionIds()).isEmpty();
+    assertThat(store.loadRecentExtensionIds()).isEmpty();
+  }
 }
