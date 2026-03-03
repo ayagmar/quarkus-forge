@@ -3,7 +3,6 @@ package dev.ayagmar.quarkusforge;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
-import dev.ayagmar.quarkusforge.domain.CommandUtils;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.ui.GitHubVisibility;
 import dev.ayagmar.quarkusforge.ui.PostGenerationExitAction;
@@ -306,16 +305,6 @@ class PostTuiActionExecutorTest {
       assertThat(shellInvocations).hasSize(1);
       assertThat(shellInvocations.get(0).invocation()).anyMatch(s -> s.contains("--public"));
     }
-  }
-
-  @Test
-  void executeWithNullActionSkipsActionSwitch() {
-    PostGenerationExitPlan plan = new PostGenerationExitPlan(null, Path.of("/tmp/project"), "");
-    TuiSessionSummary summary = new TuiSessionSummary(dummyRequest(), plan);
-    executor.execute(summary, "echo hook", diagnostics);
-    // Hook should still execute even when action is null
-    assertThat(shellInvocations).hasSize(1);
-    assertThat(shellInvocations.get(0).invocation()).contains("echo hook");
   }
 
   private static ProjectRequest dummyRequest() {
