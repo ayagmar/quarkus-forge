@@ -542,7 +542,7 @@ class SafeZipExtractorTest {
     ExtractionResult result =
         extractor.extract(zipPath, tempDir.resolve("small-out"), OverwritePolicy.FAIL_IF_EXISTS);
 
-    assertThat(result.entryCount()).isPositive();
+    assertThat(result.entryCount()).isEqualTo(1);
     Path extractedFile = tempDir.resolve("small-out/small.txt");
     assertThat(extractedFile).exists();
     assertThat(Files.readString(extractedFile)).isEqualTo("tiny");

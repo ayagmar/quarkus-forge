@@ -15,10 +15,22 @@ import java.util.Locale;
  * session ends with a successful generation.
  */
 final class PostTuiActionExecutor {
+  @FunctionalInterface
+  interface CommandAvailabilityProvider {
+    boolean isAvailable(String command);
+  }
+
   private final ShellExecutor shellExecutor;
+  private final CommandAvailabilityProvider commandAvailabilityProvider;
 
   PostTuiActionExecutor(ShellExecutor shellExecutor) {
+    this(shellExecutor, CommandUtils::isCommandAvailable);
+  }
+
+  PostTuiActionExecutor(
+      ShellExecutor shellExecutor, CommandAvailabilityProvider commandAvailabilityProvider) {
     this.shellExecutor = shellExecutor;
+    this.commandAvailabilityProvider = commandAvailabilityProvider;
   }
 
   void execute(
@@ -59,14 +71,14 @@ final class PostTuiActionExecutor {
             of("action", "publish-github"),
             of("directory", generatedProjectDir.toString()),
             of("visibility", visibility.cliFlag()));
-        if (!CommandUtils.isCommandAvailable("git")) {
+        if (!commandAvailabilityProvider.isAvailable("git")) {
           String message = "Publish to GitHub requires 'git' on PATH. Install it and rerun.";
           diagnostics.error(
               "tui.post-action.failure", of("action", "publish-github"), of("message", message));
           System.err.println(message);
           break;
         }
-        if (!CommandUtils.isCommandAvailable("gh")) {
+        if (!commandAvailabilityProvider.isAvailable("gh")) {
           String message =
               "Publish to GitHub requires GitHub CLI ('gh') on PATH. Install it and rerun.";
           diagnostics.error(

@@ -285,7 +285,9 @@ class CatalogSnapshotCacheTest {
             Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
             Duration.ofHours(6),
             2L * 1024L * 1024L);
-    writer.write(sampleMetadata(), sampleExtensions());
+    CacheWriteOutcome writeOutcome = writer.write(sampleMetadata(), sampleExtensions());
+    assertThat(writeOutcome.written()).isTrue();
+    assertThat(cacheFile).exists();
 
     // Read with a much smaller maxBytes
     CatalogSnapshotCache reader =

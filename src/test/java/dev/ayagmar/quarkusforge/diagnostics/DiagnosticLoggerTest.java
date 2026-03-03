@@ -16,18 +16,27 @@ import org.junit.jupiter.api.parallel.Resources;
 @ResourceLock(Resources.SYSTEM_ERR)
 class DiagnosticLoggerTest {
   private PrintStream originalErr;
+  private PrintStream redirectedErr;
   private ByteArrayOutputStream stderr;
 
   @BeforeEach
   void captureStderr() {
     originalErr = System.err;
     stderr = new ByteArrayOutputStream();
-    System.setErr(new PrintStream(stderr, true, StandardCharsets.UTF_8));
+    redirectedErr = new PrintStream(stderr, true, StandardCharsets.UTF_8);
+    System.setErr(redirectedErr);
   }
 
   @AfterEach
   void restoreStderr() {
-    System.setErr(originalErr);
+    try {
+      System.setErr(originalErr);
+    } finally {
+      if (redirectedErr != null) {
+        redirectedErr.close();
+        redirectedErr = null;
+      }
+    }
   }
 
   private String capturedStderr() {

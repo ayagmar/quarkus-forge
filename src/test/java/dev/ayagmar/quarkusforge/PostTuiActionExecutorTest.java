@@ -152,22 +152,33 @@ class PostTuiActionExecutorTest {
 
   @Test
   void resolveIdeCommandFallsBackToCode() {
-    // In test env without QUARKUS_FORGE_IDE_COMMAND set, expect fallback
     String envIde = System.getenv("QUARKUS_FORGE_IDE_COMMAND");
     String command = PostTuiActionExecutor.resolveIdeCommand();
     if (envIde != null && !envIde.isBlank()) {
       assertThat(command).isEqualTo(envIde.strip());
     } else {
-      assertThat(command).isNotBlank();
+      List<IdeDetector.DetectedIde> detected = IdeDetector.detect();
+      String expected = detected.isEmpty() ? "code ." : detected.get(0).command();
+      assertThat(command).isEqualTo(expected);
     }
   }
 
   @Test
   void isWindowsOsDetectsCorrectly() {
-    // In test env (Linux/macOS), this should be false
-    String osName = System.getProperty("os.name", "");
-    boolean expected = osName.toLowerCase(java.util.Locale.ROOT).contains("win");
-    assertThat(PostTuiActionExecutor.isWindowsOs()).isEqualTo(expected);
+    String previous = System.getProperty("os.name");
+    try {
+      System.setProperty("os.name", "Windows 10");
+      assertThat(PostTuiActionExecutor.isWindowsOs()).isTrue();
+
+      System.setProperty("os.name", "Linux");
+      assertThat(PostTuiActionExecutor.isWindowsOs()).isFalse();
+    } finally {
+      if (previous == null) {
+        System.clearProperty("os.name");
+      } else {
+        System.setProperty("os.name", previous);
+      }
+    }
   }
 
   @Test
@@ -211,9 +222,8 @@ class PostTuiActionExecutorTest {
     executor.execute(summary, "", diagnostics);
 
     assertThat(shellInvocations).hasSize(1);
-    // When ideCommand is null, resolveIdeCommand() is used — returns either
-    // env var, detected IDE, or "code ."
-    assertThat(shellInvocations.get(0).invocation()).isNotEmpty();
+    String expectedIdeCommand = PostTuiActionExecutor.resolveIdeCommand();
+    assertThat(shellInvocations.get(0).invocation()).anyMatch(s -> s.contains(expectedIdeCommand));
   }
 
   @Test
@@ -267,17 +277,12 @@ class PostTuiActionExecutorTest {
             GitHubVisibility.PRIVATE,
             null);
     TuiSessionSummary summary = new TuiSessionSummary(dummyRequest(), plan);
-    executor.execute(summary, "", diagnostics);
+    PostTuiActionExecutor deterministicExecutor =
+        new PostTuiActionExecutor(capturingExecutor, command -> true);
+    deterministicExecutor.execute(summary, "", diagnostics);
 
-    // Should execute the publish command since git and gh are on PATH
-    boolean hasGitAndGh =
-        CommandUtils.isCommandAvailable("git") && CommandUtils.isCommandAvailable("gh");
-    if (hasGitAndGh) {
-      assertThat(shellInvocations).hasSize(1);
-      assertThat(shellInvocations.get(0).invocation()).anyMatch(s -> s.contains("gh repo create"));
-    } else {
-      assertThat(shellInvocations).isEmpty();
-    }
+    assertThat(shellInvocations).hasSize(1);
+    assertThat(shellInvocations.get(0).invocation()).anyMatch(s -> s.contains("gh repo create"));
   }
 
   @Test
@@ -286,17 +291,12 @@ class PostTuiActionExecutorTest {
         new PostGenerationExitPlan(
             PostGenerationExitAction.PUBLISH_GITHUB, Path.of("/tmp/project"), "", null, null);
     TuiSessionSummary summary = new TuiSessionSummary(dummyRequest(), plan);
-    executor.execute(summary, "", diagnostics);
+    PostTuiActionExecutor deterministicExecutor =
+        new PostTuiActionExecutor(capturingExecutor, command -> true);
+    deterministicExecutor.execute(summary, "", diagnostics);
 
-    // Should default to PRIVATE visibility
-    boolean hasGitAndGh =
-        CommandUtils.isCommandAvailable("git") && CommandUtils.isCommandAvailable("gh");
-    if (hasGitAndGh) {
-      assertThat(shellInvocations).hasSize(1);
-      assertThat(shellInvocations.get(0).invocation()).anyMatch(s -> s.contains("--private"));
-    } else {
-      assertThat(shellInvocations).isEmpty();
-    }
+    assertThat(shellInvocations).hasSize(1);
+    assertThat(shellInvocations.get(0).invocation()).anyMatch(s -> s.contains("--private"));
   }
 
   @Test
@@ -309,16 +309,30 @@ class PostTuiActionExecutorTest {
             GitHubVisibility.PUBLIC,
             null);
     TuiSessionSummary summary = new TuiSessionSummary(dummyRequest(), plan);
-    executor.execute(summary, "", diagnostics);
+    PostTuiActionExecutor deterministicExecutor =
+        new PostTuiActionExecutor(capturingExecutor, command -> true);
+    deterministicExecutor.execute(summary, "", diagnostics);
 
-    boolean hasGitAndGh =
-        CommandUtils.isCommandAvailable("git") && CommandUtils.isCommandAvailable("gh");
-    if (hasGitAndGh) {
-      assertThat(shellInvocations).hasSize(1);
-      assertThat(shellInvocations.get(0).invocation()).anyMatch(s -> s.contains("--public"));
-    } else {
-      assertThat(shellInvocations).isEmpty();
-    }
+    assertThat(shellInvocations).hasSize(1);
+    assertThat(shellInvocations.get(0).invocation()).anyMatch(s -> s.contains("--public"));
+  }
+
+  @Test
+  void publishGithubWithMissingToolsDoesNotExecuteCommand() {
+    PostGenerationExitPlan plan =
+        new PostGenerationExitPlan(
+            PostGenerationExitAction.PUBLISH_GITHUB,
+            Path.of("/tmp/project"),
+            "",
+            GitHubVisibility.PRIVATE,
+            null);
+    TuiSessionSummary summary = new TuiSessionSummary(dummyRequest(), plan);
+    PostTuiActionExecutor deterministicExecutor =
+        new PostTuiActionExecutor(capturingExecutor, command -> false);
+
+    deterministicExecutor.execute(summary, "", diagnostics);
+
+    assertThat(shellInvocations).isEmpty();
   }
 
   private static ProjectRequest dummyRequest() {

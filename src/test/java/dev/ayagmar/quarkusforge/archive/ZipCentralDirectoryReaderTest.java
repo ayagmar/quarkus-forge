@@ -98,16 +98,18 @@ class ZipCentralDirectoryReaderTest {
   @Test
   void readsEntryWithBackslashNormalized() throws IOException {
     // Create entry with backslash in central directory name
+    String entryName = "demo/src/Main.java";
+    int slashIndex = entryName.indexOf('/');
     Path zipPath =
         ArchiveTestUtils.createZip(
             tempDir.resolve("backslash.zip"),
-            Map.of("demo/src/Main.java", "class Main {}".getBytes(StandardCharsets.UTF_8)));
+            Map.of(entryName, "class Main {}".getBytes(StandardCharsets.UTF_8)));
 
     // Patch entry name byte: replace '/' with '\' in "demo/src/Main.java"
     ArchiveTestUtils.patchCentralDirectoryEntryNameByte(
-        zipPath, "demo/src/Main.java", 4, (byte) '\\');
+        zipPath, entryName, slashIndex, (byte) '\\');
     // Also patch the local file header to match
-    ArchiveTestUtils.patchFirstLocalFileHeaderNameByte(zipPath, 4, (byte) '\\');
+    ArchiveTestUtils.patchFirstLocalFileHeaderNameByte(zipPath, slashIndex, (byte) '\\');
 
     Map<String, ZipEntryMetadata> entries = ZipCentralDirectoryReader.read(zipPath);
 
