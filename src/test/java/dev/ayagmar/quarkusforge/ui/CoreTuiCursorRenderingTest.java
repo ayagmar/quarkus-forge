@@ -13,6 +13,7 @@ class CoreTuiCursorRenderingTest {
   @Test
   void focusedMetadataInputExposesVisibleCursorAndMovesWithArrowKeys() {
     CoreTuiController controller = UiControllerTestHarness.controller();
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.GROUP_ID);
 
     Frame firstFrame = UiControllerTestHarness.renderFrame(controller, 120, 34);
     Position firstCursor = firstFrame.cursorPosition().orElseThrow();

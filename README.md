@@ -58,6 +58,7 @@ Quarkus Forge is a keyboard-first terminal UI (TUI) and headless CLI for generat
 | `Enter` / `Alt+G` | Generate project |
 | `Ctrl+R` | Reload catalog |
 | `Ctrl+K` | Toggle favorites-only |
+| `Alt+S` | Toggle selected-only view |
 | `v` | Cycle category filter |
 | `c` | Toggle current category |
 | `C` | Open all categories |

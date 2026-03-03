@@ -120,19 +120,9 @@ class CatalogRowBuilderTest {
           CatalogRowBuilder.buildRows(
               items, Set.of(), List.of("a:b", "a:b", "a:b"), "", false, false, "");
 
-      long recentItemCount =
-          rows.stream()
-              .filter(r -> !r.isSectionHeader())
-              .filter(
-                  r -> {
-                    int idx = rows.indexOf(r);
-                    return idx > 0
-                        && rows.get(0).label().equals(CatalogRowBuilder.RECENT_SECTION_TITLE);
-                  })
-              .count();
-      // Only 1 item in recents, not 3
       assertThat(rows.get(0).label()).isEqualTo(CatalogRowBuilder.RECENT_SECTION_TITLE);
       assertThat(rows.get(1).extension().id()).isEqualTo("a:b");
+      assertThat(rows.get(1).isSectionHeader()).isFalse();
       // After recent section: category section + item
       assertThat(rows.get(2).isSectionHeader()).isTrue();
       assertThat(rows.get(2).label()).isEqualTo("Web");

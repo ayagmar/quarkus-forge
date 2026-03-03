@@ -347,6 +347,7 @@ final class ExtensionCatalogState {
       return 0;
     }
     selectedExtensionIds.clear();
+    reapplyFiltersAfterSelectionMutation();
     return clearedCount;
   }
 
@@ -498,6 +499,7 @@ final class ExtensionCatalogState {
       boolean selectedNow = selectedExtensionIds.add(extension.id());
       if (!selectedNow) {
         selectedExtensionIds.remove(extension.id());
+        reapplyFiltersAfterSelectionMutation();
       } else {
         recordRecentSelection(extension.id());
       }
@@ -583,6 +585,10 @@ final class ExtensionCatalogState {
 
   private static Set<String> availableCategoryTitles(List<ExtensionCatalogItem> rankedItems) {
     return CatalogRowBuilder.availableCategoryTitles(rankedItems);
+  }
+
+  private void reapplyFiltersAfterSelectionMutation() {
+    applyFiltered(currentQuery, searchResultGate.nextToken(), ignored -> {});
   }
 
   private static Map<String, List<String>> normalizePresetMap(Map<String, List<String>> presetMap) {

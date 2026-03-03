@@ -10,12 +10,7 @@ final class UiInputStyles {
   }
 
   static Style cursor(UiTheme theme) {
-    // Strong visibility across terminals: explicit contrast + reverse + underline.
-    return Style.EMPTY
-        .fg(theme.color("base"))
-        .bg(theme.color("focus"))
-        .reversed()
-        .underlined()
-        .bold();
+    // Strong visibility across terminals: explicit focus background + base foreground.
+    return Style.EMPTY.fg(theme.color("base")).bg(theme.color("focus")).underlined().bold();
   }
 }
