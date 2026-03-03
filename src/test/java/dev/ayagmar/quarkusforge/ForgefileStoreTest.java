@@ -224,14 +224,18 @@ class ForgefileStoreTest {
   }
 
   @Test
-  void saveOmitsBlankPackageNameAndOutputStream() {
+  void saveOmitsBlankPackageNameOutputDirectoryAndPlatformStream() throws Exception {
     Forgefile forgefile =
         new Forgefile("org.acme", "app", "1.0.0", "", "", "", "maven", "21", List.of(), List.of());
 
     Path file = tempDir.resolve("omit-blanks");
     ForgefileStore.save(file, forgefile);
+    String raw = Files.readString(file);
     Forgefile loaded = ForgefileStore.load(file);
 
+    assertThat(raw).doesNotContain("\"packageName\"");
+    assertThat(raw).doesNotContain("\"outputDirectory\"");
+    assertThat(raw).doesNotContain("\"platformStream\"");
     // Blank packageName and outputDirectory should be omitted in JSON, loaded as empty
     assertThat(loaded.packageName()).isEmpty();
     assertThat(loaded.outputDirectory()).isEmpty();

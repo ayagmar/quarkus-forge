@@ -1,6 +1,7 @@
 package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -108,5 +109,9 @@ class ExtensionsPanelSnapshotTest {
 
     assertThat(snapshot.filteredRows()).hasSize(1);
     assertThat(snapshot.selectedExtensionIds()).hasSize(1);
+    assertThatThrownBy(() -> snapshot.filteredRows().clear())
+        .isInstanceOf(UnsupportedOperationException.class);
+    assertThatThrownBy(() -> snapshot.selectedExtensionIds().add("io.quarkus:jdbc"))
+        .isInstanceOf(UnsupportedOperationException.class);
   }
 }

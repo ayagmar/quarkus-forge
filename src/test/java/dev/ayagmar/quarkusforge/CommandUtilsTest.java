@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -52,12 +53,12 @@ class CommandUtilsTest {
   void emptyPathEntryIsSkipped() throws IOException {
     Path bin = tempDir.resolve("bin");
     Files.createDirectories(bin);
-    Path executable = bin.resolve("tool");
+    Path executable = bin.resolve(commandFileName("tool"));
     Files.createFile(executable);
     executable.toFile().setExecutable(true);
 
     // Empty segment between separators is safely skipped
-    String pathValue = ":" + bin.toString() + ":";
+    String pathValue = File.pathSeparator + bin + File.pathSeparator;
     assertThat(CommandUtils.isCommandAvailable("tool", pathValue)).isTrue();
   }
 
@@ -65,12 +66,12 @@ class CommandUtilsTest {
   void invalidPathEntryIsSkipped() throws IOException {
     Path bin = tempDir.resolve("bin");
     Files.createDirectories(bin);
-    Path executable = bin.resolve("valid-tool");
+    Path executable = bin.resolve(commandFileName("valid-tool"));
     Files.createFile(executable);
     executable.toFile().setExecutable(true);
 
     // Invalid path entry (null bytes) followed by valid entry
-    String pathValue = "/invalid\0path:" + bin.toString();
+    String pathValue = "/invalid\0path" + File.pathSeparator + bin;
     assertThat(CommandUtils.isCommandAvailable("valid-tool", pathValue)).isTrue();
   }
 
@@ -78,9 +79,8 @@ class CommandUtilsTest {
   void nonExecutableFileNotFound() throws IOException {
     Path bin = tempDir.resolve("bin");
     Files.createDirectories(bin);
-    Path file = bin.resolve("notexec");
+    Path file = bin.resolve("notexec.txt");
     Files.createFile(file);
-    file.toFile().setExecutable(false);
 
     assertThat(CommandUtils.isCommandAvailable("notexec", bin.toString())).isFalse();
   }
@@ -91,11 +91,11 @@ class CommandUtilsTest {
     Path bin2 = tempDir.resolve("bin2");
     Files.createDirectories(bin1);
     Files.createDirectories(bin2);
-    Path executable = bin2.resolve("deep-tool");
+    Path executable = bin2.resolve(commandFileName("deep-tool"));
     Files.createFile(executable);
     executable.toFile().setExecutable(true);
 
-    String pathValue = bin1.toString() + ":" + bin2.toString();
+    String pathValue = bin1 + File.pathSeparator + bin2;
     assertThat(CommandUtils.isCommandAvailable("deep-tool", pathValue)).isTrue();
   }
 
@@ -103,7 +103,7 @@ class CommandUtilsTest {
   void commandWithLeadingTrailingSpacesIsStripped() throws IOException {
     Path bin = tempDir.resolve("bin");
     Files.createDirectories(bin);
-    Path executable = bin.resolve("spaced-tool");
+    Path executable = bin.resolve(commandFileName("spaced-tool"));
     Files.createFile(executable);
     executable.toFile().setExecutable(true);
 
@@ -126,5 +126,10 @@ class CommandUtilsTest {
     // But an intentionally missing command should return false
     assertThat(CommandUtils.isCommandAvailable("nonexistent-binary-" + System.nanoTime()))
         .isFalse();
+  }
+
+  private static String commandFileName(String baseName) {
+    String osName = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+    return osName.contains("win") ? baseName + ".cmd" : baseName;
   }
 }

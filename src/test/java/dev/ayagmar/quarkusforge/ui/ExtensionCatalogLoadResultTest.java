@@ -72,6 +72,8 @@ class ExtensionCatalogLoadResultTest {
 
     mutable.clear();
     assertThat(result.extensions()).hasSize(1);
+    assertThatThrownBy(() -> result.extensions().add(extension("jdbc")))
+        .isInstanceOf(UnsupportedOperationException.class);
   }
 
   @Test

@@ -10,7 +10,10 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.Resources;
 
+@ResourceLock(Resources.SYSTEM_ERR)
 class DiagnosticLoggerTest {
   private PrintStream originalErr;
   private ByteArrayOutputStream stderr;

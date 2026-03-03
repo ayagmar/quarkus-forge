@@ -17,7 +17,7 @@ public record RetryPolicy(
     if (baseDelay.isNegative()) {
       throw new IllegalArgumentException("baseDelay must not be negative");
     }
-    if (jitterRatio < 0 || jitterRatio > 1) {
+    if (!Double.isFinite(jitterRatio) || jitterRatio < 0 || jitterRatio > 1) {
       throw new IllegalArgumentException("jitterRatio must be in [0, 1]");
     }
   }

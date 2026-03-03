@@ -232,8 +232,10 @@ class ProjectRequestValidatorTest {
     ValidationReport report = validator.validate(request);
 
     assertThat(report.errors()).extracting(ValidationError::field).contains("outputDirectory");
-    assertThat(report.errors())
-        .extracting(ValidationError::message)
+    assertThat(
+            report.errors().stream()
+                .filter(error -> "outputDirectory".equals(error.field()))
+                .map(ValidationError::message))
         .anyMatch(msg -> msg.contains("reserved name"));
   }
 
@@ -252,9 +254,13 @@ class ProjectRequestValidatorTest {
     ValidationReport report = validator.validate(request);
 
     assertThat(report.errors()).extracting(ValidationError::field).contains("outputDirectory");
-    assertThat(report.errors())
-        .extracting(ValidationError::message)
-        .anyMatch(msg -> msg.contains("trailing dot/space"));
+    assertThat(
+            report.errors().stream()
+                .filter(error -> "outputDirectory".equals(error.field()))
+                .map(ValidationError::message))
+        .anyMatch(
+            msg ->
+                msg.contains("trailing dot/space") || msg.contains("unsupported path characters"));
   }
 
   @Test
@@ -272,9 +278,13 @@ class ProjectRequestValidatorTest {
     ValidationReport report = validator.validate(request);
 
     assertThat(report.errors()).extracting(ValidationError::field).contains("outputDirectory");
-    assertThat(report.errors())
-        .extracting(ValidationError::message)
-        .anyMatch(msg -> msg.contains("trailing dot/space"));
+    assertThat(
+            report.errors().stream()
+                .filter(error -> "outputDirectory".equals(error.field()))
+                .map(ValidationError::message))
+        .anyMatch(
+            msg ->
+                msg.contains("trailing dot/space") || msg.contains("unsupported path characters"));
   }
 
   @Test
@@ -305,8 +315,10 @@ class ProjectRequestValidatorTest {
     ValidationReport report = validator.validate(request);
 
     assertThat(report.errors()).extracting(ValidationError::field).contains("outputDirectory");
-    assertThat(report.errors())
-        .extracting(ValidationError::message)
+    assertThat(
+            report.errors().stream()
+                .filter(error -> "outputDirectory".equals(error.field()))
+                .map(ValidationError::message))
         .anyMatch(msg -> msg.contains("must not be blank"));
   }
 

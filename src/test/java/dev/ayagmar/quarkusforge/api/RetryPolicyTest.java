@@ -73,6 +73,34 @@ class RetryPolicyTest {
   }
 
   @Test
+  void rejectsJitterRatioNaN() {
+    assertThatThrownBy(
+            () -> new RetryPolicy(1, Duration.ofSeconds(1), Duration.ofMillis(10), Double.NaN))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("jitterRatio must be in [0, 1]");
+  }
+
+  @Test
+  void rejectsJitterRatioPositiveInfinity() {
+    assertThatThrownBy(
+            () ->
+                new RetryPolicy(
+                    1, Duration.ofSeconds(1), Duration.ofMillis(10), Double.POSITIVE_INFINITY))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("jitterRatio must be in [0, 1]");
+  }
+
+  @Test
+  void rejectsJitterRatioNegativeInfinity() {
+    assertThatThrownBy(
+            () ->
+                new RetryPolicy(
+                    1, Duration.ofSeconds(1), Duration.ofMillis(10), Double.NEGATIVE_INFINITY))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("jitterRatio must be in [0, 1]");
+  }
+
+  @Test
   void defaultsProvidesValidPolicy() {
     RetryPolicy policy = RetryPolicy.defaults();
     assertThat(policy.maxAttempts()).isEqualTo(3);

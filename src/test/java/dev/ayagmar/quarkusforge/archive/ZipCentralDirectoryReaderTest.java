@@ -15,7 +15,7 @@ class ZipCentralDirectoryReaderTest {
   @TempDir Path tempDir;
 
   @Test
-  void readValidZipReturnsSortedEntries() throws IOException {
+  void readValidZipReturnsExpectedEntries() throws IOException {
     Path zipPath =
         ArchiveTestUtils.createZip(
             tempDir.resolve("valid.zip"),

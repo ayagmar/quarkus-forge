@@ -22,13 +22,14 @@ class JsonSupportTest {
 
   @Test
   void writeStringSerializesNestedValues() throws Exception {
-    String payload =
-        JsonSupport.writeString(
-            Map.of("name", "forge", "versions", List.of("21", "25"), "enabled", true));
+    Map<String, Object> payload =
+        JsonSupport.parseObject(
+            JsonSupport.writeString(
+                Map.of("name", "forge", "versions", List.of("21", "25"), "enabled", true)));
 
-    assertThat(payload).contains("\"name\":\"forge\"");
-    assertThat(payload).contains("\"versions\":[\"21\",\"25\"]");
-    assertThat(payload).contains("\"enabled\":true");
+    assertThat(payload).containsEntry("name", "forge");
+    assertThat(payload.get("versions")).isEqualTo(List.of("21", "25"));
+    assertThat(payload).containsEntry("enabled", true);
   }
 
   // ── parseArray ──────────────────────────────────────────────────────
@@ -64,82 +65,80 @@ class JsonSupportTest {
 
   @Test
   void writeBytesProducesValidJson() throws Exception {
-    byte[] bytes = JsonSupport.writeBytes(Map.of("a", 1));
-    String json = new String(bytes, StandardCharsets.UTF_8);
-    assertThat(json).contains("\"a\":1");
+    Map<String, Object> root =
+        JsonSupport.parseObject(
+            new String(JsonSupport.writeBytes(Map.of("a", 1)), StandardCharsets.UTF_8));
+    assertThat(root).containsEntry("a", 1);
   }
 
   // ── writeValue for various Number types ──────────────────────────────
 
   @Test
   void writeNullValue() throws Exception {
-    String json = JsonSupport.writeString(nullValueMap());
-    assertThat(json).contains("\"v\":null");
+    assertThat(singleValueFromWritten(nullValueMap())).isNull();
   }
 
   @Test
   void writeLongValue() throws Exception {
-    assertThat(JsonSupport.writeString(Map.of("v", 42L))).contains("\"v\":42");
+    assertThat(((Number) singleValueFromWritten(Map.of("v", 42L))).longValue()).isEqualTo(42L);
   }
 
   @Test
   void writeShortValue() throws Exception {
-    assertThat(JsonSupport.writeString(Map.of("v", (short) 7))).contains("\"v\":7");
+    assertThat(((Number) singleValueFromWritten(Map.of("v", (short) 7))).intValue()).isEqualTo(7);
   }
 
   @Test
   void writeByteValue() throws Exception {
-    assertThat(JsonSupport.writeString(Map.of("v", (byte) 3))).contains("\"v\":3");
+    assertThat(((Number) singleValueFromWritten(Map.of("v", (byte) 3))).intValue()).isEqualTo(3);
   }
 
   @Test
   void writeFloatValue() throws Exception {
-    String json = JsonSupport.writeString(Map.of("v", 1.5f));
-    assertThat(json).contains("\"v\":1.5");
+    assertThat(((Number) singleValueFromWritten(Map.of("v", 1.5f))).doubleValue()).isEqualTo(1.5d);
   }
 
   @Test
   void writeDoubleValue() throws Exception {
-    String json = JsonSupport.writeString(Map.of("v", 2.5d));
-    assertThat(json).contains("\"v\":2.5");
+    assertThat(((Number) singleValueFromWritten(Map.of("v", 2.5d))).doubleValue()).isEqualTo(2.5d);
   }
 
   @Test
   void writeBigIntegerValue() throws Exception {
-    String json = JsonSupport.writeString(Map.of("v", BigInteger.valueOf(999)));
-    assertThat(json).contains("\"v\":999");
+    assertThat(((Number) singleValueFromWritten(Map.of("v", BigInteger.valueOf(999)))).longValue())
+        .isEqualTo(999L);
   }
 
   @Test
   void writeBigDecimalValue() throws Exception {
-    String json = JsonSupport.writeString(Map.of("v", new BigDecimal("3.14")));
-    assertThat(json).contains("\"v\":3.14");
+    BigDecimal actual =
+        new BigDecimal(String.valueOf(singleValueFromWritten(Map.of("v", new BigDecimal("3.14")))));
+    assertThat(actual).isEqualTo(new BigDecimal("3.14"));
   }
 
   @Test
   void writeBooleanFalseValue() throws Exception {
-    assertThat(JsonSupport.writeString(Map.of("v", false))).contains("\"v\":false");
+    assertThat(singleValueFromWritten(Map.of("v", false))).isEqualTo(false);
   }
 
   @Test
   void writeArrayValue() throws Exception {
-    String json = JsonSupport.writeString(Map.of("v", new int[] {1, 2}));
-    assertThat(json).contains("\"v\":[1,2]");
+    assertThat(singleValueFromWritten(Map.of("v", new int[] {1, 2}))).isEqualTo(List.of(1, 2));
   }
 
   @Test
   void writeNestedObject() throws Exception {
     Map<String, Object> inner = new LinkedHashMap<>();
     inner.put("nested", "value");
-    String json = JsonSupport.writeString(Map.of("outer", inner));
-    assertThat(json).contains("\"outer\":{\"nested\":\"value\"}");
+    assertThat(JsonSupport.parseObject(JsonSupport.writeString(Map.of("outer", inner))))
+        .containsEntry("outer", Map.of("nested", "value"));
   }
 
   @Test
   void writePrettyStringProducesPrettyOutput() throws Exception {
     String json = JsonSupport.writePrettyString(Map.of("a", 1));
     assertThat(json).contains("\n"); // pretty-printed has newlines
-    assertThat(json).contains("\"a\"");
+    assertThat(JsonSupport.parseObject(json)).containsEntry("a", 1);
   }
 
   @Test
@@ -153,13 +152,14 @@ class JsonSupportTest {
           }
         };
     String json = JsonSupport.writeString(Map.of("v", custom));
-    assertThat(json).contains("custom-object");
+    assertThat(JsonSupport.parseObject(json)).containsEntry("v", "custom-object");
   }
 
   @Test
   void parseObjectHandlesTrailingContent() {
     assertThatThrownBy(() -> JsonSupport.parseObject("{\"a\":1} extra"))
-        .isInstanceOf(IOException.class);
+        .isInstanceOf(IOException.class)
+        .hasMessageMatching("(?s).*(trailing content|Unrecognized token).*");
   }
 
   @Test
@@ -177,5 +177,9 @@ class JsonSupportTest {
     Map<String, Object> map = new LinkedHashMap<>();
     map.put("v", null);
     return map;
+  }
+
+  private static Object singleValueFromWritten(Map<String, Object> value) throws Exception {
+    return JsonSupport.parseObject(JsonSupport.writeString(value)).get("v");
   }
 }

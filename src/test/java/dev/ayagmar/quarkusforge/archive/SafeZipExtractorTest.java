@@ -450,7 +450,7 @@ class SafeZipExtractorTest {
 
   @Test
   void rejectsEntryNameWithAbsoluteDrivePath() throws IOException {
-    // Create a zip with a normal entry then patch its CD name to start with "C:"
+    // Create a zip entry using a drive-prefixed name
     Path zipPath =
         ArchiveTestUtils.createZip(
             tempDir.resolve("drive-path.zip"),
@@ -543,5 +543,8 @@ class SafeZipExtractorTest {
         extractor.extract(zipPath, tempDir.resolve("small-out"), OverwritePolicy.FAIL_IF_EXISTS);
 
     assertThat(result.entryCount()).isPositive();
+    Path extractedFile = tempDir.resolve("small-out/small.txt");
+    assertThat(extractedFile).exists();
+    assertThat(Files.readString(extractedFile)).isEqualTo("tiny");
   }
 }

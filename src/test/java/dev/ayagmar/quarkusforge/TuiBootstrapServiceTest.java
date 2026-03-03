@@ -6,9 +6,14 @@ import dev.tamboui.tui.TuiConfig;
 import dev.tamboui.tui.bindings.Bindings;
 import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class TuiBootstrapServiceTest {
+  @BeforeEach
+  void clearSystemPropertiesBefore() {
+    System.clearProperty("tamboui.backend");
+  }
 
   @AfterEach
   void clearSystemProperties() {

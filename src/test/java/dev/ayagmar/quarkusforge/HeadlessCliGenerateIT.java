@@ -97,7 +97,7 @@ class HeadlessCliGenerateIT {
             "io.quarkus:quarkus-rest");
 
     assertThat(result.exitCode()).isZero();
-    assertThat(Files.notExists(outputDir)).isTrue();
+    assertThat(outputDir).doesNotExist();
     wireMockServer.verify(0, getRequestedFor(urlPathEqualTo("/api/download")));
   }
 
@@ -121,7 +121,7 @@ class HeadlessCliGenerateIT {
             "io.quarkus:quarkus-rest");
 
     assertThat(result.exitCode()).isZero();
-    assertThat(Files.notExists(outputDir)).isTrue();
+    assertThat(outputDir).doesNotExist();
   }
 
   // ── verbose diagnostics ───────────────────────────────────────────
@@ -179,7 +179,6 @@ class HeadlessCliGenerateIT {
     stubFor(
         get(urlPathEqualTo("/api/streams"))
             .willReturn(aResponse().withFixedDelay(5000).withStatus(200).withBody("[]")));
-    CliCommandTestSupport.stubStreamsUnavailable();
     CliCommandTestSupport.stubSingleRestExtensionCatalog();
 
     String previous = System.getProperty("quarkus.forge.headless.catalog-timeout-ms");
@@ -277,7 +276,7 @@ class HeadlessCliGenerateIT {
             saveAsPath.toString());
 
     assertThat(result.exitCode()).isZero();
-    assertThat(Files.exists(saveAsPath)).isTrue();
+    assertThat(saveAsPath).exists();
     String content = Files.readString(saveAsPath);
     assertThat(content).contains("\"groupId\" : \"com.save\"");
     assertThat(content).contains("io.quarkus:quarkus-rest");

@@ -1,6 +1,7 @@
 package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import java.nio.file.Files;
@@ -83,13 +84,16 @@ class UserPreferencesStoreTest {
   }
 
   @Test
-  void saveIgnoresIoErrorGracefully() {
-    UserPreferencesStore store =
-        UserPreferencesStore.fileBacked(Path.of("/nonexistent/deep/path/prefs.json"));
+  void saveIgnoresIoErrorGracefully() throws Exception {
+    Path directoryPath = Files.createDirectory(tempDir.resolve("prefs-dir"));
+    UserPreferencesStore store = UserPreferencesStore.fileBacked(directoryPath);
 
-    // Should not throw — IOException is swallowed
-    store.saveLastRequest(
-        new ProjectRequest("org.acme", "demo", "1.0", "org.acme", ".", "", "maven", "25"));
+    assertThatCode(
+            () ->
+                store.saveLastRequest(
+                    new ProjectRequest(
+                        "org.acme", "demo", "1.0", "org.acme", ".", "", "maven", "25")))
+        .doesNotThrowAnyException();
   }
 
   @Test

@@ -62,7 +62,16 @@ class CatalogDataTest {
 
   @Test
   void extensionsAreImmutableCopy() {
-    CatalogData data = new CatalogData(METADATA, EXTENSIONS, CatalogSource.LIVE, false, "");
+    var mutableExtensions =
+        new java.util.ArrayList<>(
+            List.of(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest")));
+    var expectedSnapshot = List.copyOf(mutableExtensions);
+    CatalogData data = new CatalogData(METADATA, mutableExtensions, CatalogSource.LIVE, false, "");
+
+    mutableExtensions.clear();
+
+    assertThat(data.extensions()).isNotSameAs(mutableExtensions);
+    assertThat(data.extensions()).containsExactlyElementsOf(expectedSnapshot);
     assertThat(data.extensions()).isUnmodifiable();
   }
 }

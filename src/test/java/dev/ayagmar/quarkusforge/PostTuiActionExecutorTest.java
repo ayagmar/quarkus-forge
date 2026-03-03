@@ -253,6 +253,8 @@ class PostTuiActionExecutorTest {
     String output = stdout.toString(StandardCharsets.UTF_8);
     assertThat(output).contains("Terminal handoff:");
     assertThat(output).contains("cd \"");
+    long indentedLines = output.lines().filter(line -> line.startsWith("  ")).count();
+    assertThat(indentedLines).isEqualTo(1);
   }
 
   @Test
@@ -268,9 +270,13 @@ class PostTuiActionExecutorTest {
     executor.execute(summary, "", diagnostics);
 
     // Should execute the publish command since git and gh are on PATH
-    if (CommandUtils.isCommandAvailable("git") && CommandUtils.isCommandAvailable("gh")) {
+    boolean hasGitAndGh =
+        CommandUtils.isCommandAvailable("git") && CommandUtils.isCommandAvailable("gh");
+    if (hasGitAndGh) {
       assertThat(shellInvocations).hasSize(1);
       assertThat(shellInvocations.get(0).invocation()).anyMatch(s -> s.contains("gh repo create"));
+    } else {
+      assertThat(shellInvocations).isEmpty();
     }
   }
 
@@ -283,9 +289,13 @@ class PostTuiActionExecutorTest {
     executor.execute(summary, "", diagnostics);
 
     // Should default to PRIVATE visibility
-    if (CommandUtils.isCommandAvailable("git") && CommandUtils.isCommandAvailable("gh")) {
+    boolean hasGitAndGh =
+        CommandUtils.isCommandAvailable("git") && CommandUtils.isCommandAvailable("gh");
+    if (hasGitAndGh) {
       assertThat(shellInvocations).hasSize(1);
       assertThat(shellInvocations.get(0).invocation()).anyMatch(s -> s.contains("--private"));
+    } else {
+      assertThat(shellInvocations).isEmpty();
     }
   }
 
@@ -301,9 +311,13 @@ class PostTuiActionExecutorTest {
     TuiSessionSummary summary = new TuiSessionSummary(dummyRequest(), plan);
     executor.execute(summary, "", diagnostics);
 
-    if (CommandUtils.isCommandAvailable("git") && CommandUtils.isCommandAvailable("gh")) {
+    boolean hasGitAndGh =
+        CommandUtils.isCommandAvailable("git") && CommandUtils.isCommandAvailable("gh");
+    if (hasGitAndGh) {
       assertThat(shellInvocations).hasSize(1);
       assertThat(shellInvocations.get(0).invocation()).anyMatch(s -> s.contains("--public"));
+    } else {
+      assertThat(shellInvocations).isEmpty();
     }
   }
 

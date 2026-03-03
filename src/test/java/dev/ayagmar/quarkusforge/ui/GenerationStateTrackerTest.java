@@ -48,9 +48,7 @@ class GenerationStateTrackerTest {
 
   @Test
   void transitionLoadingToSuccess() {
-    GenerationStateTracker tracker = new GenerationStateTracker();
-    tracker.transitionTo(CoreTuiController.GenerationState.VALIDATING);
-    tracker.transitionTo(CoreTuiController.GenerationState.LOADING);
+    GenerationStateTracker tracker = trackerInLoadingState();
 
     boolean result = tracker.transitionTo(CoreTuiController.GenerationState.SUCCESS);
 
@@ -63,9 +61,7 @@ class GenerationStateTrackerTest {
 
   @Test
   void transitionLoadingToError() {
-    GenerationStateTracker tracker = new GenerationStateTracker();
-    tracker.transitionTo(CoreTuiController.GenerationState.VALIDATING);
-    tracker.transitionTo(CoreTuiController.GenerationState.LOADING);
+    GenerationStateTracker tracker = trackerInLoadingState();
 
     boolean result = tracker.transitionTo(CoreTuiController.GenerationState.ERROR);
 
@@ -77,9 +73,7 @@ class GenerationStateTrackerTest {
 
   @Test
   void transitionLoadingToCancelled() {
-    GenerationStateTracker tracker = new GenerationStateTracker();
-    tracker.transitionTo(CoreTuiController.GenerationState.VALIDATING);
-    tracker.transitionTo(CoreTuiController.GenerationState.LOADING);
+    GenerationStateTracker tracker = trackerInLoadingState();
 
     boolean result = tracker.transitionTo(CoreTuiController.GenerationState.CANCELLED);
 
@@ -109,9 +103,7 @@ class GenerationStateTrackerTest {
 
   @Test
   void updateProgressSetsStepAndRatio() {
-    GenerationStateTracker tracker = new GenerationStateTracker();
-    tracker.transitionTo(CoreTuiController.GenerationState.VALIDATING);
-    tracker.transitionTo(CoreTuiController.GenerationState.LOADING);
+    GenerationStateTracker tracker = trackerInLoadingState();
 
     tracker.updateProgress(GenerationProgressUpdate.extractingArchive("Extracting files"));
 
@@ -121,9 +113,7 @@ class GenerationStateTrackerTest {
 
   @Test
   void updateProgressWithBlankMessageUsesDefault() {
-    GenerationStateTracker tracker = new GenerationStateTracker();
-    tracker.transitionTo(CoreTuiController.GenerationState.VALIDATING);
-    tracker.transitionTo(CoreTuiController.GenerationState.LOADING);
+    GenerationStateTracker tracker = trackerInLoadingState();
 
     tracker.updateProgress(GenerationProgressUpdate.finalizing(""));
 
@@ -133,9 +123,7 @@ class GenerationStateTrackerTest {
 
   @Test
   void tickUpdatesPhaseForRequestingArchive() {
-    GenerationStateTracker tracker = new GenerationStateTracker();
-    tracker.transitionTo(CoreTuiController.GenerationState.VALIDATING);
-    tracker.transitionTo(CoreTuiController.GenerationState.LOADING);
+    GenerationStateTracker tracker = trackerInLoadingState();
 
     tracker.tick(3000L);
 
@@ -155,9 +143,7 @@ class GenerationStateTrackerTest {
 
   @Test
   void tickDoesNothingForNonRequestingStep() {
-    GenerationStateTracker tracker = new GenerationStateTracker();
-    tracker.transitionTo(CoreTuiController.GenerationState.VALIDATING);
-    tracker.transitionTo(CoreTuiController.GenerationState.LOADING);
+    GenerationStateTracker tracker = trackerInLoadingState();
     tracker.updateProgress(GenerationProgressUpdate.extractingArchive("extracting"));
 
     double ratioBefore = tracker.progressRatio();
@@ -168,9 +154,7 @@ class GenerationStateTrackerTest {
 
   @Test
   void resetAfterTerminalOutcomeResetsSuccessToIdle() {
-    GenerationStateTracker tracker = new GenerationStateTracker();
-    tracker.transitionTo(CoreTuiController.GenerationState.VALIDATING);
-    tracker.transitionTo(CoreTuiController.GenerationState.LOADING);
+    GenerationStateTracker tracker = trackerInLoadingState();
     tracker.transitionTo(CoreTuiController.GenerationState.SUCCESS);
 
     tracker.resetAfterTerminalOutcome();
@@ -180,9 +164,7 @@ class GenerationStateTrackerTest {
 
   @Test
   void resetAfterTerminalOutcomeResetsErrorToIdle() {
-    GenerationStateTracker tracker = new GenerationStateTracker();
-    tracker.transitionTo(CoreTuiController.GenerationState.VALIDATING);
-    tracker.transitionTo(CoreTuiController.GenerationState.LOADING);
+    GenerationStateTracker tracker = trackerInLoadingState();
     tracker.transitionTo(CoreTuiController.GenerationState.ERROR);
 
     tracker.resetAfterTerminalOutcome();
@@ -192,9 +174,7 @@ class GenerationStateTrackerTest {
 
   @Test
   void resetAfterTerminalOutcomeResetsCancelledToIdle() {
-    GenerationStateTracker tracker = new GenerationStateTracker();
-    tracker.transitionTo(CoreTuiController.GenerationState.VALIDATING);
-    tracker.transitionTo(CoreTuiController.GenerationState.LOADING);
+    GenerationStateTracker tracker = trackerInLoadingState();
     tracker.transitionTo(CoreTuiController.GenerationState.CANCELLED);
 
     tracker.resetAfterTerminalOutcome();
@@ -239,9 +219,7 @@ class GenerationStateTrackerTest {
 
   @Test
   void tickProgressRatioIsCapped() {
-    GenerationStateTracker tracker = new GenerationStateTracker();
-    tracker.transitionTo(CoreTuiController.GenerationState.VALIDATING);
-    tracker.transitionTo(CoreTuiController.GenerationState.LOADING);
+    GenerationStateTracker tracker = trackerInLoadingState();
 
     // Simulate a very long wait
     tracker.tick(60_000L);
@@ -251,13 +229,18 @@ class GenerationStateTrackerTest {
 
   @Test
   void updateProgressWithRequestingArchiveDefaultPhase() {
-    GenerationStateTracker tracker = new GenerationStateTracker();
-    tracker.transitionTo(CoreTuiController.GenerationState.VALIDATING);
-    tracker.transitionTo(CoreTuiController.GenerationState.LOADING);
+    GenerationStateTracker tracker = trackerInLoadingState();
 
     tracker.updateProgress(GenerationProgressUpdate.requestingArchive(""));
 
     assertThat(tracker.progressPhase()).contains("requesting project archive");
     assertThat(tracker.progressRatio()).isEqualTo(0.35);
+  }
+
+  private static GenerationStateTracker trackerInLoadingState() {
+    GenerationStateTracker tracker = new GenerationStateTracker();
+    tracker.transitionTo(CoreTuiController.GenerationState.VALIDATING);
+    tracker.transitionTo(CoreTuiController.GenerationState.LOADING);
+    return tracker;
   }
 }

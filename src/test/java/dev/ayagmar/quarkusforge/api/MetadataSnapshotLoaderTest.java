@@ -22,5 +22,8 @@ class MetadataSnapshotLoaderTest {
 
     String recommended = metadata.recommendedPlatformStreamKey();
     assertThat(recommended).isNotBlank();
+    PlatformStream stream = metadata.findPlatformStream(recommended);
+    assertThat(stream).isNotNull();
+    assertThat(stream.recommended()).isTrue();
   }
 }

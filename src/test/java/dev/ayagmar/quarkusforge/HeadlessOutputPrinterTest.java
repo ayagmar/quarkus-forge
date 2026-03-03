@@ -119,8 +119,9 @@ class HeadlessOutputPrinterTest {
 
   @Test
   void resolveProjectDirectoryNormalizesPath() {
+    String outputDir = Path.of("/tmp", "other", "..", "out").toString();
     ProjectRequest request =
-        new ProjectRequest("org.acme", "app", "1.0.0", "", "/tmp/out", "", "maven", "25");
+        new ProjectRequest("org.acme", "app", "1.0.0", "", outputDir, "", "maven", "25");
 
     Path resolved = HeadlessOutputPrinter.resolveProjectDirectory(request);
 

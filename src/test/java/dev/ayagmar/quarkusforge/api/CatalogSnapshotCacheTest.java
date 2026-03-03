@@ -455,23 +455,22 @@ class CatalogSnapshotCacheTest {
 
   @Test
   void writeReturnsWriteFailedWhenFilePersistFails() throws Exception {
-    // Use a directory as the cache file location to force an IO error during persist
-    Path dirAsCacheFile = tempDir.resolve("not-a-file");
+    // Use an existing directory as the cache file location to force an IO error during persist
+    Path dirAsCacheFile = tempDir.resolve("cache-dir");
     Files.createDirectories(dirAsCacheFile);
 
     CatalogSnapshotCache cache =
         new CatalogSnapshotCache(
-            dirAsCacheFile.resolve("sub/deep/file.json"),
+            dirAsCacheFile,
             CatalogSnapshotCache.defaultPayloadCodec(),
             Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
             Duration.ofHours(6),
             2L * 1024L * 1024L);
 
-    // This should succeed - the parent directories will be created by AtomicFileStore
     CacheWriteOutcome outcome = cache.write(sampleMetadata(), sampleExtensions());
-    // The test is whether it handles gracefully either way
-    // AtomicFileStore.writeBytes may create parent dirs; what matters is no exception thrown
-    assertThat(outcome).isNotNull();
+    assertThat(outcome.written()).isFalse();
+    assertThat(outcome.rejected()).isFalse();
+    assertThat(outcome.detail()).contains("failed to persist cache snapshot");
   }
 
   @Test

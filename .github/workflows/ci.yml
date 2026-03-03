@@ -71,7 +71,7 @@ jobs:
           - suite: unit
             command: ./mvnw test -Djacoco.skip=true
           - suite: integration
-            command: ./mvnw verify -Dsurefire.skip=true -Djacoco.skip=true
+            command: ./mvnw verify -DskipUnitTests=true -Djacoco.skip=true
 
     steps:
       - name: Checkout

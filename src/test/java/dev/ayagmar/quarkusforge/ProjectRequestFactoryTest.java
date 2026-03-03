@@ -143,20 +143,20 @@ class ProjectRequestFactoryTest {
   }
 
   @Test
-  void applyRecommendedPlatformStreamHandlesNullMetadataSnapshot() {
+  void applyRecommendedPlatformStreamShortCircuitsOnLoadError() {
     ProjectRequest request =
         new ProjectRequest("com.example", "demo", "1.0.0", "", ".", "", "maven", "21");
-    // Create a context with failure that has null metadata snapshot
+    // Failure context should short-circuit recommendation logic
     MetadataCompatibilityContext ctx = MetadataCompatibilityContext.failure("timeout");
 
     ProjectRequest result = ProjectRequestFactory.applyRecommendedPlatformStream(request, ctx);
 
-    // Should return request unchanged since loadError stops it
+    // Request remains unchanged because load error stops recommendation
     assertThat(result.platformStream()).isEmpty();
   }
 
   @Test
-  void fromOptionsAppliesAllFieldsIncludingPackageNameAndOutputStream() {
+  void fromOptionsAppliesPackageNameOutputDirectoryAndPlatformStream() {
     RequestOptions options = new RequestOptions();
     options.groupId = "io.acme";
     options.artifactId = "svc";
