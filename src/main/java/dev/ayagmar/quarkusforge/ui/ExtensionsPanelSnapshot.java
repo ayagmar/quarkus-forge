@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Objects;
 
 record ExtensionsPanelSnapshot(
-    String title,
     boolean panelFocused,
     boolean listFocused,
     boolean submitFocused,
@@ -14,9 +13,11 @@ record ExtensionsPanelSnapshot(
     String catalogSource,
     boolean catalogStale,
     boolean favoritesOnlyFilterEnabled,
+    boolean selectedOnlyFilterEnabled,
     int favoriteCount,
     String activePresetFilterName,
     String activeCategoryFilterTitle,
+    int validationErrorCount,
     int filteredExtensionCount,
     int totalCatalogExtensionCount,
     List<ExtensionCatalogRow> filteredRows,
@@ -24,11 +25,11 @@ record ExtensionsPanelSnapshot(
     String searchQuery,
     String focusedExtensionDescription) {
   ExtensionsPanelSnapshot {
-    title = Objects.requireNonNull(title);
     catalogErrorMessage = catalogErrorMessage == null ? "" : catalogErrorMessage;
     catalogSource = catalogSource == null ? "" : catalogSource;
     activePresetFilterName = activePresetFilterName == null ? "" : activePresetFilterName;
     activeCategoryFilterTitle = activeCategoryFilterTitle == null ? "" : activeCategoryFilterTitle;
+    validationErrorCount = Math.max(0, validationErrorCount);
     filteredExtensionCount = Math.max(0, filteredExtensionCount);
     totalCatalogExtensionCount = Math.max(0, totalCatalogExtensionCount);
     filteredRows = List.copyOf(Objects.requireNonNull(filteredRows));

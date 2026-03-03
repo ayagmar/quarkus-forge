@@ -55,6 +55,7 @@ final class ExtensionCatalogState {
   private Map<String, Integer> rowIndexByExtensionId;
   private String currentQuery;
   private boolean favoritesOnlyFilterEnabled;
+  private boolean selectedOnlyFilterEnabled;
   private String activeCategoryFilterTitle;
   private String activePresetFilterName;
   private CompletableFuture<Void> preferencePersistenceChain;
@@ -89,6 +90,7 @@ final class ExtensionCatalogState {
     rowIndexByExtensionId = Map.of();
     currentQuery = initialQuery == null ? "" : initialQuery;
     favoritesOnlyFilterEnabled = false;
+    selectedOnlyFilterEnabled = false;
     activeCategoryFilterTitle = "";
     activePresetFilterName = "";
     preferencePersistenceChain = CompletableFuture.completedFuture(null);
@@ -127,6 +129,13 @@ final class ExtensionCatalogState {
     favoritesOnlyFilterEnabled = !favoritesOnlyFilterEnabled;
     applyFiltered(currentQuery, searchResultGate.nextToken(), onFiltered);
     return favoritesOnlyFilterEnabled;
+  }
+
+  boolean toggleSelectedOnlyFilter(IntConsumer onFiltered) {
+    Objects.requireNonNull(onFiltered);
+    selectedOnlyFilterEnabled = !selectedOnlyFilterEnabled;
+    applyFiltered(currentQuery, searchResultGate.nextToken(), onFiltered);
+    return selectedOnlyFilterEnabled;
   }
 
   boolean clearCategoryFilter(IntConsumer onFiltered) {
@@ -363,6 +372,10 @@ final class ExtensionCatalogState {
     return favoritesOnlyFilterEnabled;
   }
 
+  boolean selectedOnlyFilterEnabled() {
+    return selectedOnlyFilterEnabled;
+  }
+
   String activeCategoryFilterTitle() {
     return activeCategoryFilterTitle;
   }
@@ -537,6 +550,9 @@ final class ExtensionCatalogState {
   private List<ExtensionCatalogItem> applyFavoritesAndPresetFilters(
       List<ExtensionCatalogItem> items) {
     List<ExtensionCatalogItem> result = items;
+    if (selectedOnlyFilterEnabled) {
+      result = result.stream().filter(item -> selectedExtensionIds.contains(item.id())).toList();
+    }
     if (favoritesOnlyFilterEnabled) {
       result = result.stream().filter(item -> favoriteExtensionIds.contains(item.id())).toList();
     }
@@ -557,6 +573,7 @@ final class ExtensionCatalogState {
             recentExtensionIds,
             currentQuery,
             favoritesOnlyFilterEnabled,
+            selectedOnlyFilterEnabled,
             activePresetFilterName);
     selectableRowIndexes = CatalogRowBuilder.buildSelectableIndexes(filteredRows);
     allRowIndexes = CatalogRowBuilder.buildAllRowIndexes(filteredRows);

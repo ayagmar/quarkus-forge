@@ -47,10 +47,14 @@ final class UiControllerTestHarness {
   }
 
   static String renderToString(CoreTuiController controller, int width, int height) {
+    return renderFrame(controller, width, height).buffer().toAnsiStringTrimmed();
+  }
+
+  static Frame renderFrame(CoreTuiController controller, int width, int height) {
     Buffer buffer = Buffer.empty(new Rect(0, 0, width, height));
     Frame frame = Frame.forTesting(buffer);
     controller.render(frame);
-    return buffer.toAnsiStringTrimmed();
+    return frame;
   }
 
   static final class QueueingScheduler implements UiScheduler {

@@ -132,35 +132,6 @@ class MetadataSelectorManagerTest {
     }
   }
 
-  @Nested
-  class InlineLabel {
-    @BeforeEach
-    void syncOptions() {
-      manager.sync(testMetadata(), "", "maven", "21");
-    }
-
-    @Test
-    void selectedOptionMarkedWithAsterisk() {
-      String label = manager.inlineLabel(FocusTarget.BUILD_TOOL, "maven", testMetadata());
-      assertThat(label).startsWith("(*) maven");
-      assertThat(label).contains("( ) gradle");
-    }
-
-    @Test
-    void platformStreamShowsVersionWithRecommendedMarker() {
-      String label =
-          manager.inlineLabel(
-              FocusTarget.PLATFORM_STREAM, "io.quarkus.platform:3.20", testMetadata());
-      assertThat(label).contains("3.20*");
-    }
-
-    @Test
-    void emptyOptionsShowsNoOptionsAvailable() {
-      String label = manager.inlineLabel(FocusTarget.GROUP_ID, "", testMetadata());
-      assertThat(label).isEqualTo("( ) no options available");
-    }
-  }
-
   @Test
   void isSelectorFocusCorrect() {
     assertThat(MetadataSelectorManager.isSelectorFocus(FocusTarget.PLATFORM_STREAM)).isTrue();

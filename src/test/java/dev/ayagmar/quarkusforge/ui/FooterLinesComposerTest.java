@@ -121,6 +121,35 @@ class FooterLinesComposerTest {
     assertThat(lines).anyMatch(line -> line.equals("Error: something went wrong"));
   }
 
+  @Test
+  void contextualHintLineIsIncludedForFocusedField() {
+    FooterSnapshot snapshot = snapshotBuilder().focusTarget(FocusTarget.BUILD_TOOL).build();
+
+    List<String> lines = composer.compose(120, snapshot);
+
+    assertThat(lines).anyMatch(line -> line.startsWith("Hint: Use Left/Right"));
+  }
+
+  @Test
+  void preGeneratePlanLineIsIncludedWhenPresent() {
+    FooterSnapshot snapshot =
+        snapshotBuilder().preGeneratePlan("/tmp/demo | maven | Java 25 | 3 ext").build();
+
+    List<String> lines = composer.compose(120, snapshot);
+
+    assertThat(lines).anyMatch(line -> line.startsWith("Plan: /tmp/demo | maven"));
+  }
+
+  @Test
+  void narrowViewportTruncationDoesNotThrowForShortHints() {
+    FooterSnapshot snapshot = snapshotBuilder().successHint("1234").preGeneratePlan("abcd").build();
+
+    List<String> lines = composer.compose(3, snapshot);
+
+    assertThat(lines).contains("Nex", "Pla");
+    assertThat(lines).allSatisfy(line -> assertThat(line.length()).isGreaterThan(0));
+  }
+
   private static FooterSnapshotBuilder snapshotBuilder() {
     return new FooterSnapshotBuilder();
   }
@@ -136,6 +165,7 @@ class FooterLinesComposerTest {
     private String verboseErrorDetails = "";
     private boolean showErrorDetails;
     private String successHint = "";
+    private String preGeneratePlan = "";
 
     FooterSnapshotBuilder generationInProgress(boolean value) {
       generationInProgress = value;
@@ -162,6 +192,11 @@ class FooterLinesComposerTest {
       return this;
     }
 
+    FooterSnapshotBuilder preGeneratePlan(String value) {
+      preGeneratePlan = value;
+      return this;
+    }
+
     FooterSnapshot build() {
       return new FooterSnapshot(
           generationInProgress,
@@ -173,7 +208,8 @@ class FooterLinesComposerTest {
           activeErrorDetails,
           verboseErrorDetails,
           showErrorDetails,
-          successHint);
+          successHint,
+          preGeneratePlan);
     }
   }
 }

@@ -35,14 +35,18 @@ final class OverlayRenderer {
     List<String> lines = new ArrayList<>();
     for (int i = 0; i < entries.size(); i++) {
       CommandPaletteEntry entry = entries.get(i);
-      String prefix = i == selectedIndex ? "> " : "  ";
-      lines.add(prefix + (i + 1) + ". " + entry.label() + " [" + entry.shortcut() + "]");
+      lines.add((i + 1) + ". " + entry.label() + " [" + entry.shortcut() + "]");
     }
-    lines.add("");
-    lines.add("Enter: run | 1-9: quick run | Up/Down: navigate | Esc or Ctrl+P: close");
-
-    renderCenteredParagraphOverlay(
-        frame, viewport, theme, lines, "Command Palette [focus]", 56, true);
+    OverlayPanelRenderer.renderCenteredListOverlay(
+        frame,
+        viewport,
+        theme,
+        lines,
+        "Enter: run | 1-9: quick run | Up/Down: navigate | Esc or Ctrl+P: close",
+        "Command Palette [focus]",
+        56,
+        true,
+        selectedIndex);
   }
 
   static void renderHelpOverlay(
@@ -50,7 +54,8 @@ final class OverlayRenderer {
     if (viewport.width() < 36 || viewport.height() < 12) {
       return;
     }
-    renderCenteredParagraphOverlay(frame, viewport, theme, helpLines, title, 68, true);
+    OverlayPanelRenderer.renderCenteredParagraphOverlay(
+        frame, viewport, theme, helpLines, title, 68, true);
   }
 
   static void renderStartupOverlay(
@@ -58,7 +63,8 @@ final class OverlayRenderer {
     if (viewport.width() < 44 || viewport.height() < 12) {
       return;
     }
-    renderCenteredParagraphOverlay(frame, viewport, theme, statusLines, "Startup", 64, false);
+    OverlayPanelRenderer.renderCenteredParagraphOverlay(
+        frame, viewport, theme, statusLines, "Startup", 64, false);
   }
 
   static void renderPostGenerationOverlay(
@@ -68,14 +74,18 @@ final class OverlayRenderer {
     }
     List<String> lines = new ArrayList<>();
     for (int i = 0; i < actionLabels.size(); i++) {
-      String prefix = i == selectedIndex ? "> " : "  ";
-      lines.add(prefix + (i + 1) + ". " + actionLabels.get(i));
+      lines.add((i + 1) + ". " + actionLabels.get(i));
     }
-    lines.add("");
-    lines.add("Enter: select | Up/Down or j/k: navigate | Esc: quit");
-
-    renderCenteredParagraphOverlay(
-        frame, viewport, theme, lines, "Project Generated [focus]", 58, true);
+    OverlayPanelRenderer.renderCenteredListOverlay(
+        frame,
+        viewport,
+        theme,
+        lines,
+        "Enter: select | Up/Down or j/k: navigate | Esc: quit",
+        "Project Generated [focus]",
+        58,
+        true,
+        selectedIndex);
   }
 
   static void renderGitHubVisibilityOverlay(
@@ -85,14 +95,18 @@ final class OverlayRenderer {
     }
     List<String> lines = new ArrayList<>();
     for (int index = 0; index < visibilityLabels.size(); index++) {
-      String prefix = index == selectedIndex ? "> " : "  ";
-      lines.add(prefix + (index + 1) + ". " + visibilityLabels.get(index));
+      lines.add((index + 1) + ". " + visibilityLabels.get(index));
     }
-    lines.add("");
-    lines.add("Enter: confirm | Up/Down or j/k: navigate | Esc: back");
-
-    renderCenteredParagraphOverlay(
-        frame, viewport, theme, lines, "Publish to GitHub [focus]", 66, true);
+    OverlayPanelRenderer.renderCenteredListOverlay(
+        frame,
+        viewport,
+        theme,
+        lines,
+        "Enter: confirm | Up/Down or j/k: navigate | Esc: back",
+        "Publish to GitHub [focus]",
+        66,
+        true,
+        selectedIndex);
   }
 
   private static final String[] SPINNER_FRAMES = {"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"};
@@ -104,7 +118,7 @@ final class OverlayRenderer {
     }
     int width = Math.min(60, viewport.width() - 4);
     int height = 7;
-    Rect overlayArea = centeredRect(viewport, width, height);
+    Rect overlayArea = OverlayPanelRenderer.centeredRect(viewport, width, height);
 
     int percent = (int) (progressRatio * 100);
     String percentLabel = percent + "%";
@@ -162,49 +176,5 @@ final class OverlayRenderer {
             .overflow(Overflow.ELLIPSIS)
             .build();
     frame.renderWidget(hintLine, rows.get(3));
-  }
-
-  // ── Shared helpers ────────────────────────────────────────────────────
-
-  private static void renderCenteredParagraphOverlay(
-      Frame frame,
-      Rect viewport,
-      UiTheme theme,
-      List<String> lines,
-      String title,
-      int minWidth,
-      boolean focusBorder) {
-    int maxLineLength = lines.stream().mapToInt(String::length).max().orElse(40);
-    int width = Math.min(Math.max(minWidth, maxLineLength + 4), viewport.width() - 2);
-    int height = Math.min(lines.size() + 2, viewport.height() - 2);
-    Rect overlayArea = centeredRect(viewport, width, height);
-
-    Style borderStyle =
-        focusBorder
-            ? Style.EMPTY.fg(theme.color("focus")).bold()
-            : Style.EMPTY.fg(theme.color("accent")).bold();
-
-    Paragraph overlay =
-        Paragraph.builder()
-            .text(String.join("\n", lines))
-            .style(Style.EMPTY.fg(theme.color("text")).bg(theme.color("base")))
-            .overflow(Overflow.ELLIPSIS)
-            .block(
-                Block.builder()
-                    .title(title)
-                    .borders(Borders.ALL)
-                    .borderType(BorderType.ROUNDED)
-                    .borderStyle(borderStyle)
-                    .build())
-            .build();
-    frame.renderWidget(overlay, overlayArea);
-  }
-
-  private static Rect centeredRect(Rect viewport, int width, int height) {
-    return new Rect(
-        viewport.x() + Math.max(0, (viewport.width() - width) / 2),
-        viewport.y() + Math.max(0, (viewport.height() - height) / 2),
-        width,
-        height);
   }
 }

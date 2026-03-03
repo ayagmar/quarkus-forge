@@ -12,13 +12,15 @@ record FooterSnapshot(
     String activeErrorDetails,
     String verboseErrorDetails,
     boolean showErrorDetails,
-    String successHint) {
+    String successHint,
+    String preGeneratePlan) {
   FooterSnapshot {
     focusTarget = Objects.requireNonNull(focusTarget);
     statusMessage = normalize(statusMessage);
     activeErrorDetails = normalize(activeErrorDetails);
     verboseErrorDetails = normalize(verboseErrorDetails);
     successHint = normalize(successHint);
+    preGeneratePlan = normalize(preGeneratePlan);
   }
 
   private static String normalize(String value) {

@@ -12,25 +12,8 @@ class ExtensionsPanelSnapshotTest {
   void nullFieldsDefaultToEmptyOrZero() {
     ExtensionsPanelSnapshot snapshot =
         new ExtensionsPanelSnapshot(
-            "Extensions",
-            false,
-            false,
-            false,
-            false,
-            false,
-            null,
-            null,
-            false,
-            false,
-            0,
-            null,
-            null,
-            -5,
-            -10,
-            List.of(),
-            List.of(),
-            null,
-            null);
+            false, false, false, false, false, null, null, false, false, false, 0, null, null, -1,
+            -5, -10, List.of(), List.of(), null, null);
 
     assertThat(snapshot.catalogErrorMessage()).isEmpty();
     assertThat(snapshot.catalogSource()).isEmpty();
@@ -38,6 +21,7 @@ class ExtensionsPanelSnapshotTest {
     assertThat(snapshot.activeCategoryFilterTitle()).isEmpty();
     assertThat(snapshot.searchQuery()).isEmpty();
     assertThat(snapshot.focusedExtensionDescription()).isEmpty();
+    assertThat(snapshot.validationErrorCount()).isZero();
     assertThat(snapshot.filteredExtensionCount()).isZero();
     assertThat(snapshot.totalCatalogExtensionCount()).isZero();
   }
@@ -46,7 +30,6 @@ class ExtensionsPanelSnapshotTest {
   void nonNullFieldsArePreserved() {
     ExtensionsPanelSnapshot snapshot =
         new ExtensionsPanelSnapshot(
-            "Extensions",
             true,
             true,
             false,
@@ -56,9 +39,11 @@ class ExtensionsPanelSnapshotTest {
             "cache",
             true,
             true,
+            false,
             5,
             "web",
             "Web Services",
+            2,
             42,
             100,
             List.of(),
@@ -72,6 +57,7 @@ class ExtensionsPanelSnapshotTest {
     assertThat(snapshot.activeCategoryFilterTitle()).isEqualTo("Web Services");
     assertThat(snapshot.searchQuery()).isEqualTo("rest");
     assertThat(snapshot.focusedExtensionDescription()).isEqualTo("RESTful web services");
+    assertThat(snapshot.validationErrorCount()).isEqualTo(2);
     assertThat(snapshot.filteredExtensionCount()).isEqualTo(42);
     assertThat(snapshot.totalCatalogExtensionCount()).isEqualTo(100);
     assertThat(snapshot.selectedExtensionIds()).containsExactly("io.quarkus:rest");
@@ -84,7 +70,6 @@ class ExtensionsPanelSnapshotTest {
 
     ExtensionsPanelSnapshot snapshot =
         new ExtensionsPanelSnapshot(
-            "Extensions",
             false,
             false,
             false,
@@ -92,11 +77,13 @@ class ExtensionsPanelSnapshotTest {
             false,
             "",
             "",
+            false,
             false,
             false,
             0,
             "",
             "",
+            0,
             0,
             0,
             mutableRows,

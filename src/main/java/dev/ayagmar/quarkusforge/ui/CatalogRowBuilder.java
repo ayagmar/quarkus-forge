@@ -25,12 +25,14 @@ final class CatalogRowBuilder {
       List<String> recentExtensionIds,
       String currentQuery,
       boolean favoritesOnly,
+      boolean selectedOnly,
       String activePreset) {
     if (items.isEmpty()) {
       return List.of();
     }
     List<ExtensionCatalogRow> rows = new ArrayList<>();
-    prependRecentRows(rows, items, recentExtensionIds, currentQuery, favoritesOnly, activePreset);
+    prependRecentRows(
+        rows, items, recentExtensionIds, currentQuery, favoritesOnly, selectedOnly, activePreset);
     appendCategoryRows(rows, items, collapsedCategories);
     return List.copyOf(rows);
   }
@@ -97,9 +99,11 @@ final class CatalogRowBuilder {
       List<String> recentExtensionIds,
       String currentQuery,
       boolean favoritesOnly,
+      boolean selectedOnly,
       String activePreset) {
     if (!currentQuery.isBlank()
         || favoritesOnly
+        || selectedOnly
         || !activePreset.isBlank()
         || recentExtensionIds.isEmpty()) {
       return;

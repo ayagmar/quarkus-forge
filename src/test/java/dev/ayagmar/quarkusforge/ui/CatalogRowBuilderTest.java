@@ -18,7 +18,7 @@ class CatalogRowBuilderTest {
     @Test
     void emptyItemsReturnsEmptyList() {
       List<ExtensionCatalogRow> rows =
-          CatalogRowBuilder.buildRows(List.of(), Set.of(), List.of(), "", false, "");
+          CatalogRowBuilder.buildRows(List.of(), Set.of(), List.of(), "", false, false, "");
       assertThat(rows).isEmpty();
     }
 
@@ -27,7 +27,7 @@ class CatalogRowBuilderTest {
       List<ExtensionCatalogItem> items =
           List.of(item("a:b", "ExtA", "Web"), item("a:c", "ExtB", "Web"));
       List<ExtensionCatalogRow> rows =
-          CatalogRowBuilder.buildRows(items, Set.of(), List.of(), "", false, "");
+          CatalogRowBuilder.buildRows(items, Set.of(), List.of(), "", false, false, "");
 
       assertThat(rows).hasSize(3);
       assertThat(rows.get(0).isSectionHeader()).isTrue();
@@ -41,7 +41,7 @@ class CatalogRowBuilderTest {
       List<ExtensionCatalogItem> items =
           List.of(item("a:b", "ExtA", "Web"), item("a:c", "ExtB", "Data"));
       List<ExtensionCatalogRow> rows =
-          CatalogRowBuilder.buildRows(items, Set.of(), List.of(), "", false, "");
+          CatalogRowBuilder.buildRows(items, Set.of(), List.of(), "", false, false, "");
 
       long sectionCount = rows.stream().filter(ExtensionCatalogRow::isSectionHeader).count();
       assertThat(sectionCount).isEqualTo(2);
@@ -53,7 +53,7 @@ class CatalogRowBuilderTest {
           List.of(
               item("a:b", "ExtA", "Web"), item("a:c", "ExtB", "Web"), item("a:d", "ExtC", "Data"));
       List<ExtensionCatalogRow> rows =
-          CatalogRowBuilder.buildRows(items, Set.of("Web"), List.of(), "", false, "");
+          CatalogRowBuilder.buildRows(items, Set.of("Web"), List.of(), "", false, false, "");
 
       // Web section header (collapsed) + Data section header + ExtC
       assertThat(rows).hasSize(3);
@@ -71,7 +71,7 @@ class CatalogRowBuilderTest {
       List<ExtensionCatalogItem> items =
           List.of(item("a:b", "ExtA", "Web"), item("a:c", "ExtB", "Data"));
       List<ExtensionCatalogRow> rows =
-          CatalogRowBuilder.buildRows(items, Set.of(), List.of("a:c"), "", false, "");
+          CatalogRowBuilder.buildRows(items, Set.of(), List.of("a:c"), "", false, false, "");
 
       assertThat(rows.get(0).label()).isEqualTo(CatalogRowBuilder.RECENT_SECTION_TITLE);
       assertThat(rows.get(1).extension().id()).isEqualTo("a:c");
@@ -81,7 +81,7 @@ class CatalogRowBuilderTest {
     void recentItemsNotShownWhenSearchActive() {
       List<ExtensionCatalogItem> items = List.of(item("a:b", "ExtA", "Web"));
       List<ExtensionCatalogRow> rows =
-          CatalogRowBuilder.buildRows(items, Set.of(), List.of("a:b"), "search", false, "");
+          CatalogRowBuilder.buildRows(items, Set.of(), List.of("a:b"), "search", false, false, "");
 
       assertThat(
               rows.stream()
@@ -93,7 +93,19 @@ class CatalogRowBuilderTest {
     void recentItemsNotShownWhenFavoritesOnly() {
       List<ExtensionCatalogItem> items = List.of(item("a:b", "ExtA", "Web"));
       List<ExtensionCatalogRow> rows =
-          CatalogRowBuilder.buildRows(items, Set.of(), List.of("a:b"), "", true, "");
+          CatalogRowBuilder.buildRows(items, Set.of(), List.of("a:b"), "", true, false, "");
+
+      assertThat(
+              rows.stream()
+                  .noneMatch(r -> r.label().equals(CatalogRowBuilder.RECENT_SECTION_TITLE)))
+          .isTrue();
+    }
+
+    @Test
+    void recentItemsNotShownWhenSelectedOnly() {
+      List<ExtensionCatalogItem> items = List.of(item("a:b", "ExtA", "Web"));
+      List<ExtensionCatalogRow> rows =
+          CatalogRowBuilder.buildRows(items, Set.of(), List.of("a:b"), "", false, true, "");
 
       assertThat(
               rows.stream()
@@ -105,7 +117,8 @@ class CatalogRowBuilderTest {
     void duplicateRecentIdsDeduped() {
       List<ExtensionCatalogItem> items = List.of(item("a:b", "ExtA", "Web"));
       List<ExtensionCatalogRow> rows =
-          CatalogRowBuilder.buildRows(items, Set.of(), List.of("a:b", "a:b", "a:b"), "", false, "");
+          CatalogRowBuilder.buildRows(
+              items, Set.of(), List.of("a:b", "a:b", "a:b"), "", false, false, "");
 
       long recentItemCount =
           rows.stream()
@@ -135,7 +148,7 @@ class CatalogRowBuilderTest {
         recentIds.add(id);
       }
       List<ExtensionCatalogRow> rows =
-          CatalogRowBuilder.buildRows(items, Set.of(), recentIds, "", false, "");
+          CatalogRowBuilder.buildRows(items, Set.of(), recentIds, "", false, false, "");
 
       long recentCount =
           rows.stream()
@@ -233,7 +246,8 @@ class CatalogRowBuilderTest {
         List.of(item("a:b", "ExtA", "Web"), item("a:c", "ExtB", "Core"));
 
     List<ExtensionCatalogRow> rows =
-        CatalogRowBuilder.buildRows(items, Set.of(), List.of("a:b"), "", false, "some-preset");
+        CatalogRowBuilder.buildRows(
+            items, Set.of(), List.of("a:b"), "", false, false, "some-preset");
 
     assertThat(
             rows.stream().noneMatch(r -> CatalogRowBuilder.RECENT_SECTION_TITLE.equals(r.label())))
@@ -252,7 +266,7 @@ class CatalogRowBuilderTest {
             item("a:b", "ExtA", "Web"), item("a:c", "ExtB", "Web"), item("a:d", "ExtC", "Core"));
 
     List<ExtensionCatalogRow> rows =
-        CatalogRowBuilder.buildRows(items, Set.of("Web"), List.of(), "", false, "");
+        CatalogRowBuilder.buildRows(items, Set.of("Web"), List.of(), "", false, false, "");
 
     ExtensionCatalogRow webHeader =
         rows.stream()
@@ -274,7 +288,7 @@ class CatalogRowBuilderTest {
             item("a:web-2", "Web Two", "Web"));
 
     List<ExtensionCatalogRow> rows =
-        CatalogRowBuilder.buildRows(items, Set.of(), List.of(), "we", false, "");
+        CatalogRowBuilder.buildRows(items, Set.of(), List.of(), "we", false, false, "");
 
     assertThat(
             rows.stream()
@@ -290,7 +304,8 @@ class CatalogRowBuilderTest {
     List<ExtensionCatalogItem> items = List.of(item("a:b", "ExtA", "Web"));
 
     List<ExtensionCatalogRow> rows =
-        CatalogRowBuilder.buildRows(items, Set.of(), List.of("nonexistent-id"), "", false, "");
+        CatalogRowBuilder.buildRows(
+            items, Set.of(), List.of("nonexistent-id"), "", false, false, "");
 
     assertThat(
             rows.stream().noneMatch(r -> CatalogRowBuilder.RECENT_SECTION_TITLE.equals(r.label())))
@@ -303,7 +318,7 @@ class CatalogRowBuilderTest {
         List.of(item("a:b", "ExtA", "Web"), item("a:c", "ExtB", "Web"));
 
     List<ExtensionCatalogRow> rows =
-        CatalogRowBuilder.buildRows(items, Set.of(), List.of(), "", false, "");
+        CatalogRowBuilder.buildRows(items, Set.of(), List.of(), "", false, false, "");
 
     ExtensionCatalogRow webHeader =
         rows.stream()

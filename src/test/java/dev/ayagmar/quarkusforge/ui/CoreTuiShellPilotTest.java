@@ -6,6 +6,10 @@ import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.api.PlatformStream;
+import dev.ayagmar.quarkusforge.domain.ForgeUiState;
+import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
+import dev.ayagmar.quarkusforge.domain.ProjectRequest;
+import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.KeyModifiers;
@@ -43,6 +47,26 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void altSTogglesSelectedOnlyQuickView() {
+    CoreTuiController controller = UiControllerTestHarness.controller();
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    controller.onEvent(KeyEvent.ofChar(' '));
+    assertThat(controller.selectedExtensionIds()).hasSize(1);
+
+    controller.onEvent(KeyEvent.ofChar('s', KeyModifiers.ALT));
+    assertThat(controller.filteredExtensionCount()).isEqualTo(1);
+    assertThat(controller.statusMessage()).isEqualTo("Selected-only view enabled");
+    assertThat(UiControllerTestHarness.renderToString(controller))
+        .contains("Selected-only view")
+        .contains("[sel]")
+        .doesNotContain("Recently Selected");
+
+    controller.onEvent(KeyEvent.ofChar('s', KeyModifiers.ALT));
+    assertThat(controller.filteredExtensionCount()).isGreaterThan(1);
+    assertThat(controller.statusMessage()).isEqualTo("Selected-only view disabled");
+  }
+
+  @Test
   void vimListMotionsJAndKNavigateCatalogRows() {
     CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
@@ -72,6 +96,91 @@ class CoreTuiShellPilotTest {
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     assertThat(controller.statusMessage()).contains("Submit blocked");
+  }
+
+  @Test
+  void blockedSubmitMovesFocusToFirstInvalidField() {
+    CoreTuiController controller = UiControllerTestHarness.controller();
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.GROUP_ID);
+    for (int i = 0; i < 30; i++) {
+      controller.onEvent(KeyEvent.ofKey(KeyCode.BACKSPACE));
+    }
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.SUBMIT);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    assertThat(controller.validation().isValid()).isFalse();
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
+    assertThat(controller.statusMessage()).contains("fix groupId");
+  }
+
+  @Test
+  void submitButtonShowsBlockedLabelWhenValidationFails() {
+    CoreTuiController controller = UiControllerTestHarness.controller();
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.ARTIFACT_ID);
+    controller.onEvent(KeyEvent.ofChar('X'));
+    assertThat(controller.validation().isValid()).isFalse();
+
+    String rendered = UiControllerTestHarness.renderToString(controller, 120, 34);
+
+    assertThat(rendered).contains("Generate Project (blocked: 1 issue)");
+  }
+
+  @Test
+  void altNAndAltPCycleInvalidFields() {
+    CoreTuiController controller = UiControllerTestHarness.controller();
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.GROUP_ID);
+    for (int i = 0; i < 30; i++) {
+      controller.onEvent(KeyEvent.ofKey(KeyCode.BACKSPACE));
+    }
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.ARTIFACT_ID);
+    controller.onEvent(KeyEvent.ofChar('X'));
+    assertThat(controller.validation().isValid()).isFalse();
+
+    controller.onEvent(KeyEvent.ofChar('n', KeyModifiers.ALT));
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
+
+    controller.onEvent(KeyEvent.ofChar('n', KeyModifiers.ALT));
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.ARTIFACT_ID);
+
+    controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.ALT));
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
+  }
+
+  @Test
+  void footerShowsPreGeneratePlanLine() {
+    CoreTuiController controller = UiControllerTestHarness.controller();
+
+    String rendered = UiControllerTestHarness.renderToString(controller, 120, 34);
+
+    assertThat(rendered).contains("Plan:");
+    assertThat(rendered).contains("| Java ");
+    assertThat(rendered).contains("| 0 ext");
+  }
+
+  @Test
+  void preGeneratePlanDoesNotCrashWhenOutputDirectoryIsInvalidPath() {
+    MetadataCompatibilityContext metadata = MetadataCompatibilityContext.loadDefault();
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example",
+            "forge-app",
+            "1.0.0-SNAPSHOT",
+            "com.example.forge.app",
+            "\0invalid-output",
+            "maven",
+            "25");
+    ForgeUiState state =
+        new ForgeUiState(
+            request,
+            new ProjectRequestValidator().validate(request).merge(metadata.validate(request)),
+            metadata);
+    CoreTuiController controller =
+        CoreTuiController.from(state, UiScheduler.immediate(), java.time.Duration.ZERO);
+
+    String rendered = UiControllerTestHarness.renderToString(controller, 120, 34);
+
+    assertThat(rendered).contains("Plan:");
   }
 
   @Test
@@ -281,7 +390,7 @@ class CoreTuiShellPilotTest {
     assertThat(controller.request().packageName()).endsWith("hjklgG");
     assertThat(controller.request().outputDirectory()).endsWith("hjklgG");
     assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
-        .contains("Search: [ hjklgG");
+        .contains("Search: [hjklgG");
   }
 
   @Test
@@ -888,6 +997,33 @@ class CoreTuiShellPilotTest {
 
     controller.onEvent(KeyEvent.ofChar('l'));
     assertThat(controller.request().buildTool()).isEqualTo("gradle");
+  }
+
+  @Test
+  void focusedSelectorRetainsValidationHintForInvalidPrefill() {
+    ProjectRequest invalidRequest =
+        new ProjectRequest(
+            "com.example",
+            "forge-app",
+            "1.0.0-SNAPSHOT",
+            "com.example.forge.app",
+            "./generated",
+            "gradle.kotlin",
+            "25");
+    MetadataCompatibilityContext unavailableMetadata =
+        MetadataCompatibilityContext.failure("metadata unavailable");
+    ForgeUiState initialState =
+        new ForgeUiState(
+            invalidRequest,
+            new ProjectRequestValidator()
+                .validate(invalidRequest)
+                .merge(unavailableMetadata.validate(invalidRequest)),
+            unavailableMetadata);
+    CoreTuiController controller = CoreTuiController.from(initialState);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.BUILD_TOOL);
+
+    assertThat(controller.validation().isValid()).isFalse();
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34)).contains("⚠");
   }
 
   @Test
