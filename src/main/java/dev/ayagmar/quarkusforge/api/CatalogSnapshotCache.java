@@ -206,6 +206,7 @@ public final class CatalogSnapshotCache {
         extensionObject.put("shortName", extension.shortName());
         extensionObject.put("category", extension.category());
         extensionObject.put("order", extension.order());
+        extensionObject.put("description", extension.description());
         extensionArray.add(extensionObject);
       }
       return extensionArray;

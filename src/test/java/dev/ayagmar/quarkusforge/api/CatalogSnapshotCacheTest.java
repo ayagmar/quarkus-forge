@@ -38,6 +38,27 @@ class CatalogSnapshotCacheTest {
   }
 
   @Test
+  void writeThenReadPreservesExtensionDescriptions() {
+    Clock clock = Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC);
+    CatalogSnapshotCache cache =
+        new CatalogSnapshotCache(
+            tempDir.resolve("catalog-snapshot.json"),
+            CatalogSnapshotCache.defaultPayloadCodec(),
+            clock,
+            Duration.ofHours(6),
+            2L * 1024L * 1024L);
+    List<ExtensionDto> extensions =
+        List.of(
+            new ExtensionDto(
+                "io.quarkus:quarkus-rest", "REST", "rest", "Web", 10, "REST endpoint support"));
+
+    assertThat(cache.write(sampleMetadata(), extensions).written()).isTrue();
+
+    CachedCatalogSnapshot snapshot = cache.read().orElseThrow();
+    assertThat(snapshot.extensions().getFirst().description()).isEqualTo("REST endpoint support");
+  }
+
+  @Test
   void readMarksSnapshotAsStaleWhenTtlExpired() {
     Path cacheFile = tempDir.resolve("catalog-snapshot.json");
     CatalogSnapshotCache writer =
