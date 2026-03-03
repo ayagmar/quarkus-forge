@@ -7,7 +7,7 @@ import java.util.List;
 
 /**
  * Manages the metadata selector state (platform stream, build tool, java version) for the TUI form.
- * Encapsulates option resolution, cycling, and label generation.
+ * Encapsulates option resolution and cycling.
  */
 final class MetadataSelectorManager {
   private List<String> availableBuildTools = List.of();
@@ -83,25 +83,6 @@ final class MetadataSelectorManager {
       return null;
     }
     return first ? options.getFirst() : options.getLast();
-  }
-
-  /**
-   * Generates the inline label showing all options with radio-button style markers, e.g. "(*) maven
-   * ( ) gradle ( ) gradle-kotlin-dsl"
-   */
-  String inlineLabel(FocusTarget target, String selectedValue, MetadataDto metadataSnapshot) {
-    List<String> options = optionsFor(target);
-    if (options.isEmpty()) {
-      return "( ) no options available";
-    }
-
-    List<String> labels = new ArrayList<>();
-    for (String option : options) {
-      boolean isSelected = option.equalsIgnoreCase(selectedValue);
-      labels.add(
-          (isSelected ? "(*) " : "( ) ") + optionDisplayLabel(target, option, metadataSnapshot));
-    }
-    return String.join("  ", labels);
   }
 
   List<String> optionsFor(FocusTarget target) {

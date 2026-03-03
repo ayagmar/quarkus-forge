@@ -14,11 +14,15 @@ import dev.tamboui.widgets.block.BorderType;
 import dev.tamboui.widgets.block.Borders;
 import dev.tamboui.widgets.common.ScrollBarPolicy;
 import dev.tamboui.widgets.common.SizedWidget;
+import dev.tamboui.widgets.input.TextInput;
+import dev.tamboui.widgets.input.TextInputState;
 import dev.tamboui.widgets.list.ListItem;
 import dev.tamboui.widgets.list.ListState;
 import dev.tamboui.widgets.list.ListWidget;
 import dev.tamboui.widgets.list.ScrollMode;
 import dev.tamboui.widgets.paragraph.Paragraph;
+import dev.tamboui.widgets.toggle.Toggle;
+import dev.tamboui.widgets.toggle.ToggleState;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -31,9 +35,13 @@ import java.util.Set;
 final class BodyPanelRenderer {
 
   private final UiTheme theme;
+  private final TextInput extensionSearchInputWidget;
 
   BodyPanelRenderer(UiTheme theme) {
     this.theme = Objects.requireNonNull(theme);
+    Style focusStyle = UiInputStyles.focusedField(theme, false);
+    extensionSearchInputWidget =
+        TextInput.builder().style(focusStyle).cursorStyle(UiInputStyles.cursor(theme)).build();
   }
 
   void renderMetadataPanel(
@@ -182,12 +190,14 @@ final class BodyPanelRenderer {
       Frame frame,
       Rect area,
       ExtensionsPanelSnapshot snapshot,
+      TextInputState searchInputState,
       ListState listState,
       PanelTitleFormatter panelTitleFormatter,
       PanelBorderStyleResolver panelBorderStyleResolver,
       ExtensionFlagLookup selectedLookup,
       ExtensionFlagLookup favoriteLookup) {
     Objects.requireNonNull(snapshot);
+    Objects.requireNonNull(searchInputState);
     Objects.requireNonNull(listState);
     Objects.requireNonNull(panelTitleFormatter);
     Objects.requireNonNull(panelBorderStyleResolver);
@@ -239,7 +249,7 @@ final class BodyPanelRenderer {
     int idx = 0;
     renderSearchHint(frame, sections.get(idx++), snapshot);
     if (showSearchInput) {
-      renderSearchInput(frame, sections.get(idx++), snapshot);
+      renderSearchInput(frame, sections.get(idx++), snapshot, searchInputState);
     }
     if (hasSelected) {
       renderSelectedSummary(frame, sections.get(idx++), snapshot);
@@ -271,6 +281,9 @@ final class BodyPanelRenderer {
     if (snapshot.favoritesOnlyFilterEnabled()) {
       title.append(" [fav]");
     }
+    if (snapshot.selectedOnlyFilterEnabled()) {
+      title.append(" [sel]");
+    }
     if (!snapshot.activePresetFilterName().isBlank()) {
       title.append(" [preset:").append(snapshot.activePresetFilterName()).append("]");
     }
@@ -290,7 +303,10 @@ final class BodyPanelRenderer {
     } else {
       int filtered = snapshot.filteredExtensionCount();
       int total = snapshot.totalCatalogExtensionCount();
-      if (!snapshot.activeCategoryFilterTitle().isBlank()) {
+      if (snapshot.selectedOnlyFilterEnabled()) {
+        hint.append("Selected-only view");
+        hint.append(" | ").append(filtered).append(" of ").append(total);
+      } else if (!snapshot.activeCategoryFilterTitle().isBlank()) {
         hint.append("Filter: ").append(snapshot.activeCategoryFilterTitle());
         hint.append(" | ").append(filtered).append(" of ").append(total);
       } else if (!snapshot.activePresetFilterName().isBlank()) {
@@ -319,19 +335,42 @@ final class BodyPanelRenderer {
     frame.renderWidget(paragraph, area);
   }
 
-  private void renderSearchInput(Frame frame, Rect area, ExtensionsPanelSnapshot snapshot) {
+  private void renderSearchInput(
+      Frame frame, Rect area, ExtensionsPanelSnapshot snapshot, TextInputState searchInputState) {
     String query = snapshot.searchQuery();
     int filtered = snapshot.filteredExtensionCount();
     int total = snapshot.totalCatalogExtensionCount();
     String matchInfo = query.isBlank() ? "" : "  " + filtered + "/" + total + " matches";
-    String display = "  Search: [ " + query + "_ ]" + matchInfo + "  (Esc to clear)";
-    Paragraph paragraph =
-        Paragraph.builder()
-            .text(display)
-            .style(Style.EMPTY.fg(theme.color("focus")).bold())
-            .overflow(Overflow.ELLIPSIS)
-            .build();
-    frame.renderWidget(paragraph, area);
+    String prefix = "  Search: [";
+    String suffix = "]" + matchInfo + "  (Esc to clear)";
+    int inputWidth = area.width() - prefix.length() - suffix.length();
+    if (inputWidth < 1) {
+      String display = "  Search: [ " + query + " ]" + matchInfo + "  (Esc to clear)";
+      frame.renderWidget(
+          Paragraph.builder()
+              .text(display)
+              .style(Style.EMPTY.fg(theme.color("focus")).bold())
+              .overflow(Overflow.ELLIPSIS)
+              .build(),
+          area);
+      return;
+    }
+
+    Style focusStyle = UiInputStyles.focusedField(theme, false);
+    frame.renderWidget(
+        Paragraph.builder().text(prefix).style(focusStyle).overflow(Overflow.ELLIPSIS).build(),
+        new Rect(area.left(), area.top(), Math.min(prefix.length(), area.width()), area.height()));
+
+    Rect inputArea = new Rect(area.left() + prefix.length(), area.top(), inputWidth, area.height());
+    extensionSearchInputWidget.renderWithCursor(inputArea, frame.buffer(), searchInputState, frame);
+
+    frame.renderWidget(
+        Paragraph.builder().text(suffix).style(focusStyle).overflow(Overflow.ELLIPSIS).build(),
+        new Rect(
+            inputArea.left() + inputArea.width(),
+            area.top(),
+            area.width() - prefix.length() - inputArea.width(),
+            area.height()));
   }
 
   private void renderSelectedSummary(Frame frame, Rect area, ExtensionsPanelSnapshot snapshot) {
@@ -410,6 +449,8 @@ final class BodyPanelRenderer {
 
   private void renderSubmitButton(Frame frame, Rect area, ExtensionsPanelSnapshot snapshot) {
     boolean focused = snapshot.submitFocused();
+    int blockedIssues = snapshot.validationErrorCount();
+    boolean blocked = blockedIssues > 0;
     int selectedCount = snapshot.selectedExtensionIds().size();
     String countLabel;
     if (selectedCount == 0) {
@@ -419,17 +460,25 @@ final class BodyPanelRenderer {
     } else {
       countLabel = " (" + selectedCount + " extensions)";
     }
-    String label =
-        focused
-            ? "  >> [ Generate Project" + countLabel + " (Enter) ] <<"
+    String blockedLabel =
+        " (blocked: " + blockedIssues + " issue" + (blockedIssues == 1 ? "" : "s") + ")";
+    String focusedLabel =
+        blocked
+            ? "  [ Generate Project" + blockedLabel + " ]"
+            : "  [ Generate Project" + countLabel + " (Enter) ]";
+    String unfocusedLabel =
+        blocked
+            ? "  [ Generate Project" + blockedLabel + " ]"
             : "  [ Generate Project" + countLabel + " (Enter/Alt+G) ]";
-    Style style =
-        focused
-            ? Style.EMPTY.fg(theme.color("focus")).bold().reversed()
-            : Style.EMPTY.fg(theme.color("accent"));
-    Paragraph paragraph =
-        Paragraph.builder().text(label).style(style).overflow(Overflow.ELLIPSIS).build();
-    frame.renderWidget(paragraph, area);
+
+    Toggle toggle =
+        Toggle.builder()
+            .onSymbol(focusedLabel)
+            .offSymbol(unfocusedLabel)
+            .onColor(blocked ? theme.color("error") : theme.color("focus"))
+            .offColor(blocked ? theme.color("warning") : theme.color("accent"))
+            .build();
+    frame.renderStatefulWidget(toggle, area, new ToggleState(focused));
   }
 
   private static String catalogSourceLabel(ExtensionsPanelSnapshot snapshot) {
@@ -480,6 +529,8 @@ final class BodyPanelRenderer {
       String emptyMessage;
       if (extensionError) {
         emptyMessage = "  Catalog unavailable - using fallback snapshot";
+      } else if (snapshot.selectedOnlyFilterEnabled()) {
+        emptyMessage = "  No selected extensions in current view";
       } else if (snapshot.favoritesOnlyFilterEnabled()) {
         emptyMessage = "  No favorites match current filter";
       } else {

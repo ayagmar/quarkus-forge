@@ -7,6 +7,7 @@ public final class AppKeyActions {
   public static final String FOCUS_EXTENSION_SEARCH = "app_focus_extension_search";
   public static final String FOCUS_EXTENSION_LIST = "app_focus_extension_list";
   public static final String TOGGLE_FAVORITES_FILTER = "app_toggle_favorites_filter";
+  public static final String TOGGLE_SELECTED_FILTER = "app_toggle_selected_filter";
   public static final String CYCLE_PRESET_FILTER = "app_cycle_preset_filter";
   public static final String JUMP_TO_FAVORITE = "app_jump_to_favorite";
   public static final String RELOAD_CATALOG = "app_reload_catalog";
@@ -19,6 +20,8 @@ public final class AppKeyActions {
   public static final String OPEN_HELP = "app_help";
   public static final String OPEN_COMMAND_PALETTE = "app_command_palette";
   public static final String SUBMIT_GENERATION = "app_submit_generation";
+  public static final String NEXT_INVALID_FIELD = "app_next_invalid_field";
+  public static final String PREVIOUS_INVALID_FIELD = "app_previous_invalid_field";
 
   private AppKeyActions() {}
 
@@ -49,6 +52,10 @@ public final class AppKeyActions {
 
   static boolean isFavoritesFilterToggleKey(KeyEvent keyEvent) {
     return hasAction(keyEvent, TOGGLE_FAVORITES_FILTER) || isCtrlChar(keyEvent, 'k', 'K');
+  }
+
+  static boolean isSelectedOnlyFilterToggleKey(KeyEvent keyEvent) {
+    return hasAction(keyEvent, TOGGLE_SELECTED_FILTER) || isAltChar(keyEvent, 's', 'S');
   }
 
   static boolean isPresetFilterCycleKey(KeyEvent keyEvent) {
@@ -89,6 +96,14 @@ public final class AppKeyActions {
 
   static boolean isFocusExtensionListKey(KeyEvent keyEvent) {
     return hasAction(keyEvent, FOCUS_EXTENSION_LIST) || isCtrlChar(keyEvent, 'l', 'L');
+  }
+
+  static boolean isNextInvalidFieldKey(KeyEvent keyEvent) {
+    return hasAction(keyEvent, NEXT_INVALID_FIELD) || isAltChar(keyEvent, 'n', 'N');
+  }
+
+  static boolean isPreviousInvalidFieldKey(KeyEvent keyEvent) {
+    return hasAction(keyEvent, PREVIOUS_INVALID_FIELD) || isAltChar(keyEvent, 'p', 'P');
   }
 
   private static boolean hasAction(KeyEvent keyEvent, String action) {

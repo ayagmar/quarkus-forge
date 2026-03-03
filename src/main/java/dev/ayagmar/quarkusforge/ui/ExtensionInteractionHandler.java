@@ -111,6 +111,11 @@ final class ExtensionInteractionHandler {
     return enabled ? "Favorites filter enabled" : "Favorites filter disabled";
   }
 
+  String toggleSelectedOnlyFilter(IntConsumer onFiltered) {
+    boolean enabled = catalogState.toggleSelectedOnlyFilter(onFiltered);
+    return enabled ? "Selected-only view enabled" : "Selected-only view disabled";
+  }
+
   String cyclePresetFilter(IntConsumer onFiltered) {
     PresetFilterResult result = catalogState.cyclePresetFilter(onFiltered);
     if (!result.filtered()) {

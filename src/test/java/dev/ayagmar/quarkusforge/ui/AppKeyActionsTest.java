@@ -16,6 +16,8 @@ class AppKeyActionsTest {
     assertThat(AppKeyActions.isGenerateShortcutKey(KeyEvent.ofChar('g', KeyModifiers.ALT)))
         .isTrue();
     assertThat(AppKeyActions.isFavoriteToggleKey(KeyEvent.ofChar('f'))).isTrue();
+    assertThat(AppKeyActions.isSelectedOnlyFilterToggleKey(KeyEvent.ofChar('s', KeyModifiers.ALT)))
+        .isTrue();
     assertThat(AppKeyActions.isCategoryCollapseToggleKey(KeyEvent.ofChar('C'))).isFalse();
     assertThat(AppKeyActions.isExpandAllCategoriesKey(KeyEvent.ofChar('C'))).isTrue();
     assertThat(AppKeyActions.isHelpOverlayToggleKey(KeyEvent.ofChar('?'))).isTrue();

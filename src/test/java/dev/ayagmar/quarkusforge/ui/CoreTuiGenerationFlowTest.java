@@ -3,6 +3,10 @@ package dev.ayagmar.quarkusforge.ui;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.ayagmar.quarkusforge.api.ApiHttpException;
+import dev.ayagmar.quarkusforge.domain.ForgeUiState;
+import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
+import dev.ayagmar.quarkusforge.domain.ProjectRequest;
+import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.TickEvent;
@@ -43,6 +47,80 @@ class CoreTuiGenerationFlowTest {
         .contains("mvn quarkus:dev");
     assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
         .contains("Project Generated [focus]");
+  }
+
+  @Test
+  void submitBlockedWhenTargetFolderAlreadyExists() throws Exception {
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
+    Path outputRoot = tempDir.resolve("generated");
+    Path existingTarget = outputRoot.resolve("forge-app");
+    Files.createDirectories(existingTarget);
+
+    MetadataCompatibilityContext metadata = MetadataCompatibilityContext.loadDefault();
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example",
+            "forge-app",
+            "1.0.0-SNAPSHOT",
+            "com.example.forge.app",
+            outputRoot.toString(),
+            "maven",
+            "25");
+    ForgeUiState state =
+        new ForgeUiState(
+            request,
+            new ProjectRequestValidator().validate(request).merge(metadata.validate(request)),
+            metadata);
+    CoreTuiController controller =
+        CoreTuiController.from(state, UiScheduler.immediate(), Duration.ZERO, generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    assertThat(generationRunner.callCount()).isZero();
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.OUTPUT_DIR);
+    assertThat(controller.statusMessage()).contains("target folder exists");
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .contains("Output directory already exists:");
+  }
+
+  @Test
+  void targetFolderConflictClearsAfterArtifactChange() throws Exception {
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
+    Path outputRoot = tempDir.resolve("generated");
+    Path existingTarget = outputRoot.resolve("forge-app");
+    Files.createDirectories(existingTarget);
+
+    MetadataCompatibilityContext metadata = MetadataCompatibilityContext.loadDefault();
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example",
+            "forge-app",
+            "1.0.0-SNAPSHOT",
+            "com.example.forge.app",
+            outputRoot.toString(),
+            "maven",
+            "25");
+    ForgeUiState state =
+        new ForgeUiState(
+            request,
+            new ProjectRequestValidator().validate(request).merge(metadata.validate(request)),
+            metadata);
+    CoreTuiController controller =
+        CoreTuiController.from(state, UiScheduler.immediate(), Duration.ZERO, generationRunner);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .contains("Output directory already exists:");
+
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.ARTIFACT_ID);
+    controller.onEvent(KeyEvent.ofChar('2'));
+
+    assertThat(controller.request().artifactId()).isEqualTo("forge-app2");
+    assertThat(controller.statusMessage()).contains("conflict resolved");
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .doesNotContain("Output directory already exists:");
   }
 
   @Test
@@ -162,7 +240,7 @@ class CoreTuiGenerationFlowTest {
     controller.onEvent(KeyEvent.ofChar('j'));
 
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_SEARCH);
-    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34)).contains("Search: [ j");
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34)).contains("Search: [j");
   }
 
   @Test

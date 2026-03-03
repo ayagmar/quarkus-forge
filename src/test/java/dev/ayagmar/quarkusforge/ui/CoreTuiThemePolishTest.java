@@ -22,7 +22,10 @@ class CoreTuiThemePolishTest {
         CoreTuiController.from(UiTestFixtureFactory.defaultForgeUiState());
 
     String defaultFooter = UiControllerTestHarness.renderToString(controller, 120, 32);
-    assertThat(defaultFooter).contains("Tab/Shift+Tab: focus | Enter/Alt+G: submit | /: search");
+    assertThat(defaultFooter)
+        .contains("Tab/Shift+Tab: focus")
+        .contains("Enter/Alt+G: submit")
+        .contains("/: search");
 
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     String listFooterWide = UiControllerTestHarness.renderToString(controller, 120, 32);

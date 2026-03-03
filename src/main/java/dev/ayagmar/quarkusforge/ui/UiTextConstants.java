@@ -30,6 +30,8 @@ final class UiTextConstants {
           new CommandPaletteEntry(
               "Toggle favorite filter", "Ctrl+K", CommandPaletteAction.TOGGLE_FAVORITES_FILTER),
           new CommandPaletteEntry(
+              "Toggle selected-only view", "Alt+S", CommandPaletteAction.TOGGLE_SELECTED_FILTER),
+          new CommandPaletteEntry(
               "Cycle preset filter", "Ctrl+Y", CommandPaletteAction.CYCLE_PRESET_FILTER),
           new CommandPaletteEntry(
               "Jump to next favorite", "Ctrl+J", CommandPaletteAction.JUMP_TO_FAVORITE),
@@ -105,6 +107,7 @@ final class UiTextConstants {
           "  c / C           : close/open focused category / open all",
           "  Ctrl+J          : jump to next favorite",
           "  Ctrl+K          : toggle favorites filter",
+          "  Alt+S           : toggle selected-only view",
           "  Ctrl+Y          : cycle preset filter",
           "  Ctrl+R          : reload extension catalog",
           "",
