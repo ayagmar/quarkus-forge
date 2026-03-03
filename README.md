@@ -8,7 +8,7 @@
 
 > **[Documentation & Landing Page](https://ayagmar.github.io/quarkus-forge/)** · **[Getting Started](https://ayagmar.github.io/quarkus-forge/docs/getting-started/)**
 
-Quarkus Forge is a keyboard-first terminal UI (TUI) and headless CLI for generating and scaffolding Quarkus projects. It acts as a fast, offline-capable alternative to `quarkus create`, deeply integrated with `code.quarkus.io`'s remote metadata but built for terminal power users.
+Quarkus Forge is a keyboard-first terminal UI (TUI) and headless CLI for generating and scaffolding Quarkus projects. It acts as a fast, offline-capable alternative to `quarkus create`, deeply integrated with `code.quarkus.io` remote metadata but built for terminal power users.
 
 ![Quarkus Forge TUI](docs/images/tui-screenshot.png)
 
