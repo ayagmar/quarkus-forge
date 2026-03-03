@@ -32,11 +32,9 @@ final class OverlayRenderer {
     if (viewport.width() < 28 || viewport.height() < 10) {
       return;
     }
-    List<String> lines = new ArrayList<>();
-    for (int i = 0; i < entries.size(); i++) {
-      CommandPaletteEntry entry = entries.get(i);
-      lines.add((i + 1) + ". " + entry.label() + " [" + entry.shortcut() + "]");
-    }
+    List<String> lines =
+        buildNumberedLines(
+            entries.stream().map(entry -> entry.label() + " [" + entry.shortcut() + "]").toList());
     OverlayPanelRenderer.renderCenteredListOverlay(
         frame,
         viewport,
@@ -72,10 +70,7 @@ final class OverlayRenderer {
     if (viewport.width() < 36 || viewport.height() < 10) {
       return;
     }
-    List<String> lines = new ArrayList<>();
-    for (int i = 0; i < actionLabels.size(); i++) {
-      lines.add((i + 1) + ". " + actionLabels.get(i));
-    }
+    List<String> lines = buildNumberedLines(actionLabels);
     OverlayPanelRenderer.renderCenteredListOverlay(
         frame,
         viewport,
@@ -93,10 +88,7 @@ final class OverlayRenderer {
     if (viewport.width() < 44 || viewport.height() < 10) {
       return;
     }
-    List<String> lines = new ArrayList<>();
-    for (int index = 0; index < visibilityLabels.size(); index++) {
-      lines.add((index + 1) + ". " + visibilityLabels.get(index));
-    }
+    List<String> lines = buildNumberedLines(visibilityLabels);
     OverlayPanelRenderer.renderCenteredListOverlay(
         frame,
         viewport,
@@ -176,5 +168,13 @@ final class OverlayRenderer {
             .overflow(Overflow.ELLIPSIS)
             .build();
     frame.renderWidget(hintLine, rows.get(3));
+  }
+
+  private static List<String> buildNumberedLines(List<String> labels) {
+    List<String> lines = new ArrayList<>(labels.size());
+    for (int i = 0; i < labels.size(); i++) {
+      lines.add((i + 1) + ". " + labels.get(i));
+    }
+    return lines;
   }
 }

@@ -31,12 +31,10 @@ final class OverlayPanelRenderer {
       return;
     }
     int maxOptionLength = options.stream().mapToInt(String::length).max().orElse(40);
-    int maxOverlayWidth = Math.max(1, viewport.width() - 2);
-    int maxOverlayHeight = Math.max(1, viewport.height() - 2);
-    int width =
-        Math.min(Math.max(minWidth, Math.max(maxOptionLength, hint.length()) + 6), maxOverlayWidth);
-    int height = Math.min(options.size() + 4, maxOverlayHeight);
-    Rect overlayArea = centeredRect(viewport, width, height);
+    OverlayDimensions dimensions =
+        computeOverlayDimensions(
+            viewport, minWidth, Math.max(maxOptionLength, hint.length()), 6, options.size() + 4);
+    Rect overlayArea = centeredRect(viewport, dimensions.width(), dimensions.height());
 
     Style borderStyle = focusBorder ? focusedBorderStyle(theme) : defaultBorderStyle(theme);
     Block overlayBlock =
@@ -91,11 +89,9 @@ final class OverlayPanelRenderer {
       return;
     }
     int maxLineLength = lines.stream().mapToInt(String::length).max().orElse(40);
-    int maxOverlayWidth = Math.max(1, viewport.width() - 2);
-    int maxOverlayHeight = Math.max(1, viewport.height() - 2);
-    int width = Math.min(Math.max(minWidth, maxLineLength + 4), maxOverlayWidth);
-    int height = Math.min(lines.size() + 2, maxOverlayHeight);
-    Rect overlayArea = centeredRect(viewport, width, height);
+    OverlayDimensions dimensions =
+        computeOverlayDimensions(viewport, minWidth, maxLineLength, 4, lines.size() + 2);
+    Rect overlayArea = centeredRect(viewport, dimensions.width(), dimensions.height());
 
     Style borderStyle = focusBorder ? focusedBorderStyle(theme) : defaultBorderStyle(theme);
 
@@ -130,4 +126,15 @@ final class OverlayPanelRenderer {
   private static Style defaultBorderStyle(UiTheme theme) {
     return Style.EMPTY.fg(theme.color("accent")).bold();
   }
+
+  private static OverlayDimensions computeOverlayDimensions(
+      Rect viewport, int minWidth, int maxContentLength, int widthPadding, int desiredHeight) {
+    int maxOverlayWidth = Math.max(1, viewport.width() - 2);
+    int maxOverlayHeight = Math.max(1, viewport.height() - 2);
+    int width = Math.min(Math.max(minWidth, maxContentLength + widthPadding), maxOverlayWidth);
+    int height = Math.min(desiredHeight, maxOverlayHeight);
+    return new OverlayDimensions(width, height);
+  }
+
+  private record OverlayDimensions(int width, int height) {}
 }

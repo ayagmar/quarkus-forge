@@ -21,6 +21,10 @@ import org.junit.jupiter.api.io.TempDir;
 class CoreTuiGenerationFlowTest {
   @TempDir Path tempDir;
 
+  private record ConflictFixture(
+      CoreTuiController controller,
+      UiControllerTestHarness.ControlledGenerationRunner generationRunner) {}
+
   @Test
   void successfulGenerationShowsNextStepHintAndLocksInteractiveInputs() {
     UiControllerTestHarness.ControlledGenerationRunner generationRunner =
@@ -51,29 +55,10 @@ class CoreTuiGenerationFlowTest {
 
   @Test
   void submitBlockedWhenTargetFolderAlreadyExists() throws Exception {
+    ConflictFixture fixture = createConflictFixture();
+    CoreTuiController controller = fixture.controller();
     UiControllerTestHarness.ControlledGenerationRunner generationRunner =
-        new UiControllerTestHarness.ControlledGenerationRunner();
-    Path outputRoot = tempDir.resolve("generated");
-    Path existingTarget = outputRoot.resolve("forge-app");
-    Files.createDirectories(existingTarget);
-
-    MetadataCompatibilityContext metadata = MetadataCompatibilityContext.loadDefault();
-    ProjectRequest request =
-        new ProjectRequest(
-            "com.example",
-            "forge-app",
-            "1.0.0-SNAPSHOT",
-            "com.example.forge.app",
-            outputRoot.toString(),
-            "maven",
-            "25");
-    ForgeUiState state =
-        new ForgeUiState(
-            request,
-            new ProjectRequestValidator().validate(request).merge(metadata.validate(request)),
-            metadata);
-    CoreTuiController controller =
-        CoreTuiController.from(state, UiScheduler.immediate(), Duration.ZERO, generationRunner);
+        fixture.generationRunner();
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
@@ -86,29 +71,8 @@ class CoreTuiGenerationFlowTest {
 
   @Test
   void targetFolderConflictClearsAfterArtifactChange() throws Exception {
-    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
-        new UiControllerTestHarness.ControlledGenerationRunner();
-    Path outputRoot = tempDir.resolve("generated");
-    Path existingTarget = outputRoot.resolve("forge-app");
-    Files.createDirectories(existingTarget);
-
-    MetadataCompatibilityContext metadata = MetadataCompatibilityContext.loadDefault();
-    ProjectRequest request =
-        new ProjectRequest(
-            "com.example",
-            "forge-app",
-            "1.0.0-SNAPSHOT",
-            "com.example.forge.app",
-            outputRoot.toString(),
-            "maven",
-            "25");
-    ForgeUiState state =
-        new ForgeUiState(
-            request,
-            new ProjectRequestValidator().validate(request).merge(metadata.validate(request)),
-            metadata);
-    CoreTuiController controller =
-        CoreTuiController.from(state, UiScheduler.immediate(), Duration.ZERO, generationRunner);
+    ConflictFixture fixture = createConflictFixture();
+    CoreTuiController controller = fixture.controller();
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
@@ -555,5 +519,31 @@ class CoreTuiGenerationFlowTest {
     String afterCompletion = UiControllerTestHarness.renderToString(controller, 120, 34);
     assertThat(afterCompletion).doesNotContain("Generating Project");
     assertThat(afterCompletion).contains("Generation succeeded");
+  }
+
+  private ConflictFixture createConflictFixture() throws Exception {
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
+    Path outputRoot = tempDir.resolve("generated");
+    Path existingTarget = outputRoot.resolve("forge-app");
+    Files.createDirectories(existingTarget);
+    MetadataCompatibilityContext metadata = MetadataCompatibilityContext.loadDefault();
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example",
+            "forge-app",
+            "1.0.0-SNAPSHOT",
+            "com.example.forge.app",
+            outputRoot.toString(),
+            "maven",
+            "25");
+    ForgeUiState state =
+        new ForgeUiState(
+            request,
+            new ProjectRequestValidator().validate(request).merge(metadata.validate(request)),
+            metadata);
+    CoreTuiController controller =
+        CoreTuiController.from(state, UiScheduler.immediate(), Duration.ZERO, generationRunner);
+    return new ConflictFixture(controller, generationRunner);
   }
 }
