@@ -113,21 +113,12 @@ jobs:
       - name: Verify coverage files exist
         run: |
           test -s target/site/jacoco/jacoco.xml
-          test -s target/site/jacoco-it/jacoco.xml
 
-      - name: Upload unit test coverage report
+      - name: Upload merged coverage report
         uses: actions/upload-artifact@v7
         with:
-          name: jacoco-unit-report
+          name: jacoco-merged-report
           path: target/site/jacoco/
-          retention-days: 14
-          if-no-files-found: error
-
-      - name: Upload integration test coverage report
-        uses: actions/upload-artifact@v7
-        with:
-          name: jacoco-it-report
-          path: target/site/jacoco-it/
           retention-days: 14
           if-no-files-found: error
 
@@ -135,7 +126,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: target/site/jacoco/jacoco.xml,target/site/jacoco-it/jacoco.xml
+          files: target/site/jacoco/jacoco.xml
           fail_ci_if_error: false
           verbose: false
 
