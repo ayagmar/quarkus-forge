@@ -99,11 +99,11 @@ jobs:
           fi
 
           if [ ! -f CHANGELOG.md ]; then
-            cat > CHANGELOG.md <<'EOF'
-# Changelog
-
-All notable changes to this project will be documented in this file.
-EOF
+            printf '%s\n' \
+              '# Changelog' \
+              '' \
+              'All notable changes to this project will be documented in this file.' \
+              > CHANGELOG.md
           fi
 
           unreleased_line="$(grep -n '^## \[Unreleased\]' CHANGELOG.md | head -n1 | cut -d: -f1 || true)"
@@ -124,20 +124,20 @@ EOF
             } >> CHANGELOG.tmp
             tail -n "+$((unreleased_line + 1))" CHANGELOG.md >> CHANGELOG.tmp
           else
-            cat > CHANGELOG.tmp <<EOF
-# Changelog
-
-All notable changes to this project are documented here.
-This project uses [Conventional Commits](https://www.conventionalcommits.org/).
-
-${new_unreleased}
-
-${release_heading}
-
-### Changed
-
-${commits}
-EOF
+            {
+              printf '%s\n' '# Changelog'
+              printf '%s\n' ''
+              printf '%s\n' 'All notable changes to this project are documented here.'
+              printf '%s\n' 'This project uses [Conventional Commits](https://www.conventionalcommits.org/).'
+              printf '%s\n' ''
+              printf '%s\n' "${new_unreleased}"
+              printf '%s\n' ''
+              printf '%s\n' "${release_heading}"
+              printf '%s\n' ''
+              printf '%s\n' '### Changed'
+              printf '%s\n' ''
+              printf '%s\n' "${commits}"
+            } > CHANGELOG.tmp
           fi
 
           mv CHANGELOG.tmp CHANGELOG.md
