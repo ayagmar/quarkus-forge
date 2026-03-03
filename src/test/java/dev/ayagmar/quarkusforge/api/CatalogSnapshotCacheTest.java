@@ -50,12 +50,7 @@ class CatalogSnapshotCacheTest {
     List<ExtensionDto> extensions =
         List.of(
             new ExtensionDto(
-                "io.quarkus:quarkus-rest",
-                "REST",
-                "rest",
-                "Web",
-                10,
-                "REST endpoint support"));
+                "io.quarkus:quarkus-rest", "REST", "rest", "Web", 10, "REST endpoint support"));
 
     assertThat(cache.write(sampleMetadata(), extensions).written()).isTrue();
 
