@@ -3,7 +3,15 @@
 All notable changes to Quarkus Forge are documented here.
 This project uses [Conventional Commits](https://www.conventionalcommits.org/). GitHub Releases contain auto-generated notes from [JReleaser](https://jreleaser.org/).
 
-## [Unreleased](https://github.com/ayagmar/quarkus-forge/compare/v0.3.1...HEAD)
+## [Unreleased](https://github.com/ayagmar/quarkus-forge/compare/v0.3.2...HEAD)
+
+## [0.3.2](https://github.com/ayagmar/quarkus-forge/compare/v0.3.1...v0.3.2) (2026-03-03)
+
+### Changed
+
+- fix(api): preserve extension descriptions in catalog cache (#31) (9c09233)
+- chore(release): prepare next iteration 0.3.2-SNAPSHOT (c092c39)
+
 
 ## [0.3.1](https://github.com/ayagmar/quarkus-forge/compare/v0.3.0...v0.3.1) (2026-03-03)
 
