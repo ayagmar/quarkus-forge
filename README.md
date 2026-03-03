@@ -14,7 +14,7 @@ Quarkus Forge is a keyboard-first terminal UI (TUI) and headless CLI for generat
 
 ## Why use Quarkus Forge?
 
-- **Keyboard-First TUI:** Zero-mouse, Vim-like bindings for navigating catalogs, toggling extensions, and validating inputs. Fuzzy search highlighting, chip-style selected extensions, selector arrows with position hints, and animated progress feedback.
+- **Keyboard-First TUI:** Zero-mouse, Vim-like bindings for navigating catalogs, toggling extensions, and validating inputs. Fuzzy search highlighting, chip-style selected extensions, Tamboui selector/input widgets with visible caret, and animated progress feedback.
 - **Speed & Caching:** Background loading and local snapshot caching mean you don't wait for the network to start configuring your project.
 - **Headless & CI-Ready:** Powerful non-interactive modes for generating applications identically across local environments and CI pipelines.
 - **Deterministic State:** Supports `Forgefile` with an optional `locked` section for exact reproduction of generated applications, much like standard dependency managers.

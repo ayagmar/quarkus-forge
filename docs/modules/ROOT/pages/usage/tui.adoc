@@ -25,7 +25,9 @@ NOTE: `--enable-native-access=ALL-UNNAMED` suppresses Panama FFM warnings from t
 * **Search match count**: active search shows `5/400 matches (Esc to clear)`.
 * **Animated spinner**: braille dot animation during generation.
 * **Inline validation**: fields show `⚠ error message` inline.
-* **Selector arrows**: selector fields show `◀ maven ▶ (1/3)` when focused, `maven ◀▶` when unfocused.
+* **Visible text caret**: focused metadata/search inputs render a real caret at the active edit position.
+* **Selector controls**: focused selectors use Tamboui select controls with `◀` / `▶` indicators.
+* **Overlay lists**: command palette and post-generation menus render as navigable highlighted lists.
 * **IDE auto-detection**: post-generation menu shows detected IDEs (IntelliJ, VS Code, etc.).
 
 == Focus and Navigation
