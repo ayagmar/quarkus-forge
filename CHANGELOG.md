@@ -3,6 +3,29 @@
 All notable changes to Quarkus Forge are documented here.
 This project uses [Conventional Commits](https://www.conventionalcommits.org/). GitHub Releases contain auto-generated notes from [JReleaser](https://jreleaser.org/).
 
+## [0.2.3](https://github.com/ayagmar/quarkus-forge/compare/v0.2.2...v0.2.3) (2026-03-03)
+
+
+### Bug Fixes
+
+* **readme:** correct metadata integration wording ([29fc0ef](https://github.com/ayagmar/quarkus-forge/commit/29fc0ef5859383834502fffdc04f62aa09f1a9e4))
+* **release:** remove invalid action input and support release-as ([809e5ff](https://github.com/ayagmar/quarkus-forge/commit/809e5ff318112cfb2bf311cbd72ff263c3d1af75))
+* **release:** use maven strategy for release-please ([c2287aa](https://github.com/ayagmar/quarkus-forge/commit/c2287aa6df116c705fdcf933b40ca5c37f54e0d4))
+* **release:** wire workflow_dispatch release-as input ([479200a](https://github.com/ayagmar/quarkus-forge/commit/479200a8616b4688e2bda5adc1b16572cf88102a))
+
+
+### Maintenance
+
+* **ci:** add release provenance and npm dependabot ([4d3e738](https://github.com/ayagmar/quarkus-forge/commit/4d3e738f8e4413b0abd7f2993d282d55016525f8))
+* **ci:** do not run status job on cancelled workflows ([5153cc3](https://github.com/ayagmar/quarkus-forge/commit/5153cc30f8e7b1fdc61eee4e26c4d41a8182b6b4))
+* coverage hardening ([#26](https://github.com/ayagmar/quarkus-forge/issues/26)) ([bcc03bf](https://github.com/ayagmar/quarkus-forge/commit/bcc03bf2f3db9684e45deb4e7427d9c694e52673))
+* **deps:** bump actions/attest-build-provenance from 2 to 4 ([fb6e283](https://github.com/ayagmar/quarkus-forge/commit/fb6e283164eea18fba5aa440c12fdca9bb7b6ab0))
+* **deps:** bump actions/download-artifact from 4 to 8 ([0f170a1](https://github.com/ayagmar/quarkus-forge/commit/0f170a1bcc1e74697394c3e08238756ea77d39de))
+* fix mvnw ([7186fc6](https://github.com/ayagmar/quarkus-forge/commit/7186fc6a66c503b1499562142c4944a4706f6818))
+* **master:** release 0.2.3-SNAPSHOT ([#27](https://github.com/ayagmar/quarkus-forge/issues/27)) ([5f583f4](https://github.com/ayagmar/quarkus-forge/commit/5f583f411db60b0f92d02b45bc0c474fce11ed93))
+* **release:** prepare next iteration 0.2.3-SNAPSHOT ([5df629a](https://github.com/ayagmar/quarkus-forge/commit/5df629aa7f01af7a36599b67a746ce4b4caabd99))
+* **release:** treat chore/deps commits as releasable ([c3fd771](https://github.com/ayagmar/quarkus-forge/commit/c3fd771bc73891700f2ad4b6f052ca9257181aaa))
+
 ## [Unreleased](https://github.com/ayagmar/quarkus-forge/compare/v0.2.0...HEAD)
 
 ### Added
