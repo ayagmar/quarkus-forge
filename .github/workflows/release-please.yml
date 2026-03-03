@@ -77,9 +77,11 @@ jobs:
           release_version="${major}.${minor}.${patch}"
           next_dev_version="${major}.${minor}.$((patch + 1))-SNAPSHOT"
 
-          echo "latest_tag=${latest_tag}" >> "$GITHUB_OUTPUT"
-          echo "release_version=${release_version}" >> "$GITHUB_OUTPUT"
-          echo "next_dev_version=${next_dev_version}" >> "$GITHUB_OUTPUT"
+          {
+            echo "latest_tag=${latest_tag}"
+            echo "release_version=${release_version}"
+            echo "next_dev_version=${next_dev_version}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Set release version
         run: mvn -B -ntp versions:set -DnewVersion=${{ steps.versions.outputs.release_version }} -DgenerateBackupPoms=false
