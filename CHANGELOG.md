@@ -3,7 +3,17 @@
 All notable changes to Quarkus Forge are documented here.
 This project uses [Conventional Commits](https://www.conventionalcommits.org/). GitHub Releases contain auto-generated notes from [JReleaser](https://jreleaser.org/).
 
-## [Unreleased](https://github.com/ayagmar/quarkus-forge/compare/v0.2.0...HEAD)
+## [Unreleased](https://github.com/ayagmar/quarkus-forge/compare/v0.3.0...HEAD)
+
+## [0.3.0](https://github.com/ayagmar/quarkus-forge/compare/v0.2.3...v0.3.0) (2026-03-03)
+
+### Changed
+
+- fix(ci): resolve shellcheck output redirection warning (a9b3cfc)
+- fix(ci): lint workflows and repair release-cut changelog step (002e5e6)
+- feat(release): update changelog during release-cut (29a9e76)
+- chore(release): restore release-cut workflow and bump 0.3.0 (d47f213)
+
 
 ### Added
 
