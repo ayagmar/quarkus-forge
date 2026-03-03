@@ -126,7 +126,7 @@ jobs:
 
   ci-status:
     name: CI Status
-    if: always()
+    if: always() && !cancelled()
     needs: [quality, tests, coverage]
     runs-on: ubuntu-latest
     timeout-minutes: 1
