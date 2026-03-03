@@ -166,4 +166,46 @@ class QuarkusForgeCliTest {
     assertThat(PostTuiActionExecutor.githubPublishCommand(GitHubVisibility.INTERNAL))
         .endsWith("gh repo create --source . --push --internal");
   }
+
+  @Test
+  void applyStoredRequestDefaultsWithNullStoredPrefillDoesNothing() {
+    RequestOptions options = new RequestOptions();
+    String originalGroupId = options.groupId;
+
+    QuarkusForgeCli.applyStoredRequestDefaults(options, null);
+
+    assertThat(options.groupId).isEqualTo(originalGroupId);
+  }
+
+  @Test
+  void applyStoredRequestDefaultsAppliesStoredValues() {
+    RequestOptions options = RequestOptions.defaults();
+    var stored =
+        new dev.ayagmar.quarkusforge.domain.CliPrefill(
+            "com.stored", "stored-app", "2.0.0", "com.stored.app", "/stored", "", "gradle", "21");
+
+    QuarkusForgeCli.applyStoredRequestDefaults(options, stored);
+
+    // Stored values should apply since current values match defaults
+    assertThat(options.groupId).isEqualTo("com.stored");
+    assertThat(options.artifactId).isEqualTo("stored-app");
+    assertThat(options.version).isEqualTo("2.0.0");
+    assertThat(options.buildTool).isEqualTo("gradle");
+    assertThat(options.javaVersion).isEqualTo("21");
+  }
+
+  @Test
+  void applyStoredRequestDefaultsPreservesExplicitValues() {
+    RequestOptions options = RequestOptions.defaults();
+    options.groupId = "com.explicit"; // explicitly set, different from default
+
+    var stored =
+        new dev.ayagmar.quarkusforge.domain.CliPrefill(
+            "com.stored", "stored-app", "", "", "", "", "", "");
+
+    QuarkusForgeCli.applyStoredRequestDefaults(options, stored);
+
+    // Explicitly set values should not be overridden
+    assertThat(options.groupId).isEqualTo("com.explicit");
+  }
 }

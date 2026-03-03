@@ -218,4 +218,72 @@ class CatalogRowBuilderTest {
     Set<String> titles = CatalogRowBuilder.availableCategoryTitles(items);
     assertThat(titles).containsExactly("Data", "Web");
   }
+
+  @Test
+  void recentItemsNotShownWhenPresetActive() {
+    List<ExtensionCatalogItem> items =
+        List.of(item("a:b", "ExtA", "Web"), item("a:c", "ExtB", "Core"));
+
+    List<ExtensionCatalogRow> rows =
+        CatalogRowBuilder.buildRows(items, Set.of(), List.of("a:b"), "", false, "some-preset");
+
+    assertThat(rows.stream().noneMatch(r -> CatalogRowBuilder.RECENT_SECTION_TITLE.equals(r.label())))
+        .isTrue();
+  }
+
+  @Test
+  void resolveCategoryTitleHandlesSingleCharCategory() {
+    assertThat(CatalogRowBuilder.resolveCategoryTitle("x", "x")).isEqualTo("X");
+  }
+
+  @Test
+  void collapsedCategoryHeaderShowsHiddenAndTotalCount() {
+    List<ExtensionCatalogItem> items =
+        List.of(
+            item("a:b", "ExtA", "Web"),
+            item("a:c", "ExtB", "Web"),
+            item("a:d", "ExtC", "Core"));
+
+    List<ExtensionCatalogRow> rows =
+        CatalogRowBuilder.buildRows(items, Set.of("Web"), List.of(), "", false, "");
+
+    ExtensionCatalogRow webHeader =
+        rows.stream()
+            .filter(r -> r.isSectionHeader() && "Web".equals(r.label()))
+            .findFirst()
+            .orElseThrow();
+
+    assertThat(webHeader.collapsed()).isTrue();
+    assertThat(webHeader.hiddenCount()).isEqualTo(2);
+    assertThat(webHeader.totalCount()).isEqualTo(2);
+  }
+
+  @Test
+  void recentItemsNotFoundInCatalogAreSkipped() {
+    List<ExtensionCatalogItem> items = List.of(item("a:b", "ExtA", "Web"));
+
+    List<ExtensionCatalogRow> rows =
+        CatalogRowBuilder.buildRows(items, Set.of(), List.of("nonexistent-id"), "", false, "");
+
+    assertThat(rows.stream().noneMatch(r -> CatalogRowBuilder.RECENT_SECTION_TITLE.equals(r.label())))
+        .isTrue();
+  }
+
+  @Test
+  void uncollapsedCategorySectionHeaderShowsZeroHiddenCount() {
+    List<ExtensionCatalogItem> items =
+        List.of(item("a:b", "ExtA", "Web"), item("a:c", "ExtB", "Web"));
+
+    List<ExtensionCatalogRow> rows =
+        CatalogRowBuilder.buildRows(items, Set.of(), List.of(), "", false, "");
+
+    ExtensionCatalogRow webHeader =
+        rows.stream()
+            .filter(r -> r.isSectionHeader() && "Web".equals(r.label()))
+            .findFirst()
+            .orElseThrow();
+
+    assertThat(webHeader.collapsed()).isFalse();
+    assertThat(webHeader.hiddenCount()).isZero();
+  }
 }

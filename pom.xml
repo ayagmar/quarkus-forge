@@ -218,14 +218,29 @@
           <skip>${skipTests}</skip>
         </configuration>
         <executions>
-          <!-- Injects JaCoCo agent into ${argLine} for unit tests -->
+          <!-- Injects JaCoCo agent into ${argLine} for unit tests (appends to shared exec file) -->
           <execution>
             <id>prepare-agent</id>
             <goals>
               <goal>prepare-agent</goal>
             </goals>
+            <configuration>
+              <destFile>${project.build.directory}/jacoco.exec</destFile>
+              <append>true</append>
+            </configuration>
           </execution>
-          <!-- Generates unit test coverage report during verify (full build) -->
+          <!-- Injects JaCoCo agent into ${argLine} for integration tests (appends to same exec file) -->
+          <execution>
+            <id>prepare-agent-integration</id>
+            <goals>
+              <goal>prepare-agent-integration</goal>
+            </goals>
+            <configuration>
+              <destFile>${project.build.directory}/jacoco.exec</destFile>
+              <append>true</append>
+            </configuration>
+          </execution>
+          <!-- Generates a single merged coverage report from unit + integration tests -->
           <execution>
             <id>report</id>
             <phase>verify</phase>
@@ -233,25 +248,31 @@
               <goal>report</goal>
             </goals>
             <configuration>
+              <dataFile>${project.build.directory}/jacoco.exec</dataFile>
               <outputDirectory>${project.reporting.outputDirectory}/jacoco</outputDirectory>
             </configuration>
           </execution>
-          <!-- Injects JaCoCo agent into ${argLine} for integration tests -->
+          <!-- Enforces minimum line coverage threshold against merged data -->
           <execution>
-            <id>prepare-agent-integration</id>
-            <goals>
-              <goal>prepare-agent-integration</goal>
-            </goals>
-          </execution>
-          <!-- Generates integration test coverage report after verify phase -->
-          <execution>
-            <id>report-integration</id>
+            <id>check</id>
             <phase>verify</phase>
             <goals>
-              <goal>report-integration</goal>
+              <goal>check</goal>
             </goals>
             <configuration>
-              <outputDirectory>${project.reporting.outputDirectory}/jacoco-it</outputDirectory>
+              <dataFile>${project.build.directory}/jacoco.exec</dataFile>
+              <rules>
+                <rule>
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit>
+                      <counter>LINE</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>0.85</minimum>
+                    </limit>
+                  </limits>
+                </rule>
+              </rules>
             </configuration>
           </execution>
         </executions>

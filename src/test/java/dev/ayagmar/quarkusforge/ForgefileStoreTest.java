@@ -197,4 +197,92 @@ class ForgefileStoreTest {
     assertThat(forgefile.extensions()).containsExactly("ext1");
     assertThat(forgefile.locked()).isNull();
   }
+
+  @Test
+  void loadIgnoresNonMapLockedSection() throws Exception {
+    // Write JSON where "locked" is a string instead of a map
+    Path file = tempDir.resolve("locked-string.json");
+    Files.writeString(
+        file,
+        """
+        {
+          "groupId": "org.acme",
+          "artifactId": "test",
+          "version": "1.0.0",
+          "buildTool": "maven",
+          "javaVersion": "21",
+          "presets": [],
+          "extensions": [],
+          "locked": "not-a-map"
+        }
+        """);
+
+    Forgefile loaded = ForgefileStore.load(file);
+
+    assertThat(loaded.locked()).isNull();
+    assertThat(loaded.artifactId()).isEqualTo("test");
+  }
+
+  @Test
+  void saveOmitsBlankPackageNameAndOutputStream() {
+    Forgefile forgefile =
+        new Forgefile(
+            "org.acme", "app", "1.0.0", "", "", "", "maven", "21", List.of(), List.of());
+
+    Path file = tempDir.resolve("omit-blanks");
+    ForgefileStore.save(file, forgefile);
+    Forgefile loaded = ForgefileStore.load(file);
+
+    // Blank packageName and outputDirectory should be omitted in JSON, loaded as empty
+    assertThat(loaded.packageName()).isEmpty();
+    assertThat(loaded.outputDirectory()).isEmpty();
+    assertThat(loaded.platformStream()).isEmpty();
+  }
+
+  @Test
+  void saveIncludesNonBlankOptionalFields() {
+    Forgefile forgefile =
+        new Forgefile(
+            "org.acme",
+            "app",
+            "1.0.0",
+            "org.acme.app",
+            "/projects",
+            "io.quarkus.platform:3.31",
+            "maven",
+            "21",
+            List.of(),
+            List.of());
+
+    Path file = tempDir.resolve("include-optionals");
+    ForgefileStore.save(file, forgefile);
+    Forgefile loaded = ForgefileStore.load(file);
+
+    assertThat(loaded.packageName()).isEqualTo("org.acme.app");
+    assertThat(loaded.outputDirectory()).isEqualTo("/projects");
+    assertThat(loaded.platformStream()).isEqualTo("io.quarkus.platform:3.31");
+  }
+
+  @Test
+  void loadFileWithNullLockedFieldReturnsNullLock() throws Exception {
+    Path file = tempDir.resolve("null-locked.json");
+    Files.writeString(
+        file,
+        """
+        {
+          "groupId": "org.acme",
+          "artifactId": "test",
+          "version": "1.0",
+          "buildTool": "maven",
+          "javaVersion": "21",
+          "presets": [],
+          "extensions": [],
+          "locked": null
+        }
+        """);
+
+    Forgefile loaded = ForgefileStore.load(file);
+
+    assertThat(loaded.locked()).isNull();
+  }
 }

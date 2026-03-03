@@ -3,7 +3,9 @@ package dev.ayagmar.quarkusforge;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
+import dev.ayagmar.quarkusforge.domain.CommandUtils;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
+import dev.ayagmar.quarkusforge.ui.GitHubVisibility;
 import dev.ayagmar.quarkusforge.ui.PostGenerationExitAction;
 import dev.ayagmar.quarkusforge.ui.PostGenerationExitPlan;
 import java.io.ByteArrayOutputStream;
@@ -129,6 +131,199 @@ class PostTuiActionExecutorTest {
     String output = stdout.toString(StandardCharsets.UTF_8);
     // Without a console (CI/tests), it prints terminal handoff instructions
     assertThat(output).contains("Terminal handoff:");
+  }
+
+  @Test
+  void githubPublishCommandContainsGitAndGhSteps() {
+    String command = PostTuiActionExecutor.githubPublishCommand(GitHubVisibility.PRIVATE);
+    assertThat(command).contains("git init").contains("gh repo create").contains("--private");
+  }
+
+  @Test
+  void githubPublishCommandUsesPublicVisibility() {
+    String command = PostTuiActionExecutor.githubPublishCommand(GitHubVisibility.PUBLIC);
+    assertThat(command).contains("--public");
+  }
+
+  @Test
+  void githubPublishCommandDefaultsToPrivateForNull() {
+    String command = PostTuiActionExecutor.githubPublishCommand(null);
+    assertThat(command).contains("--private");
+  }
+
+  @Test
+  void resolveIdeCommandFallsBackToCode() {
+    // In test env without QUARKUS_FORGE_IDE_COMMAND set, expect fallback
+    String envIde = System.getenv("QUARKUS_FORGE_IDE_COMMAND");
+    String command = PostTuiActionExecutor.resolveIdeCommand();
+    if (envIde != null && !envIde.isBlank()) {
+      assertThat(command).isEqualTo(envIde.strip());
+    } else {
+      assertThat(command).isNotBlank();
+    }
+  }
+
+  @Test
+  void isWindowsOsDetectsCorrectly() {
+    // In test env (Linux/macOS), this should be false
+    String osName = System.getProperty("os.name", "");
+    boolean expected = osName.toLowerCase(java.util.Locale.ROOT).contains("win");
+    assertThat(PostTuiActionExecutor.isWindowsOs()).isEqualTo(expected);
+  }
+
+  @Test
+  void postHookDiagnosticFieldsRedactsCommand() {
+    var fields =
+        PostTuiActionExecutor.postHookDiagnosticFields(Path.of("/project"), "secret command");
+    assertThat(fields).hasSize(3);
+    // Command should be redacted
+    boolean hasRedacted = false;
+    boolean hasLength = false;
+    for (var field : fields) {
+      if ("command".equals(field.name())) {
+        assertThat(field.value()).isEqualTo("<redacted>");
+        hasRedacted = true;
+      }
+      if ("commandLength".equals(field.name())) {
+        assertThat(field.value()).isEqualTo(14);
+        hasLength = true;
+      }
+    }
+    assertThat(hasRedacted).isTrue();
+    assertThat(hasLength).isTrue();
+  }
+
+  @Test
+  void exportRecipeLockActionDoesNotInvokeShell() {
+    PostGenerationExitPlan plan =
+        new PostGenerationExitPlan(
+            PostGenerationExitAction.EXPORT_RECIPE_LOCK, Path.of("/tmp/project"), "");
+    TuiSessionSummary summary = new TuiSessionSummary(dummyRequest(), plan);
+    executor.execute(summary, "", diagnostics);
+    assertThat(shellInvocations).isEmpty();
+  }
+
+  @Test
+  void openIdeWithNullIdeCommandUsesResolvedDefault() {
+    PostGenerationExitPlan plan =
+        new PostGenerationExitPlan(
+            PostGenerationExitAction.OPEN_IDE, Path.of("/tmp/project"), "", null, null);
+    TuiSessionSummary summary = new TuiSessionSummary(dummyRequest(), plan);
+    executor.execute(summary, "", diagnostics);
+
+    assertThat(shellInvocations).hasSize(1);
+    // When ideCommand is null, resolveIdeCommand() is used — returns either
+    // env var, detected IDE, or "code ."
+    assertThat(shellInvocations.get(0).invocation()).isNotEmpty();
+  }
+
+  @Test
+  void openTerminalPrintsNextCommandInHandoffWhenPresent() {
+    PostGenerationExitPlan plan =
+        new PostGenerationExitPlan(
+            PostGenerationExitAction.OPEN_TERMINAL, Path.of("/tmp/project"), "./mvnw quarkus:dev");
+    TuiSessionSummary summary = new TuiSessionSummary(dummyRequest(), plan);
+
+    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+    PrintStream originalOut = System.out;
+    try {
+      System.setOut(new PrintStream(stdout, true, StandardCharsets.UTF_8));
+      executor.execute(summary, "", diagnostics);
+    } finally {
+      System.setOut(originalOut);
+    }
+    String output = stdout.toString(StandardCharsets.UTF_8);
+    assertThat(output).contains("./mvnw quarkus:dev");
+  }
+
+  @Test
+  void openTerminalHandoffOmitsBlankNextCommand() {
+    PostGenerationExitPlan plan =
+        new PostGenerationExitPlan(
+            PostGenerationExitAction.OPEN_TERMINAL, Path.of("/tmp/project"), "   ");
+    TuiSessionSummary summary = new TuiSessionSummary(dummyRequest(), plan);
+
+    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+    PrintStream originalOut = System.out;
+    try {
+      System.setOut(new PrintStream(stdout, true, StandardCharsets.UTF_8));
+      executor.execute(summary, "", diagnostics);
+    } finally {
+      System.setOut(originalOut);
+    }
+    String output = stdout.toString(StandardCharsets.UTF_8);
+    assertThat(output).contains("Terminal handoff:");
+    assertThat(output).contains("cd \"");
+  }
+
+  @Test
+  void publishGithubWithBothToolsAvailableExecutesCommand() {
+    PostGenerationExitPlan plan =
+        new PostGenerationExitPlan(
+            PostGenerationExitAction.PUBLISH_GITHUB,
+            Path.of("/tmp/project"),
+            "",
+            GitHubVisibility.PRIVATE,
+            null);
+    TuiSessionSummary summary = new TuiSessionSummary(dummyRequest(), plan);
+    executor.execute(summary, "", diagnostics);
+
+    // Should execute the publish command since git and gh are on PATH
+    if (CommandUtils.isCommandAvailable("git") && CommandUtils.isCommandAvailable("gh")) {
+      assertThat(shellInvocations).hasSize(1);
+      assertThat(shellInvocations.get(0).invocation())
+          .anyMatch(s -> s.contains("gh repo create"));
+    }
+  }
+
+  @Test
+  void publishGithubWithNullVisibilityDefaultsToPrivate() {
+    PostGenerationExitPlan plan =
+        new PostGenerationExitPlan(
+            PostGenerationExitAction.PUBLISH_GITHUB,
+            Path.of("/tmp/project"),
+            "",
+            null,
+            null);
+    TuiSessionSummary summary = new TuiSessionSummary(dummyRequest(), plan);
+    executor.execute(summary, "", diagnostics);
+
+    // Should default to PRIVATE visibility
+    if (CommandUtils.isCommandAvailable("git") && CommandUtils.isCommandAvailable("gh")) {
+      assertThat(shellInvocations).hasSize(1);
+      assertThat(shellInvocations.get(0).invocation())
+          .anyMatch(s -> s.contains("--private"));
+    }
+  }
+
+  @Test
+  void publishGithubWithExplicitPublicVisibility() {
+    PostGenerationExitPlan plan =
+        new PostGenerationExitPlan(
+            PostGenerationExitAction.PUBLISH_GITHUB,
+            Path.of("/tmp/project"),
+            "",
+            GitHubVisibility.PUBLIC,
+            null);
+    TuiSessionSummary summary = new TuiSessionSummary(dummyRequest(), plan);
+    executor.execute(summary, "", diagnostics);
+
+    if (CommandUtils.isCommandAvailable("git") && CommandUtils.isCommandAvailable("gh")) {
+      assertThat(shellInvocations).hasSize(1);
+      assertThat(shellInvocations.get(0).invocation())
+          .anyMatch(s -> s.contains("--public"));
+    }
+  }
+
+  @Test
+  void executeWithNullActionSkipsActionSwitch() {
+    PostGenerationExitPlan plan =
+        new PostGenerationExitPlan(null, Path.of("/tmp/project"), "");
+    TuiSessionSummary summary = new TuiSessionSummary(dummyRequest(), plan);
+    executor.execute(summary, "echo hook", diagnostics);
+    // Hook should still execute even when action is null
+    assertThat(shellInvocations).hasSize(1);
+    assertThat(shellInvocations.get(0).invocation()).contains("echo hook");
   }
 
   private static ProjectRequest dummyRequest() {

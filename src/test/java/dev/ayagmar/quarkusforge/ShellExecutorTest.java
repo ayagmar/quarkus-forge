@@ -90,6 +90,24 @@ class ShellExecutorTest {
         .containsExactly("open-terminal:Interrupted while executing post action");
   }
 
+  @Test
+  void windowsCommandUsesCmd() {
+    CapturingDiagnostics diagnostics = new CapturingDiagnostics();
+    List<String> captured = new ArrayList<>();
+    ShellExecutor executor =
+        new ShellExecutor(
+            () -> true,
+            (command, workingDirectory) -> {
+              captured.addAll(command);
+              return 0;
+            });
+
+    executor.execute("dir", Path.of("."), "test-cmd", diagnostics);
+
+    assertThat(captured).containsExactly("cmd.exe", "/c", "dir");
+    assertThat(diagnostics.successActions).containsExactly("test-cmd");
+  }
+
   private static final class CapturingDiagnostics implements ShellExecutorDiagnostics {
     private final List<String> successActions = new ArrayList<>();
     private final List<String> errorMessages = new ArrayList<>();

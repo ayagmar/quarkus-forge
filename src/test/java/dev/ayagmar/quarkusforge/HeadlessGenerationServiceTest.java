@@ -79,6 +79,221 @@ class HeadlessGenerationServiceTest {
     assertThat(client.startGenerationCalls).isZero();
   }
 
+  @Test
+  void catalogCancellationReturnsCancelledExitCode() {
+    StubCatalogClient client = new StubCatalogClient();
+    client.catalogLoadCancellation = new java.util.concurrent.CancellationException("cancelled");
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+
+    GenerateCommand command = commandWithOutput();
+    int exitCode = service.run(command, false, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.CANCELLED);
+  }
+
+  @Test
+  void validationFailureReturnsValidationExitCode() {
+    StubCatalogClient client = new StubCatalogClient();
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+
+    GenerateCommand command = commandWithOutput();
+    command.requestOptions.buildTool = "ant"; // unsupported build tool
+    int exitCode = service.run(command, false, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.VALIDATION);
+  }
+
+  @Test
+  void unknownExtensionReturnsValidationExitCode() {
+    StubCatalogClient client = new StubCatalogClient();
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+
+    GenerateCommand command = commandWithOutput();
+    command.extensions.add("io.quarkus:nonexistent");
+    int exitCode = service.run(command, false, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.VALIDATION);
+  }
+
+  @Test
+  void generationExecutionFailureReturnsCorrectExitCode() {
+    StubCatalogClient client = new StubCatalogClient();
+    client.generationFuture =
+        CompletableFuture.failedFuture(
+            new dev.ayagmar.quarkusforge.api.ApiClientException("connection refused", null));
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+
+    GenerateCommand command = commandWithOutput();
+    int exitCode = service.run(command, false, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.NETWORK);
+  }
+
+  @Test
+  void verboseModeEmitsDiagnostics() {
+    StubCatalogClient client = new StubCatalogClient();
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+
+    GenerateCommand command = commandWithOutput();
+    // verbose mode should not change exit code
+    int exitCode = service.run(command, true, true);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.OK);
+  }
+
+  @Test
+  void blankExtensionInputReturnsValidationExitCode() {
+    StubCatalogClient client = new StubCatalogClient();
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+
+    GenerateCommand command = commandWithOutput();
+    command.extensions.add("   ");
+    int exitCode = service.run(command, true, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.VALIDATION);
+  }
+
+  @Test
+  void favoritesPresetResolvesFromStore() throws Exception {
+    RuntimeConfig config = stubRuntimeConfig();
+    // Write a favorites file
+    java.nio.file.Files.createDirectories(config.favoritesFile().getParent());
+    java.nio.file.Files.writeString(
+        config.favoritesFile(),
+        """
+        {"extensions":["io.quarkus:quarkus-rest"]}
+        """);
+
+    StubCatalogClient client = new StubCatalogClient();
+    HeadlessGenerationService service = new HeadlessGenerationService(client, config);
+
+    GenerateCommand command = commandWithOutput();
+    command.presets.add("favorites");
+    int exitCode = service.run(command, true, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.OK);
+  }
+
+  @Test
+  void builtInPresetResolvesExtensions() {
+    StubCatalogClient client = new StubCatalogClient();
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+
+    GenerateCommand command = commandWithOutput();
+    command.presets.add("web");
+    int exitCode = service.run(command, true, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.OK);
+    // "web" preset resolves to quarkus-rest which is in the catalog
+  }
+
+  @Test
+  void unknownPresetReturnsValidationExitCode() {
+    StubCatalogClient client = new StubCatalogClient();
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+
+    GenerateCommand command = commandWithOutput();
+    command.presets.add("nonexistent");
+    int exitCode = service.run(command, true, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.VALIDATION);
+  }
+
+  @Test
+  void blankPresetInputIsSkipped() {
+    StubCatalogClient client = new StubCatalogClient();
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+
+    GenerateCommand command = commandWithOutput();
+    command.presets.add("   ");
+    int exitCode = service.run(command, true, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.OK);
+  }
+
+  @Test
+  void presetLoadFailureReturnsNetworkExitCode() {
+    StubCatalogClient client = new StubCatalogClient();
+    client.presetLoadTimeout = new TimeoutException("presets timeout");
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+
+    GenerateCommand command = commandWithOutput();
+    command.presets.add("web"); // non-favorites preset triggers loadBuiltInPresets
+    int exitCode = service.run(command, false, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.NETWORK);
+  }
+
+  @Test
+  void lockWithoutFromOrSaveAsReturnsValidation() {
+    StubCatalogClient client = new StubCatalogClient();
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+
+    GenerateCommand command = commandWithOutput();
+    command.lock = true;
+    // No --from or --save-as
+    int exitCode = service.run(command, false, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.VALIDATION);
+  }
+
+  @Test
+  void lockCheckWithoutFromReturnsValidation() {
+    StubCatalogClient client = new StubCatalogClient();
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+
+    GenerateCommand command = commandWithOutput();
+    command.lockCheck = true;
+    // No --from
+    int exitCode = service.run(command, false, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.VALIDATION);
+  }
+
+  @Test
+  void forgefileFromFileLoadsAndApplies() throws Exception {
+    // Create a forgefile
+    java.nio.file.Path forgefilePath = tempDir.resolve("test.forgefile.json");
+    java.nio.file.Files.writeString(
+        forgefilePath,
+        """
+        {
+          "groupId": "com.team",
+          "artifactId": "team-svc",
+          "version": "2.0.0",
+          "buildTool": "maven",
+          "javaVersion": "21",
+          "presets": [],
+          "extensions": ["io.quarkus:quarkus-rest"]
+        }
+        """);
+
+    StubCatalogClient client = new StubCatalogClient();
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+
+    GenerateCommand command = commandWithOutput();
+    command.fromFile = forgefilePath.toString();
+    int exitCode = service.run(command, true, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.OK);
+  }
+
+  @Test
+  void saveAsWritesForgefileOnDryRun() throws Exception {
+    java.nio.file.Path saveAsPath = tempDir.resolve("saved.forgefile.json");
+
+    StubCatalogClient client = new StubCatalogClient();
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+
+    GenerateCommand command = commandWithOutput();
+    command.saveAsFile = saveAsPath.toString();
+    command.extensions.add("io.quarkus:quarkus-rest");
+    int exitCode = service.run(command, true, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.OK);
+    assertThat(java.nio.file.Files.exists(saveAsPath)).isTrue();
+  }
+
   private GenerateCommand commandWithOutput() {
     GenerateCommand cmd = new GenerateCommand();
     cmd.requestOptions = new RequestOptions();
@@ -102,6 +317,8 @@ class HeadlessGenerationServiceTest {
 
   private static final class StubCatalogClient extends HeadlessCatalogClient {
     TimeoutException catalogLoadTimeout;
+    java.util.concurrent.CancellationException catalogLoadCancellation;
+    TimeoutException presetLoadTimeout;
     CompletableFuture<Path> generationFuture =
         CompletableFuture.completedFuture(Path.of("output/demo-app"));
     int startGenerationCalls;
@@ -116,11 +333,18 @@ class HeadlessGenerationServiceTest {
       if (catalogLoadTimeout != null) {
         throw catalogLoadTimeout;
       }
+      if (catalogLoadCancellation != null) {
+        throw catalogLoadCancellation;
+      }
       return CATALOG_DATA;
     }
 
     @Override
-    Map<String, List<String>> loadBuiltInPresets(String platformStream, Duration timeout) {
+    Map<String, List<String>> loadBuiltInPresets(String platformStream, Duration timeout)
+        throws ExecutionException, InterruptedException, TimeoutException {
+      if (presetLoadTimeout != null) {
+        throw presetLoadTimeout;
+      }
       return Map.of("web", List.of("io.quarkus:quarkus-rest"));
     }
 

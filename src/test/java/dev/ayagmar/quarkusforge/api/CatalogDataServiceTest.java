@@ -241,6 +241,62 @@ class CatalogDataServiceTest {
     wireMockServer.verify(0, getRequestedFor(urlEqualTo("/q/openapi")));
   }
 
+  @Test
+  void startupLoadUsesStaleCache() {
+    stubCatalogEndpoints();
+    Path cacheFile = tempDir.resolve("catalog-snapshot.json");
+
+    CatalogDataService onlineService =
+        new CatalogDataService(
+            onlineClient(),
+            new CatalogSnapshotCache(
+                cacheFile,
+                CatalogSnapshotCache.defaultPayloadCodec(),
+                Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
+                Duration.ofHours(6),
+                2L * 1024L * 1024L));
+    onlineService.load().join();
+
+    // Use startup after TTL expired → stale cache
+    CatalogDataService startupService =
+        new CatalogDataService(
+            offlineClient(),
+            new CatalogSnapshotCache(
+                cacheFile,
+                CatalogSnapshotCache.defaultPayloadCodec(),
+                Clock.fixed(Instant.parse("2026-02-22T10:00:00Z"), ZoneOffset.UTC),
+                Duration.ofHours(6),
+                2L * 1024L * 1024L));
+
+    CatalogData startupData = startupService.loadForStartup().join();
+
+    assertThat(startupData.source()).isEqualTo(CatalogSource.CACHE);
+    assertThat(startupData.stale()).isTrue();
+    assertThat(startupData.detailMessage()).contains("stale").contains("startup");
+  }
+
+  @Test
+  void startupLoadFallsBackToLiveWhenNoCacheExists() {
+    stubCatalogEndpoints();
+    Path cacheFile = tempDir.resolve("catalog-snapshot.json");
+
+    CatalogDataService service =
+        new CatalogDataService(
+            onlineClient(),
+            new CatalogSnapshotCache(
+                cacheFile,
+                CatalogSnapshotCache.defaultPayloadCodec(),
+                Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
+                Duration.ofHours(6),
+                2L * 1024L * 1024L));
+
+    CatalogData startupData = service.loadForStartup().join();
+
+    // No cache → falls back to load() which hits live endpoints
+    assertThat(startupData.source()).isEqualTo(CatalogSource.LIVE);
+    assertThat(startupData.extensions()).hasSize(2);
+  }
+
   private void stubCatalogEndpoints() {
     wireMockServer.stubFor(
         get(urlEqualTo("/api/extensions"))

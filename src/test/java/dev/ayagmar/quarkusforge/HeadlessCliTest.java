@@ -42,4 +42,25 @@ final class HeadlessCliTest {
     assertThat(result.exitCode()).isEqualTo(ExitCodes.OK);
     assertThat(result.standardOut()).containsPattern("\\d+\\.\\d+");
   }
+
+  @Test
+  void generateHelpFlagExitsCleanly() {
+    RuntimeConfig config =
+        CliCommandTestSupport.runtimeConfig(tempDir, URI.create("http://unused"));
+    CliCommandTestSupport.CommandResult result =
+        CliCommandTestSupport.runHeadlessCommand(config, "generate", "--help");
+
+    assertThat(result.exitCode()).isEqualTo(ExitCodes.OK);
+    assertThat(result.standardOut()).contains("--artifact-id").contains("--group-id");
+  }
+
+  @Test
+  void unknownOptionReturnsUsageError() {
+    RuntimeConfig config =
+        CliCommandTestSupport.runtimeConfig(tempDir, URI.create("http://unused"));
+    CliCommandTestSupport.CommandResult result =
+        CliCommandTestSupport.runHeadlessCommand(config, "--nonexistent-flag");
+
+    assertThat(result.exitCode()).isNotEqualTo(ExitCodes.OK);
+  }
 }
