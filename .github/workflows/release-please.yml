@@ -77,16 +77,75 @@ jobs:
           release_version="${major}.${minor}.${patch}"
           next_dev_version="${major}.${minor}.$((patch + 1))-SNAPSHOT"
 
+          echo "latest_tag=${latest_tag}" >> "$GITHUB_OUTPUT"
           echo "release_version=${release_version}" >> "$GITHUB_OUTPUT"
           echo "next_dev_version=${next_dev_version}" >> "$GITHUB_OUTPUT"
 
       - name: Set release version
         run: mvn -B -ntp versions:set -DnewVersion=${{ steps.versions.outputs.release_version }} -DgenerateBackupPoms=false
 
+      - name: Update CHANGELOG.md for release
+        run: |
+          set -euo pipefail
+          release_version="${{ steps.versions.outputs.release_version }}"
+          latest_tag="${{ steps.versions.outputs.latest_tag }}"
+          release_tag="v${release_version}"
+          repo_url="https://github.com/${{ github.repository }}"
+          release_date="$(date -u +%Y-%m-%d)"
+
+          commits="$(git log --no-merges --pretty='- %s (%h)' "${latest_tag}..HEAD")"
+          if [ -z "${commits}" ]; then
+            commits="- No user-facing changes in this release."
+          fi
+
+          if [ ! -f CHANGELOG.md ]; then
+            cat > CHANGELOG.md <<'EOF'
+# Changelog
+
+All notable changes to this project will be documented in this file.
+EOF
+          fi
+
+          unreleased_line="$(grep -n '^## \[Unreleased\]' CHANGELOG.md | head -n1 | cut -d: -f1 || true)"
+          new_unreleased="## [Unreleased](${repo_url}/compare/${release_tag}...HEAD)"
+          release_heading="## [${release_version}](${repo_url}/compare/${latest_tag}...${release_tag}) (${release_date})"
+
+          if [ -n "${unreleased_line}" ]; then
+            head -n "$((unreleased_line - 1))" CHANGELOG.md > CHANGELOG.tmp
+            {
+              echo "${new_unreleased}"
+              echo
+              echo "${release_heading}"
+              echo
+              echo "### Changed"
+              echo
+              printf '%s\n' "${commits}"
+              echo
+            } >> CHANGELOG.tmp
+            tail -n "+$((unreleased_line + 1))" CHANGELOG.md >> CHANGELOG.tmp
+          else
+            cat > CHANGELOG.tmp <<EOF
+# Changelog
+
+All notable changes to this project are documented here.
+This project uses [Conventional Commits](https://www.conventionalcommits.org/).
+
+${new_unreleased}
+
+${release_heading}
+
+### Changed
+
+${commits}
+EOF
+          fi
+
+          mv CHANGELOG.tmp CHANGELOG.md
+
       - name: Commit and tag release
         run: |
           set -euo pipefail
-          git add pom.xml
+          git add pom.xml CHANGELOG.md
           if git diff --cached --quiet; then
             echo "No release version change detected."
             exit 1
