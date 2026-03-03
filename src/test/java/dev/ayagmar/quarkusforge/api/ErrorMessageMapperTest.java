@@ -28,8 +28,7 @@ class ErrorMessageMapperTest {
 
   @Test
   void simpleErrorReturnsMessageWhenPresent() {
-    assertThat(ErrorMessageMapper.simpleError(new RuntimeException("broken")))
-        .isEqualTo("broken");
+    assertThat(ErrorMessageMapper.simpleError(new RuntimeException("broken"))).isEqualTo("broken");
   }
 
   @Test

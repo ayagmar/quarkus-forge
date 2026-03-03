@@ -83,8 +83,25 @@ class ExtensionsPanelSnapshotTest {
 
     ExtensionsPanelSnapshot snapshot =
         new ExtensionsPanelSnapshot(
-            "Extensions", false, false, false, false, false, "", "", false, false, 0, "", "", 0, 0,
-            mutableRows, mutableSelected, "", "");
+            "Extensions",
+            false,
+            false,
+            false,
+            false,
+            false,
+            "",
+            "",
+            false,
+            false,
+            0,
+            "",
+            "",
+            0,
+            0,
+            mutableRows,
+            mutableSelected,
+            "",
+            "");
 
     mutableRows.clear();
     mutableSelected.clear();

@@ -391,8 +391,7 @@ class SafeZipExtractorTest {
     }
     Path zipPath =
         ArchiveTestUtils.createZip(
-            tempDir.resolve("total-size.zip"),
-            Map.of("demo/a.bin", data1, "demo/b.bin", data2));
+            tempDir.resolve("total-size.zip"), Map.of("demo/a.bin", data1, "demo/b.bin", data2));
 
     SafeZipExtractor extractor =
         new SafeZipExtractor(new ArchiveSafetyPolicy(100, 600L, 500.0d, 0L));
@@ -437,8 +436,7 @@ class SafeZipExtractorTest {
             Map.of("demo/file.txt", "data".getBytes(StandardCharsets.UTF_8)));
 
     // Patch an entry name byte to NUL
-    ArchiveTestUtils.patchCentralDirectoryEntryNameByte(
-        zipPath, "demo/file.txt", 5, (byte) 0);
+    ArchiveTestUtils.patchCentralDirectoryEntryNameByte(zipPath, "demo/file.txt", 5, (byte) 0);
 
     SafeZipExtractor extractor = new SafeZipExtractor();
 
@@ -535,16 +533,14 @@ class SafeZipExtractorTest {
     byte[] smallData = "tiny".getBytes(StandardCharsets.UTF_8);
     Path zipPath =
         ArchiveTestUtils.createZip(
-            tempDir.resolve("small-ratio.zip"),
-            Map.of("demo/small.txt", smallData));
+            tempDir.resolve("small-ratio.zip"), Map.of("demo/small.txt", smallData));
 
     // minBytesForCompressionRatioCheck=1000 → 4-byte entry skips ratio check
     SafeZipExtractor extractor =
         new SafeZipExtractor(new ArchiveSafetyPolicy(100, 10_000_000L, 1.0d, 1000L));
 
     ExtractionResult result =
-        extractor.extract(
-            zipPath, tempDir.resolve("small-out"), OverwritePolicy.FAIL_IF_EXISTS);
+        extractor.extract(zipPath, tempDir.resolve("small-out"), OverwritePolicy.FAIL_IF_EXISTS);
 
     assertThat(result.entryCount()).isPositive();
   }

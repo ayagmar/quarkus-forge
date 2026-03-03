@@ -45,16 +45,14 @@ class RetryPolicyTest {
 
   @Test
   void rejectsNegativeRequestTimeout() {
-    assertThatThrownBy(
-            () -> new RetryPolicy(1, Duration.ofMillis(-1), Duration.ofMillis(10), 0.2d))
+    assertThatThrownBy(() -> new RetryPolicy(1, Duration.ofMillis(-1), Duration.ofMillis(10), 0.2d))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("requestTimeout must be positive");
   }
 
   @Test
   void rejectsNegativeBaseDelay() {
-    assertThatThrownBy(
-            () -> new RetryPolicy(1, Duration.ofSeconds(1), Duration.ofMillis(-1), 0.2d))
+    assertThatThrownBy(() -> new RetryPolicy(1, Duration.ofSeconds(1), Duration.ofMillis(-1), 0.2d))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("baseDelay must not be negative");
   }
@@ -69,8 +67,7 @@ class RetryPolicyTest {
 
   @Test
   void rejectsJitterRatioAboveOne() {
-    assertThatThrownBy(
-            () -> new RetryPolicy(1, Duration.ofSeconds(1), Duration.ofMillis(10), 1.1d))
+    assertThatThrownBy(() -> new RetryPolicy(1, Duration.ofSeconds(1), Duration.ofMillis(10), 1.1d))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("jitterRatio must be in [0, 1]");
   }

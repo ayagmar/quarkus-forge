@@ -11,8 +11,17 @@ class ForgefileTest {
   void fullConstructorNormalizesFields() {
     Forgefile forgefile =
         new Forgefile(
-            "  org.acme  ", "  demo  ", "  1.0  ", "  org.acme  ", "  .  ", "  3.31  ",
-            "  maven  ", "  25  ", List.of("  web  "), List.of("  rest  "), null);
+            "  org.acme  ",
+            "  demo  ",
+            "  1.0  ",
+            "  org.acme  ",
+            "  .  ",
+            "  3.31  ",
+            "  maven  ",
+            "  25  ",
+            List.of("  web  "),
+            List.of("  rest  "),
+            null);
 
     assertThat(forgefile.groupId()).isEqualTo("org.acme");
     assertThat(forgefile.artifactId()).isEqualTo("demo");
@@ -25,7 +34,15 @@ class ForgefileTest {
   void shortConstructorHasNoLockedSection() {
     Forgefile forgefile =
         new Forgefile(
-            "org.acme", "demo", "1.0", "org.acme", ".", "3.31", "maven", "25", List.of(),
+            "org.acme",
+            "demo",
+            "1.0",
+            "org.acme",
+            ".",
+            "3.31",
+            "maven",
+            "25",
+            List.of(),
             List.of());
 
     assertThat(forgefile.locked()).isNull();
@@ -50,8 +67,7 @@ class ForgefileTest {
 
   @Test
   void toRequestOptionsUsesDefaultsForBlanks() {
-    Forgefile forgefile =
-        new Forgefile("", "", "", "", "", "", "", "", List.of(), List.of());
+    Forgefile forgefile = new Forgefile("", "", "", "", "", "", "", "", List.of(), List.of());
 
     RequestOptions options = forgefile.toRequestOptions();
 
@@ -67,8 +83,16 @@ class ForgefileTest {
   void toRequestOptionsPreservesNonBlankValues() {
     Forgefile forgefile =
         new Forgefile(
-            "com.example", "my-app", "2.0.0", "com.example.app", "./out", "3.31", "gradle",
-            "21", List.of(), List.of());
+            "com.example",
+            "my-app",
+            "2.0.0",
+            "com.example.app",
+            "./out",
+            "3.31",
+            "gradle",
+            "21",
+            List.of(),
+            List.of());
 
     RequestOptions options = forgefile.toRequestOptions();
 

@@ -68,8 +68,7 @@ class ExtensionCatalogLoadResultTest {
   @Test
   void extensionsAreImmutableCopy() {
     var mutable = new java.util.ArrayList<>(List.of(extension("rest")));
-    var result =
-        new ExtensionCatalogLoadResult(mutable, CatalogSource.LIVE, false, "", null);
+    var result = new ExtensionCatalogLoadResult(mutable, CatalogSource.LIVE, false, "", null);
 
     mutable.clear();
     assertThat(result.extensions()).hasSize(1);

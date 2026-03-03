@@ -227,7 +227,8 @@ class CatalogRowBuilderTest {
     List<ExtensionCatalogRow> rows =
         CatalogRowBuilder.buildRows(items, Set.of(), List.of("a:b"), "", false, "some-preset");
 
-    assertThat(rows.stream().noneMatch(r -> CatalogRowBuilder.RECENT_SECTION_TITLE.equals(r.label())))
+    assertThat(
+            rows.stream().noneMatch(r -> CatalogRowBuilder.RECENT_SECTION_TITLE.equals(r.label())))
         .isTrue();
   }
 
@@ -240,9 +241,7 @@ class CatalogRowBuilderTest {
   void collapsedCategoryHeaderShowsHiddenAndTotalCount() {
     List<ExtensionCatalogItem> items =
         List.of(
-            item("a:b", "ExtA", "Web"),
-            item("a:c", "ExtB", "Web"),
-            item("a:d", "ExtC", "Core"));
+            item("a:b", "ExtA", "Web"), item("a:c", "ExtB", "Web"), item("a:d", "ExtC", "Core"));
 
     List<ExtensionCatalogRow> rows =
         CatalogRowBuilder.buildRows(items, Set.of("Web"), List.of(), "", false, "");
@@ -265,7 +264,8 @@ class CatalogRowBuilderTest {
     List<ExtensionCatalogRow> rows =
         CatalogRowBuilder.buildRows(items, Set.of(), List.of("nonexistent-id"), "", false, "");
 
-    assertThat(rows.stream().noneMatch(r -> CatalogRowBuilder.RECENT_SECTION_TITLE.equals(r.label())))
+    assertThat(
+            rows.stream().noneMatch(r -> CatalogRowBuilder.RECENT_SECTION_TITLE.equals(r.label())))
         .isTrue();
   }
 

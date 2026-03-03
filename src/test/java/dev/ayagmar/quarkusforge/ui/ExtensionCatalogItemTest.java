@@ -31,8 +31,7 @@ class ExtensionCatalogItemTest {
 
   @Test
   void fiveArgConstructorDefaultsDescription() {
-    ExtensionCatalogItem item =
-        new ExtensionCatalogItem("io.quarkus:arc", "CDI", "cdi", "Core", 5);
+    ExtensionCatalogItem item = new ExtensionCatalogItem("io.quarkus:arc", "CDI", "cdi", "Core", 5);
 
     assertThat(item.description()).isEmpty();
     assertThat(item.category()).isEqualTo("Core");

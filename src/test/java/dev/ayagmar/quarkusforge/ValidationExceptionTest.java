@@ -46,7 +46,6 @@ class ValidationExceptionTest {
     ValidationException exception =
         new ValidationException(List.of(new ValidationError("version", "is required")));
 
-    assertThat(exception.getMessage())
-        .isEqualTo("Validation failed — version: is required");
+    assertThat(exception.getMessage()).isEqualTo("Validation failed — version: is required");
   }
 }

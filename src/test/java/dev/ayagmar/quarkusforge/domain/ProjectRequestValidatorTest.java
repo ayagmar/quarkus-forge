@@ -227,19 +227,11 @@ class ProjectRequestValidatorTest {
   void rejectsWindowsReservedNameWithExtension() {
     ProjectRequest request =
         new ProjectRequest(
-            "com.example",
-            "forge-app",
-            "1.0.0",
-            "com.example.forge",
-            "tmp/CON.txt",
-            "maven",
-            "25");
+            "com.example", "forge-app", "1.0.0", "com.example.forge", "tmp/CON.txt", "maven", "25");
 
     ValidationReport report = validator.validate(request);
 
-    assertThat(report.errors())
-        .extracting(ValidationError::field)
-        .contains("outputDirectory");
+    assertThat(report.errors()).extracting(ValidationError::field).contains("outputDirectory");
     assertThat(report.errors())
         .extracting(ValidationError::message)
         .anyMatch(msg -> msg.contains("reserved name"));
@@ -259,9 +251,7 @@ class ProjectRequestValidatorTest {
 
     ValidationReport report = validator.validate(request);
 
-    assertThat(report.errors())
-        .extracting(ValidationError::field)
-        .contains("outputDirectory");
+    assertThat(report.errors()).extracting(ValidationError::field).contains("outputDirectory");
     assertThat(report.errors())
         .extracting(ValidationError::message)
         .anyMatch(msg -> msg.contains("trailing dot/space"));
@@ -281,9 +271,7 @@ class ProjectRequestValidatorTest {
 
     ValidationReport report = validator.validate(request);
 
-    assertThat(report.errors())
-        .extracting(ValidationError::field)
-        .contains("outputDirectory");
+    assertThat(report.errors()).extracting(ValidationError::field).contains("outputDirectory");
     assertThat(report.errors())
         .extracting(ValidationError::message)
         .anyMatch(msg -> msg.contains("trailing dot/space"));
@@ -316,9 +304,7 @@ class ProjectRequestValidatorTest {
 
     ValidationReport report = validator.validate(request);
 
-    assertThat(report.errors())
-        .extracting(ValidationError::field)
-        .contains("outputDirectory");
+    assertThat(report.errors()).extracting(ValidationError::field).contains("outputDirectory");
     assertThat(report.errors())
         .extracting(ValidationError::message)
         .anyMatch(msg -> msg.contains("must not be blank"));
@@ -350,9 +336,7 @@ class ProjectRequestValidatorTest {
 
     ValidationReport report = validator.validate(request);
 
-    assertThat(report.errors())
-        .extracting(ValidationError::field)
-        .contains("outputDirectory");
+    assertThat(report.errors()).extracting(ValidationError::field).contains("outputDirectory");
   }
 
   @Test

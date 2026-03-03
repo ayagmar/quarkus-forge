@@ -51,8 +51,7 @@ class MetadataDtoEdgeCaseTest {
             List.of("21"),
             List.of("maven"),
             Map.of("maven", List.of("21")),
-            List.of(
-                new PlatformStream("io.quarkus.platform:3.31", "3.31", true, List.of("21"))));
+            List.of(new PlatformStream("io.quarkus.platform:3.31", "3.31", true, List.of("21"))));
 
     PlatformStream found = metadata.findPlatformStream("IO.QUARKUS.PLATFORM:3.31");
     assertThat(found).isNotNull();
@@ -66,8 +65,7 @@ class MetadataDtoEdgeCaseTest {
             List.of("21"),
             List.of("maven"),
             Map.of("maven", List.of("21")),
-            List.of(
-                new PlatformStream("io.quarkus.platform:3.31", "3.31", true, List.of("21"))));
+            List.of(new PlatformStream("io.quarkus.platform:3.31", "3.31", true, List.of("21"))));
 
     assertThat(metadata.findPlatformStream("  ")).isNull();
   }
@@ -79,8 +77,7 @@ class MetadataDtoEdgeCaseTest {
             List.of("21"),
             List.of("maven"),
             Map.of("maven", List.of("21")),
-            List.of(
-                new PlatformStream("io.quarkus.platform:3.31", "3.31", true, List.of("21"))));
+            List.of(new PlatformStream("io.quarkus.platform:3.31", "3.31", true, List.of("21"))));
 
     assertThat(metadata.findPlatformStream("io.quarkus.platform:99.99")).isNull();
   }
@@ -102,10 +99,7 @@ class MetadataDtoEdgeCaseTest {
   @Test
   void javaVersionsAreNormalized() {
     MetadataDto metadata =
-        new MetadataDto(
-            List.of(" 21 ", " 25 "),
-            List.of("maven"),
-            Map.of("maven", List.of("21")));
+        new MetadataDto(List.of(" 21 ", " 25 "), List.of("maven"), Map.of("maven", List.of("21")));
 
     assertThat(metadata.javaVersions()).containsExactly("21", "25");
   }

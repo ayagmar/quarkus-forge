@@ -226,8 +226,7 @@ class ForgefileStoreTest {
   @Test
   void saveOmitsBlankPackageNameAndOutputStream() {
     Forgefile forgefile =
-        new Forgefile(
-            "org.acme", "app", "1.0.0", "", "", "", "maven", "21", List.of(), List.of());
+        new Forgefile("org.acme", "app", "1.0.0", "", "", "", "maven", "21", List.of(), List.of());
 
     Path file = tempDir.resolve("omit-blanks");
     ForgefileStore.save(file, forgefile);

@@ -271,8 +271,7 @@ class PostTuiActionExecutorTest {
     // Should execute the publish command since git and gh are on PATH
     if (CommandUtils.isCommandAvailable("git") && CommandUtils.isCommandAvailable("gh")) {
       assertThat(shellInvocations).hasSize(1);
-      assertThat(shellInvocations.get(0).invocation())
-          .anyMatch(s -> s.contains("gh repo create"));
+      assertThat(shellInvocations.get(0).invocation()).anyMatch(s -> s.contains("gh repo create"));
     }
   }
 
@@ -280,19 +279,14 @@ class PostTuiActionExecutorTest {
   void publishGithubWithNullVisibilityDefaultsToPrivate() {
     PostGenerationExitPlan plan =
         new PostGenerationExitPlan(
-            PostGenerationExitAction.PUBLISH_GITHUB,
-            Path.of("/tmp/project"),
-            "",
-            null,
-            null);
+            PostGenerationExitAction.PUBLISH_GITHUB, Path.of("/tmp/project"), "", null, null);
     TuiSessionSummary summary = new TuiSessionSummary(dummyRequest(), plan);
     executor.execute(summary, "", diagnostics);
 
     // Should default to PRIVATE visibility
     if (CommandUtils.isCommandAvailable("git") && CommandUtils.isCommandAvailable("gh")) {
       assertThat(shellInvocations).hasSize(1);
-      assertThat(shellInvocations.get(0).invocation())
-          .anyMatch(s -> s.contains("--private"));
+      assertThat(shellInvocations.get(0).invocation()).anyMatch(s -> s.contains("--private"));
     }
   }
 
@@ -310,15 +304,13 @@ class PostTuiActionExecutorTest {
 
     if (CommandUtils.isCommandAvailable("git") && CommandUtils.isCommandAvailable("gh")) {
       assertThat(shellInvocations).hasSize(1);
-      assertThat(shellInvocations.get(0).invocation())
-          .anyMatch(s -> s.contains("--public"));
+      assertThat(shellInvocations.get(0).invocation()).anyMatch(s -> s.contains("--public"));
     }
   }
 
   @Test
   void executeWithNullActionSkipsActionSwitch() {
-    PostGenerationExitPlan plan =
-        new PostGenerationExitPlan(null, Path.of("/tmp/project"), "");
+    PostGenerationExitPlan plan = new PostGenerationExitPlan(null, Path.of("/tmp/project"), "");
     TuiSessionSummary summary = new TuiSessionSummary(dummyRequest(), plan);
     executor.execute(summary, "echo hook", diagnostics);
     // Hook should still execute even when action is null

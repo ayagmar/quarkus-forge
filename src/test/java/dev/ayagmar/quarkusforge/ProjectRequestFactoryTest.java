@@ -201,7 +201,6 @@ class ProjectRequestFactoryTest {
     ForgeUiState state = ProjectRequestFactory.buildInitialState(request, ctx);
 
     assertThat(state.canSubmit()).isFalse();
-    assertThat(state.validation().errors())
-        .anyMatch(e -> e.field().equals("javaVersion"));
+    assertThat(state.validation().errors()).anyMatch(e -> e.field().equals("javaVersion"));
   }
 }

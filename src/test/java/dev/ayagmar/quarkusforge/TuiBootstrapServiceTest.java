@@ -24,8 +24,7 @@ class TuiBootstrapServiceTest {
 
   @Test
   void startupSplashMinDurationIs450ms() {
-    assertThat(TuiBootstrapService.STARTUP_SPLASH_MIN_DURATION)
-        .isEqualTo(Duration.ofMillis(450));
+    assertThat(TuiBootstrapService.STARTUP_SPLASH_MIN_DURATION).isEqualTo(Duration.ofMillis(450));
   }
 
   @Test

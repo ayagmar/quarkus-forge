@@ -233,8 +233,7 @@ class GenerationStateTrackerTest {
   void invalidTransitionFromErrorToLoading() {
     assertThat(
             GenerationStateTracker.isValidTransition(
-                CoreTuiController.GenerationState.ERROR,
-                CoreTuiController.GenerationState.LOADING))
+                CoreTuiController.GenerationState.ERROR, CoreTuiController.GenerationState.LOADING))
         .isFalse();
   }
 

@@ -2,7 +2,6 @@ package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class MetadataPanelSnapshotTest {
@@ -28,8 +27,20 @@ class MetadataPanelSnapshotTest {
   void nullSelectorInfoDefaultsToEmpty() {
     MetadataPanelSnapshot snapshot =
         new MetadataPanelSnapshot(
-            "Config", true, false, "org.acme", "demo", "1.0", "org.acme", ".", "3.31", "maven",
-            "25", null, null, null);
+            "Config",
+            true,
+            false,
+            "org.acme",
+            "demo",
+            "1.0",
+            "org.acme",
+            ".",
+            "3.31",
+            "maven",
+            "25",
+            null,
+            null,
+            null);
 
     assertThat(snapshot.platformStreamInfo()).isEqualTo(MetadataPanelSnapshot.SelectorInfo.EMPTY);
     assertThat(snapshot.buildToolInfo()).isEqualTo(MetadataPanelSnapshot.SelectorInfo.EMPTY);
@@ -41,8 +52,20 @@ class MetadataPanelSnapshotTest {
     var selectorInfo = new MetadataPanelSnapshot.SelectorInfo(2, 5);
     MetadataPanelSnapshot snapshot =
         new MetadataPanelSnapshot(
-            "Config", false, true, "org.acme", "demo", "1.0.0", "org.acme.demo", "./out",
-            "io.quarkus:3.31", "gradle", "21", selectorInfo, selectorInfo, selectorInfo);
+            "Config",
+            false,
+            true,
+            "org.acme",
+            "demo",
+            "1.0.0",
+            "org.acme.demo",
+            "./out",
+            "io.quarkus:3.31",
+            "gradle",
+            "21",
+            selectorInfo,
+            selectorInfo,
+            selectorInfo);
 
     assertThat(snapshot.title()).isEqualTo("Config");
     assertThat(snapshot.focused()).isFalse();

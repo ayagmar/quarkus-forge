@@ -9,7 +9,14 @@ class CliPrefillMapperTest {
   @Test
   void mapTrimsAllFields() {
     CliPrefill prefill =
-        new CliPrefill("  com.example  ", "  demo  ", "  1.0  ", "  com.example.demo  ", "  ./out  ", "  maven  ", "  25  ");
+        new CliPrefill(
+            "  com.example  ",
+            "  demo  ",
+            "  1.0  ",
+            "  com.example.demo  ",
+            "  ./out  ",
+            "  maven  ",
+            "  25  ");
 
     ProjectRequest request = CliPrefillMapper.map(prefill);
 
@@ -24,8 +31,7 @@ class CliPrefillMapperTest {
 
   @Test
   void mapDerivesPackageNameWhenBlank() {
-    CliPrefill prefill =
-        new CliPrefill("com.example", "my-app", "1.0", "", "./out", "maven", "25");
+    CliPrefill prefill = new CliPrefill("com.example", "my-app", "1.0", "", "./out", "maven", "25");
 
     ProjectRequest request = CliPrefillMapper.map(prefill);
 
@@ -34,8 +40,7 @@ class CliPrefillMapperTest {
 
   @Test
   void mapDerivesPackageNameWhenNull() {
-    CliPrefill prefill =
-        new CliPrefill("com.example", "demo", "1.0", null, "./out", "maven", "25");
+    CliPrefill prefill = new CliPrefill("com.example", "demo", "1.0", null, "./out", "maven", "25");
 
     ProjectRequest request = CliPrefillMapper.map(prefill);
 
@@ -72,14 +77,12 @@ class CliPrefillMapperTest {
 
   @Test
   void derivePackageNameReturnsGroupIdOnlyWhenArtifactIsBlank() {
-    assertThat(CliPrefillMapper.derivePackageName("com.example", ""))
-        .isEqualTo("com.example");
+    assertThat(CliPrefillMapper.derivePackageName("com.example", "")).isEqualTo("com.example");
   }
 
   @Test
   void derivePackageNameReturnsArtifactOnlyWhenGroupIdIsBlank() {
-    assertThat(CliPrefillMapper.derivePackageName("", "demo"))
-        .isEqualTo("demo");
+    assertThat(CliPrefillMapper.derivePackageName("", "demo")).isEqualTo("demo");
   }
 
   @Test
@@ -101,8 +104,7 @@ class CliPrefillMapperTest {
 
   @Test
   void mapHandlesNullFields() {
-    CliPrefill prefill =
-        new CliPrefill(null, null, null, null, null, null, null);
+    CliPrefill prefill = new CliPrefill(null, null, null, null, null, null, null);
 
     ProjectRequest request = CliPrefillMapper.map(prefill);
 
@@ -117,7 +119,15 @@ class CliPrefillMapperTest {
   @Test
   void mapIncludesPlatformStream() {
     CliPrefill prefill =
-        new CliPrefill("com.example", "demo", "1.0", "com.example.demo", "./out", "io.quarkus.platform:3.18", "maven", "25");
+        new CliPrefill(
+            "com.example",
+            "demo",
+            "1.0",
+            "com.example.demo",
+            "./out",
+            "io.quarkus.platform:3.18",
+            "maven",
+            "25");
 
     ProjectRequest request = CliPrefillMapper.map(prefill);
 

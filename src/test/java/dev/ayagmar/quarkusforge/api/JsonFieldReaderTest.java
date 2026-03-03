@@ -119,8 +119,7 @@ class JsonFieldReaderTest {
 
   @Test
   void readStringSetReturnsDeduplicatedValues() {
-    Set<String> result =
-        JsonFieldReader.readStringSet(Map.of("s", List.of("a", "b", "a")), "s");
+    Set<String> result = JsonFieldReader.readStringSet(Map.of("s", List.of("a", "b", "a")), "s");
     assertThat(result).containsExactly("a", "b");
   }
 

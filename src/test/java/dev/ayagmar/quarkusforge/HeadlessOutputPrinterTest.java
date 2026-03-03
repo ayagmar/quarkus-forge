@@ -57,8 +57,7 @@ class HeadlessOutputPrinterTest {
 
   @Test
   void printValidationErrorsOmitsBlankSourceFields() {
-    ValidationReport report =
-        new ValidationReport(List.of(new ValidationError("field", "error")));
+    ValidationReport report = new ValidationReport(List.of(new ValidationError("field", "error")));
 
     HeadlessOutputPrinter.printValidationErrors(report, "", null);
 
@@ -79,8 +78,7 @@ class HeadlessOutputPrinterTest {
             "maven",
             "21");
 
-    HeadlessOutputPrinter.printDryRunSummary(
-        request, List.of("io.quarkus:quarkus-rest"), "live");
+    HeadlessOutputPrinter.printDryRunSummary(request, List.of("io.quarkus:quarkus-rest"), "live");
 
     String output = stdout.toString(StandardCharsets.UTF_8);
     assertThat(output)
@@ -131,8 +129,7 @@ class HeadlessOutputPrinterTest {
 
   @Test
   void printValidationErrorsOmitsNullSourceLabel() {
-    ValidationReport report =
-        new ValidationReport(List.of(new ValidationError("f", "e")));
+    ValidationReport report = new ValidationReport(List.of(new ValidationError("f", "e")));
 
     HeadlessOutputPrinter.printValidationErrors(report, null, "detail");
 
@@ -143,8 +140,7 @@ class HeadlessOutputPrinterTest {
 
   @Test
   void printValidationErrorsOmitsNullAndBlankSourceDetail() {
-    ValidationReport report =
-        new ValidationReport(List.of(new ValidationError("x", "y")));
+    ValidationReport report = new ValidationReport(List.of(new ValidationError("x", "y")));
 
     HeadlessOutputPrinter.printValidationErrors(report, "live", "   ");
 
@@ -175,9 +171,7 @@ class HeadlessOutputPrinterTest {
     HeadlessOutputPrinter.printPrefillSummary(request, "cache", "from disk");
 
     String output = stdout.toString(StandardCharsets.UTF_8);
-    assertThat(output)
-        .contains("metadataSource: cache")
-        .contains("metadataDetail: from disk");
+    assertThat(output).contains("metadataSource: cache").contains("metadataDetail: from disk");
   }
 
   @Test

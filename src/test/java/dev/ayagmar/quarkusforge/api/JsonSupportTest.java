@@ -145,12 +145,13 @@ class JsonSupportTest {
   @Test
   void writeUnknownTypeConvertsToString() throws Exception {
     // An object type not recognized by writeValue falls to String.valueOf
-    Object custom = new Object() {
-      @Override
-      public String toString() {
-        return "custom-object";
-      }
-    };
+    Object custom =
+        new Object() {
+          @Override
+          public String toString() {
+            return "custom-object";
+          }
+        };
     String json = JsonSupport.writeString(Map.of("v", custom));
     assertThat(json).contains("custom-object");
   }

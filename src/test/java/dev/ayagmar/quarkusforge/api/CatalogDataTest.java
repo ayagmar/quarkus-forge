@@ -62,8 +62,7 @@ class CatalogDataTest {
 
   @Test
   void extensionsAreImmutableCopy() {
-    CatalogData data =
-        new CatalogData(METADATA, EXTENSIONS, CatalogSource.LIVE, false, "");
+    CatalogData data = new CatalogData(METADATA, EXTENSIONS, CatalogSource.LIVE, false, "");
     assertThat(data.extensions()).isUnmodifiable();
   }
 }

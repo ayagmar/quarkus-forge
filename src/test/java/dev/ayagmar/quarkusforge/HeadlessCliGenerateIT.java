@@ -15,7 +15,6 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -61,17 +60,20 @@ class HeadlessCliGenerateIT {
     CliCommandTestSupport.CommandResult result =
         runHeadless(
             "generate",
-            "--group-id", "com.example",
-            "--artifact-id", "hl-app",
-            "--output-dir", outputDir.toString(),
-            "--extension", "io.quarkus:quarkus-rest");
+            "--group-id",
+            "com.example",
+            "--artifact-id",
+            "hl-app",
+            "--output-dir",
+            outputDir.toString(),
+            "--extension",
+            "io.quarkus:quarkus-rest");
 
     assertThat(result.exitCode()).isZero();
     assertThat(outputDir.resolve("hl-app/pom.xml")).exists();
     assertThat(result.standardOut()).contains("Generation succeeded");
     wireMockServer.verify(
-        getRequestedFor(urlPathEqualTo("/api/download"))
-            .withQueryParam("a", equalTo("hl-app")));
+        getRequestedFor(urlPathEqualTo("/api/download")).withQueryParam("a", equalTo("hl-app")));
   }
 
   // ── dry-run ───────────────────────────────────────────────────────
@@ -85,10 +87,14 @@ class HeadlessCliGenerateIT {
         runHeadless(
             "generate",
             "--dry-run",
-            "--group-id", "com.example",
-            "--artifact-id", "dry-app",
-            "--output-dir", outputDir.toString(),
-            "--extension", "io.quarkus:quarkus-rest");
+            "--group-id",
+            "com.example",
+            "--artifact-id",
+            "dry-app",
+            "--output-dir",
+            outputDir.toString(),
+            "--extension",
+            "io.quarkus:quarkus-rest");
 
     assertThat(result.exitCode()).isZero();
     assertThat(Files.notExists(outputDir)).isTrue();
@@ -105,10 +111,14 @@ class HeadlessCliGenerateIT {
             runtimeConfig(),
             "--dry-run",
             "generate",
-            "--group-id", "com.example",
-            "--artifact-id", "dry-app",
-            "--output-dir", outputDir.toString(),
-            "--extension", "io.quarkus:quarkus-rest");
+            "--group-id",
+            "com.example",
+            "--artifact-id",
+            "dry-app",
+            "--output-dir",
+            outputDir.toString(),
+            "--extension",
+            "io.quarkus:quarkus-rest");
 
     assertThat(result.exitCode()).isZero();
     assertThat(Files.notExists(outputDir)).isTrue();
@@ -126,9 +136,12 @@ class HeadlessCliGenerateIT {
             "--verbose",
             "generate",
             "--dry-run",
-            "--group-id", "com.example",
-            "--artifact-id", "diag-app",
-            "--extension", "io.quarkus:quarkus-rest");
+            "--group-id",
+            "com.example",
+            "--artifact-id",
+            "diag-app",
+            "--extension",
+            "io.quarkus:quarkus-rest");
 
     assertThat(result.exitCode()).isZero();
     assertThat(result.standardError())
@@ -144,10 +157,7 @@ class HeadlessCliGenerateIT {
     stubCatalogEndpoints();
 
     CliCommandTestSupport.CommandResult result =
-        runHeadless(
-            "generate",
-            "--dry-run",
-            "--extension", "io.quarkus:nonexistent-extension");
+        runHeadless("generate", "--dry-run", "--extension", "io.quarkus:nonexistent-extension");
 
     assertThat(result.exitCode()).isEqualTo(ExitCodes.VALIDATION);
   }
@@ -157,10 +167,7 @@ class HeadlessCliGenerateIT {
     stubCatalogEndpoints();
 
     CliCommandTestSupport.CommandResult result =
-        runHeadless(
-            "generate",
-            "--dry-run",
-            "--build-tool", "ant");
+        runHeadless("generate", "--dry-run", "--build-tool", "ant");
 
     assertThat(result.exitCode()).isEqualTo(ExitCodes.VALIDATION);
   }
@@ -179,10 +186,7 @@ class HeadlessCliGenerateIT {
     try {
       System.setProperty("quarkus.forge.headless.catalog-timeout-ms", "1");
       CliCommandTestSupport.CommandResult result =
-          runHeadless(
-              "generate",
-              "--dry-run",
-              "--extension", "io.quarkus:quarkus-rest");
+          runHeadless("generate", "--dry-run", "--extension", "io.quarkus:quarkus-rest");
 
       assertThat(result.exitCode()).isEqualTo(ExitCodes.NETWORK);
     } finally {
@@ -214,11 +218,7 @@ class HeadlessCliGenerateIT {
         """);
 
     CliCommandTestSupport.CommandResult result =
-        runHeadless(
-            "generate",
-            "--dry-run",
-            "--from", forgefilePath.toString(),
-            "--lock");
+        runHeadless("generate", "--dry-run", "--from", forgefilePath.toString(), "--lock");
 
     assertThat(result.exitCode()).isZero();
     String updatedContent = Files.readString(forgefilePath);
@@ -252,11 +252,7 @@ class HeadlessCliGenerateIT {
         """);
 
     CliCommandTestSupport.CommandResult result =
-        runHeadless(
-            "generate",
-            "--dry-run",
-            "--from", forgefilePath.toString(),
-            "--lock-check");
+        runHeadless("generate", "--dry-run", "--from", forgefilePath.toString(), "--lock-check");
 
     assertThat(result.exitCode()).isEqualTo(ExitCodes.VALIDATION);
     assertThat(result.standardError()).contains("javaVersion drift");
@@ -271,10 +267,14 @@ class HeadlessCliGenerateIT {
         runHeadless(
             "generate",
             "--dry-run",
-            "--group-id", "com.save",
-            "--artifact-id", "save-app",
-            "--extension", "io.quarkus:quarkus-rest",
-            "--save-as", saveAsPath.toString());
+            "--group-id",
+            "com.save",
+            "--artifact-id",
+            "save-app",
+            "--extension",
+            "io.quarkus:quarkus-rest",
+            "--save-as",
+            saveAsPath.toString());
 
     assertThat(result.exitCode()).isZero();
     assertThat(Files.exists(saveAsPath)).isTrue();
@@ -290,10 +290,7 @@ class HeadlessCliGenerateIT {
     stubCatalogEndpoints();
 
     CliCommandTestSupport.CommandResult result =
-        runHeadless(
-            "generate",
-            "--dry-run",
-            "--preset", "web");
+        runHeadless("generate", "--dry-run", "--preset", "web");
 
     assertThat(result.exitCode()).isZero();
     // The dry-run output should mention the resolved extensions from the "web" preset
@@ -305,10 +302,7 @@ class HeadlessCliGenerateIT {
     stubCatalogEndpoints();
 
     CliCommandTestSupport.CommandResult result =
-        runHeadless(
-            "generate",
-            "--dry-run",
-            "--preset", "nonexistent-preset");
+        runHeadless("generate", "--dry-run", "--preset", "nonexistent-preset");
 
     assertThat(result.exitCode()).isEqualTo(ExitCodes.VALIDATION);
   }
@@ -316,8 +310,7 @@ class HeadlessCliGenerateIT {
   // ── helpers ───────────────────────────────────────────────────────
 
   private RuntimeConfig runtimeConfig() {
-    return CliCommandTestSupport.runtimeConfig(
-        tempDir, URI.create(wireMockServer.baseUrl()));
+    return CliCommandTestSupport.runtimeConfig(tempDir, URI.create(wireMockServer.baseUrl()));
   }
 
   private CliCommandTestSupport.CommandResult runHeadless(String... args) {

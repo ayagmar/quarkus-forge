@@ -100,8 +100,7 @@ class GenerationQueryBuilderTest {
 
   @Test
   void buildReturnsEndpointWithoutQueryWhenAllValuesAreBlank() {
-    GenerationRequest request =
-        new GenerationRequest("", "", "", "", "", List.of());
+    GenerationRequest request = new GenerationRequest("", "", "", "", "", List.of());
 
     URI uri = GenerationQueryBuilder.build(URI.create("https://code.quarkus.io"), request);
 
@@ -122,8 +121,7 @@ class GenerationQueryBuilderTest {
   @Test
   void buildExcludesNullPlatformStream() {
     GenerationRequest request =
-        new GenerationRequest(
-            "com.example", "demo", "1.0.0", null, "maven", "25", List.of());
+        new GenerationRequest("com.example", "demo", "1.0.0", null, "maven", "25", List.of());
 
     URI uri = GenerationQueryBuilder.build(URI.create("https://code.quarkus.io"), request);
 

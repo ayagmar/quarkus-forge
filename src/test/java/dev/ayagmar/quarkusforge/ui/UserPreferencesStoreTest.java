@@ -71,7 +71,9 @@ class UserPreferencesStoreTest {
   @Test
   void loadReturnsNullForMissingSchemaVersion() throws Exception {
     Path file = tempDir.resolve("noschema.json");
-    Files.writeString(file, """
+    Files.writeString(
+        file,
+        """
         {"groupId": "org.acme"}
         """);
 
@@ -98,7 +100,9 @@ class UserPreferencesStoreTest {
   @Test
   void loadReturnsEmptyStringsForNullFieldValues() throws Exception {
     Path file = tempDir.resolve("partial.json");
-    Files.writeString(file, """
+    Files.writeString(
+        file,
+        """
         {"schemaVersion": 1}
         """);
 
