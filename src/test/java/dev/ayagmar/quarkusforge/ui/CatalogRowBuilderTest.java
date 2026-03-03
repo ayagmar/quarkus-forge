@@ -165,6 +165,14 @@ class CatalogRowBuilderTest {
     }
 
     @Test
+    void unknownCategoryKeyUsesNormalizedKeyNotRawCase() {
+      assertThat(CatalogRowBuilder.resolveCategoryTitle("web services", "Web Services"))
+          .isEqualTo("Web services");
+      assertThat(CatalogRowBuilder.resolveCategoryTitle("web services", "web services"))
+          .isEqualTo("Web services");
+    }
+
+    @Test
     void blankCategoryResolvesToOther() {
       assertThat(CatalogRowBuilder.resolveCategoryTitle("unknown", "")).isEqualTo("Other");
     }
@@ -255,6 +263,26 @@ class CatalogRowBuilderTest {
     assertThat(webHeader.collapsed()).isTrue();
     assertThat(webHeader.hiddenCount()).isEqualTo(2);
     assertThat(webHeader.totalCount()).isEqualTo(2);
+  }
+
+  @Test
+  void interleavedSameCategoryRendersSingleSectionHeader() {
+    List<ExtensionCatalogItem> items =
+        List.of(
+            item("a:web-1", "Web One", "Web"),
+            item("a:data-1", "Data One", "Data"),
+            item("a:web-2", "Web Two", "Web"));
+
+    List<ExtensionCatalogRow> rows =
+        CatalogRowBuilder.buildRows(items, Set.of(), List.of(), "we", false, "");
+
+    assertThat(
+            rows.stream()
+                .filter(ExtensionCatalogRow::isSectionHeader)
+                .map(ExtensionCatalogRow::label))
+        .containsExactly("Web", "Data");
+    assertThat(rows.stream().filter(r -> r.isSectionHeader() && "Web".equals(r.label())).count())
+        .isEqualTo(1);
   }
 
   @Test

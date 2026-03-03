@@ -48,7 +48,7 @@ final class CatalogRowBuilder {
       case "testing" -> "Testing";
       case "misc" -> "Misc";
       case "other" -> "Other";
-      default -> titleCase(rawCategory);
+      default -> titleCase(normalizeCategoryLabel(rawCategory));
     };
   }
 
@@ -141,25 +141,23 @@ final class CatalogRowBuilder {
       List<ExtensionCatalogRow> rows,
       List<ExtensionCatalogItem> items,
       Set<String> collapsedCategories) {
-    Map<String, Integer> categoryItemCount = new LinkedHashMap<>();
+    Map<String, List<ExtensionCatalogItem>> itemsByCategoryTitle = new LinkedHashMap<>();
     for (ExtensionCatalogItem item : items) {
       String title = resolveCategoryTitle(item.categoryKey(), item.category());
-      categoryItemCount.merge(title, 1, Integer::sum);
+      itemsByCategoryTitle.computeIfAbsent(title, ignored -> new ArrayList<>()).add(item);
     }
 
-    String previousTitle = null;
-    boolean collapsed = false;
-    for (ExtensionCatalogItem item : items) {
-      String title = resolveCategoryTitle(item.categoryKey(), item.category());
-      if (!title.equals(previousTitle)) {
-        collapsed = collapsedCategories.contains(title);
-        int totalCount = categoryItemCount.getOrDefault(title, 0);
-        int hiddenCount = collapsed ? totalCount : 0;
-        rows.add(ExtensionCatalogRow.section(title, collapsed, hiddenCount, totalCount));
-        previousTitle = title;
-      }
+    for (Map.Entry<String, List<ExtensionCatalogItem>> entry : itemsByCategoryTitle.entrySet()) {
+      String title = entry.getKey();
+      List<ExtensionCatalogItem> categoryItems = entry.getValue();
+      boolean collapsed = collapsedCategories.contains(title);
+      int totalCount = categoryItems.size();
+      int hiddenCount = collapsed ? totalCount : 0;
+      rows.add(ExtensionCatalogRow.section(title, collapsed, hiddenCount, totalCount));
       if (!collapsed) {
-        rows.add(ExtensionCatalogRow.item(item));
+        for (ExtensionCatalogItem item : categoryItems) {
+          rows.add(ExtensionCatalogRow.item(item));
+        }
       }
     }
   }
@@ -173,5 +171,12 @@ final class CatalogRowBuilder {
       return normalized.toUpperCase(Locale.ROOT);
     }
     return normalized.substring(0, 1).toUpperCase(Locale.ROOT) + normalized.substring(1);
+  }
+
+  private static String normalizeCategoryLabel(String value) {
+    if (value == null || value.isBlank()) {
+      return "other";
+    }
+    return value.trim().toLowerCase(Locale.ROOT);
   }
 }
