@@ -4,6 +4,11 @@ import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import java.util.List;
 
+/**
+ * Immutable UI read-model snapshot used by reducer logic and renderer orchestration.
+ *
+ * <p>Contains only serializable/view-model state and avoids direct mutable widget ownership.
+ */
 record UiState(
     ProjectRequest request,
     ValidationReport validation,

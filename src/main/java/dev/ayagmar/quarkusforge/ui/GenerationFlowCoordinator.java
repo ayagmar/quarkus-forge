@@ -6,6 +6,10 @@ import java.nio.file.Path;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * Coordinates async generation lifecycle transitions, including token-based stale protection,
+ * cancellation handling, and completion reconciliation.
+ */
 final class GenerationFlowCoordinator {
   private CompletableFuture<Path> generationFuture;
   private long generationStartedAtNanos;

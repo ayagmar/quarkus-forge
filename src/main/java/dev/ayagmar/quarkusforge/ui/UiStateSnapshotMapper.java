@@ -4,6 +4,7 @@ import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import java.util.List;
 
+/** Maps controller-owned mutable state into an immutable {@link UiState} snapshot. */
 final class UiStateSnapshotMapper {
 
   UiState map(

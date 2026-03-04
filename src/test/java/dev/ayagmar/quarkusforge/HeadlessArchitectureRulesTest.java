@@ -9,6 +9,14 @@ import com.tngtech.archunit.lang.ArchRule;
 
 @AnalyzeClasses(packages = "dev.ayagmar.quarkusforge")
 class HeadlessArchitectureRulesTest {
+  private static final String[] CORE_NON_UI_PACKAGES = {
+    "dev.ayagmar.quarkusforge.api..",
+    "dev.ayagmar.quarkusforge.archive..",
+    "dev.ayagmar.quarkusforge.domain..",
+    "dev.ayagmar.quarkusforge.diagnostics..",
+    "dev.ayagmar.quarkusforge.util.."
+  };
+
   @ArchTest
   static final ArchRule headlessComponentsDoNotDependOnTuiOrTamboui =
       classes()
@@ -26,13 +34,26 @@ class HeadlessArchitectureRulesTest {
   static final ArchRule nonUiCoreLayersDoNotDependOnUiPackage =
       noClasses()
           .that()
-          .resideInAnyPackage(
-              "dev.ayagmar.quarkusforge.api..",
-              "dev.ayagmar.quarkusforge.archive..",
-              "dev.ayagmar.quarkusforge.domain..",
-              "dev.ayagmar.quarkusforge.diagnostics..",
-              "dev.ayagmar.quarkusforge.util..")
+          .resideInAnyPackage(CORE_NON_UI_PACKAGES)
           .should()
           .dependOnClassesThat()
           .resideInAnyPackage("dev.ayagmar.quarkusforge.ui..");
+
+  @ArchTest
+  static final ArchRule nonUiCoreLayersDoNotDependOnTamboui =
+      noClasses()
+          .that()
+          .resideInAnyPackage(CORE_NON_UI_PACKAGES)
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage("dev.tamboui..");
+
+  @ArchTest
+  static final ArchRule uiLayerDoesNotDependOnPicocli =
+      noClasses()
+          .that()
+          .resideInAnyPackage("dev.ayagmar.quarkusforge.ui..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage("picocli..");
 }

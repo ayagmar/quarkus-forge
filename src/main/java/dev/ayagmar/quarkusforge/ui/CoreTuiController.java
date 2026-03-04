@@ -47,6 +47,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 
+/**
+ * Main TUI orchestration shell.
+ *
+ * <p>Coordinates input routing, reducer/effects dispatch, async lifecycle callbacks, and
+ * state-driven rendering while delegating domain-specific behavior to extracted collaborators.
+ */
 public final class CoreTuiController
     implements CompactInputRenderer, UiRoutingContext, GenerationFlowCallbacks, UiRenderer.Adapter {
   private static final int METADATA_PANEL_HEIGHT_COMPACT = 4;

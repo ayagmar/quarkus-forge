@@ -2,6 +2,8 @@ package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.tamboui.tui.event.KeyCode;
+import dev.tamboui.tui.event.KeyEvent;
 import org.junit.jupiter.api.Test;
 
 class CoreUiReducerTest {
@@ -46,5 +48,53 @@ class CoreUiReducerTest {
     assertThat(result.effects()).containsExactly(new UiEffect.ResetGenerationAfterOutcome());
     assertThat(result.nextState().statusMessage()).isEqualTo("Ready for next generation");
     assertThat(result.nextState().errorMessage()).isEmpty();
+  }
+
+  @Test
+  void metadataIntentIsIgnoredWhenSelectorHasNoOptions() {
+    UiState currentState = UiControllerTestHarness.controller().uiState();
+    UiState noOptionsState =
+        new UiState(
+            currentState.request(),
+            currentState.validation(),
+            FocusTarget.BUILD_TOOL,
+            currentState.statusMessage(),
+            currentState.errorMessage(),
+            currentState.verboseErrorDetails(),
+            currentState.submitRequested(),
+            currentState.submitBlockedByValidation(),
+            currentState.submitBlockedByTargetConflict(),
+            currentState.commandPaletteSelection(),
+            new MetadataPanelSnapshot(
+                currentState.metadataPanel().title(),
+                currentState.metadataPanel().focused(),
+                currentState.metadataPanel().invalid(),
+                currentState.metadataPanel().groupId(),
+                currentState.metadataPanel().artifactId(),
+                currentState.metadataPanel().version(),
+                currentState.metadataPanel().packageName(),
+                currentState.metadataPanel().outputDir(),
+                currentState.metadataPanel().platformStream(),
+                currentState.metadataPanel().buildTool(),
+                currentState.metadataPanel().javaVersion(),
+                currentState.metadataPanel().platformStreamInfo(),
+                MetadataPanelSnapshot.SelectorInfo.EMPTY,
+                currentState.metadataPanel().javaVersionInfo()),
+            currentState.extensionsPanel(),
+            currentState.footer(),
+            currentState.overlays(),
+            currentState.generation(),
+            currentState.catalogLoad(),
+            currentState.postGeneration(),
+            currentState.startupOverlay(),
+            currentState.extensions());
+
+    ReduceResult result =
+        reducer.reduce(
+            noOptionsState,
+            new UiIntent.MetadataInputIntent(KeyEvent.ofKey(KeyCode.LEFT), FocusTarget.BUILD_TOOL));
+
+    assertThat(result.action()).isEqualTo(UiAction.ignored());
+    assertThat(result.effects()).isEmpty();
   }
 }

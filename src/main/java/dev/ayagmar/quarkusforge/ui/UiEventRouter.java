@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge.ui;
 
 import dev.tamboui.tui.event.KeyEvent;
 
+/** Enforces deterministic key-routing priority across overlays, flows, and input handlers. */
 final class UiEventRouter {
 
   UiAction routeKeyEvent(KeyEvent keyEvent, UiRoutingContext context) {
