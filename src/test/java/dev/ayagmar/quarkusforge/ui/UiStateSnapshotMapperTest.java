@@ -82,6 +82,7 @@ class UiStateSnapshotMapperTest {
             false,
             false,
             false,
+            0,
             new MetadataPanelSnapshot(
                 "",
                 false,

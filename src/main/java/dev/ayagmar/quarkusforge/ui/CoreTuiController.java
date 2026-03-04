@@ -48,7 +48,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 
 public final class CoreTuiController
-    implements CompactInputRenderer, UiRoutingContext, GenerationFlowCallbacks {
+    implements CompactInputRenderer, UiRoutingContext, GenerationFlowCallbacks, UiRenderer.Adapter {
   private static final int METADATA_PANEL_HEIGHT_COMPACT = 4;
   private static final int METADATA_PANEL_HEIGHT_NARROW = 10;
   private static final List<FocusTarget> FOCUS_ORDER =
@@ -98,6 +98,7 @@ public final class CoreTuiController
   private final UiReducer uiReducer;
   private final UiEffectsRunner uiEffectsRunner;
   private final UiStateSnapshotMapper uiStateSnapshotMapper;
+  private final UiRenderer uiRenderer;
   private volatile long extensionCatalogLoadToken;
   private CatalogLoadState catalogLoadState = CatalogLoadState.initial();
   private ExtensionCatalogLoader extensionCatalogLoader;
@@ -160,6 +161,7 @@ public final class CoreTuiController
     uiReducer = new CoreUiReducer();
     uiEffectsRunner = new UiEffectsRunner();
     uiStateSnapshotMapper = new UiStateSnapshotMapper();
+    uiRenderer = new UiRenderer();
     extensionCatalogLoadToken = 0L;
     extensionCatalogLoader = null;
     showErrorDetails = false;
@@ -618,33 +620,7 @@ public final class CoreTuiController
 
   public void render(Frame frame) {
     reconcileGenerationCompletionIfDone();
-    UiState uiState = uiState();
-    Rect area = frame.area();
-    List<String> footerLines = footerLinesComposer.compose(area.width(), uiState.footer());
-    int footerHeight = estimateFooterHeight(footerLines, Math.max(1, area.width() - 2));
-    List<Rect> rootLayout =
-        Layout.vertical()
-            .constraints(Constraint.length(1), Constraint.fill(), Constraint.length(footerHeight))
-            .split(area);
-
-    renderHeader(frame, rootLayout.get(0));
-    renderBody(frame, rootLayout.get(1), uiState.metadataPanel(), uiState.extensionsPanel());
-    renderFooter(frame, rootLayout.get(2), footerLines);
-    if (uiState.overlays().generationVisible()) {
-      renderGenerationOverlay(frame, area);
-    }
-    if (uiState.overlays().commandPaletteVisible()) {
-      renderCommandPalette(frame, area);
-    }
-    if (uiState.overlays().helpOverlayVisible()) {
-      renderHelpOverlay(frame, area);
-    }
-    if (uiState.overlays().postGenerationVisible()) {
-      renderPostGenerationOverlay(frame, area);
-    }
-    if (uiState.overlays().startupOverlayVisible()) {
-      renderStartupStatusOverlay(frame, area);
-    }
+    uiRenderer.render(frame, uiState(), this);
   }
 
   UiState uiState() {
@@ -663,6 +639,7 @@ public final class CoreTuiController
         submitRequested,
         submitBlockedByValidation,
         submitBlockedByTargetConflict,
+        commandPaletteSelection,
         metadataPanelSnapshot,
         extensionsPanelSnapshot,
         footerSnapshot,
@@ -800,7 +777,18 @@ public final class CoreTuiController
     return extensionCatalogState.focusedExtensionId();
   }
 
-  private void renderHeader(Frame frame, Rect area) {
+  @Override
+  public List<String> composeFooterLines(int width, FooterSnapshot footerSnapshot) {
+    return footerLinesComposer.compose(width, footerSnapshot);
+  }
+
+  @Override
+  public int estimateFooterHeight(List<String> lines, int availableWidth) {
+    return estimateFooterHeightInternal(lines, availableWidth);
+  }
+
+  @Override
+  public void renderHeader(Frame frame, Rect area) {
     String text = "  QUARKUS FORGE  ─  Keyboard-first project generator";
     Paragraph header =
         Paragraph.builder()
@@ -811,7 +799,8 @@ public final class CoreTuiController
     frame.renderWidget(header, area);
   }
 
-  private void renderBody(
+  @Override
+  public void renderBody(
       Frame frame,
       Rect area,
       MetadataPanelSnapshot metadataPanelSnapshot,
@@ -1058,7 +1047,8 @@ public final class CoreTuiController
     };
   }
 
-  private void renderFooter(Frame frame, Rect area, List<String> footerLines) {
+  @Override
+  public void renderFooter(Frame frame, Rect area, List<String> footerLines) {
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < footerLines.size(); i++) {
       if (i > 0) {
@@ -1076,7 +1066,7 @@ public final class CoreTuiController
     frame.renderWidget(footer, area);
   }
 
-  private static int estimateFooterHeight(List<String> lines, int availableWidth) {
+  private static int estimateFooterHeightInternal(List<String> lines, int availableWidth) {
     if (availableWidth <= 0) {
       return Math.max(1, lines.size());
     }
@@ -1088,9 +1078,10 @@ public final class CoreTuiController
     return Math.max(1, height);
   }
 
-  private void renderCommandPalette(Frame frame, Rect viewport) {
+  @Override
+  public void renderCommandPalette(Frame frame, Rect viewport, int selection) {
     OverlayRenderer.renderCommandPalette(
-        frame, viewport, theme, UiTextConstants.COMMAND_PALETTE_ENTRIES, commandPaletteSelection);
+        frame, viewport, theme, UiTextConstants.COMMAND_PALETTE_ENTRIES, selection);
   }
 
   private boolean isGenerationActive() {
@@ -1098,16 +1089,15 @@ public final class CoreTuiController
     return state == GenerationState.VALIDATING || state == GenerationState.LOADING;
   }
 
-  private void renderGenerationOverlay(Frame frame, Rect viewport) {
+  @Override
+  public void renderGenerationOverlay(
+      Frame frame, Rect viewport, UiState.GenerationView generation) {
     OverlayRenderer.renderGenerationOverlay(
-        frame,
-        viewport,
-        theme,
-        generationStateTracker.progressRatio(),
-        generationStateTracker.progressPhase());
+        frame, viewport, theme, generation.progressRatio(), generation.progressPhase());
   }
 
-  private void renderHelpOverlay(Frame frame, Rect viewport) {
+  @Override
+  public void renderHelpOverlay(Frame frame, Rect viewport) {
     OverlayRenderer.renderHelpOverlay(
         frame, viewport, theme, helpOverlayLines(), helpOverlayTitle());
   }
@@ -1187,8 +1177,10 @@ public final class CoreTuiController
     };
   }
 
-  private void renderStartupStatusOverlay(Frame frame, Rect viewport) {
-    OverlayRenderer.renderStartupOverlay(frame, viewport, theme, startupStatusLines());
+  @Override
+  public void renderStartupStatusOverlay(
+      Frame frame, Rect viewport, UiState.StartupOverlayView startupOverlay) {
+    OverlayRenderer.renderStartupOverlay(frame, viewport, theme, startupOverlay.statusLines());
   }
 
   private List<String> startupStatusLines() {
@@ -1208,22 +1200,20 @@ public final class CoreTuiController
     return List.copyOf(lines);
   }
 
-  private void renderPostGenerationOverlay(Frame frame, Rect viewport) {
-    if (postGenerationMenu.isGithubVisibilityMenuVisible()) {
+  @Override
+  public void renderPostGenerationOverlay(
+      Frame frame, Rect viewport, UiState.PostGenerationView postGeneration) {
+    if (postGeneration.githubVisibilityVisible()) {
       OverlayRenderer.renderGitHubVisibilityOverlay(
           frame,
           viewport,
           theme,
           UiTextConstants.GITHUB_VISIBILITY_LABELS,
-          postGenerationMenu.githubVisibilitySelection());
+          postGeneration.githubVisibilitySelection());
       return;
     }
     OverlayRenderer.renderPostGenerationOverlay(
-        frame,
-        viewport,
-        theme,
-        postGenerationMenu.actionLabels(),
-        postGenerationMenu.actionSelection());
+        frame, viewport, theme, postGeneration.actionLabels(), postGeneration.actionSelection());
   }
 
   private FooterSnapshot footerSnapshot() {
