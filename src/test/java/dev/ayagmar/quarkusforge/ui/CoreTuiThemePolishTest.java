@@ -123,6 +123,51 @@ class CoreTuiThemePolishTest {
   }
 
   @Test
+  void startupOverlayStillRendersWhileCommandPaletteAndHelpAreOpen() {
+    UiControllerTestHarness.QueueingScheduler scheduler =
+        new UiControllerTestHarness.QueueingScheduler();
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ofMillis(50));
+    CompletableFuture<ExtensionCatalogLoadResult> loadFuture = new CompletableFuture<>();
+    controller.loadExtensionCatalogAsync(() -> loadFuture);
+
+    controller.onEvent(KeyEvent.ofChar('p', dev.tamboui.tui.event.KeyModifiers.CTRL));
+    String withCommandPalette = UiControllerTestHarness.renderToString(controller, 120, 32);
+    assertThat(withCommandPalette).contains("Startup");
+    assertThat(withCommandPalette).contains("Command Palette [focus]");
+    assertThat(withCommandPalette).contains("Please wait...");
+
+    controller.onEvent(KeyEvent.ofChar('p', dev.tamboui.tui.event.KeyModifiers.CTRL));
+    controller.onEvent(KeyEvent.ofChar('?'));
+    String withHelpOverlay = UiControllerTestHarness.renderToString(controller, 120, 32);
+    assertThat(withHelpOverlay).contains("Startup");
+    assertThat(withHelpOverlay).doesNotContain("Help [focus]");
+  }
+
+  @Test
+  void startupOverlayStillRendersWhenPostGenerationMenuIsVisible() {
+    UiControllerTestHarness.QueueingScheduler scheduler =
+        new UiControllerTestHarness.QueueingScheduler();
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(), scheduler, Duration.ZERO, generationRunner);
+    CompletableFuture<ExtensionCatalogLoadResult> loadFuture = new CompletableFuture<>();
+    controller.loadExtensionCatalogAsync(() -> loadFuture);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    generationRunner.complete(Path.of("build/generated-project"));
+    scheduler.runAll();
+    assertThat(controller.postGenerationMenuVisible()).isTrue();
+
+    String rendered = UiControllerTestHarness.renderToString(controller, 120, 32);
+    assertThat(rendered).contains("Startup");
+    assertThat(rendered).doesNotContain("Project Generated [focus]");
+  }
+
+  @Test
   void startupOverlayExpiresWithoutKeyboardInput() throws Exception {
     CoreTuiController controller =
         CoreTuiController.from(

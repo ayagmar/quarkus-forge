@@ -80,6 +80,26 @@ class GenerationFlowCoordinatorTest {
     assertThat(runner.callCount).isZero();
   }
 
+  @Test
+  void reconcileCompletionAppliesDoneFutureEvenWhenSchedulerCallbackWasDropped() {
+    GenerationFlowCoordinator coordinator = new GenerationFlowCoordinator();
+    TestCallbacks callbacks = new TestCallbacks();
+    callbacks.transitionAllowed = true;
+    callbacks.dropScheduledTasks = true;
+    ControlledRunner runner = new ControlledRunner();
+
+    coordinator.startFlow(runner, request(), Path.of("output/demo"), callbacks);
+    runner.complete(Path.of("output/demo"));
+    assertThat(callbacks.successPaths).isEmpty();
+
+    coordinator.reconcileCompletionIfDone(callbacks);
+
+    assertThat(callbacks.transitions)
+        .containsExactly(
+            CoreTuiController.GenerationState.LOADING, CoreTuiController.GenerationState.SUCCESS);
+    assertThat(callbacks.successPaths).containsExactly(Path.of("output/demo").toAbsolutePath());
+  }
+
   private static GenerationRequest request() {
     return new GenerationRequest(
         "org.acme", "demo", "1.0.0-SNAPSHOT", "", "maven", "21", List.of());
@@ -116,6 +136,7 @@ class GenerationFlowCoordinatorTest {
     private final List<String> submitIgnoredStates = new ArrayList<>();
     private CoreTuiController.GenerationState currentState = CoreTuiController.GenerationState.IDLE;
     private boolean transitionAllowed;
+    private boolean dropScheduledTasks;
     private int cancelledCount;
 
     @Override
@@ -148,7 +169,9 @@ class GenerationFlowCoordinatorTest {
 
     @Override
     public void scheduleOnRenderThread(Runnable task) {
-      task.run();
+      if (!dropScheduledTasks) {
+        task.run();
+      }
     }
 
     @Override
