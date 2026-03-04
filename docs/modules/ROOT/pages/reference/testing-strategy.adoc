@@ -9,6 +9,15 @@
 * **Headless CLI tests** (3): `HeadlessCli` entry point smoke tests (no-subcommand, help, version).
 * **Architecture guardrails**: ArchUnit tests prevent headless/UI boundary drift.
 
+== TUI Test Strategy
+
+TUI tests follow a two-layer approach:
+
+* **Semantic behavior tests first**: assert controller state (`focusTarget`, generation state, exit plans, filters, errors).
+* **Golden/render tests selectively**: keep a smaller set of snapshot-style assertions for UX copy/layout regression.
+
+Prefer semantic assertions for navigation/workflow logic, and reserve render-string assertions for user-facing text contracts.
+
 == Dedicated Test Suites for Extracted Classes
 
 [cols="1,1,2"]
