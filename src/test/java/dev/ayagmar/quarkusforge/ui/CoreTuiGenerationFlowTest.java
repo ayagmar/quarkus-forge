@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -155,15 +156,27 @@ class CoreTuiGenerationFlowTest {
 
           controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
           generationRunner.complete(generated);
-          for (int i = 0; i < 5; i++) {
-            controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
-          }
+          moveSelectionToLabel(controller, "Export Forgefile");
           UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
           assertThat(action.shouldQuit()).isFalse();
           assertThat(controller.postGenerationExitPlan()).isEmpty();
           assertThat(generated.resolve("Forgefile")).exists();
         });
+  }
+
+  private void moveSelectionToLabel(CoreTuiController controller, String label) {
+    final int maxIterations = 20;
+    Pattern focusedLabelPattern =
+        Pattern.compile("(?s).*?>\\s*\\d+\\.\\s*" + Pattern.quote(label) + ".*");
+    for (int i = 0; i < maxIterations; i++) {
+      String rendered = UiControllerTestHarness.renderToString(controller, 120, 34);
+      if (focusedLabelPattern.matcher(rendered).matches()) {
+        return;
+      }
+      controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    }
+    throw new AssertionError("Could not focus label: " + label);
   }
 
   @Test
