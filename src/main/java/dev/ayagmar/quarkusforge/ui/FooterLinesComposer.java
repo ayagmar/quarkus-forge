@@ -42,6 +42,18 @@ final class FooterLinesComposer {
       lines.add(truncateForWidth("Plan: " + snapshot.preGeneratePlan(), width));
     }
 
+    if (!snapshot.resolvedTargetPath().isBlank()) {
+      lines.add("Resolved target: " + snapshot.resolvedTargetPath());
+    }
+
+    if (!snapshot.focusedFieldValue().isBlank()) {
+      lines.add("Value: " + snapshot.focusedFieldValue());
+    }
+
+    if (!snapshot.focusedFieldIssue().isBlank()) {
+      lines.add("Field issue: " + snapshot.focusedFieldIssue());
+    }
+
     String contextualHint = contextualFocusHint(snapshot);
     if (!contextualHint.isBlank()) {
       lines.add("Hint: " + contextualHint);

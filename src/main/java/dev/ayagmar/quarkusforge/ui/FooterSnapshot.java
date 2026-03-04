@@ -13,7 +13,10 @@ record FooterSnapshot(
     String verboseErrorDetails,
     boolean showErrorDetails,
     String successHint,
-    String preGeneratePlan) {
+    String preGeneratePlan,
+    String resolvedTargetPath,
+    String focusedFieldValue,
+    String focusedFieldIssue) {
   FooterSnapshot {
     focusTarget = Objects.requireNonNull(focusTarget);
     statusMessage = normalize(statusMessage);
@@ -21,6 +24,9 @@ record FooterSnapshot(
     verboseErrorDetails = normalize(verboseErrorDetails);
     successHint = normalize(successHint);
     preGeneratePlan = normalize(preGeneratePlan);
+    resolvedTargetPath = normalize(resolvedTargetPath);
+    focusedFieldValue = normalize(focusedFieldValue);
+    focusedFieldIssue = normalize(focusedFieldIssue);
   }
 
   private static String normalize(String value) {
