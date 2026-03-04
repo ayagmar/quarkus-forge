@@ -369,11 +369,7 @@ public final class CoreTuiController
       return null;
     }
     if (isGenerationInProgress()) {
-      ReduceResult reduceResult =
-          uiReducer.reduce(uiState(), new UiIntent.CancelGenerationIntent());
-      applyReducerState(reduceResult.nextState());
-      uiEffectsRunner.run(reduceResult.effects(), this);
-      return reduceResult.action();
+      return routeIntent(new UiIntent.CancelGenerationIntent());
     }
     cancelPendingAsyncOperations();
     return UiAction.handled(true);
@@ -436,14 +432,7 @@ public final class CoreTuiController
 
   @Override
   public UiAction handleFocusNavigationFlow(KeyEvent keyEvent) {
-    ReduceResult reduceResult =
-        uiReducer.reduce(uiState(), new UiIntent.FocusNavigationIntent(keyEvent, focusTarget));
-    if (reduceResult.effects().isEmpty()) {
-      return null;
-    }
-    applyReducerState(reduceResult.nextState());
-    uiEffectsRunner.run(reduceResult.effects(), this);
-    return reduceResult.action();
+    return routeIntent(new UiIntent.FocusNavigationIntent(keyEvent, focusTarget));
   }
 
   @Override
@@ -530,26 +519,12 @@ public final class CoreTuiController
 
   @Override
   public UiAction handleMetadataSelectorFlow(KeyEvent keyEvent) {
-    ReduceResult reduceResult =
-        uiReducer.reduce(uiState(), new UiIntent.MetadataInputIntent(keyEvent, focusTarget));
-    if (reduceResult.effects().isEmpty()) {
-      return null;
-    }
-    applyReducerState(reduceResult.nextState());
-    uiEffectsRunner.run(reduceResult.effects(), this);
-    return reduceResult.action();
+    return routeIntent(new UiIntent.MetadataInputIntent(keyEvent, focusTarget));
   }
 
   @Override
   public UiAction handleTextInputFlow(KeyEvent keyEvent) {
-    ReduceResult reduceResult =
-        uiReducer.reduce(uiState(), new UiIntent.TextInputIntent(keyEvent, focusTarget));
-    if (reduceResult.effects().isEmpty()) {
-      return null;
-    }
-    applyReducerState(reduceResult.nextState());
-    uiEffectsRunner.run(reduceResult.effects(), this);
-    return reduceResult.action();
+    return routeIntent(new UiIntent.TextInputIntent(keyEvent, focusTarget));
   }
 
   @Override
@@ -576,47 +551,30 @@ public final class CoreTuiController
   @Override
   public void onProgress(GenerationProgressUpdate progressUpdate) {
     generationStateTracker.updateProgress(progressUpdate);
-    ReduceResult reduceResult =
-        uiReducer.reduce(uiState(), new UiIntent.GenerationProgressIntent(progressUpdate));
-    applyReducerState(reduceResult.nextState());
+    dispatchIntent(new UiIntent.GenerationProgressIntent(progressUpdate));
   }
 
   @Override
   public void onGenerationSuccess(Path generatedPath) {
-    ReduceResult reduceResult =
-        uiReducer.reduce(
-            uiState(),
-            new UiIntent.GenerationSuccessIntent(
-                generatedPath, nextStepCommand(request.buildTool())));
-    applyReducerState(reduceResult.nextState());
-    uiEffectsRunner.run(reduceResult.effects(), this);
+    dispatchIntent(
+        new UiIntent.GenerationSuccessIntent(generatedPath, nextStepCommand(request.buildTool())));
   }
 
   @Override
   public void onGenerationCancelled() {
-    ReduceResult reduceResult =
-        uiReducer.reduce(uiState(), new UiIntent.GenerationCancelledIntent());
-    applyReducerState(reduceResult.nextState());
-    uiEffectsRunner.run(reduceResult.effects(), this);
+    dispatchIntent(new UiIntent.GenerationCancelledIntent());
   }
 
   @Override
   public void onGenerationFailed(Throwable cause) {
-    ReduceResult reduceResult =
-        uiReducer.reduce(
-            uiState(),
-            new UiIntent.GenerationFailedIntent(
-                ErrorMessageMapper.userFriendlyError(cause),
-                ErrorMessageMapper.verboseDetails(cause)));
-    applyReducerState(reduceResult.nextState());
-    uiEffectsRunner.run(reduceResult.effects(), this);
+    dispatchIntent(
+        new UiIntent.GenerationFailedIntent(
+            ErrorMessageMapper.userFriendlyError(cause), ErrorMessageMapper.verboseDetails(cause)));
   }
 
   @Override
   public void onCancellationRequested() {
-    ReduceResult reduceResult =
-        uiReducer.reduce(uiState(), new UiIntent.GenerationCancellationRequestedIntent());
-    applyReducerState(reduceResult.nextState());
+    dispatchIntent(new UiIntent.GenerationCancellationRequestedIntent());
   }
 
   public void setStartupOverlayMinDuration(Duration minimumDuration) {
@@ -637,52 +595,52 @@ public final class CoreTuiController
     List<String> startupStatusLines = startupStatusLines();
     return uiStateSnapshotMapper.map(
         request,
-        validation,
         focusTarget,
-        statusMessage,
-        errorMessage,
-        verboseErrorDetails,
-        submitRequested,
-        submitBlockedByValidation,
-        submitBlockedByTargetConflict,
         commandPaletteSelection,
-        metadataPanelSnapshot,
-        extensionsPanelSnapshot,
-        footerSnapshot,
-        new UiState.OverlayState(
-            isGenerationActive(),
-            commandPaletteVisible,
-            helpOverlayVisible,
-            postGenerationMenu.isVisible(),
-            startupOverlayVisible),
-        new UiState.GenerationView(
-            generationStateTracker.currentState(),
-            generationStateTracker.progressRatio(),
-            generationStateTracker.progressPhase(),
-            generationFlowCoordinator.isCancellationRequested()),
-        new UiState.CatalogLoadView(
-            catalogLoadState.isLoading(),
-            catalogLoadState.sourceLabel(),
-            catalogLoadState.isStale(),
-            catalogLoadState.errorMessage()),
-        new UiState.PostGenerationView(
-            postGenerationMenu.isVisible(),
-            postGenerationMenu.isGithubVisibilityMenuVisible(),
-            postGenerationMenu.actionSelection(),
-            postGenerationMenu.githubVisibilitySelection(),
-            postGenerationMenu.actionLabels(),
-            postGenerationMenu.successHint()),
-        new UiState.StartupOverlayView(startupOverlayVisible, startupStatusLines),
-        new UiState.ExtensionView(
-            extensionCatalogState.filteredExtensions().size(),
-            extensionCatalogState.totalCatalogExtensionCount(),
-            extensionCatalogState.selectedExtensionCount(),
-            extensionCatalogState.favoritesOnlyFilterEnabled(),
-            extensionCatalogState.selectedOnlyFilterEnabled(),
-            extensionCatalogState.activePresetFilterName(),
-            extensionCatalogState.activeCategoryFilterTitle(),
-            inputStates.get(FocusTarget.EXTENSION_SEARCH).text(),
-            extensionCatalogState.focusedExtensionId()));
+        new UiStateSnapshotMapper.ValidationState(validation, submitBlockedByValidation),
+        new UiStateSnapshotMapper.SubmissionState(
+            submitRequested,
+            submitBlockedByTargetConflict,
+            statusMessage,
+            errorMessage,
+            verboseErrorDetails),
+        new UiStateSnapshotMapper.ViewState(
+            new UiState.OverlayState(
+                isGenerationActive(),
+                commandPaletteVisible,
+                helpOverlayVisible,
+                postGenerationMenu.isVisible(),
+                startupOverlayVisible),
+            new UiState.GenerationView(
+                generationStateTracker.currentState(),
+                generationStateTracker.progressRatio(),
+                generationStateTracker.progressPhase(),
+                generationFlowCoordinator.isCancellationRequested()),
+            new UiState.CatalogLoadView(
+                catalogLoadState.isLoading(),
+                catalogLoadState.sourceLabel(),
+                catalogLoadState.isStale(),
+                catalogLoadState.errorMessage()),
+            new UiState.PostGenerationView(
+                postGenerationMenu.isVisible(),
+                postGenerationMenu.isGithubVisibilityMenuVisible(),
+                postGenerationMenu.actionSelection(),
+                postGenerationMenu.githubVisibilitySelection(),
+                postGenerationMenu.actionLabels(),
+                postGenerationMenu.successHint()),
+            new UiState.StartupOverlayView(startupOverlayVisible, startupStatusLines),
+            new UiState.ExtensionView(
+                extensionCatalogState.filteredExtensions().size(),
+                extensionCatalogState.totalCatalogExtensionCount(),
+                extensionCatalogState.selectedExtensionCount(),
+                extensionCatalogState.favoritesOnlyFilterEnabled(),
+                extensionCatalogState.selectedOnlyFilterEnabled(),
+                extensionCatalogState.activePresetFilterName(),
+                extensionCatalogState.activeCategoryFilterTitle(),
+                inputStates.get(FocusTarget.EXTENSION_SEARCH).text(),
+                extensionCatalogState.focusedExtensionId())),
+        new UiStateSnapshotMapper.PanelState(
+            metadataPanelSnapshot, extensionsPanelSnapshot, footerSnapshot));
   }
 
   FocusTarget focusTarget() {
@@ -1341,10 +1299,7 @@ public final class CoreTuiController
     if (result == null) {
       return null;
     }
-    ReduceResult reduceResult = uiReducer.reduce(uiState(), mapPostGenerationIntent(result));
-    applyReducerState(reduceResult.nextState());
-    uiEffectsRunner.run(reduceResult.effects(), this);
-    return reduceResult.action();
+    return routeIntent(mapPostGenerationIntent(result));
   }
 
   private static UiIntent mapPostGenerationIntent(PostGenerationMenuState.MenuKeyResult result) {
@@ -1364,6 +1319,18 @@ public final class CoreTuiController
     statusMessage = reducedState.statusMessage();
     errorMessage = reducedState.errorMessage();
     verboseErrorDetails = reducedState.verboseErrorDetails();
+  }
+
+  private ReduceResult dispatchIntent(UiIntent intent) {
+    ReduceResult reduceResult = uiReducer.reduce(uiState(), intent);
+    applyReducerState(reduceResult.nextState());
+    uiEffectsRunner.run(reduceResult.effects(), this);
+    return reduceResult;
+  }
+
+  private UiAction routeIntent(UiIntent intent) {
+    UiAction action = dispatchIntent(intent).action();
+    return action.handled() ? action : null;
   }
 
   private void exportRecipeAndLockFiles() {
@@ -2012,9 +1979,7 @@ public final class CoreTuiController
       transitionGenerationState(GenerationState.IDLE);
       return;
     }
-    ReduceResult reduceResult = uiReducer.reduce(uiState(), new UiIntent.SubmitReadyIntent());
-    applyReducerState(reduceResult.nextState());
-    uiEffectsRunner.run(reduceResult.effects(), this);
+    dispatchIntent(new UiIntent.SubmitReadyIntent());
   }
 
   private void updateExtensionFilterStatus(int filteredCount) {

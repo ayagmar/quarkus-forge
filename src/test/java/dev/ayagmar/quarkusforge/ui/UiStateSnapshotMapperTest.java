@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
+import dev.ayagmar.quarkusforge.domain.ForgeUiState;
+import dev.ayagmar.quarkusforge.domain.ProjectRequest;
+import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
@@ -71,19 +73,34 @@ class UiStateSnapshotMapperTest {
 
   @Test
   void postGenerationActionLabelsAreExposedAsImmutableSnapshot() {
-    UiStateSnapshotMapper mapper = new UiStateSnapshotMapper();
     UiState state =
-        mapper.map(
-            UiTestFixtureFactory.defaultForgeUiState().request(),
-            UiTestFixtureFactory.defaultForgeUiState().validation(),
-            FocusTarget.GROUP_ID,
-            "Ready",
-            "",
-            "",
-            false,
-            false,
-            false,
-            0,
+        new UiStateFixtureBuilder()
+            .withPostGenerationView(
+                new UiState.PostGenerationView(false, false, 0, 0, List.of("Open", "Quit"), ""))
+            .withStartupOverlayView(new UiState.StartupOverlayView(false, List.of("line")))
+            .build();
+
+    assertThatThrownBy(() -> state.postGeneration().actionLabels().add("new"))
+        .isInstanceOf(UnsupportedOperationException.class);
+    assertThatThrownBy(() -> state.startupOverlay().statusLines().add("new"))
+        .isInstanceOf(UnsupportedOperationException.class);
+  }
+
+  private static final class UiStateFixtureBuilder {
+    private final UiStateSnapshotMapper mapper = new UiStateSnapshotMapper();
+    private final ForgeUiState initialState = UiTestFixtureFactory.defaultForgeUiState();
+
+    private ProjectRequest request = initialState.request();
+    private ValidationReport validation = initialState.validation();
+    private FocusTarget focusTarget = FocusTarget.GROUP_ID;
+    private int commandPaletteSelection = 0;
+
+    private UiStateSnapshotMapper.ValidationState validationState =
+        new UiStateSnapshotMapper.ValidationState(validation, false);
+    private UiStateSnapshotMapper.SubmissionState submissionState =
+        new UiStateSnapshotMapper.SubmissionState(false, false, "Ready", "", "");
+    private UiStateSnapshotMapper.PanelState panelState =
+        new UiStateSnapshotMapper.PanelState(
             new MetadataPanelSnapshot(
                 "",
                 false,
@@ -134,18 +151,49 @@ class UiStateSnapshotMapperTest {
                 "",
                 "",
                 "",
-                ""),
+                ""));
+    private UiStateSnapshotMapper.ViewState viewState =
+        new UiStateSnapshotMapper.ViewState(
             new UiState.OverlayState(false, false, false, false, false),
             new UiState.GenerationView(CoreTuiController.GenerationState.IDLE, 0.0, "", false),
             new UiState.CatalogLoadView(false, "snapshot", false, ""),
-            new UiState.PostGenerationView(
-                false, false, 0, 0, new ArrayList<>(List.of("Open", "Quit")), ""),
-            new UiState.StartupOverlayView(false, new ArrayList<>(List.of("line"))),
+            new UiState.PostGenerationView(false, false, 0, 0, List.of(), ""),
+            new UiState.StartupOverlayView(false, List.of()),
             new UiState.ExtensionView(0, 0, 0, false, false, "", "", "", ""));
 
-    assertThatThrownBy(() -> state.postGeneration().actionLabels().add("new"))
-        .isInstanceOf(UnsupportedOperationException.class);
-    assertThatThrownBy(() -> state.startupOverlay().statusLines().add("new"))
-        .isInstanceOf(UnsupportedOperationException.class);
+    UiStateFixtureBuilder withPostGenerationView(UiState.PostGenerationView postGenerationView) {
+      viewState =
+          new UiStateSnapshotMapper.ViewState(
+              viewState.overlays(),
+              viewState.generation(),
+              viewState.catalogLoad(),
+              postGenerationView,
+              viewState.startupOverlay(),
+              viewState.extensions());
+      return this;
+    }
+
+    UiStateFixtureBuilder withStartupOverlayView(UiState.StartupOverlayView startupOverlayView) {
+      viewState =
+          new UiStateSnapshotMapper.ViewState(
+              viewState.overlays(),
+              viewState.generation(),
+              viewState.catalogLoad(),
+              viewState.postGeneration(),
+              startupOverlayView,
+              viewState.extensions());
+      return this;
+    }
+
+    UiState build() {
+      return mapper.map(
+          request,
+          focusTarget,
+          commandPaletteSelection,
+          validationState,
+          submissionState,
+          viewState,
+          panelState);
+    }
   }
 }
