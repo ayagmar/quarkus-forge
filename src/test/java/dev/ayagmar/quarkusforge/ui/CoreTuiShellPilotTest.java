@@ -188,7 +188,8 @@ class CoreTuiShellPilotTest {
   void metadataPanelRendersOutputDirectoryAsAbsolutePath() {
     Path homePath = Path.of("target", "qf-home").toAbsolutePath().normalize();
     String expectedOutputPath = homePath.resolve("Projects").resolve("Quarkus").toString();
-    String expectedPlanPath = homePath.resolve("Projects").resolve("Quarkus").resolve("forge-app").toString();
+    String expectedPlanPath =
+        homePath.resolve("Projects").resolve("Quarkus").resolve("forge-app").toString();
     withSystemProperty(
         "user.home",
         homePath.toString(),
