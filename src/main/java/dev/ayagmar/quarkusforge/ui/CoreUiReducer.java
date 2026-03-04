@@ -8,68 +8,61 @@ final class CoreUiReducer implements UiReducer {
 
   @Override
   public ReduceResult reduce(UiState state, UiIntent intent) {
-    if (intent instanceof UiIntent.PostGenerationIntent postGenerationIntent) {
-      return reducePostGeneration(state, postGenerationIntent.transition());
-    }
-    if (intent instanceof UiIntent.SubmitReadyIntent) {
-      return new ReduceResult(
-          state, List.of(new UiEffect.StartGeneration()), UiAction.handled(false));
-    }
-    if (intent instanceof UiIntent.CancelGenerationIntent) {
-      return new ReduceResult(
-          state, List.of(new UiEffect.RequestGenerationCancellation()), UiAction.handled(false));
-    }
-    if (intent instanceof UiIntent.GenerationProgressIntent progressIntent) {
-      GenerationProgressUpdate progressUpdate = progressIntent.progressUpdate();
-      String rawProgressMessage = progressUpdate.message() == null ? "" : progressUpdate.message();
-      String progressMessage = rawProgressMessage.isBlank() ? "working..." : rawProgressMessage;
-      return new ReduceResult(
-          state.withFeedback("Generation in progress: " + progressMessage, "", ""),
-          List.of(),
-          UiAction.handled(false));
-    }
-    if (intent instanceof UiIntent.GenerationSuccessIntent successIntent) {
-      return new ReduceResult(
-          state.withFeedback("Generation succeeded: " + successIntent.generatedPath(), "", ""),
-          List.of(
-              new UiEffect.ShowPostGenerationSuccess(
-                  successIntent.generatedPath(), successIntent.nextCommand()),
-              new UiEffect.RequestAsyncRepaint()),
-          UiAction.handled(false));
-    }
-    if (intent instanceof UiIntent.GenerationCancelledIntent) {
-      return new ReduceResult(
-          state.withFeedback(
-              "Generation cancelled. Update inputs and press Enter to retry.", "", ""),
-          List.of(new UiEffect.HidePostGenerationMenu(), new UiEffect.RequestAsyncRepaint()),
-          UiAction.handled(false));
-    }
-    if (intent instanceof UiIntent.GenerationFailedIntent failedIntent) {
-      return new ReduceResult(
-          state.withFeedback(
-              "Generation failed.",
-              failedIntent.userErrorMessage(),
-              failedIntent.verboseErrorDetails()),
-          List.of(new UiEffect.HidePostGenerationMenu(), new UiEffect.RequestAsyncRepaint()),
-          UiAction.handled(false));
-    }
-    if (intent instanceof UiIntent.GenerationCancellationRequestedIntent) {
-      return new ReduceResult(
-          state.withStatusAndError("Cancellation requested. Waiting for cleanup...", ""),
-          List.of(),
-          UiAction.handled(false));
-    }
-    if (intent instanceof UiIntent.FocusNavigationIntent navigationIntent) {
-      return reduceFocusNavigation(
-          state, navigationIntent.keyEvent(), navigationIntent.focusTarget());
-    }
-    if (intent instanceof UiIntent.MetadataInputIntent metadataIntent) {
-      return reduceMetadataInput(state, metadataIntent.keyEvent(), metadataIntent.focusTarget());
-    }
-    if (intent instanceof UiIntent.TextInputIntent textInputIntent) {
-      return reduceTextInput(state, textInputIntent.keyEvent(), textInputIntent.focusTarget());
-    }
-    return new ReduceResult(state, List.of(), UiAction.ignored());
+    return switch (intent) {
+      case UiIntent.PostGenerationIntent postGenerationIntent ->
+          reducePostGeneration(state, postGenerationIntent.transition());
+      case UiIntent.SubmitReadyIntent _ ->
+          new ReduceResult(state, List.of(new UiEffect.StartGeneration()), UiAction.handled(false));
+      case UiIntent.CancelGenerationIntent _ ->
+          new ReduceResult(
+              state,
+              List.of(new UiEffect.RequestGenerationCancellation()),
+              UiAction.handled(false));
+      case UiIntent.GenerationProgressIntent progressIntent -> {
+        GenerationProgressUpdate progressUpdate = progressIntent.progressUpdate();
+        String rawProgressMessage =
+            progressUpdate.message() == null ? "" : progressUpdate.message();
+        String progressMessage = rawProgressMessage.isBlank() ? "working..." : rawProgressMessage;
+        yield new ReduceResult(
+            state.withFeedback("Generation in progress: " + progressMessage, "", ""),
+            List.of(),
+            UiAction.handled(false));
+      }
+      case UiIntent.GenerationSuccessIntent successIntent ->
+          new ReduceResult(
+              state.withFeedback("Generation succeeded: " + successIntent.generatedPath(), "", ""),
+              List.of(
+                  new UiEffect.ShowPostGenerationSuccess(
+                      successIntent.generatedPath(), successIntent.nextCommand()),
+                  new UiEffect.RequestAsyncRepaint()),
+              UiAction.handled(false));
+      case UiIntent.GenerationCancelledIntent _ ->
+          new ReduceResult(
+              state.withFeedback(
+                  "Generation cancelled. Update inputs and press Enter to retry.", "", ""),
+              List.of(new UiEffect.HidePostGenerationMenu(), new UiEffect.RequestAsyncRepaint()),
+              UiAction.handled(false));
+      case UiIntent.GenerationFailedIntent failedIntent ->
+          new ReduceResult(
+              state.withFeedback(
+                  "Generation failed.",
+                  failedIntent.userErrorMessage(),
+                  failedIntent.verboseErrorDetails()),
+              List.of(new UiEffect.HidePostGenerationMenu(), new UiEffect.RequestAsyncRepaint()),
+              UiAction.handled(false));
+      case UiIntent.GenerationCancellationRequestedIntent _ ->
+          new ReduceResult(
+              state.withStatusAndError("Cancellation requested. Waiting for cleanup...", ""),
+              List.of(),
+              UiAction.handled(false));
+      case UiIntent.FocusNavigationIntent navigationIntent ->
+          reduceFocusNavigation(state, navigationIntent.keyEvent(), navigationIntent.focusTarget());
+      case UiIntent.MetadataInputIntent metadataIntent ->
+          reduceMetadataInput(state, metadataIntent.keyEvent(), metadataIntent.focusTarget());
+      case UiIntent.TextInputIntent textInputIntent ->
+          reduceTextInput(state, textInputIntent.keyEvent(), textInputIntent.focusTarget());
+      default -> new ReduceResult(state, List.of(), UiAction.ignored());
+    };
   }
 
   private static ReduceResult reduceFocusNavigation(

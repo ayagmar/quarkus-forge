@@ -123,7 +123,7 @@ class CoreTuiThemePolishTest {
   }
 
   @Test
-  void startupOverlayStillRendersWhileCommandPaletteAndHelpAreOpen() {
+  void startupOverlayBlocksHelpOverlayWhenCommandPaletteWasOpen() {
     UiControllerTestHarness.QueueingScheduler scheduler =
         new UiControllerTestHarness.QueueingScheduler();
     CoreTuiController controller =

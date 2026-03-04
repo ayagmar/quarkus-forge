@@ -7,43 +7,55 @@ import java.util.List;
 /** Maps controller-owned mutable state into an immutable {@link UiState} snapshot. */
 final class UiStateSnapshotMapper {
 
-  UiState map(
-      ProjectRequest request,
-      ValidationReport validation,
-      FocusTarget focusTarget,
+  record ValidationState(ValidationReport validation, boolean submitBlockedByValidation) {}
+
+  record SubmissionState(
+      boolean submitRequested,
+      boolean submitBlockedByTargetConflict,
       String statusMessage,
       String errorMessage,
-      String verboseErrorDetails,
-      boolean submitRequested,
-      boolean submitBlockedByValidation,
-      boolean submitBlockedByTargetConflict,
-      int commandPaletteSelection,
-      MetadataPanelSnapshot metadataPanel,
-      ExtensionsPanelSnapshot extensionsPanel,
-      FooterSnapshot footer,
+      String verboseErrorDetails) {}
+
+  record ViewState(
       UiState.OverlayState overlays,
       UiState.GenerationView generation,
       UiState.CatalogLoadView catalogLoad,
       UiState.PostGenerationView postGeneration,
       UiState.StartupOverlayView startupOverlay,
-      UiState.ExtensionView extensions) {
+      UiState.ExtensionView extensions) {}
+
+  record PanelState(
+      MetadataPanelSnapshot metadataPanel,
+      ExtensionsPanelSnapshot extensionsPanel,
+      FooterSnapshot footer) {}
+
+  UiState map(
+      ProjectRequest request,
+      FocusTarget focusTarget,
+      int commandPaletteSelection,
+      ValidationState validationState,
+      SubmissionState submissionState,
+      ViewState viewState,
+      PanelState panelState) {
+    UiState.PostGenerationView postGeneration = viewState.postGeneration();
+    UiState.StartupOverlayView startupOverlay = viewState.startupOverlay();
     return new UiState(
         request,
-        validation,
+        validationState.validation(),
         focusTarget,
-        statusMessage,
-        errorMessage,
-        verboseErrorDetails,
-        submitRequested,
-        submitBlockedByValidation,
-        submitBlockedByTargetConflict,
+        submissionState.statusMessage(),
+        submissionState.errorMessage(),
+        submissionState.verboseErrorDetails(),
+        submissionState.submitRequested(),
+        validationState.submitBlockedByValidation(),
+        submissionState.submitBlockedByTargetConflict(),
         commandPaletteSelection,
-        metadataPanel,
-        extensionsPanel,
-        footer,
-        overlays,
-        generation,
-        catalogLoad,
+        panelState.metadataPanel(),
+        panelState.extensionsPanel(),
+        panelState.footer(),
+        viewState.overlays(),
+        viewState.generation(),
+        viewState.catalogLoad(),
         new UiState.PostGenerationView(
             postGeneration.visible(),
             postGeneration.githubVisibilityVisible(),
@@ -53,6 +65,6 @@ final class UiStateSnapshotMapper {
             postGeneration.successHint()),
         new UiState.StartupOverlayView(
             startupOverlay.visible(), List.copyOf(startupOverlay.statusLines())),
-        extensions);
+        viewState.extensions());
   }
 }
