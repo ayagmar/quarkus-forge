@@ -666,6 +666,10 @@ public final class CoreTuiController
     return statusMessage;
   }
 
+  String errorMessage() {
+    return errorMessage;
+  }
+
   boolean commandPaletteVisible() {
     return commandPaletteVisible;
   }
@@ -680,6 +684,26 @@ public final class CoreTuiController
 
   public Optional<PostGenerationExitPlan> postGenerationExitPlan() {
     return Optional.ofNullable(postGenerationMenu.exitPlan());
+  }
+
+  boolean postGenerationMenuVisible() {
+    return postGenerationMenu.isVisible();
+  }
+
+  boolean githubVisibilityMenuVisible() {
+    return postGenerationMenu.isGithubVisibilityMenuVisible();
+  }
+
+  String postGenerationSuccessHint() {
+    return postGenerationMenu.successHint();
+  }
+
+  List<String> postGenerationActionLabels() {
+    return postGenerationMenu.actionLabels();
+  }
+
+  int postGenerationActionSelection() {
+    return postGenerationMenu.actionSelection();
   }
 
   GenerationState generationState() {

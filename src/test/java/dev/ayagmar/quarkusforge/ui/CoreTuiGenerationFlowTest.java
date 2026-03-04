@@ -15,7 +15,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -46,12 +45,10 @@ class CoreTuiGenerationFlowTest {
 
     generationRunner.complete(Path.of("build/generated-project"));
 
+    assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.SUCCESS);
     assertThat(controller.statusMessage()).contains("Generation succeeded");
-    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34)).contains("Next: cd");
-    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
-        .contains("mvn quarkus:dev");
-    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
-        .contains("Project Generated [focus]");
+    assertThat(controller.postGenerationMenuVisible()).isTrue();
+    assertThat(controller.postGenerationSuccessHint()).contains("cd ").contains("mvn quarkus:dev");
   }
 
   @Test
@@ -66,8 +63,7 @@ class CoreTuiGenerationFlowTest {
     assertThat(generationRunner.callCount()).isZero();
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.OUTPUT_DIR);
     assertThat(controller.statusMessage()).contains("target folder exists");
-    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
-        .contains("Output directory already exists:");
+    assertThat(controller.errorMessage()).contains("Output directory already exists:");
   }
 
   @Test
@@ -76,8 +72,7 @@ class CoreTuiGenerationFlowTest {
     CoreTuiController controller = fixture.controller();
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
-    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
-        .contains("Output directory already exists:");
+    assertThat(controller.errorMessage()).contains("Output directory already exists:");
 
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.ARTIFACT_ID);
     controller.onEvent(KeyEvent.ofChar('2'));
@@ -126,10 +121,8 @@ class CoreTuiGenerationFlowTest {
     UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
     assertThat(action.shouldQuit()).isFalse();
-    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
-        .doesNotContain("Project Generated [focus]");
-    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
-        .doesNotContain("Next: ");
+    assertThat(controller.postGenerationMenuVisible()).isFalse();
+    assertThat(controller.postGenerationSuccessHint()).isEmpty();
     assertThat(controller.statusMessage()).isEqualTo("Ready for next generation");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
@@ -166,17 +159,18 @@ class CoreTuiGenerationFlowTest {
   }
 
   private void moveSelectionToLabel(CoreTuiController controller, String label) {
-    final int maxIterations = 20;
-    Pattern focusedLabelPattern =
-        Pattern.compile("(?s).*?>\\s*\\d+\\.\\s*" + Pattern.quote(label) + ".*");
-    for (int i = 0; i < maxIterations; i++) {
-      String rendered = UiControllerTestHarness.renderToString(controller, 120, 34);
-      if (focusedLabelPattern.matcher(rendered).matches()) {
-        return;
+    int targetIndex = controller.postGenerationActionLabels().indexOf(label);
+    assertThat(targetIndex).isGreaterThanOrEqualTo(0);
+    int delta = targetIndex - controller.postGenerationActionSelection();
+    if (delta > 0) {
+      for (int i = 0; i < delta; i++) {
+        controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
       }
-      controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+      return;
     }
-    throw new AssertionError("Could not focus label: " + label);
+    for (int i = 0; i < -delta; i++) {
+      controller.onEvent(KeyEvent.ofKey(KeyCode.UP));
+    }
   }
 
   @Test
@@ -223,12 +217,10 @@ class CoreTuiGenerationFlowTest {
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     generationRunner.complete(Path.of("build/generated-project"));
-    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
-        .contains("Publish to GitHub (requires gh)");
+    assertThat(controller.postGenerationMenuVisible()).isTrue();
     UiAction choosePublishAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     assertThat(choosePublishAction.shouldQuit()).isFalse();
-    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
-        .contains("Publish to GitHub [focus]");
+    assertThat(controller.githubVisibilityMenuVisible()).isTrue();
 
     UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
@@ -362,8 +354,7 @@ class CoreTuiGenerationFlowTest {
     generationRunner.fail(new RuntimeException("download failed"));
 
     assertThat(controller.statusMessage()).contains("Generation failed");
-    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
-        .contains("Error: download failed");
+    assertThat(controller.errorMessage()).contains("download failed");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.ARTIFACT_ID);
@@ -381,8 +372,8 @@ class CoreTuiGenerationFlowTest {
     generationRunner.fail(new ApiHttpException(400, "<binary>"));
 
     assertThat(controller.statusMessage()).contains("Generation failed");
-    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
-        .contains("Error: Quarkus API rejected generation request (HTTP 400).");
+    assertThat(controller.errorMessage())
+        .contains("Quarkus API rejected generation request (HTTP 400).");
   }
 
   @Test
@@ -400,8 +391,7 @@ class CoreTuiGenerationFlowTest {
 
     assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.ERROR);
     assertThat(controller.statusMessage()).contains("Generation failed");
-    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
-        .contains("Error: runner crashed");
+    assertThat(controller.errorMessage()).contains("runner crashed");
   }
 
   @Test
@@ -417,8 +407,7 @@ class CoreTuiGenerationFlowTest {
 
     assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.ERROR);
     assertThat(controller.statusMessage()).contains("Generation failed");
-    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
-        .contains("Error: Generation service returned null future");
+    assertThat(controller.errorMessage()).contains("Generation service returned null future");
   }
 
   private static void withSystemProperty(String key, String value, Runnable runnable) {
