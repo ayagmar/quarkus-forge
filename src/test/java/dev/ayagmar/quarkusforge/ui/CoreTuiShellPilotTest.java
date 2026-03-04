@@ -188,6 +188,8 @@ class CoreTuiShellPilotTest {
   void metadataPanelRendersOutputDirectoryAsAbsolutePath() {
     Path homePath = Path.of("target", "qf-home").toAbsolutePath().normalize();
     String expectedOutputPath = homePath.resolve("Projects").resolve("Quarkus").toString();
+    String expectedOutputPrefix =
+        expectedOutputPath.substring(0, Math.min(expectedOutputPath.length(), 48));
     String expectedPlanPath =
         homePath.resolve("Projects").resolve("Quarkus").resolve("forge-app").toString();
     withSystemProperty(
@@ -212,9 +214,10 @@ class CoreTuiShellPilotTest {
           CoreTuiController controller =
               CoreTuiController.from(state, UiScheduler.immediate(), java.time.Duration.ZERO);
 
-          String rendered = UiControllerTestHarness.renderToString(controller, 180, 34);
+          String rendered = UiControllerTestHarness.renderToString(controller, 260, 34);
 
           assertThat(rendered).doesNotContain("Output: ~/Projects/Quarkus");
+          assertThat(rendered).contains("Output: " + expectedOutputPrefix);
           assertThat(rendered).contains("Plan: " + expectedPlanPath);
         });
   }
