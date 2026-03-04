@@ -95,6 +95,8 @@ public final class CoreTuiController
   private final AsyncRepaintSignal asyncRepaintSignal;
   private final UiEventRouter uiEventRouter;
   private final GenerationFlowCoordinator generationFlowCoordinator;
+  private final UiReducer uiReducer;
+  private final UiEffectsRunner uiEffectsRunner;
   private final UiStateSnapshotMapper uiStateSnapshotMapper;
   private volatile long extensionCatalogLoadToken;
   private CatalogLoadState catalogLoadState = CatalogLoadState.initial();
@@ -155,6 +157,8 @@ public final class CoreTuiController
     asyncRepaintSignal = new AsyncRepaintSignal();
     uiEventRouter = new UiEventRouter();
     generationFlowCoordinator = new GenerationFlowCoordinator();
+    uiReducer = new CoreUiReducer();
+    uiEffectsRunner = new UiEffectsRunner();
     uiStateSnapshotMapper = new UiStateSnapshotMapper();
     extensionCatalogLoadToken = 0L;
     extensionCatalogLoader = null;
@@ -1347,23 +1351,28 @@ public final class CoreTuiController
     if (result == null) {
       return null;
     }
+    ReduceResult reduceResult = uiReducer.reduce(uiState(), mapPostGenerationIntent(result));
+    applyReducerState(reduceResult.nextState());
+    uiEffectsRunner.run(reduceResult.effects(), this);
+    return reduceResult.action();
+  }
+
+  private static UiIntent mapPostGenerationIntent(PostGenerationMenuState.MenuKeyResult result) {
     return switch (result) {
-      case PostGenerationMenuState.MenuKeyResult.Handled _ -> UiAction.handled(false);
-      case PostGenerationMenuState.MenuKeyResult.Quit _ -> {
-        cancelPendingAsyncOperations();
-        yield UiAction.handled(true);
-      }
-      case PostGenerationMenuState.MenuKeyResult.ExportRecipe _ -> {
-        exportRecipeAndLockFiles();
-        yield UiAction.handled(false);
-      }
-      case PostGenerationMenuState.MenuKeyResult.GenerateAgain _ -> {
-        resetGenerationStateAfterTerminalOutcome();
-        statusMessage = "Ready for next generation";
-        errorMessage = "";
-        yield UiAction.handled(false);
-      }
+      case PostGenerationMenuState.MenuKeyResult.Handled _ ->
+          new UiIntent.PostGenerationIntent(UiIntent.PostGenerationTransition.HANDLED);
+      case PostGenerationMenuState.MenuKeyResult.Quit _ ->
+          new UiIntent.PostGenerationIntent(UiIntent.PostGenerationTransition.QUIT);
+      case PostGenerationMenuState.MenuKeyResult.ExportRecipe _ ->
+          new UiIntent.PostGenerationIntent(UiIntent.PostGenerationTransition.EXPORT_RECIPE);
+      case PostGenerationMenuState.MenuKeyResult.GenerateAgain _ ->
+          new UiIntent.PostGenerationIntent(UiIntent.PostGenerationTransition.GENERATE_AGAIN);
     };
+  }
+
+  private void applyReducerState(UiState reducedState) {
+    statusMessage = reducedState.statusMessage();
+    errorMessage = reducedState.errorMessage();
   }
 
   private void exportRecipeAndLockFiles() {
@@ -1815,6 +1824,18 @@ public final class CoreTuiController
 
   private void resetGenerationStateAfterTerminalOutcome() {
     generationStateTracker.resetAfterTerminalOutcome();
+  }
+
+  void cancelPendingAsyncForReducer() {
+    cancelPendingAsyncOperations();
+  }
+
+  void exportRecipeAndLockForReducer() {
+    exportRecipeAndLockFiles();
+  }
+
+  void resetGenerationForReducer() {
+    resetGenerationStateAfterTerminalOutcome();
   }
 
   @Override
