@@ -25,6 +25,43 @@ class OutputPathResolverTest {
                 .isEqualTo(homePath.resolve("Projects").resolve("Quarkus").normalize()));
   }
 
+  @Test
+  void expandsBareTildeToHomeDirectory() {
+    Path homePath = Path.of("target", "qf-home-bare").toAbsolutePath().normalize();
+    withSystemProperty(
+        "user.home",
+        homePath.toString(),
+        () -> assertThat(OutputPathResolver.resolveOutputRoot("~")).isEqualTo(homePath));
+  }
+
+  @Test
+  void expandsWindowsStyleTildePrefixAgainstUserHome() {
+    Path homePath = Path.of("target", "qf-home-win").toAbsolutePath().normalize();
+    withSystemProperty(
+        "user.home",
+        homePath.toString(),
+        () -> {
+          String output = "~\\Projects\\Quarkus";
+          Path expected =
+              Path.of(homePath.toString() + output.substring(1)).toAbsolutePath().normalize();
+          assertThat(OutputPathResolver.resolveOutputRoot(output)).isEqualTo(expected);
+        });
+  }
+
+  @Test
+  void absoluteDisplayPathFallsBackToOriginalInputWhenPathIsInvalid() {
+    withSystemProperty(
+        "user.home",
+        "\0bad-home",
+        () -> assertThat(OutputPathResolver.absoluteDisplayPath("~")).isEqualTo("~"));
+  }
+
+  @Test
+  void absoluteDisplayPathResolvesNullInputToCurrentWorkingDirectory() {
+    assertThat(OutputPathResolver.absoluteDisplayPath(null))
+        .isEqualTo(Path.of("").toAbsolutePath().normalize().toString());
+  }
+
   private static void withSystemProperty(String key, String value, Runnable runnable) {
     String previous = System.getProperty(key);
     try {
