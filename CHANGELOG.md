@@ -3,7 +3,20 @@
 All notable changes to Quarkus Forge are documented here.
 This project uses [Conventional Commits](https://www.conventionalcommits.org/). GitHub Releases contain auto-generated notes from [JReleaser](https://jreleaser.org/).
 
-## [Unreleased](https://github.com/ayagmar/quarkus-forge/compare/v0.3.2...HEAD)
+## [Unreleased](https://github.com/ayagmar/quarkus-forge/compare/v0.4.0...HEAD)
+
+## [0.4.0](https://github.com/ayagmar/quarkus-forge/compare/v0.3.2...v0.4.0) (2026-03-04)
+
+### Changed
+
+- fix(ci): ignore test sources in Codecov patch coverage (5e3b74d)
+- test(ui): add lowercase invalid-nav coverage and fixture helper (7c173f6)
+- test(ui): improve coverage for overlay and filter flows (dc4e096)
+- fix(ui): address review findings and remove duplicated logic (07d7cd2)
+- docs(ui): refresh tui docs for tamboui-native widgets (7cc0280)
+- feat(ui): improve tui input feedback and validation navigation (ecbcaee)
+- chore(release): prepare next iteration 0.3.3-SNAPSHOT (3e14413)
+
 
 ## [0.3.2](https://github.com/ayagmar/quarkus-forge/compare/v0.3.1...v0.3.2) (2026-03-03)
 
