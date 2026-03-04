@@ -428,25 +428,14 @@ public final class CoreTuiController
 
   @Override
   public UiAction handleFocusNavigationFlow(KeyEvent keyEvent) {
-    if (keyEvent.isFocusPrevious()) {
-      moveFocus(-1);
-      return UiAction.handled(false);
+    ReduceResult reduceResult =
+        uiReducer.reduce(uiState(), new UiIntent.FocusNavigationIntent(keyEvent, focusTarget));
+    if (reduceResult.effects().isEmpty()) {
+      return null;
     }
-    if (keyEvent.isFocusNext()) {
-      moveFocus(1);
-      return UiAction.handled(false);
-    }
-    if (focusTarget == FocusTarget.SUBMIT) {
-      if (UiKeyMatchers.isVimDownKey(keyEvent)) {
-        moveFocus(1);
-        return UiAction.handled(false);
-      }
-      if (UiKeyMatchers.isVimUpKey(keyEvent)) {
-        moveFocus(-1);
-        return UiAction.handled(false);
-      }
-    }
-    return null;
+    applyReducerState(reduceResult.nextState());
+    uiEffectsRunner.run(reduceResult.effects(), this);
+    return reduceResult.action();
   }
 
   @Override
@@ -533,28 +522,26 @@ public final class CoreTuiController
 
   @Override
   public UiAction handleMetadataSelectorFlow(KeyEvent keyEvent) {
-    if (isMetadataSelectorFocus(focusTarget) && handleMetadataSelectorKey(focusTarget, keyEvent)) {
-      revalidate();
-      refreshValidationFeedbackAfterEdit();
-      return UiAction.handled(false);
+    ReduceResult reduceResult =
+        uiReducer.reduce(uiState(), new UiIntent.MetadataInputIntent(keyEvent, focusTarget));
+    if (reduceResult.effects().isEmpty()) {
+      return null;
     }
-    return null;
+    applyReducerState(reduceResult.nextState());
+    uiEffectsRunner.run(reduceResult.effects(), this);
+    return reduceResult.action();
   }
 
   @Override
   public UiAction handleTextInputFlow(KeyEvent keyEvent) {
-    if (isTextInputFocus(focusTarget)
-        && handleTextInputKey(inputStates.get(focusTarget), keyEvent)) {
-      if (focusTarget == FocusTarget.EXTENSION_SEARCH) {
-        scheduleFilteredExtensionsRefresh();
-      } else {
-        rebuildRequestFromInputs();
-        revalidate();
-        refreshValidationFeedbackAfterEdit();
-      }
-      return UiAction.handled(false);
+    ReduceResult reduceResult =
+        uiReducer.reduce(uiState(), new UiIntent.TextInputIntent(keyEvent, focusTarget));
+    if (reduceResult.effects().isEmpty()) {
+      return null;
     }
-    return null;
+    applyReducerState(reduceResult.nextState());
+    uiEffectsRunner.run(reduceResult.effects(), this);
+    return reduceResult.action();
   }
 
   @Override
@@ -1866,6 +1853,30 @@ public final class CoreTuiController
     requestAsyncRepaint();
   }
 
+  void moveFocusForReducer(int offset) {
+    moveFocus(offset);
+  }
+
+  void applyMetadataSelectorKeyForReducer(FocusTarget target, KeyEvent keyEvent) {
+    if (handleMetadataSelectorKey(target, keyEvent)) {
+      revalidate();
+      refreshValidationFeedbackAfterEdit();
+    }
+  }
+
+  void applyTextInputKeyForReducer(FocusTarget target, KeyEvent keyEvent) {
+    if (!handleTextInputKey(inputStates.get(target), keyEvent)) {
+      return;
+    }
+    if (target == FocusTarget.EXTENSION_SEARCH) {
+      scheduleFilteredExtensionsRefresh();
+      return;
+    }
+    rebuildRequestFromInputs();
+    revalidate();
+    refreshValidationFeedbackAfterEdit();
+  }
+
   @Override
   public String generationStateLabel() {
     return generationStateTracker.stateLabel();
@@ -2353,7 +2364,10 @@ public final class CoreTuiController
   }
 
   private static boolean handleTextInputKey(TextInputState state, KeyEvent event) {
-    if (event.code() == dev.tamboui.tui.event.KeyCode.CHAR && !event.hasCtrl() && !event.hasAlt()) {
+    if (!UiTextInputKeys.isSupportedEditKey(event)) {
+      return false;
+    }
+    if (event.code() == dev.tamboui.tui.event.KeyCode.CHAR) {
       state.insert(event.character());
       return true;
     }
