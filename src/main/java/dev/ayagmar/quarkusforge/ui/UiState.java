@@ -25,13 +25,18 @@ record UiState(
     ExtensionView extensions) {
 
   UiState withStatusAndError(String nextStatusMessage, String nextErrorMessage) {
+    return withFeedback(nextStatusMessage, nextErrorMessage, verboseErrorDetails);
+  }
+
+  UiState withFeedback(
+      String nextStatusMessage, String nextErrorMessage, String nextVerboseErrorDetails) {
     return new UiState(
         request,
         validation,
         focusTarget,
         nextStatusMessage,
         nextErrorMessage,
-        verboseErrorDetails,
+        nextVerboseErrorDetails,
         submitRequested,
         submitBlockedByValidation,
         submitBlockedByTargetConflict,
