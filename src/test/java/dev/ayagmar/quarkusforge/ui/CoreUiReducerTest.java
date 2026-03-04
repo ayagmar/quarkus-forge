@@ -54,20 +54,18 @@ class CoreUiReducerTest {
 
   @Test
   void generationSuccessUpdatesStatusAndProducesPostGenerationEffects() {
+    java.nio.file.Path generatedPath = java.nio.file.Path.of("build/generated-project");
     ReduceResult result =
         reducer.reduce(
-            baseState(),
-            new UiIntent.GenerationSuccessIntent(
-                java.nio.file.Path.of("build/generated-project"), "mvn quarkus:dev"));
+            baseState(), new UiIntent.GenerationSuccessIntent(generatedPath, "mvn quarkus:dev"));
 
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
     assertThat(result.nextState().statusMessage())
-        .isEqualTo("Generation succeeded: build/generated-project");
+        .isEqualTo("Generation succeeded: " + generatedPath);
     assertThat(result.nextState().errorMessage()).isEmpty();
     assertThat(result.effects())
         .containsExactly(
-            new UiEffect.ShowPostGenerationSuccess(
-                java.nio.file.Path.of("build/generated-project"), "mvn quarkus:dev"),
+            new UiEffect.ShowPostGenerationSuccess(generatedPath, "mvn quarkus:dev"),
             new UiEffect.RequestAsyncRepaint());
   }
 
