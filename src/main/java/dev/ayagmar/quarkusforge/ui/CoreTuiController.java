@@ -361,8 +361,11 @@ public final class CoreTuiController
       return null;
     }
     if (isGenerationInProgress()) {
-      requestGenerationCancellation();
-      return UiAction.handled(false);
+      ReduceResult reduceResult =
+          uiReducer.reduce(uiState(), new UiIntent.CancelGenerationIntent());
+      applyReducerState(reduceResult.nextState());
+      uiEffectsRunner.run(reduceResult.effects(), this);
+      return reduceResult.action();
     }
     cancelPendingAsyncOperations();
     return UiAction.handled(true);
@@ -578,43 +581,47 @@ public final class CoreTuiController
   @Override
   public void onProgress(GenerationProgressUpdate progressUpdate) {
     generationStateTracker.updateProgress(progressUpdate);
-    String progressMessage =
-        progressUpdate.message().isBlank() ? "working..." : progressUpdate.message();
-    statusMessage = "Generation in progress: " + progressMessage;
+    ReduceResult reduceResult =
+        uiReducer.reduce(uiState(), new UiIntent.GenerationProgressIntent(progressUpdate));
+    applyReducerState(reduceResult.nextState());
   }
 
   @Override
   public void onGenerationSuccess(Path generatedPath) {
-    String nextCommand = nextStepCommand(request.buildTool());
-    postGenerationMenu.showAfterSuccess(generatedPath, nextCommand);
-    statusMessage = "Generation succeeded: " + generatedPath;
-    errorMessage = "";
-    verboseErrorDetails = "";
-    requestAsyncRepaint();
+    ReduceResult reduceResult =
+        uiReducer.reduce(
+            uiState(),
+            new UiIntent.GenerationSuccessIntent(
+                generatedPath, nextStepCommand(request.buildTool())));
+    applyReducerState(reduceResult.nextState());
+    uiEffectsRunner.run(reduceResult.effects(), this);
   }
 
   @Override
   public void onGenerationCancelled() {
-    statusMessage = "Generation cancelled. Update inputs and press Enter to retry.";
-    errorMessage = "";
-    verboseErrorDetails = "";
-    postGenerationMenu.hideAfterFailureOrCancel();
-    requestAsyncRepaint();
+    ReduceResult reduceResult =
+        uiReducer.reduce(uiState(), new UiIntent.GenerationCancelledIntent());
+    applyReducerState(reduceResult.nextState());
+    uiEffectsRunner.run(reduceResult.effects(), this);
   }
 
   @Override
   public void onGenerationFailed(Throwable cause) {
-    statusMessage = "Generation failed.";
-    errorMessage = ErrorMessageMapper.userFriendlyError(cause);
-    verboseErrorDetails = ErrorMessageMapper.verboseDetails(cause);
-    postGenerationMenu.hideAfterFailureOrCancel();
-    requestAsyncRepaint();
+    ReduceResult reduceResult =
+        uiReducer.reduce(
+            uiState(),
+            new UiIntent.GenerationFailedIntent(
+                ErrorMessageMapper.userFriendlyError(cause),
+                ErrorMessageMapper.verboseDetails(cause)));
+    applyReducerState(reduceResult.nextState());
+    uiEffectsRunner.run(reduceResult.effects(), this);
   }
 
   @Override
   public void onCancellationRequested() {
-    statusMessage = "Cancellation requested. Waiting for cleanup...";
-    errorMessage = "";
+    ReduceResult reduceResult =
+        uiReducer.reduce(uiState(), new UiIntent.GenerationCancellationRequestedIntent());
+    applyReducerState(reduceResult.nextState());
   }
 
   public void setStartupOverlayMinDuration(Duration minimumDuration) {
@@ -1373,6 +1380,7 @@ public final class CoreTuiController
   private void applyReducerState(UiState reducedState) {
     statusMessage = reducedState.statusMessage();
     errorMessage = reducedState.errorMessage();
+    verboseErrorDetails = reducedState.verboseErrorDetails();
   }
 
   private void exportRecipeAndLockFiles() {
@@ -1838,6 +1846,26 @@ public final class CoreTuiController
     resetGenerationStateAfterTerminalOutcome();
   }
 
+  void startGenerationForReducer() {
+    startGenerationFlow();
+  }
+
+  void requestGenerationCancellationForReducer() {
+    requestGenerationCancellation();
+  }
+
+  void showPostGenerationSuccessForReducer(Path generatedPath, String nextCommand) {
+    postGenerationMenu.showAfterSuccess(generatedPath, nextCommand);
+  }
+
+  void hidePostGenerationForReducer() {
+    postGenerationMenu.hideAfterFailureOrCancel();
+  }
+
+  void requestAsyncRepaintForReducer() {
+    requestAsyncRepaint();
+  }
+
   @Override
   public String generationStateLabel() {
     return generationStateTracker.stateLabel();
@@ -1990,7 +2018,9 @@ public final class CoreTuiController
       transitionGenerationState(GenerationState.IDLE);
       return;
     }
-    startGenerationFlow();
+    ReduceResult reduceResult = uiReducer.reduce(uiState(), new UiIntent.SubmitReadyIntent());
+    applyReducerState(reduceResult.nextState());
+    uiEffectsRunner.run(reduceResult.effects(), this);
   }
 
   private void updateExtensionFilterStatus(int filteredCount) {

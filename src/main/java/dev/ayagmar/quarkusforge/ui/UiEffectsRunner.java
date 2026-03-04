@@ -15,6 +15,14 @@ final class UiEffectsRunner {
       case UiEffect.CancelPendingAsync _ -> controller.cancelPendingAsyncForReducer();
       case UiEffect.ExportRecipeAndLock _ -> controller.exportRecipeAndLockForReducer();
       case UiEffect.ResetGenerationAfterOutcome _ -> controller.resetGenerationForReducer();
+      case UiEffect.StartGeneration _ -> controller.startGenerationForReducer();
+      case UiEffect.RequestGenerationCancellation _ ->
+          controller.requestGenerationCancellationForReducer();
+      case UiEffect.ShowPostGenerationSuccess showEffect ->
+          controller.showPostGenerationSuccessForReducer(
+              showEffect.generatedPath(), showEffect.nextCommand());
+      case UiEffect.HidePostGenerationMenu _ -> controller.hidePostGenerationForReducer();
+      case UiEffect.RequestAsyncRepaint _ -> controller.requestAsyncRepaintForReducer();
     }
   }
 }
