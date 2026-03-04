@@ -1,8 +1,13 @@
 # JSON Output Mode for `generate` — Implementation Spec
 
+> [!IMPORTANT]
+> This file is a historical implementation spec.
+> Canonical runtime behavior is documented in `README.md` and `docs/modules/ROOT/pages/**`.
+> If this spec diverges from current code, treat product docs and code as source of truth.
+
 **Issue**: #10 (follow-up)
 **Branch target**: `feat/headless-cli` (after headless profile is merged)
-**Prerequisite**: `docs/headless-profile-spec.md` Phases 0–6 complete (headless profile working)
+**Prerequisite**: Headless profile migration complete (headless build/profile behavior already merged)
 **Goal**: Add `--format json` option to the `generate` subcommand so CI/CD pipelines and
 automation scripts can consume machine-parseable output.
 

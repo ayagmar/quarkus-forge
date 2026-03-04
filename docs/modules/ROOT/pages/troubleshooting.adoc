@@ -85,7 +85,12 @@ Actions:
 
 . Ensure you used the `native` Maven profile when building: `mvn clean package -Pnative`.
 . Verify the binary was built on the same OS/arch as the target. Native images are not cross-platform.
-. Run with verbose logging if available: `QUARKUS_FORGE_LOG_LEVEL=DEBUG ./quarkus-forge-native`.
+. Run with verbose diagnostics:
++
+[source,bash]
+----
+./target/quarkus-forge --verbose
+----
 
 == Theme not applied
 

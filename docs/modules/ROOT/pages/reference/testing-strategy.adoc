@@ -2,11 +2,11 @@
 
 == Test Layers
 
-* **Unit tests** (547+): parsing, validation, state machines, and extracted class behavior.
-* **Integration tests** (2): WireMock-based API contract verification and E2E generation.
+* **Unit tests**: parsing, validation, state machines, and extracted class behavior.
+* **Integration tests**: WireMock-based API contract verification and E2E generation.
 * **Deterministic async harnesses**: TUI state machine tests use `UiScheduler.immediate()` and `Duration.ZERO` debounce.
 * **Property-based tests**: ZIP extraction edge cases (path traversal, large archives).
-* **Headless CLI tests** (3): `HeadlessCli` entry point smoke tests (no-subcommand, help, version).
+* **Headless CLI tests**: `HeadlessCli` entry point smoke tests (no-subcommand, help, version).
 * **Architecture guardrails**: ArchUnit tests prevent headless/UI boundary drift.
 
 == TUI Test Strategy

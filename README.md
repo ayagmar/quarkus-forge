@@ -94,7 +94,7 @@ Output: `target/quarkus-forge-headless.jar` — ~40% smaller, no TUI or terminal
 ./mvnw clean package -Pnative
 ```
 
-Output: `target/quarkus-forge-native` — standalone binary, no JVM required at runtime.
+Output: `target/quarkus-forge` — standalone binary, no JVM required at runtime.
 
 > **Note:** Native image requires GraalVM or a compatible toolchain. Set `GRAALVM_HOME` before building.
 
@@ -232,7 +232,9 @@ The codebase is organized into focused modules that follow SOLID principles and 
 - **`CliPrefillMapper`** — Maps CLI options to validated project requests.
 
 ### UI Layer (`ui/`)
-- **`CoreTuiController`** — Central TUI state machine managing focus, input, and generation flow.
+- **`CoreTuiController`** — TUI orchestration shell delegating transitions to reducer/effects and rendering from immutable state snapshots.
+- **`CoreUiReducer`** — Pure reducer for migrated UI intents and effects.
+- **`UiStateSnapshotMapper`** — Builds immutable `UiState` snapshots from controller-managed state slices.
 - **`OverlayRenderer`** — Stateless overlay rendering (command palette, help, progress, post-generation menus).
 - **`MetadataSelectorManager`** — Metadata selector state (platform stream, build tool, Java version cycling and label generation).
 - **`UiTextConstants`** — UI text content (help lines, splash art, action labels).
@@ -281,6 +283,6 @@ just format              # auto-format
 
 Or without `just`: `./mvnw clean verify` and `./mvnw spotless:apply`.
 
-Coverage reports (after `./mvnw clean verify`): `target/site/jacoco/index.html` (unit) and `target/site/jacoco-it/index.html` (integration).
+Coverage reports (after `./mvnw clean verify`): `target/site/jacoco/index.html` (HTML) and `target/site/jacoco/jacoco.xml` (XML).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for full setup guide, code style, testing conventions, and commit format. PRs welcome.

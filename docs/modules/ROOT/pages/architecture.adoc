@@ -359,8 +359,8 @@ graph TD
 
 == Testing Strategy
 
-* **547 unit tests** with deterministic async harnesses for TUI state machine testing
-* **2 integration tests** using WireMock for API contract verification
+* Extensive unit tests with deterministic async harnesses for TUI state machine testing
+* Integration tests using WireMock for API contract verification
 * Dedicated unit tests for extracted state managers: `PostGenerationMenuState`, `MetadataSelectorManager`, `CatalogRowBuilder`, `StartupOverlayTracker`
 * Async TUI tests use `UiScheduler.immediate()` and `Duration.ZERO` debounce for deterministic behavior
 * Property-based tests for ZIP extraction edge cases
