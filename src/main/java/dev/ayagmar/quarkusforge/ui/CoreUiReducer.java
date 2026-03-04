@@ -57,7 +57,80 @@ final class CoreUiReducer implements UiReducer {
           List.of(),
           UiAction.handled(false));
     }
+    if (intent instanceof UiIntent.FocusNavigationIntent navigationIntent) {
+      return reduceFocusNavigation(
+          state, navigationIntent.keyEvent(), navigationIntent.focusTarget());
+    }
+    if (intent instanceof UiIntent.MetadataInputIntent metadataIntent) {
+      return reduceMetadataInput(state, metadataIntent.keyEvent(), metadataIntent.focusTarget());
+    }
+    if (intent instanceof UiIntent.TextInputIntent textInputIntent) {
+      return reduceTextInput(state, textInputIntent.keyEvent(), textInputIntent.focusTarget());
+    }
     return new ReduceResult(state, List.of(), UiAction.ignored());
+  }
+
+  private static ReduceResult reduceFocusNavigation(
+      UiState state, dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget) {
+    if (keyEvent.isFocusPrevious()) {
+      return new ReduceResult(state, List.of(new UiEffect.MoveFocus(-1)), UiAction.handled(false));
+    }
+    if (keyEvent.isFocusNext()) {
+      return new ReduceResult(state, List.of(new UiEffect.MoveFocus(1)), UiAction.handled(false));
+    }
+    if (focusTarget == FocusTarget.SUBMIT) {
+      if (UiKeyMatchers.isVimDownKey(keyEvent)) {
+        return new ReduceResult(state, List.of(new UiEffect.MoveFocus(1)), UiAction.handled(false));
+      }
+      if (UiKeyMatchers.isVimUpKey(keyEvent)) {
+        return new ReduceResult(
+            state, List.of(new UiEffect.MoveFocus(-1)), UiAction.handled(false));
+      }
+    }
+    return new ReduceResult(state, List.of(), UiAction.ignored());
+  }
+
+  private static ReduceResult reduceMetadataInput(
+      UiState state, dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget) {
+    if (!MetadataSelectorManager.isSelectorFocus(focusTarget)) {
+      return new ReduceResult(state, List.of(), UiAction.ignored());
+    }
+    if (keyEvent.isLeft()
+        || UiKeyMatchers.isVimLeftKey(keyEvent)
+        || keyEvent.isUp()
+        || UiKeyMatchers.isVimUpKey(keyEvent)
+        || keyEvent.isRight()
+        || UiKeyMatchers.isVimRightKey(keyEvent)
+        || keyEvent.isDown()
+        || UiKeyMatchers.isVimDownKey(keyEvent)
+        || keyEvent.isHome()
+        || keyEvent.isEnd()) {
+      return new ReduceResult(
+          state,
+          List.of(new UiEffect.ApplyMetadataSelectorKey(focusTarget, keyEvent)),
+          UiAction.handled(false));
+    }
+    return new ReduceResult(state, List.of(), UiAction.ignored());
+  }
+
+  private static ReduceResult reduceTextInput(
+      UiState state, dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget) {
+    if (!isTextInputFocus(focusTarget) || !UiTextInputKeys.isSupportedEditKey(keyEvent)) {
+      return new ReduceResult(state, List.of(), UiAction.ignored());
+    }
+    return new ReduceResult(
+        state,
+        List.of(new UiEffect.ApplyTextInputKey(focusTarget, keyEvent)),
+        UiAction.handled(false));
+  }
+
+  private static boolean isTextInputFocus(FocusTarget focusTarget) {
+    return focusTarget == FocusTarget.GROUP_ID
+        || focusTarget == FocusTarget.ARTIFACT_ID
+        || focusTarget == FocusTarget.VERSION
+        || focusTarget == FocusTarget.PACKAGE_NAME
+        || focusTarget == FocusTarget.OUTPUT_DIR
+        || focusTarget == FocusTarget.EXTENSION_SEARCH;
   }
 
   private static ReduceResult reducePostGeneration(

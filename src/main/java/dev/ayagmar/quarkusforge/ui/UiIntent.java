@@ -19,6 +19,15 @@ sealed interface UiIntent {
 
   record GenerationCancellationRequestedIntent() implements UiIntent {}
 
+  record FocusNavigationIntent(dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget)
+      implements UiIntent {}
+
+  record MetadataInputIntent(dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget)
+      implements UiIntent {}
+
+  record TextInputIntent(dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget)
+      implements UiIntent {}
+
   enum PostGenerationTransition {
     HANDLED,
     QUIT,
