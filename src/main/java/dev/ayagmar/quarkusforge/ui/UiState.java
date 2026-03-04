@@ -79,9 +79,17 @@ record UiState(
       int actionSelection,
       int githubVisibilitySelection,
       List<String> actionLabels,
-      String successHint) {}
+      String successHint) {
+    PostGenerationView {
+      actionLabels = List.copyOf(actionLabels);
+    }
+  }
 
-  record StartupOverlayView(boolean visible, List<String> statusLines) {}
+  record StartupOverlayView(boolean visible, List<String> statusLines) {
+    StartupOverlayView {
+      statusLines = List.copyOf(statusLines);
+    }
+  }
 
   record ExtensionView(
       int filteredCount,

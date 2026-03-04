@@ -42,6 +42,21 @@ final class UiControllerTestHarness {
     assertThat(controller.focusTarget()).isEqualTo(target);
   }
 
+  static void moveSelectionToLabel(CoreTuiController controller, String label) {
+    int targetIndex = controller.postGenerationActionLabels().indexOf(label);
+    assertThat(targetIndex).isGreaterThanOrEqualTo(0);
+    int delta = targetIndex - controller.postGenerationActionSelection();
+    if (delta > 0) {
+      for (int i = 0; i < delta; i++) {
+        controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+      }
+      return;
+    }
+    for (int i = 0; i < -delta; i++) {
+      controller.onEvent(KeyEvent.ofKey(KeyCode.UP));
+    }
+  }
+
   static String renderToString(CoreTuiController controller) {
     return renderToString(controller, 120, 32);
   }

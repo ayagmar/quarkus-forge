@@ -586,31 +586,42 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('f', KeyModifiers.CTRL));
     controller.onEvent(KeyEvent.ofChar('c'));
     assertThat(UiControllerTestHarness.renderToString(controller)).contains("Search: [c");
+    assertThat(controller.uiState().extensions().searchQuery()).isEqualTo("c");
+    assertThat(controller.uiState().extensions().favoritesOnlyEnabled()).isTrue();
+    assertThat(controller.uiState().extensions().selectedOnlyEnabled()).isTrue();
+    assertThat(controller.uiState().extensions().activePresetFilterName()).isNotBlank();
+    assertThat(controller.uiState().extensions().activeCategoryFilterTitle()).isNotBlank();
 
     UiAction clearSearch = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(clearSearch.handled()).isTrue();
     assertThat(clearSearch.shouldQuit()).isFalse();
     assertThat(controller.statusMessage()).contains("Extension search cleared");
+    assertThat(controller.uiState().extensions().searchQuery()).isEmpty();
 
     UiAction disableFavorites = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(disableFavorites.handled()).isTrue();
     assertThat(disableFavorites.shouldQuit()).isFalse();
     assertThat(controller.statusMessage()).contains("Favorites filter disabled");
+    assertThat(controller.favoritesOnlyFilterEnabled()).isFalse();
 
     UiAction disableSelectedOnly = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(disableSelectedOnly.handled()).isTrue();
     assertThat(disableSelectedOnly.shouldQuit()).isFalse();
     assertThat(controller.statusMessage()).contains("Selected-only view disabled");
+    assertThat(controller.uiState().extensions().selectedOnlyEnabled()).isFalse();
 
     UiAction clearPreset = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(clearPreset.handled()).isTrue();
     assertThat(clearPreset.shouldQuit()).isFalse();
     assertThat(controller.statusMessage()).contains("Preset filter disabled");
+    assertThat(controller.uiState().extensions().activePresetFilterName()).isBlank();
 
     UiAction clearCategory = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(clearCategory.handled()).isTrue();
     assertThat(clearCategory.shouldQuit()).isFalse();
     assertThat(controller.statusMessage()).contains("Category filter cleared");
+    assertThat(controller.uiState().extensions().activeCategoryFilterTitle()).isBlank();
+    assertThat(controller.catalogSectionHeaders()).contains("Core", "Web");
 
     UiAction moveToList = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
     assertThat(moveToList.handled()).isTrue();

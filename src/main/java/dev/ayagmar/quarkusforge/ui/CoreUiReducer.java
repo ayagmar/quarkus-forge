@@ -21,8 +21,8 @@ final class CoreUiReducer implements UiReducer {
     }
     if (intent instanceof UiIntent.GenerationProgressIntent progressIntent) {
       GenerationProgressUpdate progressUpdate = progressIntent.progressUpdate();
-      String progressMessage =
-          progressUpdate.message().isBlank() ? "working..." : progressUpdate.message();
+      String rawProgressMessage = progressUpdate.message() == null ? "" : progressUpdate.message();
+      String progressMessage = rawProgressMessage.isBlank() ? "working..." : rawProgressMessage;
       return new ReduceResult(
           state.withFeedback("Generation in progress: " + progressMessage, "", ""),
           List.of(),

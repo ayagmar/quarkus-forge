@@ -53,6 +53,17 @@ class CoreUiReducerTest {
   }
 
   @Test
+  void generationProgressUsesWorkingFallbackWhenMessageNull() {
+    ReduceResult result =
+        reducer.reduce(
+            baseState(),
+            new UiIntent.GenerationProgressIntent(
+                new GenerationProgressUpdate(GenerationProgressStep.REQUESTING_ARCHIVE, null)));
+
+    assertThat(result.nextState().statusMessage()).isEqualTo("Generation in progress: working...");
+  }
+
+  @Test
   void generationSuccessUpdatesStatusAndProducesPostGenerationEffects() {
     java.nio.file.Path generatedPath = java.nio.file.Path.of("build/generated-project");
     ReduceResult result =

@@ -2350,7 +2350,7 @@ public final class CoreTuiController
     if (!UiTextInputKeys.isSupportedEditKey(event)) {
       return false;
     }
-    if (event.code() == dev.tamboui.tui.event.KeyCode.CHAR) {
+    if (event.code() == KeyCode.CHAR) {
       state.insert(event.character());
       return true;
     }

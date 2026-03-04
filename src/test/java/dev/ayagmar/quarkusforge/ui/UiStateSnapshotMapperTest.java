@@ -8,6 +8,7 @@ import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
@@ -137,8 +138,9 @@ class UiStateSnapshotMapperTest {
             new UiState.OverlayState(false, false, false, false, false),
             new UiState.GenerationView(CoreTuiController.GenerationState.IDLE, 0.0, "", false),
             new UiState.CatalogLoadView(false, "snapshot", false, ""),
-            new UiState.PostGenerationView(false, false, 0, 0, List.of("Open", "Quit"), ""),
-            new UiState.StartupOverlayView(false, List.of("line")),
+            new UiState.PostGenerationView(
+                false, false, 0, 0, new ArrayList<>(List.of("Open", "Quit")), ""),
+            new UiState.StartupOverlayView(false, new ArrayList<>(List.of("line"))),
             new UiState.ExtensionView(0, 0, 0, false, false, "", "", "", ""));
 
     assertThatThrownBy(() -> state.postGeneration().actionLabels().add("new"))

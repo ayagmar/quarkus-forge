@@ -149,28 +149,13 @@ class CoreTuiGenerationFlowTest {
 
           controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
           generationRunner.complete(generated);
-          moveSelectionToLabel(controller, "Export Forgefile");
+          UiControllerTestHarness.moveSelectionToLabel(controller, "Export Forgefile");
           UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
           assertThat(action.shouldQuit()).isFalse();
           assertThat(controller.postGenerationExitPlan()).isEmpty();
           assertThat(generated.resolve("Forgefile")).exists();
         });
-  }
-
-  private void moveSelectionToLabel(CoreTuiController controller, String label) {
-    int targetIndex = controller.postGenerationActionLabels().indexOf(label);
-    assertThat(targetIndex).isGreaterThanOrEqualTo(0);
-    int delta = targetIndex - controller.postGenerationActionSelection();
-    if (delta > 0) {
-      for (int i = 0; i < delta; i++) {
-        controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
-      }
-      return;
-    }
-    for (int i = 0; i < -delta; i++) {
-      controller.onEvent(KeyEvent.ofKey(KeyCode.UP));
-    }
   }
 
   @Test
