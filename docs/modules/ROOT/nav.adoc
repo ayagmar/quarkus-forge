@@ -15,5 +15,6 @@
 
 .Reference
 * xref:reference/forge-files-and-state.adoc[Forge Files and State]
+* xref:reference/headless-maintenance.adoc[Headless Maintenance]
 * xref:reference/testing-strategy.adoc[Testing Strategy]
 * xref:architecture.adoc[Architecture]
