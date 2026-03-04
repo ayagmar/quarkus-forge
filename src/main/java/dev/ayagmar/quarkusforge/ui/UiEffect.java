@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge.ui;
 
+/** Reducer-emitted side effects executed outside pure transition logic. */
 sealed interface UiEffect {
   record CancelPendingAsync() implements UiEffect {}
 

@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge.ui;
 
+/** Normalized user/system events consumed by the reducer. */
 sealed interface UiIntent {
   record PostGenerationIntent(PostGenerationTransition transition) implements UiIntent {}
 

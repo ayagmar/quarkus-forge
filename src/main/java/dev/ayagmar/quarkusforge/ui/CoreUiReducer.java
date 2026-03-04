@@ -1,7 +1,9 @@
 package dev.ayagmar.quarkusforge.ui;
 
+import dev.tamboui.tui.event.KeyEvent;
 import java.util.List;
 
+/** Default reducer implementation for migrated UI state-machine slices. */
 final class CoreUiReducer implements UiReducer {
 
   @Override
@@ -71,7 +73,7 @@ final class CoreUiReducer implements UiReducer {
   }
 
   private static ReduceResult reduceFocusNavigation(
-      UiState state, dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget) {
+      UiState state, KeyEvent keyEvent, FocusTarget focusTarget) {
     if (keyEvent.isFocusPrevious()) {
       return new ReduceResult(state, List.of(new UiEffect.MoveFocus(-1)), UiAction.handled(false));
     }
@@ -91,8 +93,11 @@ final class CoreUiReducer implements UiReducer {
   }
 
   private static ReduceResult reduceMetadataInput(
-      UiState state, dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget) {
+      UiState state, KeyEvent keyEvent, FocusTarget focusTarget) {
     if (!MetadataSelectorManager.isSelectorFocus(focusTarget)) {
+      return new ReduceResult(state, List.of(), UiAction.ignored());
+    }
+    if (!hasSelectorOptions(state, focusTarget)) {
       return new ReduceResult(state, List.of(), UiAction.ignored());
     }
     if (keyEvent.isLeft()
@@ -114,7 +119,7 @@ final class CoreUiReducer implements UiReducer {
   }
 
   private static ReduceResult reduceTextInput(
-      UiState state, dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget) {
+      UiState state, KeyEvent keyEvent, FocusTarget focusTarget) {
     if (!UiFocusPredicates.isTextInputFocus(focusTarget)
         || !UiTextInputKeys.isSupportedEditKey(keyEvent)) {
       return new ReduceResult(state, List.of(), UiAction.ignored());
@@ -141,5 +146,16 @@ final class CoreUiReducer implements UiReducer {
               List.of(new UiEffect.ResetGenerationAfterOutcome()),
               UiAction.handled(false));
     };
+  }
+
+  private static boolean hasSelectorOptions(UiState state, FocusTarget focusTarget) {
+    MetadataPanelSnapshot.SelectorInfo selectorInfo =
+        switch (focusTarget) {
+          case PLATFORM_STREAM -> state.metadataPanel().platformStreamInfo();
+          case BUILD_TOOL -> state.metadataPanel().buildToolInfo();
+          case JAVA_VERSION -> state.metadataPanel().javaVersionInfo();
+          default -> MetadataPanelSnapshot.SelectorInfo.EMPTY;
+        };
+    return selectorInfo.totalOptions() > 0;
   }
 }

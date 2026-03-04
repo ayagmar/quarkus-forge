@@ -6,6 +6,10 @@ import dev.tamboui.layout.Rect;
 import dev.tamboui.terminal.Frame;
 import java.util.List;
 
+/**
+ * Render orchestrator that consumes immutable {@link UiState} and delegates concrete drawing to an
+ * adapter.
+ */
 final class UiRenderer {
 
   interface Adapter {

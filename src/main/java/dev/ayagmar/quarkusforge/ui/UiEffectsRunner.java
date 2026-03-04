@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge.ui;
 
 import java.util.List;
 
+/** Executes reducer-emitted effects by invoking controller-owned imperative operations. */
 final class UiEffectsRunner {
 
   void run(List<UiEffect> effects, CoreTuiController controller) {

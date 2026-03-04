@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge.ui;
 
+/** Shared focus classification helpers used by routing/reducer paths. */
 final class UiFocusPredicates {
   private UiFocusPredicates() {}
 
