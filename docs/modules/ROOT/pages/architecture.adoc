@@ -231,7 +231,7 @@ When the user presses `Esc` in the extension search or list, the TUI unwinds fil
 
 == API Layer Design
 
-== Architectural Guardrails
+=== Architectural Guardrails
 
 Headless/TUI boundaries are protected by ArchUnit tests to prevent dependency drift:
 
