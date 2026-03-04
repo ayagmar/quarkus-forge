@@ -54,6 +54,10 @@ Before and during the UI state-machine migration, these semantic contracts must 
 | `StartupOverlayTracker`
 | 8
 | Duration tracking, visibility state, timing edge cases
+
+| `CoreUiReducer` + `UiStateSnapshotMapper`
+| contract-focused
+| Reducer intent/effect outcomes and immutable state snapshot mapping contracts
 |===
 
 == Core Verification Commands
