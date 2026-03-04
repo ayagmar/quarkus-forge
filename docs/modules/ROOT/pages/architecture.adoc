@@ -155,6 +155,45 @@ stateDiagram-v2
 </pre>
 ++++
 
+=== UI State-Machine Refactor Invariants (ADR-UI-001)
+
+The UI refactor to explicit `UiState`/`UiIntent`/`UiReducer`/`UiEffect` must preserve these behavior contracts:
+
+* Routing precedence remains fixed in `UiEventRouter`:
+.. help overlay keys / toggle
+.. command palette toggle + keys
+.. post-generation menu
+.. extension cancel flow
+.. quit flow
+.. loading lock handling
+.. global shortcuts
+.. focus navigation
+.. submit flow
+.. extension flow
+.. metadata selectors
+.. text input
+* Generation lifecycle semantics from `GenerationFlowCoordinator` remain unchanged:
+.. token-based stale completion protection
+.. cancellation semantics (`CancellationException` and cancel flag)
+.. dropped-callback reconciliation via `reconcileCompletionIfDone`
+* Post-generation flow semantics from `PostGenerationMenuState` remain unchanged:
+.. action selection and visibility sub-menu behavior
+.. stable exit-plan generation
+.. `Generate again` returns to active TUI session without quitting
+* Non-key event behavior remains unchanged:
+.. `TickEvent` drives repaint/progress updates
+.. `ResizeEvent` updates status text while preserving state
+.. unknown events are ignored
+* Overlay rendering order remains fixed:
+.. header/body/footer
+.. generation overlay
+.. command palette
+.. help overlay
+.. post-generation menu
+.. startup overlay
+* State updates follow single-writer discipline: reducer transitions execute on the render thread.
+* TUI refactor cannot change headless behavior or CLI semantics.
+
 === Extension Cancel Flow (Esc Priority Chain)
 
 When the user presses `Esc` in the extension search or list, the TUI unwinds filters in priority order:
@@ -166,13 +205,15 @@ When the user presses `Esc` in the extension search or list, the TUI unwinds fil
       │
       ├──[2] Favorites filter on? ──► Disable favorites filter
       │
-      ├──[3] Preset filter active? ──► Clear preset filter
+      ├──[3] Selected-only filter on? ──► Disable selected-only filter
       │
-      ├──[4] Category filter active? ──► Clear category filter
+      ├──[4] Preset filter active? ──► Clear preset filter
       │
-      ├──[5] In search field? ──► Focus extension list
+      ├──[5] Category filter active? ──► Clear category filter
       │
-      └──[6] None of the above ──► Fall through to quit flow
+      ├──[6] In search field? ──► Focus extension list
+      │
+      └──[7] None of the above ──► Fall through to quit flow
 ....
 
 == API Layer Design

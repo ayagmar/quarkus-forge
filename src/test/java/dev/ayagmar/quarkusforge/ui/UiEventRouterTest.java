@@ -81,11 +81,62 @@ class UiEventRouterTest {
             "textInput");
   }
 
+  @Test
+  void commandPaletteToggleWinsBeforeCommandPaletteHandler() {
+    TestRoutingContext context = new TestRoutingContext();
+    context.commandPaletteToggle = true;
+
+    UiAction action = new UiEventRouter().routeKeyEvent(ANY_KEY, context);
+
+    assertThat(action).isEqualTo(UiAction.handled(false));
+    assertThat(context.commandPaletteToggled).isTrue();
+    assertThat(context.calls).containsExactly("help", "shouldToggleHelp", "isCommandPaletteToggle");
+  }
+
+  @Test
+  void postGenerationHandlerWinsBeforeCancelAndQuitFlows() {
+    TestRoutingContext context = new TestRoutingContext();
+    context.postGenerationAction = UiAction.handled(false);
+
+    UiAction action = new UiEventRouter().routeKeyEvent(ANY_KEY, context);
+
+    assertThat(action).isEqualTo(UiAction.handled(false));
+    assertThat(context.calls)
+        .containsExactly(
+            "help",
+            "shouldToggleHelp",
+            "isCommandPaletteToggle",
+            "commandPalette",
+            "postGeneration");
+  }
+
+  @Test
+  void extensionCancelWinsBeforeQuitFlow() {
+    TestRoutingContext context = new TestRoutingContext();
+    context.cancelAction = UiAction.handled(false);
+
+    UiAction action = new UiEventRouter().routeKeyEvent(ANY_KEY, context);
+
+    assertThat(action).isEqualTo(UiAction.handled(false));
+    assertThat(context.calls)
+        .containsExactly(
+            "help",
+            "shouldToggleHelp",
+            "isCommandPaletteToggle",
+            "commandPalette",
+            "postGeneration",
+            "extensionCancel");
+  }
+
   private static final class TestRoutingContext implements UiRoutingContext {
     private final List<String> calls = new ArrayList<>();
     private UiAction helpOverlayAction;
     private boolean shouldToggleHelp;
     private boolean helpToggled;
+    private boolean commandPaletteToggle;
+    private boolean commandPaletteToggled;
+    private UiAction postGenerationAction;
+    private UiAction cancelAction;
     private boolean generationInProgress;
     private UiAction generationInProgressAction;
 
@@ -109,12 +160,12 @@ class UiEventRouterTest {
     @Override
     public boolean isCommandPaletteToggleKey(KeyEvent keyEvent) {
       calls.add("isCommandPaletteToggle");
-      return false;
+      return commandPaletteToggle;
     }
 
     @Override
     public void toggleCommandPalette() {
-      throw new AssertionError("unexpected toggleCommandPalette");
+      commandPaletteToggled = true;
     }
 
     @Override
@@ -126,13 +177,13 @@ class UiEventRouterTest {
     @Override
     public UiAction handlePostGenerationMenuKey(KeyEvent keyEvent) {
       calls.add("postGeneration");
-      return null;
+      return postGenerationAction;
     }
 
     @Override
     public UiAction handleExtensionCancelFlow(KeyEvent keyEvent) {
       calls.add("extensionCancel");
-      return null;
+      return cancelAction;
     }
 
     @Override

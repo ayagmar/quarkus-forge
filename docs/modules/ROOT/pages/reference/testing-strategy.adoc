@@ -18,6 +18,21 @@ TUI tests follow a two-layer approach:
 
 Prefer semantic assertions for navigation/workflow logic, and reserve render-string assertions for user-facing text contracts.
 
+=== UI State-Machine Refactor Contract Baseline
+
+Before and during the UI state-machine migration, these semantic contracts must remain green:
+
+* routing precedence (overlay/cancel/quit/loading/global/focus/input)
+* generation transitions (`IDLE -> LOADING -> SUCCESS|ERROR|CANCELLED`)
+* post-generation exit-plan semantics
+* focus transition semantics
+* extension cancel unwind order
+* overlay layering/z-order contracts
+* resize/tick event behavior
+* catalog load success/failure semantics and startup overlay visibility
+* stale-token completion no-op behavior for async catalog/generation callbacks
+* single-writer transition discipline (state transitions on render thread)
+
 == Dedicated Test Suites for Extracted Classes
 
 [cols="1,1,2"]

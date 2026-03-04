@@ -559,6 +559,70 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void extensionEscapeUnwindsInStrictPriorityOrderBeforeQuit() {
+    CoreTuiController controller = UiControllerTestHarness.controller();
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                new ExtensionCatalogLoadResult(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20)),
+                    CatalogSource.LIVE,
+                    false,
+                    "",
+                    null,
+                    Map.of(
+                        "core", List.of("io.quarkus:quarkus-arc"),
+                        "web", List.of("io.quarkus:quarkus-rest")))));
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+
+    controller.onEvent(KeyEvent.ofChar('f'));
+    controller.onEvent(KeyEvent.ofChar(' '));
+    controller.onEvent(KeyEvent.ofChar('k', KeyModifiers.CTRL));
+    controller.onEvent(KeyEvent.ofChar('s', KeyModifiers.ALT));
+    controller.onEvent(KeyEvent.ofChar('y', KeyModifiers.CTRL));
+    controller.onEvent(KeyEvent.ofChar('v'));
+    controller.onEvent(KeyEvent.ofChar('f', KeyModifiers.CTRL));
+    controller.onEvent(KeyEvent.ofChar('c'));
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("Search: [c");
+
+    UiAction clearSearch = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(clearSearch.handled()).isTrue();
+    assertThat(clearSearch.shouldQuit()).isFalse();
+    assertThat(controller.statusMessage()).contains("Extension search cleared");
+
+    UiAction disableFavorites = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(disableFavorites.handled()).isTrue();
+    assertThat(disableFavorites.shouldQuit()).isFalse();
+    assertThat(controller.statusMessage()).contains("Favorites filter disabled");
+
+    UiAction disableSelectedOnly = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(disableSelectedOnly.handled()).isTrue();
+    assertThat(disableSelectedOnly.shouldQuit()).isFalse();
+    assertThat(controller.statusMessage()).contains("Selected-only view disabled");
+
+    UiAction clearPreset = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(clearPreset.handled()).isTrue();
+    assertThat(clearPreset.shouldQuit()).isFalse();
+    assertThat(controller.statusMessage()).contains("Preset filter disabled");
+
+    UiAction clearCategory = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(clearCategory.handled()).isTrue();
+    assertThat(clearCategory.shouldQuit()).isFalse();
+    assertThat(controller.statusMessage()).contains("Category filter cleared");
+
+    UiAction moveToList = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(moveToList.handled()).isTrue();
+    assertThat(moveToList.shouldQuit()).isFalse();
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
+
+    UiAction quit = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
+    assertThat(quit.handled()).isTrue();
+    assertThat(quit.shouldQuit()).isTrue();
+  }
+
+  @Test
   void xClearsSelectedExtensionsWhenListIsFocused() {
     CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
