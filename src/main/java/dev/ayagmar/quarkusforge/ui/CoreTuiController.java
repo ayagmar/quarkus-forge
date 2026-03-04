@@ -95,6 +95,7 @@ public final class CoreTuiController
   private final AsyncRepaintSignal asyncRepaintSignal;
   private final UiEventRouter uiEventRouter;
   private final GenerationFlowCoordinator generationFlowCoordinator;
+  private final UiStateSnapshotMapper uiStateSnapshotMapper;
   private volatile long extensionCatalogLoadToken;
   private CatalogLoadState catalogLoadState = CatalogLoadState.initial();
   private ExtensionCatalogLoader extensionCatalogLoader;
@@ -154,6 +155,7 @@ public final class CoreTuiController
     asyncRepaintSignal = new AsyncRepaintSignal();
     uiEventRouter = new UiEventRouter();
     generationFlowCoordinator = new GenerationFlowCoordinator();
+    uiStateSnapshotMapper = new UiStateSnapshotMapper();
     extensionCatalogLoadToken = 0L;
     extensionCatalogLoader = null;
     showErrorDetails = false;
@@ -618,8 +620,9 @@ public final class CoreTuiController
 
   public void render(Frame frame) {
     reconcileGenerationCompletionIfDone();
+    UiState uiState = uiState();
     Rect area = frame.area();
-    List<String> footerLines = footerLinesComposer.compose(area.width(), footerSnapshot());
+    List<String> footerLines = footerLinesComposer.compose(area.width(), uiState.footer());
     int footerHeight = estimateFooterHeight(footerLines, Math.max(1, area.width() - 2));
     List<Rect> rootLayout =
         Layout.vertical()
@@ -627,23 +630,78 @@ public final class CoreTuiController
             .split(area);
 
     renderHeader(frame, rootLayout.get(0));
-    renderBody(frame, rootLayout.get(1));
+    renderBody(frame, rootLayout.get(1), uiState.metadataPanel(), uiState.extensionsPanel());
     renderFooter(frame, rootLayout.get(2), footerLines);
-    if (isGenerationActive()) {
+    if (uiState.overlays().generationVisible()) {
       renderGenerationOverlay(frame, area);
     }
-    if (commandPaletteVisible) {
+    if (uiState.overlays().commandPaletteVisible()) {
       renderCommandPalette(frame, area);
     }
-    if (helpOverlayVisible) {
+    if (uiState.overlays().helpOverlayVisible()) {
       renderHelpOverlay(frame, area);
     }
-    if (postGenerationMenu.isVisible()) {
+    if (uiState.overlays().postGenerationVisible()) {
       renderPostGenerationOverlay(frame, area);
     }
-    if (isStartupOverlayVisible()) {
+    if (uiState.overlays().startupOverlayVisible()) {
       renderStartupStatusOverlay(frame, area);
     }
+  }
+
+  UiState uiState() {
+    MetadataPanelSnapshot metadataPanelSnapshot = metadataPanelSnapshot();
+    ExtensionsPanelSnapshot extensionsPanelSnapshot = extensionsPanelSnapshot();
+    FooterSnapshot footerSnapshot = footerSnapshot();
+    boolean startupOverlayVisible = isStartupOverlayVisible();
+    List<String> startupStatusLines = startupStatusLines();
+    return uiStateSnapshotMapper.map(
+        request,
+        validation,
+        focusTarget,
+        statusMessage,
+        errorMessage,
+        verboseErrorDetails,
+        submitRequested,
+        submitBlockedByValidation,
+        submitBlockedByTargetConflict,
+        metadataPanelSnapshot,
+        extensionsPanelSnapshot,
+        footerSnapshot,
+        new UiState.OverlayState(
+            isGenerationActive(),
+            commandPaletteVisible,
+            helpOverlayVisible,
+            postGenerationMenu.isVisible(),
+            startupOverlayVisible),
+        new UiState.GenerationView(
+            generationStateTracker.currentState(),
+            generationStateTracker.progressRatio(),
+            generationStateTracker.progressPhase(),
+            generationFlowCoordinator.isCancellationRequested()),
+        new UiState.CatalogLoadView(
+            catalogLoadState.isLoading(),
+            catalogLoadState.sourceLabel(),
+            catalogLoadState.isStale(),
+            catalogLoadState.errorMessage()),
+        new UiState.PostGenerationView(
+            postGenerationMenu.isVisible(),
+            postGenerationMenu.isGithubVisibilityMenuVisible(),
+            postGenerationMenu.actionSelection(),
+            postGenerationMenu.githubVisibilitySelection(),
+            postGenerationMenu.actionLabels(),
+            postGenerationMenu.successHint()),
+        new UiState.StartupOverlayView(startupOverlayVisible, startupStatusLines),
+        new UiState.ExtensionView(
+            extensionCatalogState.filteredExtensions().size(),
+            extensionCatalogState.totalCatalogExtensionCount(),
+            extensionCatalogState.selectedExtensionCount(),
+            extensionCatalogState.favoritesOnlyFilterEnabled(),
+            extensionCatalogState.selectedOnlyFilterEnabled(),
+            extensionCatalogState.activePresetFilterName(),
+            extensionCatalogState.activeCategoryFilterTitle(),
+            inputStates.get(FocusTarget.EXTENSION_SEARCH).text(),
+            extensionCatalogState.focusedExtensionId()));
   }
 
   FocusTarget focusTarget() {
@@ -755,7 +813,11 @@ public final class CoreTuiController
     frame.renderWidget(header, area);
   }
 
-  private void renderBody(Frame frame, Rect area) {
+  private void renderBody(
+      Frame frame,
+      Rect area,
+      MetadataPanelSnapshot metadataPanelSnapshot,
+      ExtensionsPanelSnapshot extensionsPanelSnapshot) {
     int metadataHeight =
         area.width() < UiLayoutConstants.NARROW_WIDTH_THRESHOLD
             ? METADATA_PANEL_HEIGHT_NARROW
@@ -768,14 +830,14 @@ public final class CoreTuiController
     bodyPanelRenderer.renderMetadataPanel(
         frame,
         bodyLayout.get(0),
-        metadataPanelSnapshot(),
+        metadataPanelSnapshot,
         this,
         CoreTuiController::panelTitle,
         this::panelBorderStyle);
     bodyPanelRenderer.renderExtensionsPanel(
         frame,
         bodyLayout.get(1),
-        extensionsPanelSnapshot(),
+        extensionsPanelSnapshot,
         inputStates.get(FocusTarget.EXTENSION_SEARCH),
         extensionCatalogState.listState(),
         CoreTuiController::panelTitle,
