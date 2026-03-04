@@ -177,6 +177,16 @@ When the user presses `Esc` in the extension search or list, the TUI unwinds fil
 
 == API Layer Design
 
+== Architectural Guardrails
+
+Headless/TUI boundaries are protected by ArchUnit tests to prevent dependency drift:
+
+* Headless orchestration classes must not depend on `dev.ayagmar.quarkusforge.ui.*`.
+* Headless orchestration classes must not depend on `dev.tamboui.*`.
+* Core non-UI layers (`api`, `archive`, `domain`, `diagnostics`, `util`) must not depend on `ui`.
+
+See xref:reference/headless-maintenance.adoc[Headless Maintenance Guardrails].
+
 === Transport vs Parsing Separation
 
 ++++

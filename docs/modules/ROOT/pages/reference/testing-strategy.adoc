@@ -7,6 +7,7 @@
 * **Deterministic async harnesses**: TUI state machine tests use `UiScheduler.immediate()` and `Duration.ZERO` debounce.
 * **Property-based tests**: ZIP extraction edge cases (path traversal, large archives).
 * **Headless CLI tests** (3): `HeadlessCli` entry point smoke tests (no-subcommand, help, version).
+* **Architecture guardrails**: ArchUnit tests prevent headless/UI boundary drift.
 
 == Dedicated Test Suites for Extracted Classes
 
@@ -36,9 +37,7 @@
 [source,bash]
 ----
 ./mvnw -q spotless:check
-./mvnw -q checkstyle:check
-./mvnw -q test
-./mvnw -q verify -DskipTests=true
+./mvnw -q verify
 ./mvnw -q clean compile -Pheadless  # verify headless profile compiles
 ----
 
@@ -54,15 +53,16 @@ just headless-check    # headless profile compile
 just verify            # format-check + headless-check + test
 ----
 
+See also: xref:reference/headless-maintenance.adoc[Headless Maintenance Guardrails]
+
 == Coverage
 
 JaCoCo reports are generated during a full `./mvnw clean verify` run.
 
 * `./mvnw test` (unit-only) does not publish JaCoCo site reports.
-* `./mvnw verify -DskipTests=true` (integration-only) does not publish JaCoCo site reports.
-* `./mvnw clean verify` publishes both reports:
-** Unit HTML/XML: `target/site/jacoco/index.html` and `target/site/jacoco/jacoco.xml`
-** Integration HTML/XML: `target/site/jacoco-it/index.html` and `target/site/jacoco-it/jacoco.xml`
+* `./mvnw clean verify` publishes merged reports:
+** HTML: `target/site/jacoco/index.html`
+** XML: `target/site/jacoco/jacoco.xml`
 
 In CI, a dedicated `coverage` job runs `./mvnw clean verify` on Linux, generates both reports, and uploads them to Codecov and as GitHub Actions artifacts (14-day retention).
 

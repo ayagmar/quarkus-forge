@@ -1,0 +1,29 @@
+= Headless Maintenance Guardrails
+
+The `headless` profile is intentionally strict: it must stay runnable without TUI classes or `dev.tamboui` dependencies.
+
+== What Must Stay True
+
+* Headless entry flow (`HeadlessCli`, `HeadlessGenerationService`, `GenerateCommand`) must not import `dev.ayagmar.quarkusforge.ui.*`.
+* Headless flow must not import `dev.tamboui.*`.
+* Core non-UI layers (`api`, `archive`, `domain`, `diagnostics`, `util`) must not depend on `ui`.
+
+These rules are enforced by ArchUnit tests in
+`src/test/java/dev/ayagmar/quarkusforge/HeadlessArchitectureRulesTest.java`.
+
+== Verification Commands
+
+[source,bash]
+----
+./mvnw -q spotless:check
+./mvnw -q verify
+./mvnw -q clean compile -Pheadless
+----
+
+== Refactoring Checklist
+
+Before merging refactors that touch CLI/bootstrap classes:
+
+* Run the default test suite (`./mvnw -q verify`) so ArchUnit guardrails are evaluated.
+* Run headless compile (`./mvnw -q clean compile -Pheadless`) to confirm profile scope still compiles.
+* If you add a new headless orchestration class, include it in the ArchUnit rule scope.
