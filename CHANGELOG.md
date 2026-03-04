@@ -3,7 +3,37 @@
 All notable changes to Quarkus Forge are documented here.
 This project uses [Conventional Commits](https://www.conventionalcommits.org/). GitHub Releases contain auto-generated notes from [JReleaser](https://jreleaser.org/).
 
-## [Unreleased](https://github.com/ayagmar/quarkus-forge/compare/v0.4.0...HEAD)
+## [Unreleased](https://github.com/ayagmar/quarkus-forge/compare/v0.5.0...HEAD)
+
+## [0.5.0](https://github.com/ayagmar/quarkus-forge/compare/v0.4.0...v0.5.0) (2026-03-04)
+
+### Changed
+
+- refactor(ui): unify reducer dispatch and simplify snapshot mapping (7dceaa0)
+- fix(ui): resolve valid coderabbit findings (9b5c00b)
+- test(ui): make generation success path assertion cross-platform (ccababd)
+- test(ui): expand reducer intent coverage and trim controller indirection (ae9a3ca)
+- chore(ui): add core javadocs and tighten reducer guard (a837bf2)
+- refactor(ui): finalize state-machine cleanup and docs (71420df)
+- refactor(ui): extract state-driven renderer orchestration (7564016)
+- refactor(ui): route focus and input decisions via reducer (a25aeda)
+- refactor(ui): migrate generation callbacks to reducer effects (9a96359)
+- refactor(ui): migrate post-generation flow to reducer (eefb237)
+- refactor(ui): introduce immutable ui state snapshots (4f53a29)
+- test(ui): lock state-machine migration contracts (ec10f3a)
+- test(ui): favor semantic assertions for generation flow (0edd0dc)
+- ci(release): smoke test native binaries before upload (50f4118)
+- test(architecture): enforce headless dependency guardrails (37f9f39)
+- test(ui): harden post-generation label navigation (5515e9a)
+- feat(ui): reorder export action and bound footer lines (7c3d910)
+- feat(ui): surface resolved target and focused field diagnostics (9e1a54b)
+- test(ui): assert absolute output path with stable prefix (db3b3c1)
+- style(test): apply spotless formatting (779a508)
+- test(ui): make plan path assertion OS-agnostic (6c55690)
+- test(util): cover remaining OutputPathResolver branches (f951045)
+- fix(ui): resolve output directory to absolute path (e41bc0e)
+- chore(release): prepare next iteration 0.4.1-SNAPSHOT (ddef97c)
+
 
 ## [0.4.0](https://github.com/ayagmar/quarkus-forge/compare/v0.3.2...v0.4.0) (2026-03-04)
 
