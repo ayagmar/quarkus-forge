@@ -116,6 +116,15 @@ jobs:
         if: runner.os != 'Windows'
         run: chmod +x target/${{ matrix.binary_name }}-${{ matrix.platform }}${{ matrix.ext }}
 
+      - name: Smoke test native artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          binary="target/${{ matrix.binary_name }}-${{ matrix.platform }}${{ matrix.ext }}"
+          "$binary" --help > /dev/null
+          "$binary" --version > /dev/null
+          "$binary" generate --help > /dev/null
+
       - name: Upload native artifact
         uses: actions/upload-artifact@v7
         with:
