@@ -18,6 +18,7 @@ import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
+import dev.ayagmar.quarkusforge.util.OutputPathResolver;
 import dev.tamboui.layout.Constraint;
 import dev.tamboui.layout.Layout;
 import dev.tamboui.layout.Rect;
@@ -768,7 +769,7 @@ public final class CoreTuiController
         request.artifactId(),
         request.version(),
         request.packageName(),
-        request.outputDirectory(),
+        OutputPathResolver.absoluteDisplayPath(request.outputDirectory()),
         MetadataSelectorManager.optionDisplayLabel(
             FocusTarget.PLATFORM_STREAM,
             selectorValue(FocusTarget.PLATFORM_STREAM),
@@ -1682,8 +1683,8 @@ public final class CoreTuiController
   }
 
   private Path resolveGeneratedProjectDirectory() {
-    Path outputRoot = Path.of(request.outputDirectory());
-    return outputRoot.resolve(request.artifactId());
+    Path outputRoot = OutputPathResolver.resolveOutputRoot(request.outputDirectory());
+    return outputRoot.resolve(request.artifactId()).normalize();
   }
 
   private void resetGenerationStateAfterTerminalOutcome() {
@@ -2151,8 +2152,7 @@ public final class CoreTuiController
     }
     String targetPathDisplay;
     try {
-      targetPathDisplay =
-          resolveGeneratedProjectDirectory().toAbsolutePath().normalize().toString();
+      targetPathDisplay = resolveGeneratedProjectDirectory().toString();
     } catch (RuntimeException pathError) {
       targetPathDisplay = request.outputDirectory() + "/" + request.artifactId();
     }
