@@ -1902,12 +1902,7 @@ public final class CoreTuiController
   }
 
   private static boolean isTextInputFocus(FocusTarget focusTarget) {
-    return focusTarget == FocusTarget.GROUP_ID
-        || focusTarget == FocusTarget.ARTIFACT_ID
-        || focusTarget == FocusTarget.VERSION
-        || focusTarget == FocusTarget.PACKAGE_NAME
-        || focusTarget == FocusTarget.OUTPUT_DIR
-        || focusTarget == FocusTarget.EXTENSION_SEARCH;
+    return UiFocusPredicates.isTextInputFocus(focusTarget);
   }
 
   private static boolean isMetadataSelectorFocus(FocusTarget focusTarget) {

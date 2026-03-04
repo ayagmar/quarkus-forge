@@ -75,9 +75,9 @@ The TUI layer uses an immediate-mode rendering architecture built on the https:/
 === Component Decomposition
 
 ....
-CoreTuiController (State Machine)
+CoreTuiController (Orchestration Shell)
     │
-    ├── UiEventRouter           Routes keyboard events through priority chain
+    ├── UiEventRouter           Preserves key-priority contract
     │       │
     │       ├── Overlay handlers (command palette, help, post-gen menu)
     │       ├── Cancel flow (filter unwind priority chain)
@@ -85,7 +85,19 @@ CoreTuiController (State Machine)
     │       ├── Focus navigation
     │       └── Input handling
     │
-    ├── Rendering
+    ├── UiStateSnapshotMapper    Builds immutable UiState read model from controller internals
+    │
+    ├── CoreUiReducer            Pure transition logic for migrated slices
+    │       ├── post-generation intent handling
+    │       ├── generation callback intent handling
+    │       └── focus/input intent handling
+    │
+    ├── UiEffectsRunner          Executes side effects emitted by reducer
+    │       ├── generation start/cancel
+    │       ├── post-generation menu updates
+    │       └── repaint + async coordination hooks
+    │
+    ├── UiRenderer               State-driven render orchestration
     │       ├── OverlayRenderer          Stateless overlay rendering
     │       ├── BodyPanelRenderer        Layout: metadata + extensions panels
     │       └── FooterLinesComposer      Status bar composition
@@ -103,7 +115,8 @@ CoreTuiController (State Machine)
             ├── CatalogRowBuilder            Pure function: row building
             ├── UiTextConstants              UI text content
             ├── AsyncFailureHandler          Reusable async exception mapping
-            └── GenerationFlowCoordinator    Async generation lifecycle
+            ├── GenerationFlowCoordinator    Async generation lifecycle
+            └── UiTextInputKeys              Text-input edit-key normalization
 ....
 
 === State Machine: Generation Flow

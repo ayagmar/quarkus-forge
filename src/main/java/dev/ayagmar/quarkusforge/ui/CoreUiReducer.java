@@ -115,22 +115,14 @@ final class CoreUiReducer implements UiReducer {
 
   private static ReduceResult reduceTextInput(
       UiState state, dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget) {
-    if (!isTextInputFocus(focusTarget) || !UiTextInputKeys.isSupportedEditKey(keyEvent)) {
+    if (!UiFocusPredicates.isTextInputFocus(focusTarget)
+        || !UiTextInputKeys.isSupportedEditKey(keyEvent)) {
       return new ReduceResult(state, List.of(), UiAction.ignored());
     }
     return new ReduceResult(
         state,
         List.of(new UiEffect.ApplyTextInputKey(focusTarget, keyEvent)),
         UiAction.handled(false));
-  }
-
-  private static boolean isTextInputFocus(FocusTarget focusTarget) {
-    return focusTarget == FocusTarget.GROUP_ID
-        || focusTarget == FocusTarget.ARTIFACT_ID
-        || focusTarget == FocusTarget.VERSION
-        || focusTarget == FocusTarget.PACKAGE_NAME
-        || focusTarget == FocusTarget.OUTPUT_DIR
-        || focusTarget == FocusTarget.EXTENSION_SEARCH;
   }
 
   private static ReduceResult reducePostGeneration(
