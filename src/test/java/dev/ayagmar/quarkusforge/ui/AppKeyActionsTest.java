@@ -21,7 +21,18 @@ class AppKeyActionsTest {
     assertThat(AppKeyActions.isSelectedOnlyFilterToggleKey(KeyEvent.ofChar('S', KeyModifiers.ALT)))
         .isTrue();
     assertThat(AppKeyActions.isCategoryCollapseToggleKey(KeyEvent.ofChar('C'))).isFalse();
+    assertThat(AppKeyActions.isCategoryCollapseToggleKey(KeyEvent.ofChar('c'))).isTrue();
     assertThat(AppKeyActions.isExpandAllCategoriesKey(KeyEvent.ofChar('C'))).isTrue();
+    assertThat(AppKeyActions.isFocusExtensionSearchSlashKey(KeyEvent.ofChar('/'))).isTrue();
+    assertThat(
+            AppKeyActions.isFocusExtensionSearchSlashKey(KeyEvent.ofChar('/', KeyModifiers.CTRL)))
+        .isFalse();
+    assertThat(AppKeyActions.isNextInvalidFieldKey(KeyEvent.ofChar('N', KeyModifiers.ALT)))
+        .isTrue();
+    assertThat(AppKeyActions.isPreviousInvalidFieldKey(KeyEvent.ofChar('P', KeyModifiers.ALT)))
+        .isTrue();
+    assertThat(AppKeyActions.isGenerateShortcutKey(KeyEvent.ofChar('g', KeyModifiers.CTRL)))
+        .isFalse();
     assertThat(AppKeyActions.isHelpOverlayToggleKey(KeyEvent.ofChar('?'))).isTrue();
   }
 
@@ -35,5 +46,15 @@ class AppKeyActionsTest {
     KeyEvent reboundShortcut = KeyEvent.ofChar('z', KeyModifiers.CTRL, bindings);
 
     assertThat(AppKeyActions.isCatalogReloadKey(reboundShortcut)).isTrue();
+
+    Bindings selectedFilterBinding =
+        BindingSets.standard().toBuilder()
+            .bind(KeyTrigger.ctrl('z'), AppKeyActions.TOGGLE_SELECTED_FILTER)
+            .build();
+
+    KeyEvent selectedFilterActionKey =
+        KeyEvent.ofChar('z', KeyModifiers.CTRL, selectedFilterBinding);
+
+    assertThat(AppKeyActions.isSelectedOnlyFilterToggleKey(selectedFilterActionKey)).isTrue();
   }
 }

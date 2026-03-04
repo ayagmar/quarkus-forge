@@ -122,12 +122,36 @@ class FooterLinesComposerTest {
   }
 
   @Test
+  void errorLineShowsDetailsHintWhenVerboseDiffers() {
+    FooterSnapshot snapshot =
+        snapshotBuilder()
+            .activeErrorDetails("compact")
+            .verboseErrorDetails("compact with stack")
+            .build();
+
+    List<String> lines = composer.compose(120, snapshot);
+
+    assertThat(lines).anyMatch(line -> line.contains("Ctrl+E for details"));
+  }
+
+  @Test
   void contextualHintLineIsIncludedForFocusedField() {
     FooterSnapshot snapshot = snapshotBuilder().focusTarget(FocusTarget.BUILD_TOOL).build();
 
     List<String> lines = composer.compose(120, snapshot);
 
     assertThat(lines).anyMatch(line -> line.startsWith("Hint: Use Left/Right"));
+  }
+
+  @Test
+  void contextualHintLineIsSuppressedWhileOverlayIsVisible() {
+    FooterSnapshot snapshot =
+        snapshotBuilder().focusTarget(FocusTarget.BUILD_TOOL).helpOverlayVisible(true).build();
+
+    List<String> lines = composer.compose(120, snapshot);
+
+    assertThat(lines).noneMatch(line -> line.startsWith("Hint:"));
+    assertThat(lines.getLast()).isEqualTo("Esc: close help");
   }
 
   @Test
@@ -177,6 +201,11 @@ class FooterLinesComposerTest {
       return this;
     }
 
+    FooterSnapshotBuilder verboseErrorDetails(String value) {
+      verboseErrorDetails = value;
+      return this;
+    }
+
     FooterSnapshotBuilder focusTarget(FocusTarget value) {
       focusTarget = value;
       return this;
@@ -184,6 +213,11 @@ class FooterLinesComposerTest {
 
     FooterSnapshotBuilder showErrorDetails(boolean value) {
       showErrorDetails = value;
+      return this;
+    }
+
+    FooterSnapshotBuilder helpOverlayVisible(boolean value) {
+      helpOverlayVisible = value;
       return this;
     }
 
