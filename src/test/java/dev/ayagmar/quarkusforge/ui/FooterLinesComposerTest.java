@@ -165,6 +165,29 @@ class FooterLinesComposerTest {
   }
 
   @Test
+  void resolvedTargetLineIsIncludedWhenPresent() {
+    FooterSnapshot snapshot = snapshotBuilder().resolvedTargetPath("/tmp/demo/forge-app").build();
+
+    List<String> lines = composer.compose(120, snapshot);
+
+    assertThat(lines).contains("Resolved target: /tmp/demo/forge-app");
+  }
+
+  @Test
+  void focusedValueAndIssueLinesAreIncludedWhenPresent() {
+    FooterSnapshot snapshot =
+        snapshotBuilder()
+            .focusedFieldValue("~/Projects/Quarkus")
+            .focusedFieldIssue("must not be blank")
+            .build();
+
+    List<String> lines = composer.compose(120, snapshot);
+
+    assertThat(lines).contains("Value: ~/Projects/Quarkus");
+    assertThat(lines).contains("Field issue: must not be blank");
+  }
+
+  @Test
   void narrowViewportTruncationDoesNotThrowForShortHints() {
     FooterSnapshot snapshot = snapshotBuilder().successHint("1234").preGeneratePlan("abcd").build();
 
@@ -190,6 +213,9 @@ class FooterLinesComposerTest {
     private boolean showErrorDetails;
     private String successHint = "";
     private String preGeneratePlan = "";
+    private String resolvedTargetPath = "";
+    private String focusedFieldValue = "";
+    private String focusedFieldIssue = "";
 
     FooterSnapshotBuilder generationInProgress(boolean value) {
       generationInProgress = value;
@@ -231,6 +257,21 @@ class FooterLinesComposerTest {
       return this;
     }
 
+    FooterSnapshotBuilder resolvedTargetPath(String value) {
+      resolvedTargetPath = value;
+      return this;
+    }
+
+    FooterSnapshotBuilder focusedFieldValue(String value) {
+      focusedFieldValue = value;
+      return this;
+    }
+
+    FooterSnapshotBuilder focusedFieldIssue(String value) {
+      focusedFieldIssue = value;
+      return this;
+    }
+
     FooterSnapshot build() {
       return new FooterSnapshot(
           generationInProgress,
@@ -243,7 +284,10 @@ class FooterLinesComposerTest {
           verboseErrorDetails,
           showErrorDetails,
           successHint,
-          preGeneratePlan);
+          preGeneratePlan,
+          resolvedTargetPath,
+          focusedFieldValue,
+          focusedFieldIssue);
     }
   }
 }

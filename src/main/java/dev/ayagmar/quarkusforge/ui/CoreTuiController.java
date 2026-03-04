@@ -1154,7 +1154,47 @@ public final class CoreTuiController
         verboseErrorDetails(),
         showErrorDetails,
         postGenerationMenu.successHint(),
-        preGeneratePlan());
+        preGeneratePlan(),
+        resolvedTargetPathForFooter(),
+        focusedFieldValueForFooter(),
+        focusedFieldIssueForFooter());
+  }
+
+  private String resolvedTargetPathForFooter() {
+    if (helpOverlayVisible || commandPaletteVisible || postGenerationMenu.isVisible()) {
+      return "";
+    }
+    try {
+      return resolveGeneratedProjectDirectory().toString();
+    } catch (RuntimeException pathError) {
+      return "";
+    }
+  }
+
+  private String focusedFieldValueForFooter() {
+    if (helpOverlayVisible || commandPaletteVisible || postGenerationMenu.isVisible()) {
+      return "";
+    }
+    return switch (focusTarget) {
+      case GROUP_ID, ARTIFACT_ID, VERSION, PACKAGE_NAME, OUTPUT_DIR ->
+          inputStates.get(focusTarget).text();
+      default -> "";
+    };
+  }
+
+  private String focusedFieldIssueForFooter() {
+    if (helpOverlayVisible || commandPaletteVisible || postGenerationMenu.isVisible()) {
+      return "";
+    }
+    if (!hasValidationErrorFor(focusTarget)) {
+      return "";
+    }
+    String fieldName = focusTargetName(focusTarget);
+    return validation.errors().stream()
+        .filter(error -> error.field().equalsIgnoreCase(fieldName))
+        .findFirst()
+        .map(error -> error.message())
+        .orElse("");
   }
 
   private void moveFocus(int offset) {
