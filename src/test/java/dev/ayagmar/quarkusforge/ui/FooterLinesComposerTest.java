@@ -188,6 +188,22 @@ class FooterLinesComposerTest {
   }
 
   @Test
+  void resolvedValueAndIssueLinesAreTruncatedOnNarrowViewports() {
+    FooterSnapshot snapshot =
+        snapshotBuilder()
+            .resolvedTargetPath("/very/long/path/that/should/not/stretch/the/footer/line")
+            .focusedFieldValue("value-that-is-too-long-for-the-current-footer-width")
+            .focusedFieldIssue("issue-that-is-too-long-for-the-current-footer-width")
+            .build();
+
+    List<String> lines = composer.compose(24, snapshot);
+
+    assertThat(lines).anyMatch(line -> line.startsWith("Resolved target:") && line.endsWith("..."));
+    assertThat(lines).anyMatch(line -> line.startsWith("Value:") && line.endsWith("..."));
+    assertThat(lines).anyMatch(line -> line.startsWith("Field issue:") && line.endsWith("..."));
+  }
+
+  @Test
   void narrowViewportTruncationDoesNotThrowForShortHints() {
     FooterSnapshot snapshot = snapshotBuilder().successHint("1234").preGeneratePlan("abcd").build();
 

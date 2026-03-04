@@ -131,14 +131,14 @@ class PostGenerationMenuStateTest {
 
     @Test
     void enterOnExportRecipeReturnsExportResult() {
-      // Index 0 is Export Forgefile
+      moveSelectionToLabel("Export Forgefile");
       MenuKeyResult result = state.handleKey(KeyEvent.ofKey(KeyCode.ENTER));
       assertThat(result).isInstanceOf(MenuKeyResult.ExportRecipe.class);
     }
 
     @Test
     void enterOnPublishGithubShowsVisibilityMenu() {
-      state.handleKey(KeyEvent.ofKey(KeyCode.DOWN)); // → 1 (Publish GitHub)
+      moveSelectionToLabel("Publish to GitHub (requires gh)");
       MenuKeyResult result = state.handleKey(KeyEvent.ofKey(KeyCode.ENTER));
       assertThat(result).isInstanceOf(MenuKeyResult.Handled.class);
       assertThat(state.isGithubVisibilityMenuVisible()).isTrue();
@@ -146,10 +146,7 @@ class PostGenerationMenuStateTest {
 
     @Test
     void enterOnGenerateAgainResetsAndReturns() {
-      // Navigate to "Generate again" (index 4)
-      for (int i = 0; i < 4; i++) {
-        state.handleKey(KeyEvent.ofKey(KeyCode.DOWN));
-      }
+      moveSelectionToLabel("Generate again");
       MenuKeyResult result = state.handleKey(KeyEvent.ofKey(KeyCode.ENTER));
       assertThat(result).isInstanceOf(MenuKeyResult.GenerateAgain.class);
       assertThat(state.isVisible()).isFalse();
@@ -157,10 +154,7 @@ class PostGenerationMenuStateTest {
 
     @Test
     void enterOnQuitSetsExitPlan() {
-      // Navigate to "Quit" (index 5)
-      for (int i = 0; i < 5; i++) {
-        state.handleKey(KeyEvent.ofKey(KeyCode.DOWN));
-      }
+      moveSelectionToLabel("Quit");
       MenuKeyResult result = state.handleKey(KeyEvent.ofKey(KeyCode.ENTER));
       assertThat(result).isInstanceOf(MenuKeyResult.Quit.class);
       assertThat(state.exitPlan().action()).isEqualTo(PostGenerationExitAction.QUIT);
@@ -168,9 +162,9 @@ class PostGenerationMenuStateTest {
 
     @Test
     void digitKeySelectsDirectly() {
-      // Digit '1' → index 0 → export recipe
       MenuKeyResult result = state.handleKey(KeyEvent.ofChar('1'));
-      assertThat(result).isInstanceOf(MenuKeyResult.ExportRecipe.class);
+      assertThat(result).isInstanceOf(MenuKeyResult.Handled.class);
+      assertThat(state.isGithubVisibilityMenuVisible()).isTrue();
     }
 
     @Test
@@ -186,7 +180,7 @@ class PostGenerationMenuStateTest {
     @BeforeEach
     void showVisibilityMenu() {
       state.showAfterSuccess(Path.of("/tmp/p"), "cmd");
-      state.handleKey(KeyEvent.ofKey(KeyCode.DOWN)); // → Publish GitHub
+      moveSelectionToLabel("Publish to GitHub (requires gh)");
       state.handleKey(KeyEvent.ofKey(KeyCode.ENTER)); // → opens visibility menu
     }
 
@@ -224,6 +218,14 @@ class PostGenerationMenuStateTest {
       MenuKeyResult result = state.handleKey(KeyEvent.ofChar('c', KeyModifiers.CTRL));
       assertThat(result).isInstanceOf(MenuKeyResult.Quit.class);
       assertThat(state.exitPlan().action()).isEqualTo(PostGenerationExitAction.QUIT);
+    }
+  }
+
+  private void moveSelectionToLabel(String label) {
+    int targetIndex = state.actionLabels().indexOf(label);
+    assertThat(targetIndex).isGreaterThanOrEqualTo(0);
+    for (int i = 0; i < targetIndex; i++) {
+      state.handleKey(KeyEvent.ofKey(KeyCode.DOWN));
     }
   }
 }

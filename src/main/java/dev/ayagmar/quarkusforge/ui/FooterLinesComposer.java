@@ -42,17 +42,9 @@ final class FooterLinesComposer {
       lines.add(truncateForWidth("Plan: " + snapshot.preGeneratePlan(), width));
     }
 
-    if (!snapshot.resolvedTargetPath().isBlank()) {
-      lines.add("Resolved target: " + snapshot.resolvedTargetPath());
-    }
-
-    if (!snapshot.focusedFieldValue().isBlank()) {
-      lines.add("Value: " + snapshot.focusedFieldValue());
-    }
-
-    if (!snapshot.focusedFieldIssue().isBlank()) {
-      lines.add("Field issue: " + snapshot.focusedFieldIssue());
-    }
+    addLabeledLine(lines, width, "Resolved target: ", snapshot.resolvedTargetPath());
+    addLabeledLine(lines, width, "Value: ", snapshot.focusedFieldValue());
+    addLabeledLine(lines, width, "Field issue: ", snapshot.focusedFieldIssue());
 
     String contextualHint = contextualFocusHint(snapshot);
     if (!contextualHint.isBlank()) {
@@ -97,6 +89,16 @@ final class FooterLinesComposer {
       return text.substring(0, width);
     }
     return text.substring(0, width - 3) + "...";
+  }
+
+  private static void addLabeledLine(List<String> lines, int width, String label, String value) {
+    if (value.isBlank()) {
+      return;
+    }
+    String clipped = truncateForWidth(label + value, width);
+    if (!clipped.isBlank()) {
+      lines.add(clipped);
+    }
   }
 
   private static String footerHintLine(int width, FooterSnapshot snapshot) {

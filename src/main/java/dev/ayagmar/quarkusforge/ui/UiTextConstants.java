@@ -54,8 +54,6 @@ final class UiTextConstants {
       List<IdeDetector.DetectedIde> detectedIdes) {
     var actions = new ArrayList<PostGenerationAction>();
     actions.add(
-        new PostGenerationAction("Export Forgefile", PostGenerationExitAction.EXPORT_RECIPE_LOCK));
-    actions.add(
         new PostGenerationAction(
             "Publish to GitHub (requires gh)", PostGenerationExitAction.PUBLISH_GITHUB));
     if (detectedIdes.isEmpty()) {
@@ -72,6 +70,8 @@ final class UiTextConstants {
     actions.add(
         new PostGenerationAction("Generate again", PostGenerationExitAction.GENERATE_AGAIN));
     actions.add(new PostGenerationAction("Quit", PostGenerationExitAction.QUIT));
+    actions.add(
+        new PostGenerationAction("Export Forgefile", PostGenerationExitAction.EXPORT_RECIPE_LOCK));
     return List.copyOf(actions);
   }
 

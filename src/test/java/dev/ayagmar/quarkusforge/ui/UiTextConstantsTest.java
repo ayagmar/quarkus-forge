@@ -40,6 +40,7 @@ class UiTextConstantsTest {
     List<String> labels = UiTextConstants.postGenerationActionLabels(actions);
 
     assertThat(labels).contains("Export Forgefile", "Open in terminal", "Generate again", "Quit");
+    assertThat(labels.getLast()).isEqualTo("Export Forgefile");
   }
 
   @Test
