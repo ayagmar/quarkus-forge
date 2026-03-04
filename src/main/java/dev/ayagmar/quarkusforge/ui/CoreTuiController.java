@@ -1779,17 +1779,8 @@ public final class CoreTuiController
     extensionCatalogState.cancelPendingAsync();
   }
 
-  private void startGenerationFlow() {
-    generationFlowCoordinator.startFlow(
-        projectGenerationRunner, toGenerationRequest(), resolveGeneratedProjectDirectory(), this);
-  }
-
   private void reconcileGenerationCompletionIfDone() {
     generationFlowCoordinator.reconcileCompletionIfDone(this);
-  }
-
-  private void requestGenerationCancellation() {
-    generationFlowCoordinator.requestCancellation(this);
   }
 
   @Override
@@ -1830,11 +1821,12 @@ public final class CoreTuiController
   }
 
   void startGenerationForReducer() {
-    startGenerationFlow();
+    generationFlowCoordinator.startFlow(
+        projectGenerationRunner, toGenerationRequest(), resolveGeneratedProjectDirectory(), this);
   }
 
   void requestGenerationCancellationForReducer() {
-    requestGenerationCancellation();
+    generationFlowCoordinator.requestCancellation(this);
   }
 
   void showPostGenerationSuccessForReducer(Path generatedPath, String nextCommand) {
