@@ -222,10 +222,18 @@ class PostGenerationMenuStateTest {
   }
 
   private void moveSelectionToLabel(String label) {
+    int currentIndex = state.actionSelection();
     int targetIndex = state.actionLabels().indexOf(label);
     assertThat(targetIndex).isGreaterThanOrEqualTo(0);
-    for (int i = 0; i < targetIndex; i++) {
-      state.handleKey(KeyEvent.ofKey(KeyCode.DOWN));
+    int delta = targetIndex - currentIndex;
+    if (delta > 0) {
+      for (int i = 0; i < delta; i++) {
+        state.handleKey(KeyEvent.ofKey(KeyCode.DOWN));
+      }
+      return;
+    }
+    for (int i = 0; i < -delta; i++) {
+      state.handleKey(KeyEvent.ofKey(KeyCode.UP));
     }
   }
 }
