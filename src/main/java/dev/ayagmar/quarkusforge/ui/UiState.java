@@ -24,6 +24,28 @@ record UiState(
     StartupOverlayView startupOverlay,
     ExtensionView extensions) {
 
+  UiState withStatusAndError(String nextStatusMessage, String nextErrorMessage) {
+    return new UiState(
+        request,
+        validation,
+        focusTarget,
+        nextStatusMessage,
+        nextErrorMessage,
+        verboseErrorDetails,
+        submitRequested,
+        submitBlockedByValidation,
+        submitBlockedByTargetConflict,
+        metadataPanel,
+        extensionsPanel,
+        footer,
+        overlays,
+        generation,
+        catalogLoad,
+        postGeneration,
+        startupOverlay,
+        extensions);
+  }
+
   record OverlayState(
       boolean generationVisible,
       boolean commandPaletteVisible,
