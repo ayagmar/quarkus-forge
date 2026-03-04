@@ -10,8 +10,7 @@ class ExtensionCatalogStateTest {
 
   @Test
   void deselectInSelectedOnlyModeReappliesFiltersImmediately() {
-    ExtensionCatalogState state =
-        new ExtensionCatalogState(UiScheduler.immediate(), Duration.ZERO, "");
+    ExtensionCatalogState state = createDefaultState();
 
     assertThat(state.handleListKeys(KeyEvent.ofChar(' '), ignored -> {})).isTrue();
     assertThat(state.selectedExtensionCount()).isEqualTo(1);
@@ -27,8 +26,7 @@ class ExtensionCatalogStateTest {
 
   @Test
   void clearSelectionInSelectedOnlyModeReappliesFiltersImmediately() {
-    ExtensionCatalogState state =
-        new ExtensionCatalogState(UiScheduler.immediate(), Duration.ZERO, "");
+    ExtensionCatalogState state = createDefaultState();
 
     assertThat(state.handleListKeys(KeyEvent.ofChar(' '), ignored -> {})).isTrue();
     state.toggleSelectedOnlyFilter(ignored -> {});
@@ -39,5 +37,9 @@ class ExtensionCatalogStateTest {
     assertThat(cleared).isEqualTo(1);
     assertThat(state.selectedExtensionCount()).isZero();
     assertThat(state.filteredExtensions()).isEmpty();
+  }
+
+  private static ExtensionCatalogState createDefaultState() {
+    return new ExtensionCatalogState(UiScheduler.immediate(), Duration.ZERO, "");
   }
 }

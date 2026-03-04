@@ -29,7 +29,11 @@ class AppKeyActionsTest {
         .isFalse();
     assertThat(AppKeyActions.isNextInvalidFieldKey(KeyEvent.ofChar('N', KeyModifiers.ALT)))
         .isTrue();
+    assertThat(AppKeyActions.isNextInvalidFieldKey(KeyEvent.ofChar('n', KeyModifiers.ALT)))
+        .isTrue();
     assertThat(AppKeyActions.isPreviousInvalidFieldKey(KeyEvent.ofChar('P', KeyModifiers.ALT)))
+        .isTrue();
+    assertThat(AppKeyActions.isPreviousInvalidFieldKey(KeyEvent.ofChar('p', KeyModifiers.ALT)))
         .isTrue();
     assertThat(AppKeyActions.isGenerateShortcutKey(KeyEvent.ofChar('g', KeyModifiers.CTRL)))
         .isFalse();
