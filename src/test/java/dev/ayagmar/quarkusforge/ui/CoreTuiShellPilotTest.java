@@ -14,6 +14,7 @@ import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.KeyModifiers;
 import dev.tamboui.tui.event.ResizeEvent;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -181,6 +182,39 @@ class CoreTuiShellPilotTest {
     String rendered = UiControllerTestHarness.renderToString(controller, 120, 34);
 
     assertThat(rendered).contains("Plan:");
+  }
+
+  @Test
+  void metadataPanelRendersOutputDirectoryAsAbsolutePath() {
+    Path homePath = Path.of("target", "qf-home").toAbsolutePath().normalize();
+    String expectedOutputPath = homePath.resolve("Projects").resolve("Quarkus").toString();
+    withSystemProperty(
+        "user.home",
+        homePath.toString(),
+        () -> {
+          MetadataCompatibilityContext metadata = MetadataCompatibilityContext.loadDefault();
+          ProjectRequest request =
+              new ProjectRequest(
+                  "com.example",
+                  "forge-app",
+                  "1.0.0-SNAPSHOT",
+                  "com.example.forge.app",
+                  "~/Projects/Quarkus",
+                  "maven",
+                  "25");
+          ForgeUiState state =
+              new ForgeUiState(
+                  request,
+                  new ProjectRequestValidator().validate(request).merge(metadata.validate(request)),
+                  metadata);
+          CoreTuiController controller =
+              CoreTuiController.from(state, UiScheduler.immediate(), java.time.Duration.ZERO);
+
+          String rendered = UiControllerTestHarness.renderToString(controller, 180, 34);
+
+          assertThat(rendered).doesNotContain("Output: ~/Projects/Quarkus");
+          assertThat(rendered).contains("Plan: " + expectedOutputPath + "/forge-app");
+        });
   }
 
   @Test
@@ -1064,5 +1098,19 @@ class CoreTuiShellPilotTest {
         List.of(
             new PlatformStream("io.quarkus.platform:3.31", "3.31", true, List.of("17", "21", "25")),
             new PlatformStream("io.quarkus.platform:3.20", "3.20", false, List.of("17", "21"))));
+  }
+
+  private static void withSystemProperty(String key, String value, Runnable runnable) {
+    String previous = System.getProperty(key);
+    try {
+      System.setProperty(key, value);
+      runnable.run();
+    } finally {
+      if (previous == null) {
+        System.clearProperty(key);
+      } else {
+        System.setProperty(key, previous);
+      }
+    }
   }
 }

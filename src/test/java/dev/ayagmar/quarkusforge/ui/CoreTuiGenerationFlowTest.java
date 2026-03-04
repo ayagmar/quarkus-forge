@@ -37,7 +37,7 @@ class CoreTuiGenerationFlowTest {
 
     assertThat(generationRunner.callCount()).isEqualTo(1);
     assertThat(generationRunner.lastOutputDirectory())
-        .isEqualTo(Path.of("./generated").resolve("forge-app"));
+        .isEqualTo(Path.of("./generated").toAbsolutePath().resolve("forge-app").normalize());
     assertThat(controller.statusMessage()).contains("Generation in progress");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.TAB));
@@ -162,6 +162,40 @@ class CoreTuiGenerationFlowTest {
           assertThat(action.shouldQuit()).isFalse();
           assertThat(controller.postGenerationExitPlan()).isEmpty();
           assertThat(generated.resolve("Forgefile")).exists();
+        });
+  }
+
+  @Test
+  void submitResolvesTildeOutputDirectoryAgainstUserHome() {
+    withSystemProperty(
+        "user.home",
+        tempDir.toString(),
+        () -> {
+          UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+              new UiControllerTestHarness.ControlledGenerationRunner();
+          ProjectRequest request =
+              new ProjectRequest(
+                  "com.example",
+                  "forge-app",
+                  "1.0.0-SNAPSHOT",
+                  "com.example.forge.app",
+                  "~/Projects/Quarkus",
+                  "maven",
+                  "25");
+          ForgeUiState state =
+              new ForgeUiState(
+                  request,
+                  new ProjectRequestValidator().validate(request),
+                  MetadataCompatibilityContext.loadDefault());
+          CoreTuiController controller =
+              CoreTuiController.from(
+                  state, UiScheduler.immediate(), Duration.ZERO, generationRunner);
+
+          controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+          assertThat(generationRunner.lastOutputDirectory())
+              .isEqualTo(
+                  tempDir.resolve("Projects").resolve("Quarkus").resolve("forge-app").normalize());
         });
   }
 
