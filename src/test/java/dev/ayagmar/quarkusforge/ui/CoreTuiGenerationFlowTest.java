@@ -99,7 +99,6 @@ class CoreTuiGenerationFlowTest {
     generationRunner.complete(Path.of("build/generated-project"));
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
-    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
     assertThat(action.shouldQuit()).isTrue();
@@ -120,7 +119,6 @@ class CoreTuiGenerationFlowTest {
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     generationRunner.complete(Path.of("build/generated-project"));
-    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
@@ -157,6 +155,9 @@ class CoreTuiGenerationFlowTest {
 
           controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
           generationRunner.complete(generated);
+          for (int i = 0; i < 5; i++) {
+            controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+          }
           UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
           assertThat(action.shouldQuit()).isFalse();
@@ -211,7 +212,6 @@ class CoreTuiGenerationFlowTest {
     generationRunner.complete(Path.of("build/generated-project"));
     assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
         .contains("Publish to GitHub (requires gh)");
-    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
     UiAction choosePublishAction = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     assertThat(choosePublishAction.shouldQuit()).isFalse();
     assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
