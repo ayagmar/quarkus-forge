@@ -11,6 +11,108 @@ class CoreUiReducerTest {
   private final UiReducer reducer = new CoreUiReducer();
 
   @Test
+  void submitReadyProducesStartGenerationEffect() {
+    ReduceResult result = reducer.reduce(baseState(), new UiIntent.SubmitReadyIntent());
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects()).containsExactly(new UiEffect.StartGeneration());
+  }
+
+  @Test
+  void cancelGenerationProducesRequestCancellationEffect() {
+    ReduceResult result = reducer.reduce(baseState(), new UiIntent.CancelGenerationIntent());
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects()).containsExactly(new UiEffect.RequestGenerationCancellation());
+  }
+
+  @Test
+  void generationProgressUpdatesStatusWithMessage() {
+    ReduceResult result =
+        reducer.reduce(
+            baseState(),
+            new UiIntent.GenerationProgressIntent(
+                GenerationProgressUpdate.extractingArchive("extracting archive...")));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects()).isEmpty();
+    assertThat(result.nextState().statusMessage())
+        .isEqualTo("Generation in progress: extracting archive...");
+    assertThat(result.nextState().errorMessage()).isEmpty();
+  }
+
+  @Test
+  void generationProgressUsesWorkingFallbackWhenMessageBlank() {
+    ReduceResult result =
+        reducer.reduce(
+            baseState(),
+            new UiIntent.GenerationProgressIntent(
+                new GenerationProgressUpdate(GenerationProgressStep.REQUESTING_ARCHIVE, "")));
+
+    assertThat(result.nextState().statusMessage()).isEqualTo("Generation in progress: working...");
+  }
+
+  @Test
+  void generationSuccessUpdatesStatusAndProducesPostGenerationEffects() {
+    ReduceResult result =
+        reducer.reduce(
+            baseState(),
+            new UiIntent.GenerationSuccessIntent(
+                java.nio.file.Path.of("build/generated-project"), "mvn quarkus:dev"));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.nextState().statusMessage())
+        .isEqualTo("Generation succeeded: build/generated-project");
+    assertThat(result.nextState().errorMessage()).isEmpty();
+    assertThat(result.effects())
+        .containsExactly(
+            new UiEffect.ShowPostGenerationSuccess(
+                java.nio.file.Path.of("build/generated-project"), "mvn quarkus:dev"),
+            new UiEffect.RequestAsyncRepaint());
+  }
+
+  @Test
+  void generationFailedUpdatesErrorsAndProducesHideMenuEffects() {
+    ReduceResult result =
+        reducer.reduce(
+            baseState(),
+            new UiIntent.GenerationFailedIntent(
+                "Unable to download archive", "HTTP 502 while contacting API"));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.nextState().statusMessage()).isEqualTo("Generation failed.");
+    assertThat(result.nextState().errorMessage()).isEqualTo("Unable to download archive");
+    assertThat(result.nextState().verboseErrorDetails()).isEqualTo("HTTP 502 while contacting API");
+    assertThat(result.effects())
+        .containsExactly(new UiEffect.HidePostGenerationMenu(), new UiEffect.RequestAsyncRepaint());
+  }
+
+  @Test
+  void generationCancelledUpdatesStatusAndProducesHideMenuEffects() {
+    ReduceResult result = reducer.reduce(baseState(), new UiIntent.GenerationCancelledIntent());
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.nextState().statusMessage())
+        .isEqualTo("Generation cancelled. Update inputs and press Enter to retry.");
+    assertThat(result.effects())
+        .containsExactly(new UiEffect.HidePostGenerationMenu(), new UiEffect.RequestAsyncRepaint());
+  }
+
+  @Test
+  void cancellationRequestedUpdatesStatusAndClearsError() {
+    UiState stateWithError = baseState().withStatusAndError("before", "existing error");
+
+    ReduceResult result =
+        reducer.reduce(stateWithError, new UiIntent.GenerationCancellationRequestedIntent());
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.nextState().statusMessage())
+        .isEqualTo("Cancellation requested. Waiting for cleanup...");
+    assertThat(result.nextState().errorMessage()).isEmpty();
+    assertThat(result.effects()).isEmpty();
+  }
+
+  @Test
   void postGenerationQuitProducesQuitActionAndCancelEffect() {
     ReduceResult result =
         reducer.reduce(
@@ -52,7 +154,7 @@ class CoreUiReducerTest {
 
   @Test
   void metadataIntentIsIgnoredWhenSelectorHasNoOptions() {
-    UiState currentState = UiControllerTestHarness.controller().uiState();
+    UiState currentState = baseState();
     UiState noOptionsState =
         new UiState(
             currentState.request(),
@@ -96,5 +198,68 @@ class CoreUiReducerTest {
 
     assertThat(result.action()).isEqualTo(UiAction.ignored());
     assertThat(result.effects()).isEmpty();
+  }
+
+  @Test
+  void metadataIntentWithOptionsProducesSelectorEffect() {
+    ReduceResult result =
+        reducer.reduce(
+            baseState(),
+            new UiIntent.MetadataInputIntent(KeyEvent.ofKey(KeyCode.LEFT), FocusTarget.BUILD_TOOL));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects()).hasSize(1);
+    assertThat(result.effects().getFirst()).isInstanceOf(UiEffect.ApplyMetadataSelectorKey.class);
+  }
+
+  @Test
+  void textInputIntentWithSupportedKeyProducesApplyKeyEffect() {
+    ReduceResult result =
+        reducer.reduce(
+            baseState(),
+            new UiIntent.TextInputIntent(KeyEvent.ofChar('a'), FocusTarget.ARTIFACT_ID));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects()).hasSize(1);
+    assertThat(result.effects().getFirst()).isInstanceOf(UiEffect.ApplyTextInputKey.class);
+  }
+
+  @Test
+  void textInputIntentWithUnsupportedKeyIsIgnored() {
+    ReduceResult result =
+        reducer.reduce(
+            baseState(),
+            new UiIntent.TextInputIntent(
+                KeyEvent.ofChar('a', dev.tamboui.tui.event.KeyModifiers.CTRL),
+                FocusTarget.ARTIFACT_ID));
+
+    assertThat(result.action()).isEqualTo(UiAction.ignored());
+    assertThat(result.effects()).isEmpty();
+  }
+
+  @Test
+  void focusNavigationIntentProducesMoveFocusEffect() {
+    ReduceResult result =
+        reducer.reduce(
+            baseState(),
+            new UiIntent.FocusNavigationIntent(KeyEvent.ofKey(KeyCode.TAB), FocusTarget.GROUP_ID));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects()).containsExactly(new UiEffect.MoveFocus(1));
+  }
+
+  @Test
+  void unrelatedIntentReturnsIgnoredWithoutEffects() {
+    ReduceResult result =
+        reducer.reduce(
+            baseState(),
+            new UiIntent.MetadataInputIntent(KeyEvent.ofChar('x'), FocusTarget.SUBMIT));
+
+    assertThat(result.action()).isEqualTo(UiAction.ignored());
+    assertThat(result.effects()).isEmpty();
+  }
+
+  private static UiState baseState() {
+    return UiControllerTestHarness.controller().uiState();
   }
 }
