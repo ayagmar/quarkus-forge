@@ -15,7 +15,6 @@ import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
 import dev.ayagmar.quarkusforge.api.RetryPolicy;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -67,26 +66,28 @@ class ProjectArchiveServiceTest {
                     .withBody(createZipPayload("demo/pom.xml", "<project/>"))));
 
     Path tempArchive = tempDir.resolve("download.zip");
-    ProjectArchiveService service =
-        new ProjectArchiveService(newClient(), new SafeZipExtractor(), () -> tempArchive);
+    try (QuarkusApiClient apiClient = newClient()) {
+      ProjectArchiveService service =
+          new ProjectArchiveService(apiClient, new SafeZipExtractor(), () -> tempArchive);
 
-    GenerationRequest request =
-        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+      GenerationRequest request =
+          new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
 
-    assertThatThrownBy(
-            () ->
-                service
-                    .downloadAndExtract(
-                        request,
-                        tempDir.resolve("generated-project"),
-                        OverwritePolicy.FAIL_IF_EXISTS,
-                        () -> true)
-                    .join())
-        .isInstanceOf(java.util.concurrent.CancellationException.class);
+      assertThatThrownBy(
+              () ->
+                  service
+                      .downloadAndExtract(
+                          request,
+                          tempDir.resolve("generated-project"),
+                          OverwritePolicy.FAIL_IF_EXISTS,
+                          () -> true)
+                      .join())
+          .isInstanceOf(java.util.concurrent.CancellationException.class);
 
-    verify(0, getRequestedFor(urlPathEqualTo("/api/download")));
-    assertThat(Files.exists(tempArchive)).isFalse();
-    assertThat(Files.exists(tempDir.resolve("generated-project"))).isFalse();
+      verify(0, getRequestedFor(urlPathEqualTo("/api/download")));
+      assertThat(Files.exists(tempArchive)).isFalse();
+      assertThat(Files.exists(tempDir.resolve("generated-project"))).isFalse();
+    }
   }
 
   @Test
@@ -97,24 +98,26 @@ class ProjectArchiveServiceTest {
                 aResponse().withStatus(200).withBody("corrupt".getBytes(StandardCharsets.UTF_8))));
 
     Path tempArchive = tempDir.resolve("download.zip");
-    ProjectArchiveService service =
-        new ProjectArchiveService(newClient(), new SafeZipExtractor(), () -> tempArchive);
+    try (QuarkusApiClient apiClient = newClient()) {
+      ProjectArchiveService service =
+          new ProjectArchiveService(apiClient, new SafeZipExtractor(), () -> tempArchive);
 
-    GenerationRequest request =
-        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+      GenerationRequest request =
+          new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
 
-    assertThatThrownBy(
-            () ->
-                service
-                    .downloadAndExtract(
-                        request,
-                        tempDir.resolve("generated-project"),
-                        OverwritePolicy.FAIL_IF_EXISTS)
-                    .join())
-        .isInstanceOf(CompletionException.class)
-        .hasRootCauseInstanceOf(ArchiveException.class);
-    assertThat(Files.exists(tempArchive)).isFalse();
-    assertThat(Files.exists(tempDir.resolve("generated-project"))).isFalse();
+      assertThatThrownBy(
+              () ->
+                  service
+                      .downloadAndExtract(
+                          request,
+                          tempDir.resolve("generated-project"),
+                          OverwritePolicy.FAIL_IF_EXISTS)
+                      .join())
+          .isInstanceOf(CompletionException.class)
+          .hasRootCauseInstanceOf(ArchiveException.class);
+      assertThat(Files.exists(tempArchive)).isFalse();
+      assertThat(Files.exists(tempDir.resolve("generated-project"))).isFalse();
+    }
   }
 
   @Test
@@ -127,19 +130,21 @@ class ProjectArchiveServiceTest {
                     .withBody(createZipPayload("demo/pom.xml", "<project/>"))));
 
     Path tempArchive = tempDir.resolve("download.zip");
-    ProjectArchiveService service =
-        new ProjectArchiveService(newClient(), new SafeZipExtractor(), () -> tempArchive);
+    try (QuarkusApiClient apiClient = newClient()) {
+      ProjectArchiveService service =
+          new ProjectArchiveService(apiClient, new SafeZipExtractor(), () -> tempArchive);
 
-    GenerationRequest request =
-        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+      GenerationRequest request =
+          new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
 
-    Path output = tempDir.resolve("generated-project");
-    Path extracted =
-        service.downloadAndExtract(request, output, OverwritePolicy.FAIL_IF_EXISTS).join();
+      Path output = tempDir.resolve("generated-project");
+      Path extracted =
+          service.downloadAndExtract(request, output, OverwritePolicy.FAIL_IF_EXISTS).join();
 
-    assertThat(extracted).isEqualTo(output);
-    assertThat(Files.exists(output.resolve("pom.xml"))).isTrue();
-    assertThat(Files.exists(tempArchive)).isFalse();
+      assertThat(extracted).isEqualTo(output);
+      assertThat(Files.exists(output.resolve("pom.xml"))).isTrue();
+      assertThat(Files.exists(tempArchive)).isFalse();
+    }
   }
 
   @Test
@@ -154,19 +159,21 @@ class ProjectArchiveServiceTest {
     Path tempArchiveDirectory = tempDir.resolve("archive-staging");
     Files.createDirectories(tempArchiveDirectory);
     Path tempArchive = tempArchiveDirectory.resolve("download.zip");
-    ProjectArchiveService service =
-        new ProjectArchiveService(newClient(), new SafeZipExtractor(), () -> tempArchive);
+    try (QuarkusApiClient apiClient = newClient()) {
+      ProjectArchiveService service =
+          new ProjectArchiveService(apiClient, new SafeZipExtractor(), () -> tempArchive);
 
-    GenerationRequest request =
-        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+      GenerationRequest request =
+          new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
 
-    Path output = tempDir.resolve("generated-project");
-    service.downloadAndExtract(request, output, OverwritePolicy.FAIL_IF_EXISTS).join();
+      Path output = tempDir.resolve("generated-project");
+      service.downloadAndExtract(request, output, OverwritePolicy.FAIL_IF_EXISTS).join();
 
-    assertThat(Files.exists(output.resolve("pom.xml"))).isTrue();
-    assertThat(Files.exists(tempArchive)).isFalse();
-    try (var stagedFiles = Files.list(tempArchiveDirectory)) {
-      assertThat(stagedFiles.findAny()).isEmpty();
+      assertThat(Files.exists(output.resolve("pom.xml"))).isTrue();
+      assertThat(Files.exists(tempArchive)).isFalse();
+      try (var stagedFiles = Files.list(tempArchiveDirectory)) {
+        assertThat(stagedFiles.findAny()).isEmpty();
+      }
     }
   }
 
@@ -188,31 +195,33 @@ class ProjectArchiveServiceTest {
               return thread;
             });
     try {
-      ProjectArchiveService service =
-          new ProjectArchiveService(
-              newClient(), new SafeZipExtractor(), () -> tempArchive, extractionExecutor);
+      try (QuarkusApiClient apiClient = newClient()) {
+        ProjectArchiveService service =
+            new ProjectArchiveService(
+                apiClient, new SafeZipExtractor(), () -> tempArchive, extractionExecutor);
 
-      GenerationRequest request =
-          new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+        GenerationRequest request =
+            new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
 
-      AtomicReference<String> extractionThreadName = new AtomicReference<>();
-      Path output = tempDir.resolve("generated-project");
-      service
-          .downloadAndExtract(
-              request,
-              output,
-              OverwritePolicy.FAIL_IF_EXISTS,
-              () -> false,
-              progress -> {
-                if (progress == ProjectArchiveService.ProgressStep.EXTRACTING_ARCHIVE) {
-                  extractionThreadName.set(Thread.currentThread().getName());
-                }
-              })
-          .join();
+        AtomicReference<String> extractionThreadName = new AtomicReference<>();
+        Path output = tempDir.resolve("generated-project");
+        service
+            .downloadAndExtract(
+                request,
+                output,
+                OverwritePolicy.FAIL_IF_EXISTS,
+                () -> false,
+                progress -> {
+                  if (progress == ProjectArchiveService.ProgressStep.EXTRACTING_ARCHIVE) {
+                    extractionThreadName.set(Thread.currentThread().getName());
+                  }
+                })
+            .join();
 
-      assertThat(extractionThreadName.get()).contains("archive-extractor-test");
-      assertThat(Files.exists(output.resolve("pom.xml"))).isTrue();
-      assertThat(Files.exists(tempArchive)).isFalse();
+        assertThat(extractionThreadName.get()).contains("archive-extractor-test");
+        assertThat(Files.exists(output.resolve("pom.xml"))).isTrue();
+        assertThat(Files.exists(tempArchive)).isFalse();
+      }
     } finally {
       extractionExecutor.shutdownNow();
     }
@@ -232,25 +241,27 @@ class ProjectArchiveServiceTest {
         command -> {
           throw new RejectedExecutionException("executor saturated");
         };
-    ProjectArchiveService service =
-        new ProjectArchiveService(
-            newClient(), new SafeZipExtractor(), () -> tempArchive, rejectingExecutor);
+    try (QuarkusApiClient apiClient = newClient()) {
+      ProjectArchiveService service =
+          new ProjectArchiveService(
+              apiClient, new SafeZipExtractor(), () -> tempArchive, rejectingExecutor);
 
-    GenerationRequest request =
-        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+      GenerationRequest request =
+          new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
 
-    assertThatThrownBy(
-            () ->
-                service
-                    .downloadAndExtract(
-                        request,
-                        tempDir.resolve("generated-project"),
-                        OverwritePolicy.FAIL_IF_EXISTS)
-                    .join())
-        .isInstanceOf(CompletionException.class)
-        .hasCauseInstanceOf(RejectedExecutionException.class);
-    assertThat(Files.exists(tempArchive)).isFalse();
-    assertThat(Files.exists(tempDir.resolve("generated-project"))).isFalse();
+      assertThatThrownBy(
+              () ->
+                  service
+                      .downloadAndExtract(
+                          request,
+                          tempDir.resolve("generated-project"),
+                          OverwritePolicy.FAIL_IF_EXISTS)
+                      .join())
+          .isInstanceOf(CompletionException.class)
+          .hasCauseInstanceOf(RejectedExecutionException.class);
+      assertThat(Files.exists(tempArchive)).isFalse();
+      assertThat(Files.exists(tempDir.resolve("generated-project"))).isFalse();
+    }
   }
 
   @Test
@@ -263,30 +274,32 @@ class ProjectArchiveServiceTest {
                     .withBody(createZipPayload("demo/pom.xml", "<project/>"))));
 
     Path tempArchive = tempDir.resolve("download.zip");
-    ProjectArchiveService service =
-        new ProjectArchiveService(newClient(), new SafeZipExtractor(), () -> tempArchive);
+    try (QuarkusApiClient apiClient = newClient()) {
+      ProjectArchiveService service =
+          new ProjectArchiveService(apiClient, new SafeZipExtractor(), () -> tempArchive);
 
-    GenerationRequest request =
-        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+      GenerationRequest request =
+          new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
 
-    AtomicBoolean cancelled = new AtomicBoolean(false);
-    assertThatThrownBy(
-            () ->
-                service
-                    .downloadAndExtract(
-                        request,
-                        tempDir.resolve("generated-project"),
-                        OverwritePolicy.FAIL_IF_EXISTS,
-                        cancelled::get,
-                        progress -> {
-                          if (progress == ProjectArchiveService.ProgressStep.EXTRACTING_ARCHIVE) {
-                            cancelled.set(true);
-                          }
-                        })
-                    .join())
-        .isInstanceOf(CompletionException.class)
-        .hasCauseInstanceOf(java.util.concurrent.CancellationException.class);
-    assertThat(Files.exists(tempArchive)).isFalse();
+      AtomicBoolean cancelled = new AtomicBoolean(false);
+      assertThatThrownBy(
+              () ->
+                  service
+                      .downloadAndExtract(
+                          request,
+                          tempDir.resolve("generated-project"),
+                          OverwritePolicy.FAIL_IF_EXISTS,
+                          cancelled::get,
+                          progress -> {
+                            if (progress == ProjectArchiveService.ProgressStep.EXTRACTING_ARCHIVE) {
+                              cancelled.set(true);
+                            }
+                          })
+                      .join())
+          .isInstanceOf(CompletionException.class)
+          .hasCauseInstanceOf(java.util.concurrent.CancellationException.class);
+      assertThat(Files.exists(tempArchive)).isFalse();
+    }
   }
 
   @Test
@@ -299,32 +312,33 @@ class ProjectArchiveServiceTest {
                     .withBody(createZipPayload("demo/pom.xml", "<project/>"))));
 
     Path tempArchive = tempDir.resolve("download.zip");
-    ProjectArchiveService service =
-        new ProjectArchiveService(newClient(), new SafeZipExtractor(), () -> tempArchive);
+    try (QuarkusApiClient apiClient = newClient()) {
+      ProjectArchiveService service =
+          new ProjectArchiveService(apiClient, new SafeZipExtractor(), () -> tempArchive);
 
-    GenerationRequest request =
-        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+      GenerationRequest request =
+          new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
 
-    assertThatThrownBy(
-            () ->
-                service.downloadAndExtract(
-                    request,
-                    tempDir.resolve("generated-project"),
-                    OverwritePolicy.FAIL_IF_EXISTS,
-                    () -> false,
-                    progress -> {
-                      throw new IllegalStateException("progress-hook-failure");
-                    }))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessage("progress-hook-failure");
+      assertThatThrownBy(
+              () ->
+                  service.downloadAndExtract(
+                      request,
+                      tempDir.resolve("generated-project"),
+                      OverwritePolicy.FAIL_IF_EXISTS,
+                      () -> false,
+                      progress -> {
+                        throw new IllegalStateException("progress-hook-failure");
+                      }))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessage("progress-hook-failure");
 
-    assertThat(Files.exists(tempArchive)).isFalse();
-    verify(0, getRequestedFor(urlPathEqualTo("/api/download")));
+      assertThat(Files.exists(tempArchive)).isFalse();
+      verify(0, getRequestedFor(urlPathEqualTo("/api/download")));
+    }
   }
 
   private QuarkusApiClient newClient() {
     return new QuarkusApiClient(
-        HttpClient.newHttpClient(),
         URI.create(wireMockServer.baseUrl()),
         new RetryPolicy(1, Duration.ofSeconds(3), Duration.ofMillis(1), 0.0d),
         delay -> java.util.concurrent.CompletableFuture.completedFuture(null),

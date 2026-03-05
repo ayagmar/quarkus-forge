@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'src/**'
+      - 'scripts/**'
       - 'pom.xml'
       - '.github/workflows/**'
   push:
@@ -11,6 +12,7 @@ on:
       - master
     paths:
       - 'src/**'
+      - 'scripts/**'
       - 'pom.xml'
       - '.github/workflows/**'
   workflow_dispatch:
@@ -131,16 +133,84 @@ jobs:
           fail_ci_if_error: false
           verbose: false
 
+  native-size:
+    name: Native Size
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up GraalVM 25
+        uses: graalvm/setup-graalvm@v1
+        with:
+          distribution: graalvm
+          java-version: '25'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache: maven
+
+      - name: Verify native-image toolchain
+        run: native-image --version
+
+      - name: Build headless native image
+        shell: bash
+        run: |
+          ./mvnw clean
+          mkdir -p target/native-size
+          set -o pipefail
+          ./mvnw package -Pheadless-native -DskipTests -Djacoco.skip=true | tee target/native-size/headless-native.log
+
+      - name: Check headless native size budget
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 scripts/check_native_size.py \
+            --label headless-native \
+            --binary target/quarkus-forge-headless \
+            --report target/quarkus-forge-headless-build-report.html \
+            --log target/native-size/headless-native.log \
+            --max-bytes 24500000 | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Build native image
+        shell: bash
+        run: |
+          set -o pipefail
+          ./mvnw package -Pnative -DskipTests -Djacoco.skip=true | tee target/native-size/native.log
+
+      - name: Check native size budget
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 scripts/check_native_size.py \
+            --label native \
+            --binary target/quarkus-forge \
+            --report target/quarkus-forge-build-report.html \
+            --log target/native-size/native.log \
+            --max-bytes 27000000 | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload native size reports
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-size-reports
+          path: |
+            target/native-size/
+            target/quarkus-forge-build-report.html
+            target/quarkus-forge-headless-build-report.html
+          retention-days: 14
+          if-no-files-found: error
+
   ci-status:
     name: CI Status
     if: always()
-    needs: [quality, tests, coverage]
+    needs: [quality, tests, coverage, native-size]
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
       - name: Check CI results
         run: |
-          if [[ "${{ needs.quality.result }}" != "success" || "${{ needs.tests.result }}" != "success" || "${{ needs.coverage.result }}" != "success" ]]; then
+          if [[ "${{ needs.quality.result }}" != "success" || "${{ needs.tests.result }}" != "success" || "${{ needs.coverage.result }}" != "success" || "${{ needs.native-size.result }}" != "success" ]]; then
             echo "CI failed — see individual job logs above."
             exit 1
           fi
