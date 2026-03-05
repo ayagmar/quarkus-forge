@@ -23,7 +23,6 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -171,7 +170,6 @@ public final class QuarkusApiClient implements AutoCloseable {
       Supplier<CompletableFuture<R>> requestSender, int attempt) {
     return requestSender
         .get()
-        .orTimeout(retryPolicy.requestTimeout().toMillis(), TimeUnit.MILLISECONDS)
         .handle(
             (response, throwable) -> {
               Throwable cause = ThrowableUnwrapper.unwrapCompletionCause(throwable);

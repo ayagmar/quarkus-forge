@@ -97,7 +97,7 @@ Output: `target/quarkus-forge-headless.jar` — ~40% smaller, no TUI or terminal
 Output: `target/quarkus-forge` — standalone binary, no JVM required at runtime.
 
 > **Note:** Native image requires GraalVM or a compatible toolchain. Set `GRAALVM_HOME` before building.
-> CI also enforces native binary size budgets for `headless-native` and `native` from the generated build report and native-image log.
+> CI also enforces native binary size budgets for `headless-native` and `native` using produced binary file size; the build report and native-image log are included for diagnostics.
 
 ## Quick Start
 
