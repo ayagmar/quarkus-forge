@@ -26,7 +26,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--log", required=True, type=Path)
     parser.add_argument("--max-bytes", required=True, type=int)
     parser.add_argument("--top-count", type=int, default=5)
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.max_bytes < 0:
+        parser.error("--max-bytes must be >= 0")
+    if args.top_count < 1:
+        parser.error("--top-count must be >= 1")
+    return args
 
 
 def require_file(path: Path) -> None:

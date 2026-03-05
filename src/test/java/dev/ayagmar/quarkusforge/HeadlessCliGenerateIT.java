@@ -30,6 +30,9 @@ import org.junit.jupiter.api.io.TempDir;
  * verbose diagnostics.
  */
 class HeadlessCliGenerateIT {
+  private static final String HEADLESS_CATALOG_TIMEOUT_PROPERTY =
+      "quarkus.forge.headless.catalog-timeout-ms";
+
   @TempDir Path tempDir;
 
   private WireMockServer wireMockServer;
@@ -181,19 +184,19 @@ class HeadlessCliGenerateIT {
         get(urlPathEqualTo("/q/openapi")).willReturn(aResponse().withStatus(200).withBody("{}")));
     stubSingleRestExtensionCatalog();
 
-    String previous = System.getProperty("quarkus.forge.headless.catalog-timeout-ms");
+    String previous = System.getProperty(HEADLESS_CATALOG_TIMEOUT_PROPERTY);
     try {
-      System.setProperty("quarkus.forge.headless.catalog-timeout-ms", "1");
+      System.setProperty(HEADLESS_CATALOG_TIMEOUT_PROPERTY, "50");
       CliCommandTestSupport.CommandResult result =
           runHeadless("generate", "--dry-run", "--extension", "io.quarkus:quarkus-rest");
 
       assertThat(result.exitCode()).isEqualTo(ExitCodes.NETWORK);
-      wireMockServer.verify(getRequestedFor(urlPathEqualTo("/api/streams")));
+      assertThat(result.standardError()).contains("timed out");
     } finally {
       if (previous == null) {
-        System.clearProperty("quarkus.forge.headless.catalog-timeout-ms");
+        System.clearProperty(HEADLESS_CATALOG_TIMEOUT_PROPERTY);
       } else {
-        System.setProperty("quarkus.forge.headless.catalog-timeout-ms", previous);
+        System.setProperty(HEADLESS_CATALOG_TIMEOUT_PROPERTY, previous);
       }
     }
   }
