@@ -21,8 +21,8 @@ import java.util.function.Consumer;
 
 /**
  * Manages catalog loading, preset loading, and project generation for headless mode. Shares a
- * single {@link QuarkusApiClient} (and its underlying HTTP connection pool) across all calls within
- * one generation session. Must be closed after use to release the HTTP client.
+ * single {@link QuarkusApiClient} across all calls within one generation session. Must be closed
+ * after use to release transport resources.
  */
 class HeadlessCatalogClient implements AutoCloseable {
   private final RuntimeConfig runtimeConfig;

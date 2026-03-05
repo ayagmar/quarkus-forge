@@ -2,20 +2,13 @@ package dev.ayagmar.quarkusforge.api;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URLEncoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpHeaders;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.net.http.HttpResponse.BodyHandler;
-import java.net.http.HttpResponse.BodyHandlers;
-import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -40,7 +33,7 @@ public final class QuarkusApiClient implements AutoCloseable {
       List.of("maven", "gradle", "gradle-kotlin-dsl");
   private static final Duration MAX_RETRY_DELAY = Duration.ofSeconds(30);
 
-  private final HttpClient httpClient;
+  private final ApiTransport transport;
   private final URI baseUri;
   private final RetryPolicy retryPolicy;
   private final AsyncSleeper sleeper;
@@ -49,7 +42,7 @@ public final class QuarkusApiClient implements AutoCloseable {
 
   public QuarkusApiClient(URI baseUri) {
     this(
-        HttpClient.newHttpClient(),
+        new UrlConnectionTransport(),
         baseUri,
         RetryPolicy.defaults(),
         AsyncSleeper.system(),
@@ -58,13 +51,22 @@ public final class QuarkusApiClient implements AutoCloseable {
   }
 
   public QuarkusApiClient(
-      HttpClient httpClient,
       URI baseUri,
       RetryPolicy retryPolicy,
       AsyncSleeper sleeper,
       Clock clock,
       Supplier<Double> jitterSupplier) {
-    this.httpClient = Objects.requireNonNull(httpClient);
+    this(new UrlConnectionTransport(), baseUri, retryPolicy, sleeper, clock, jitterSupplier);
+  }
+
+  QuarkusApiClient(
+      ApiTransport transport,
+      URI baseUri,
+      RetryPolicy retryPolicy,
+      AsyncSleeper sleeper,
+      Clock clock,
+      Supplier<Double> jitterSupplier) {
+    this.transport = Objects.requireNonNull(transport);
     this.baseUri = Objects.requireNonNull(baseUri);
     this.retryPolicy = Objects.requireNonNull(retryPolicy);
     this.sleeper = Objects.requireNonNull(sleeper);
@@ -74,30 +76,32 @@ public final class QuarkusApiClient implements AutoCloseable {
 
   @Override
   public void close() {
-    httpClient.close();
+    transport.close();
   }
 
   public CompletableFuture<List<ExtensionDto>> fetchExtensions() {
-    HttpRequest request = newGetRequest(baseUri.resolve("/api/extensions"), "application/json");
-    return sendWithRetry(request, BodyHandlers.ofString(StandardCharsets.UTF_8), 1)
+    ApiRequest request = newGetRequest(baseUri.resolve("/api/extensions"), "application/json");
+    return sendWithRetry(() -> transport.sendStringAsync(request), 1)
         .thenApply(this::assertSuccessful)
-        .thenApply(response -> ApiPayloadParser.parseExtensionsPayload(response.body()));
+        .thenApply(ApiStringResponse::body)
+        .thenApply(ApiPayloadParser::parseExtensionsPayload);
   }
 
   public CompletableFuture<MetadataDto> fetchMetadata() {
-    HttpRequest streamsRequest = newGetRequest(baseUri.resolve("/api/streams"), "application/json");
-    HttpRequest openApiRequest = newGetRequest(baseUri.resolve("/q/openapi"), "application/json");
+    ApiRequest streamsRequest = newGetRequest(baseUri.resolve("/api/streams"), "application/json");
+    ApiRequest openApiRequest = newGetRequest(baseUri.resolve("/q/openapi"), "application/json");
 
     CompletableFuture<StreamsMetadata> streamsMetadataFuture =
-        sendWithRetry(streamsRequest, BodyHandlers.ofString(StandardCharsets.UTF_8), 1)
+        sendWithRetry(() -> transport.sendStringAsync(streamsRequest), 1)
             .thenApply(this::assertSuccessful)
-            .thenApply(response -> ApiPayloadParser.parseStreamsMetadataPayload(response.body()));
+            .thenApply(ApiStringResponse::body)
+            .thenApply(ApiPayloadParser::parseStreamsMetadataPayload);
 
     CompletableFuture<List<String>> buildToolsFuture =
-        sendWithRetry(openApiRequest, BodyHandlers.ofString(StandardCharsets.UTF_8), 1)
+        sendWithRetry(() -> transport.sendStringAsync(openApiRequest), 1)
             .thenApply(this::assertSuccessful)
-            .thenApply(
-                response -> ApiPayloadParser.parseBuildToolsFromOpenApiPayload(response.body()))
+            .thenApply(ApiStringResponse::body)
+            .thenApply(ApiPayloadParser::parseBuildToolsFromOpenApiPayload)
             .exceptionally(ignored -> fallbackBuildTools());
 
     return streamsMetadataFuture.thenCombine(buildToolsFuture, QuarkusApiClient::toMetadata);
@@ -109,10 +113,11 @@ public final class QuarkusApiClient implements AutoCloseable {
             ? baseUri.resolve("/api/presets")
             : baseUri.resolve(
                 "/api/presets/stream/" + URLEncoder.encode(streamKey, StandardCharsets.UTF_8));
-    HttpRequest request = newGetRequest(presetsUri, "application/json");
-    return sendWithRetry(request, BodyHandlers.ofString(StandardCharsets.UTF_8), 1)
+    ApiRequest request = newGetRequest(presetsUri, "application/json");
+    return sendWithRetry(() -> transport.sendStringAsync(request), 1)
         .thenApply(this::assertSuccessful)
-        .thenApply(response -> ApiPayloadParser.parsePresetsPayload(response.body()));
+        .thenApply(ApiStringResponse::body)
+        .thenApply(ApiPayloadParser::parsePresetsPayload);
   }
 
   private static MetadataDto toMetadata(StreamsMetadata streamsMetadata, List<String> buildTools) {
@@ -145,21 +150,14 @@ public final class QuarkusApiClient implements AutoCloseable {
   public CompletableFuture<Path> downloadProjectZipToFile(
       GenerationRequest generationRequest, Path destinationFile) {
     URI uri = GenerationQueryBuilder.build(baseUri, generationRequest);
-    HttpRequest request = newGetRequest(uri, "application/zip, application/octet-stream");
+    ApiRequest request = newGetRequest(uri, "application/zip, application/octet-stream");
     Path temporaryArchive =
         destinationFile.resolveSibling(
             destinationFile.getFileName() + ".part-" + UUID.randomUUID());
 
-    return sendWithRetry(
-            request,
-            BodyHandlers.ofFile(
-                temporaryArchive,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.WRITE,
-                StandardOpenOption.TRUNCATE_EXISTING),
-            1)
+    return sendWithRetry(() -> transport.sendFileAsync(request, temporaryArchive), 1)
         .thenApply(this::assertSuccessful)
-        .thenApply(HttpResponse::body)
+        .thenApply(ApiFileResponse::body)
         .thenApply(path -> moveDownloadedArchive(path, destinationFile))
         .whenComplete(
             (ignored, throwable) -> {
@@ -169,23 +167,21 @@ public final class QuarkusApiClient implements AutoCloseable {
             });
   }
 
-  // ── Retry logic ───────────────────────────────────────────────────────
-
-  private <T> CompletableFuture<HttpResponse<T>> sendWithRetry(
-      HttpRequest request, BodyHandler<T> bodyHandler, int attempt) {
-    return httpClient
-        .sendAsync(request, bodyHandler)
+  private <R extends ApiHttpResponse> CompletableFuture<R> sendWithRetry(
+      Supplier<CompletableFuture<R>> requestSender, int attempt) {
+    return requestSender
+        .get()
         .orTimeout(retryPolicy.requestTimeout().toMillis(), TimeUnit.MILLISECONDS)
         .handle(
             (response, throwable) -> {
               Throwable cause = ThrowableUnwrapper.unwrapCompletionCause(throwable);
               if (cause != null) {
-                return handleFailure(request, bodyHandler, attempt, cause);
+                return handleFailure(requestSender, attempt, cause);
               }
 
               if (shouldRetry(response.statusCode()) && attempt < retryPolicy.maxAttempts()) {
                 Duration delay = computeRetryDelay(attempt, response.headers());
-                return scheduleRetry(request, bodyHandler, attempt, delay);
+                return scheduleRetry(requestSender, attempt, delay);
               }
 
               return CompletableFuture.completedFuture(response);
@@ -193,11 +189,11 @@ public final class QuarkusApiClient implements AutoCloseable {
         .thenCompose(Function.identity());
   }
 
-  private <T> CompletableFuture<HttpResponse<T>> handleFailure(
-      HttpRequest request, BodyHandler<T> bodyHandler, int attempt, Throwable cause) {
+  private <R extends ApiHttpResponse> CompletableFuture<R> handleFailure(
+      Supplier<CompletableFuture<R>> requestSender, int attempt, Throwable cause) {
     if (attempt < retryPolicy.maxAttempts() && isRetryableFailure(cause)) {
-      Duration delay = computeRetryDelay(attempt, HttpHeaders.of(Map.of(), (a, b) -> true));
-      return scheduleRetry(request, bodyHandler, attempt, delay);
+      Duration delay = computeRetryDelay(attempt, Map.of());
+      return scheduleRetry(requestSender, attempt, delay);
     }
 
     return CompletableFuture.failedFuture(
@@ -205,11 +201,9 @@ public final class QuarkusApiClient implements AutoCloseable {
             "Request failed after " + attempt + " attempt(s): " + cause.getMessage(), cause));
   }
 
-  private <T> CompletableFuture<HttpResponse<T>> scheduleRetry(
-      HttpRequest request, BodyHandler<T> bodyHandler, int attempt, Duration delay) {
-    return sleeper
-        .sleep(delay)
-        .thenCompose(ignored -> sendWithRetry(request, bodyHandler, attempt + 1));
+  private <R extends ApiHttpResponse> CompletableFuture<R> scheduleRetry(
+      Supplier<CompletableFuture<R>> requestSender, int attempt, Duration delay) {
+    return sleeper.sleep(delay).thenCompose(ignored -> sendWithRetry(requestSender, attempt + 1));
   }
 
   private boolean shouldRetry(int statusCode) {
@@ -218,11 +212,11 @@ public final class QuarkusApiClient implements AutoCloseable {
 
   private boolean isRetryableFailure(Throwable cause) {
     return cause instanceof TimeoutException
-        || cause instanceof HttpTimeoutException
+        || cause instanceof SocketTimeoutException
         || cause instanceof IOException;
   }
 
-  private Duration computeRetryDelay(int attempt, HttpHeaders headers) {
+  private Duration computeRetryDelay(int attempt, Map<String, List<String>> headers) {
     Duration retryAfter = parseRetryAfter(headers);
     if (retryAfter != null) {
       return boundRetryDelay(retryAfter);
@@ -240,8 +234,25 @@ public final class QuarkusApiClient implements AutoCloseable {
     return boundRetryDelay(Duration.ofMillis(adjustedMillis));
   }
 
-  private Duration parseRetryAfter(HttpHeaders headers) {
-    return headers.firstValue("Retry-After").map(this::parseRetryAfterValue).orElse(null);
+  private Duration parseRetryAfter(Map<String, List<String>> headers) {
+    String retryAfterValue = firstHeaderValue(headers, "Retry-After");
+    if (retryAfterValue == null) {
+      return null;
+    }
+    return parseRetryAfterValue(retryAfterValue);
+  }
+
+  private static String firstHeaderValue(Map<String, List<String>> headers, String name) {
+    for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+      String key = entry.getKey();
+      if (key != null && key.equalsIgnoreCase(name)) {
+        List<String> values = entry.getValue();
+        if (values != null && !values.isEmpty()) {
+          return values.get(0);
+        }
+      }
+    }
+    return null;
   }
 
   private Duration parseRetryAfterValue(String rawValue) {
@@ -279,19 +290,13 @@ public final class QuarkusApiClient implements AutoCloseable {
     return candidate;
   }
 
-  // ── HTTP helpers ──────────────────────────────────────────────────────
-
-  private HttpRequest newGetRequest(URI uri, String acceptHeader) {
-    return HttpRequest.newBuilder(uri)
-        .GET()
-        .header("Accept", acceptHeader)
-        .timeout(retryPolicy.requestTimeout())
-        .build();
+  private ApiRequest newGetRequest(URI uri, String acceptHeader) {
+    return new ApiRequest(uri, acceptHeader, retryPolicy.requestTimeout());
   }
 
   private static final int MAX_ERROR_BODY_BYTES = 16 * 1024;
 
-  private <T> HttpResponse<T> assertSuccessful(HttpResponse<T> response) {
+  private <R extends ApiHttpResponse> R assertSuccessful(R response) {
     int status = response.statusCode();
     if (status < 200 || status >= 300) {
       throw new ApiHttpException(status, extractErrorBody(response));
@@ -299,27 +304,29 @@ public final class QuarkusApiClient implements AutoCloseable {
     return response;
   }
 
-  private static String extractErrorBody(HttpResponse<?> response) {
-    Object body = response.body();
-    return switch (body) {
-      case null -> "";
-      case String text -> text;
-      case byte[] bytes -> decodeBytesAsUtf8OrBinary(bytes);
-      case Path path -> {
-        try {
-          if (!Files.exists(path)) {
-            yield "";
-          }
-          try (InputStream inputStream = Files.newInputStream(path)) {
-            byte[] bytes = inputStream.readNBytes(MAX_ERROR_BODY_BYTES);
-            yield decodeBytesAsUtf8OrBinary(bytes);
-          }
-        } catch (IOException ignored) {
-          yield "<binary>";
-        }
-      }
-      default -> "<binary>";
+  private static String extractErrorBody(ApiHttpResponse response) {
+    return switch (response) {
+      case ApiStringResponse stringResponse -> extractErrorBody(stringResponse.body());
+      case ApiFileResponse fileResponse -> extractErrorBody(fileResponse.body());
     };
+  }
+
+  private static String extractErrorBody(String body) {
+    return body == null ? "" : body;
+  }
+
+  private static String extractErrorBody(Path path) {
+    try {
+      if (!Files.exists(path)) {
+        return "";
+      }
+      try (InputStream inputStream = Files.newInputStream(path)) {
+        byte[] bytes = inputStream.readNBytes(MAX_ERROR_BODY_BYTES);
+        return decodeBytesAsUtf8OrBinary(bytes);
+      }
+    } catch (IOException ignored) {
+      return "<binary>";
+    }
   }
 
   private static String decodeBytesAsUtf8OrBinary(byte[] bytes) {

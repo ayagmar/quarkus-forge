@@ -14,8 +14,8 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
+import java.net.SocketTimeoutException;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,48 @@ class QuarkusApiClientTest {
   }
 
   @Test
+  void constructorRejectsNullInputs() {
+    RetryPolicy retryPolicy = RetryPolicy.defaults();
+    RecordingSleeper sleeper = new RecordingSleeper();
+    Clock clock = Clock.fixed(Instant.parse("2026-02-21T00:00:00Z"), ZoneOffset.UTC);
+    Supplier<Double> jitterSupplier = () -> 0.5d;
+
+    assertThatThrownBy(
+            () -> new QuarkusApiClient(null, retryPolicy, sleeper, clock, jitterSupplier))
+        .isInstanceOf(NullPointerException.class);
+    assertThatThrownBy(
+            () ->
+                new QuarkusApiClient(
+                    null,
+                    URI.create("http://localhost"),
+                    retryPolicy,
+                    sleeper,
+                    clock,
+                    jitterSupplier))
+        .isInstanceOf(NullPointerException.class);
+    assertThatThrownBy(
+            () ->
+                new QuarkusApiClient(
+                    URI.create("http://localhost"), null, sleeper, clock, jitterSupplier))
+        .isInstanceOf(NullPointerException.class);
+    assertThatThrownBy(
+            () ->
+                new QuarkusApiClient(
+                    URI.create("http://localhost"), retryPolicy, null, clock, jitterSupplier))
+        .isInstanceOf(NullPointerException.class);
+    assertThatThrownBy(
+            () ->
+                new QuarkusApiClient(
+                    URI.create("http://localhost"), retryPolicy, sleeper, null, jitterSupplier))
+        .isInstanceOf(NullPointerException.class);
+    assertThatThrownBy(
+            () ->
+                new QuarkusApiClient(
+                    URI.create("http://localhost"), retryPolicy, sleeper, clock, null))
+        .isInstanceOf(NullPointerException.class);
+  }
+
+  @Test
   void fetchExtensionsReturnsParsedDtoList() {
     stubFor(
         get(urlEqualTo("/api/extensions"))
@@ -62,12 +105,12 @@ class QuarkusApiClientTest {
                     ]
                     """)));
 
-    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+    try (QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper())) {
+      List<ExtensionDto> extensions = client.fetchExtensions().join();
 
-    List<ExtensionDto> extensions = client.fetchExtensions().join();
-
-    assertThat(extensions)
-        .containsExactly(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest"));
+      assertThat(extensions)
+          .containsExactly(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest"));
+    }
   }
 
   @Test
@@ -82,14 +125,14 @@ class QuarkusApiClientTest {
                     ]
                     """)));
 
-    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+    try (QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper())) {
+      Map<String, List<String>> presets = client.fetchPresets("").join();
 
-    Map<String, List<String>> presets = client.fetchPresets("").join();
-
-    assertThat(presets)
-        .containsExactly(
-            java.util.Map.entry(
-                "web", List.of("io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc")));
+      assertThat(presets)
+          .containsExactly(
+              java.util.Map.entry(
+                  "web", List.of("io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc")));
+    }
   }
 
   @Test
@@ -104,12 +147,12 @@ class QuarkusApiClientTest {
                     ]
                     """)));
 
-    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+    try (QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper())) {
+      Map<String, List<String>> presets = client.fetchPresets("io.quarkus.platform:3.31").join();
 
-    Map<String, List<String>> presets = client.fetchPresets("io.quarkus.platform:3.31").join();
-
-    assertThat(presets).containsKey("data");
-    verify(getRequestedFor(urlEqualTo("/api/presets/stream/io.quarkus.platform%3A3.31")));
+      assertThat(presets).containsKey("data");
+      verify(getRequestedFor(urlEqualTo("/api/presets/stream/io.quarkus.platform%3A3.31")));
+    }
   }
 
   @Test
@@ -130,12 +173,12 @@ class QuarkusApiClientTest {
                     ]
                     """)));
 
-    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+    try (QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper())) {
+      List<ExtensionDto> extensions = client.fetchExtensions().join();
 
-    List<ExtensionDto> extensions = client.fetchExtensions().join();
-
-    assertThat(extensions)
-        .containsExactly(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 15));
+      assertThat(extensions)
+          .containsExactly(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 15));
+    }
   }
 
   @Test
@@ -155,12 +198,12 @@ class QuarkusApiClientTest {
                     ]
                     """)));
 
-    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+    try (QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper())) {
+      List<ExtensionDto> extensions = client.fetchExtensions().join();
 
-    List<ExtensionDto> extensions = client.fetchExtensions().join();
-
-    assertThat(extensions)
-        .containsExactly(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "REST"));
+      assertThat(extensions)
+          .containsExactly(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "REST"));
+    }
   }
 
   @Test
@@ -178,12 +221,12 @@ class QuarkusApiClientTest {
                     ]
                     """)));
 
-    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+    try (QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper())) {
+      List<ExtensionDto> extensions = client.fetchExtensions().join();
 
-    List<ExtensionDto> extensions = client.fetchExtensions().join();
-
-    assertThat(extensions)
-        .containsExactly(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "REST"));
+      assertThat(extensions)
+          .containsExactly(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "REST"));
+    }
   }
 
   @Test
@@ -203,16 +246,16 @@ class QuarkusApiClientTest {
                     ]
                     """)));
 
-    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+    try (QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper())) {
+      List<ExtensionDto> extensions = client.fetchExtensions().join();
 
-    List<ExtensionDto> extensions = client.fetchExtensions().join();
-
-    assertThat(extensions)
-        .containsExactly(
-            new ExtensionDto(
-                "io.quarkus:quarkus-agroal",
-                "Agroal - DB connection pool",
-                "Agroal - DB connection pool"));
+      assertThat(extensions)
+          .containsExactly(
+              new ExtensionDto(
+                  "io.quarkus:quarkus-agroal",
+                  "Agroal - DB connection pool",
+                  "Agroal - DB connection pool"));
+    }
   }
 
   @Test
@@ -236,13 +279,13 @@ class QuarkusApiClientTest {
 
     RecordingSleeper sleeper = new RecordingSleeper();
     RetryPolicy retryPolicy = new RetryPolicy(3, Duration.ofMillis(300), Duration.ofMillis(20), 0d);
-    QuarkusApiClient client = newClient(retryPolicy, sleeper);
+    try (QuarkusApiClient client = newClient(retryPolicy, sleeper)) {
+      List<ExtensionDto> extensions = client.fetchExtensions().join();
 
-    List<ExtensionDto> extensions = client.fetchExtensions().join();
-
-    assertThat(extensions).hasSize(1);
-    verify(2, getRequestedFor(urlEqualTo("/api/extensions")));
-    assertThat(sleeper.delays).containsExactly(Duration.ofMillis(20));
+      assertThat(extensions).hasSize(1);
+      verify(2, getRequestedFor(urlEqualTo("/api/extensions")));
+      assertThat(sleeper.delays).containsExactly(Duration.ofMillis(20));
+    }
   }
 
   @Test
@@ -266,12 +309,12 @@ class QuarkusApiClientTest {
 
     RecordingSleeper sleeper = new RecordingSleeper();
     RetryPolicy retryPolicy = new RetryPolicy(3, Duration.ofMillis(300), Duration.ofMillis(20), 0d);
-    QuarkusApiClient client = newClient(retryPolicy, sleeper);
+    try (QuarkusApiClient client = newClient(retryPolicy, sleeper)) {
+      client.fetchExtensions().join();
 
-    client.fetchExtensions().join();
-
-    verify(2, getRequestedFor(urlEqualTo("/api/extensions")));
-    assertThat(sleeper.delays).containsExactly(Duration.ofSeconds(2));
+      verify(2, getRequestedFor(urlEqualTo("/api/extensions")));
+      assertThat(sleeper.delays).containsExactly(Duration.ofSeconds(2));
+    }
   }
 
   @Test
@@ -295,12 +338,12 @@ class QuarkusApiClientTest {
 
     RecordingSleeper sleeper = new RecordingSleeper();
     RetryPolicy retryPolicy = new RetryPolicy(3, Duration.ofMillis(300), Duration.ofMillis(20), 0d);
-    QuarkusApiClient client = newClient(retryPolicy, sleeper);
+    try (QuarkusApiClient client = newClient(retryPolicy, sleeper)) {
+      client.fetchExtensions().join();
 
-    client.fetchExtensions().join();
-
-    verify(2, getRequestedFor(urlEqualTo("/api/extensions")));
-    assertThat(sleeper.delays).containsExactly(Duration.ofSeconds(30));
+      verify(2, getRequestedFor(urlEqualTo("/api/extensions")));
+      assertThat(sleeper.delays).containsExactly(Duration.ofSeconds(30));
+    }
   }
 
   @Test
@@ -327,12 +370,12 @@ class QuarkusApiClientTest {
 
     RecordingSleeper sleeper = new RecordingSleeper();
     RetryPolicy retryPolicy = new RetryPolicy(3, Duration.ofMillis(300), Duration.ofMillis(20), 0d);
-    QuarkusApiClient client = newClient(retryPolicy, sleeper);
+    try (QuarkusApiClient client = newClient(retryPolicy, sleeper)) {
+      client.fetchExtensions().join();
 
-    client.fetchExtensions().join();
-
-    verify(2, getRequestedFor(urlEqualTo("/api/extensions")));
-    assertThat(sleeper.delays).containsExactly(Duration.ofSeconds(3));
+      verify(2, getRequestedFor(urlEqualTo("/api/extensions")));
+      assertThat(sleeper.delays).containsExactly(Duration.ofSeconds(3));
+    }
   }
 
   @Test
@@ -361,25 +404,25 @@ class QuarkusApiClientTest {
 
     RecordingSleeper sleeper = new RecordingSleeper();
     RetryPolicy retryPolicy = new RetryPolicy(3, Duration.ofMillis(300), Duration.ofMillis(20), 0d);
-    QuarkusApiClient client = newClient(retryPolicy, sleeper);
+    try (QuarkusApiClient client = newClient(retryPolicy, sleeper)) {
+      client.fetchExtensions().join();
 
-    client.fetchExtensions().join();
-
-    verify(2, getRequestedFor(urlEqualTo("/api/extensions")));
-    assertThat(sleeper.delays).containsExactly(Duration.ofSeconds(3));
+      verify(2, getRequestedFor(urlEqualTo("/api/extensions")));
+      assertThat(sleeper.delays).containsExactly(Duration.ofSeconds(3));
+    }
   }
 
   @Test
   void fetchExtensionsFailsOnMalformedJson() {
     stubFor(get(urlEqualTo("/api/extensions")).willReturn(okJson("{not-json")));
 
-    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
-
-    assertThatThrownBy(() -> client.fetchExtensions().join())
-        .isInstanceOf(java.util.concurrent.CompletionException.class)
-        .hasCauseInstanceOf(ApiContractException.class)
-        .cause()
-        .hasMessage("Malformed JSON payload");
+    try (QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper())) {
+      assertThatThrownBy(() -> client.fetchExtensions().join())
+          .isInstanceOf(java.util.concurrent.CompletionException.class)
+          .hasCauseInstanceOf(ApiContractException.class)
+          .cause()
+          .hasMessage("Malformed JSON payload");
+    }
   }
 
   @Test
@@ -395,11 +438,11 @@ class QuarkusApiClientTest {
         get(urlEqualTo("/api/extensions"))
             .willReturn(okJson("[{\"name\":\"REST\",\"shortName\":\"rest\"}]")));
 
-    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
-
-    assertThatThrownBy(() -> client.fetchExtensions().join())
-        .hasRootCauseInstanceOf(ApiContractException.class)
-        .hasRootCauseMessage("Missing required contract field 'id'");
+    try (QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper())) {
+      assertThatThrownBy(() -> client.fetchExtensions().join())
+          .hasRootCauseInstanceOf(ApiContractException.class)
+          .hasRootCauseMessage("Missing required contract field 'id'");
+    }
   }
 
   @Test
@@ -410,19 +453,19 @@ class QuarkusApiClientTest {
 
     RecordingSleeper sleeper = new RecordingSleeper();
     RetryPolicy retryPolicy = new RetryPolicy(2, Duration.ofMillis(50), Duration.ofMillis(10), 0d);
-    QuarkusApiClient client = newClient(retryPolicy, sleeper);
+    try (QuarkusApiClient client = newClient(retryPolicy, sleeper)) {
+      Throwable thrown = catchThrowable(() -> client.fetchExtensions().join());
+      assertThat(thrown)
+          .isInstanceOf(java.util.concurrent.CompletionException.class)
+          .hasCauseInstanceOf(ApiClientException.class);
+      assertThat(thrown.getCause()).hasMessageContaining("Request failed after 2 attempt(s)");
+      assertThat(org.assertj.core.util.Throwables.getRootCause(thrown))
+          .isInstanceOfAny(
+              SocketTimeoutException.class, java.util.concurrent.TimeoutException.class);
 
-    Throwable thrown = catchThrowable(() -> client.fetchExtensions().join());
-    assertThat(thrown)
-        .isInstanceOf(java.util.concurrent.CompletionException.class)
-        .hasCauseInstanceOf(ApiClientException.class);
-    assertThat(thrown.getCause()).hasMessageContaining("Request failed after 2 attempt(s)");
-    assertThat(org.assertj.core.util.Throwables.getRootCause(thrown))
-        .isInstanceOfAny(
-            java.net.http.HttpTimeoutException.class, java.util.concurrent.TimeoutException.class);
-
-    verify(2, getRequestedFor(urlEqualTo("/api/extensions")));
-    assertThat(sleeper.delays).containsExactly(Duration.ofMillis(10));
+      verify(2, getRequestedFor(urlEqualTo("/api/extensions")));
+      assertThat(sleeper.delays).containsExactly(Duration.ofMillis(10));
+    }
   }
 
   @Test
@@ -432,15 +475,15 @@ class QuarkusApiClientTest {
             .willReturn(aResponse().withStatus(400).withBody("bad input")));
     stubOpenApiBuildTools();
 
-    QuarkusApiClient client =
+    try (QuarkusApiClient client =
         newClient(
             new RetryPolicy(1, Duration.ofMillis(300), Duration.ofMillis(20), 0d),
-            new RecordingSleeper());
-
-    assertThatThrownBy(() -> client.fetchMetadata().join())
-        .hasRootCauseInstanceOf(ApiHttpException.class)
-        .rootCause()
-        .hasMessageContaining("Unexpected HTTP status 400");
+            new RecordingSleeper())) {
+      assertThatThrownBy(() -> client.fetchMetadata().join())
+          .hasRootCauseInstanceOf(ApiHttpException.class)
+          .rootCause()
+          .hasMessageContaining("Unexpected HTTP status 400");
+    }
   }
 
   @Test
@@ -448,25 +491,25 @@ class QuarkusApiClientTest {
     stubStreamsPayload(List.of(17, 21, 25));
     stubOpenApiBuildTools();
 
-    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+    try (QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper())) {
+      MetadataDto metadata = client.fetchMetadata().join();
 
-    MetadataDto metadata = client.fetchMetadata().join();
-
-    assertThat(metadata)
-        .isEqualTo(
-            new MetadataDto(
-                List.of("17", "21", "25"),
-                List.of("maven", "gradle", "gradle-kotlin-dsl"),
-                Map.of(
-                    "maven",
-                    List.of("17", "21", "25"),
-                    "gradle",
-                    List.of("17", "21", "25"),
-                    "gradle-kotlin-dsl",
-                    List.of("17", "21", "25")),
-                List.of(
-                    new PlatformStream(
-                        "io.quarkus.platform:3.31", "3.31", true, List.of("17", "21", "25")))));
+      assertThat(metadata)
+          .isEqualTo(
+              new MetadataDto(
+                  List.of("17", "21", "25"),
+                  List.of("maven", "gradle", "gradle-kotlin-dsl"),
+                  Map.of(
+                      "maven",
+                      List.of("17", "21", "25"),
+                      "gradle",
+                      List.of("17", "21", "25"),
+                      "gradle-kotlin-dsl",
+                      List.of("17", "21", "25")),
+                  List.of(
+                      new PlatformStream(
+                          "io.quarkus.platform:3.31", "3.31", true, List.of("17", "21", "25")))));
+    }
   }
 
   @Test
@@ -474,12 +517,13 @@ class QuarkusApiClientTest {
     stubStreamsPayload(List.of(17, 21, 25));
     stubFor(get(urlEqualTo("/q/openapi")).willReturn(aResponse().withStatus(404)));
 
-    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+    try (QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper())) {
+      MetadataDto metadata = client.fetchMetadata().join();
 
-    MetadataDto metadata = client.fetchMetadata().join();
-
-    assertThat(metadata.buildTools()).containsExactly("maven", "gradle", "gradle-kotlin-dsl");
-    assertThat(metadata.compatibility().get("gradle-kotlin-dsl")).containsExactly("17", "21", "25");
+      assertThat(metadata.buildTools()).containsExactly("maven", "gradle", "gradle-kotlin-dsl");
+      assertThat(metadata.compatibility().get("gradle-kotlin-dsl"))
+          .containsExactly("17", "21", "25");
+    }
   }
 
   @Test
@@ -503,14 +547,14 @@ class QuarkusApiClientTest {
                     }
                     """)));
 
-    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
+    try (QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper())) {
+      MetadataDto metadata = client.fetchMetadata().join();
 
-    MetadataDto metadata = client.fetchMetadata().join();
-
-    assertThat(metadata.buildTools())
-        .containsExactlyInAnyOrder("maven", "gradle", "gradle-kotlin-dsl");
-    assertThat(metadata.compatibility().keySet())
-        .containsExactlyInAnyOrder("maven", "gradle", "gradle-kotlin-dsl");
+      assertThat(metadata.buildTools())
+          .containsExactlyInAnyOrder("maven", "gradle", "gradle-kotlin-dsl");
+      assertThat(metadata.compatibility().keySet())
+          .containsExactlyInAnyOrder("maven", "gradle", "gradle-kotlin-dsl");
+    }
   }
 
   @Test
@@ -519,15 +563,16 @@ class QuarkusApiClientTest {
         get(urlPathEqualTo("/api/download"))
             .willReturn(aResponse().withStatus(200).withBody("zip-data")));
 
-    QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper());
-    GenerationRequest request =
-        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
-    java.nio.file.Path destination = tempDir.resolve("download.zip");
+    try (QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper())) {
+      GenerationRequest request =
+          new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+      java.nio.file.Path destination = tempDir.resolve("download.zip");
 
-    java.nio.file.Path downloaded = client.downloadProjectZipToFile(request, destination).join();
+      java.nio.file.Path downloaded = client.downloadProjectZipToFile(request, destination).join();
 
-    assertThat(downloaded).isEqualTo(destination);
-    assertThat(java.nio.file.Files.readString(destination)).isEqualTo("zip-data");
+      assertThat(downloaded).isEqualTo(destination);
+      assertThat(java.nio.file.Files.readString(destination)).isEqualTo("zip-data");
+    }
   }
 
   @Test
@@ -547,17 +592,18 @@ class QuarkusApiClientTest {
 
     RecordingSleeper sleeper = new RecordingSleeper();
     RetryPolicy retryPolicy = new RetryPolicy(3, Duration.ofMillis(300), Duration.ofMillis(20), 0d);
-    QuarkusApiClient client = newClient(retryPolicy, sleeper);
-    GenerationRequest request =
-        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
-    java.nio.file.Path destination = tempDir.resolve("download-retry.zip");
+    try (QuarkusApiClient client = newClient(retryPolicy, sleeper)) {
+      GenerationRequest request =
+          new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+      java.nio.file.Path destination = tempDir.resolve("download-retry.zip");
 
-    java.nio.file.Path downloaded = client.downloadProjectZipToFile(request, destination).join();
+      java.nio.file.Path downloaded = client.downloadProjectZipToFile(request, destination).join();
 
-    assertThat(downloaded).isEqualTo(destination);
-    assertThat(java.nio.file.Files.readString(destination)).isEqualTo("zip-data");
-    verify(2, getRequestedFor(urlPathEqualTo("/api/download")));
-    assertThat(sleeper.delays).containsExactly(Duration.ofMillis(20));
+      assertThat(downloaded).isEqualTo(destination);
+      assertThat(java.nio.file.Files.readString(destination)).isEqualTo("zip-data");
+      verify(2, getRequestedFor(urlPathEqualTo("/api/download")));
+      assertThat(sleeper.delays).containsExactly(Duration.ofMillis(20));
+    }
   }
 
   @Test
@@ -578,23 +624,23 @@ class QuarkusApiClientTest {
 
     RecordingSleeper sleeper = new RecordingSleeper();
     RetryPolicy retryPolicy = new RetryPolicy(2, Duration.ofMillis(300), Duration.ofMillis(20), 0d);
-    QuarkusApiClient client = newClient(retryPolicy, sleeper);
-    GenerationRequest request =
-        new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
-    java.nio.file.Path destination = tempDir.resolve("download-retry-fail.zip");
+    try (QuarkusApiClient client = newClient(retryPolicy, sleeper)) {
+      GenerationRequest request =
+          new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+      java.nio.file.Path destination = tempDir.resolve("download-retry-fail.zip");
 
-    assertThatThrownBy(() -> client.downloadProjectZipToFile(request, destination).join())
-        .hasRootCauseInstanceOf(ApiHttpException.class)
-        .rootCause()
-        .hasMessageContaining("Unexpected HTTP status 503");
-    assertThat(java.nio.file.Files.exists(destination)).isFalse();
-    verify(2, getRequestedFor(urlPathEqualTo("/api/download")));
-    assertThat(sleeper.delays).containsExactly(Duration.ofMillis(20));
+      assertThatThrownBy(() -> client.downloadProjectZipToFile(request, destination).join())
+          .hasRootCauseInstanceOf(ApiHttpException.class)
+          .rootCause()
+          .hasMessageContaining("Unexpected HTTP status 503");
+      assertThat(java.nio.file.Files.exists(destination)).isFalse();
+      verify(2, getRequestedFor(urlPathEqualTo("/api/download")));
+      assertThat(sleeper.delays).containsExactly(Duration.ofMillis(20));
+    }
   }
 
   private QuarkusApiClient newClient(RetryPolicy retryPolicy, RecordingSleeper sleeper) {
     return new QuarkusApiClient(
-        HttpClient.newHttpClient(),
         URI.create(wireMockServer.baseUrl()),
         retryPolicy,
         sleeper,

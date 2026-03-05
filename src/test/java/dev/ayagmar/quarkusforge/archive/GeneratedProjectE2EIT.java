@@ -18,7 +18,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -78,51 +77,52 @@ class GeneratedProjectE2EIT {
             .willReturn(
                 aResponse().withStatus(200).withBody(createGeneratedProjectZip(artifactId))));
 
-    ProjectArchiveService archiveService =
-        new ProjectArchiveService(newClient(), new SafeZipExtractor());
-    List<ProjectArchiveService.ProgressStep> progressSteps = new CopyOnWriteArrayList<>();
+    try (QuarkusApiClient apiClient = newClient()) {
+      ProjectArchiveService archiveService =
+          new ProjectArchiveService(apiClient, new SafeZipExtractor());
+      List<ProjectArchiveService.ProgressStep> progressSteps = new CopyOnWriteArrayList<>();
 
-    Path generatedProjectRoot = tempDir.resolve("generated").resolve(artifactId);
-    Path generatedProject =
-        archiveService
-            .downloadAndExtract(
-                request,
-                generatedProjectRoot,
-                OverwritePolicy.FAIL_IF_EXISTS,
-                () -> false,
-                progressSteps::add)
-            .join();
+      Path generatedProjectRoot = tempDir.resolve("generated").resolve(artifactId);
+      Path generatedProject =
+          archiveService
+              .downloadAndExtract(
+                  request,
+                  generatedProjectRoot,
+                  OverwritePolicy.FAIL_IF_EXISTS,
+                  () -> false,
+                  progressSteps::add)
+              .join();
 
-    assertThat(generatedProject).isEqualTo(generatedProjectRoot);
-    assertThat(progressSteps)
-        .containsExactly(
-            ProjectArchiveService.ProgressStep.REQUESTING_ARCHIVE,
-            ProjectArchiveService.ProgressStep.EXTRACTING_ARCHIVE);
+      assertThat(generatedProject).isEqualTo(generatedProjectRoot);
+      assertThat(progressSteps)
+          .containsExactly(
+              ProjectArchiveService.ProgressStep.REQUESTING_ARCHIVE,
+              ProjectArchiveService.ProgressStep.EXTRACTING_ARCHIVE);
 
-    verify(
-        getRequestedFor(urlPathEqualTo("/api/download"))
-            .withQueryParam("g", equalTo("org.acme"))
-            .withQueryParam("a", equalTo(artifactId))
-            .withQueryParam("v", equalTo("1.0.0-SNAPSHOT"))
-            .withQueryParam("b", equalTo("MAVEN"))
-            .withQueryParam("j", equalTo("25"))
-            .withQueryParam(
-                "e",
-                havingExactly(
-                    equalTo("io.quarkus:quarkus-resteasy-reactive"),
-                    equalTo("io.quarkus:quarkus-arc"))));
+      verify(
+          getRequestedFor(urlPathEqualTo("/api/download"))
+              .withQueryParam("g", equalTo("org.acme"))
+              .withQueryParam("a", equalTo(artifactId))
+              .withQueryParam("v", equalTo("1.0.0-SNAPSHOT"))
+              .withQueryParam("b", equalTo("MAVEN"))
+              .withQueryParam("j", equalTo("25"))
+              .withQueryParam(
+                  "e",
+                  havingExactly(
+                      equalTo("io.quarkus:quarkus-resteasy-reactive"),
+                      equalTo("io.quarkus:quarkus-arc"))));
 
-    assertThat(generatedProject.resolve("pom.xml")).exists();
-    assertThat(generatedProject.resolve("README.md")).exists();
-    assertThat(generatedProject.resolve("src/main/resources/application.properties")).exists();
-    assertThat(generatedProject.resolve("src/main/java/org/acme/GreetingResource.java")).exists();
+      assertThat(generatedProject.resolve("pom.xml")).exists();
+      assertThat(generatedProject.resolve("README.md")).exists();
+      assertThat(generatedProject.resolve("src/main/resources/application.properties")).exists();
+      assertThat(generatedProject.resolve("src/main/java/org/acme/GreetingResource.java")).exists();
 
-    assertStartsInDevMode(generatedProject);
+      assertStartsInDevMode(generatedProject);
+    }
   }
 
   private QuarkusApiClient newClient() {
     return new QuarkusApiClient(
-        HttpClient.newHttpClient(),
         URI.create(wireMockServer.baseUrl()),
         new RetryPolicy(1, Duration.ofSeconds(10), Duration.ofMillis(1), 0.0d),
         delay -> java.util.concurrent.CompletableFuture.completedFuture(null),
