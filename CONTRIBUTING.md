@@ -41,17 +41,21 @@ java -jar target/quarkus-forge-headless.jar generate \
 ```text
 src/main/java/dev/ayagmar/quarkusforge/
 ├── api/          HTTP transport, JSON parsing, catalog caching
-├── application/  Startup metadata selection and request assembly
+├── application/  Request assembly and startup orchestration helpers
 ├── archive/      ZIP download, extraction, Zip-Bomb and Zip-Slip protection
+├── cli/          Picocli entry points, commands, options, exit codes
 ├── diagnostics/  Structured logging and diagnostic payloads
-├── domain/       ProjectRequest, validation, Forgefile, compatibility rules
+├── domain/       ProjectRequest, validation, compatibility rules
+├── forge/        Forgefile models and persistence
+├── headless/     Headless catalog loading, generation, output, timeouts
+├── postgen/      Shell execution, IDE detection, post-generation actions
 ├── runtime/      Runtime wiring, bootstrap, and session summaries
 └── ui/           TUI state machine, renderers, event routing
 ```
 
 Entry points:
-- `QuarkusForgeCli` — TUI launch (picocli root command)
-- `HeadlessCli` — headless-only launch (picocli root command)
+- `cli.QuarkusForgeCli` — TUI launch (picocli root command)
+- `cli.HeadlessCli` — headless-only launch (picocli root command)
 
 See [Architecture & Internals](docs/modules/ROOT/pages/architecture.adoc) for component diagrams and design principles.
 

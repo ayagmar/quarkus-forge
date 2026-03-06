@@ -1,6 +1,6 @@
 package dev.ayagmar.quarkusforge.ui;
 
-import dev.ayagmar.quarkusforge.IdeDetector;
+import dev.ayagmar.quarkusforge.postgen.IdeDetector;
 import java.util.ArrayList;
 import java.util.List;
 

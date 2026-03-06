@@ -1,9 +1,5 @@
 package dev.ayagmar.quarkusforge.ui;
 
-import dev.ayagmar.quarkusforge.Forgefile;
-import dev.ayagmar.quarkusforge.ForgefileLock;
-import dev.ayagmar.quarkusforge.ForgefileStore;
-import dev.ayagmar.quarkusforge.IdeDetector;
 import dev.ayagmar.quarkusforge.api.BuildToolCodec;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
@@ -18,6 +14,10 @@ import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
+import dev.ayagmar.quarkusforge.forge.Forgefile;
+import dev.ayagmar.quarkusforge.forge.ForgefileLock;
+import dev.ayagmar.quarkusforge.forge.ForgefileStore;
+import dev.ayagmar.quarkusforge.postgen.IdeDetector;
 import dev.ayagmar.quarkusforge.util.OutputPathResolver;
 import dev.tamboui.layout.Constraint;
 import dev.tamboui.layout.Layout;

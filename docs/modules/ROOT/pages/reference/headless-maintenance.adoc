@@ -6,7 +6,7 @@ The `headless` profile is intentionally strict: it must stay runnable without TU
 
 * Headless entry flow (`HeadlessCli`, `HeadlessGenerationService`, `GenerateCommand`) must not import `dev.ayagmar.quarkusforge.ui.*`.
 * Headless flow must not import `dev.tamboui.*`.
-* Core non-UI layers (`api`, `archive`, `domain`, `diagnostics`, `util`) must not depend on `ui`.
+* Core non-UI layers (`application`, `api`, `archive`, `diagnostics`, `domain`, `forge`, `headless`, `util`) must not depend on `ui`.
 
 These rules are enforced by ArchUnit tests in
 `src/test/java/dev/ayagmar/quarkusforge/HeadlessArchitectureRulesTest.java`.

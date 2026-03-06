@@ -2,7 +2,7 @@ package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.ayagmar.quarkusforge.IdeDetector;
+import dev.ayagmar.quarkusforge.postgen.IdeDetector;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
