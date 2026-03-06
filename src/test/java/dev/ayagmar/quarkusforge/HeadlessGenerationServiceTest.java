@@ -17,9 +17,15 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
 
 class HeadlessGenerationServiceTest {
+  private static final String HEADLESS_GENERATION_TIMEOUT_PROPERTY =
+      "quarkus.forge.headless.generation-timeout-ms";
+
+  @RegisterExtension final SystemPropertyExtension systemProperties = new SystemPropertyExtension();
+
   @TempDir Path tempDir;
 
   private static final MetadataDto METADATA =
@@ -55,15 +61,13 @@ class HeadlessGenerationServiceTest {
     HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
     GenerateCommand command = commandWithOutput();
-    System.setProperty("quarkus.forge.headless.generation-timeout-ms", "1");
-    try {
-      int exitCode = service.run(command, false, false);
-      assertThat(exitCode).isEqualTo(ExitCodes.NETWORK);
-      assertThat(client.startGenerationCalls).isEqualTo(1);
-      assertThat(client.generationFuture.isCancelled()).isTrue();
-    } finally {
-      System.clearProperty("quarkus.forge.headless.generation-timeout-ms");
-    }
+    systemProperties.set(HEADLESS_GENERATION_TIMEOUT_PROPERTY, "1");
+
+    int exitCode = service.run(command, false, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.NETWORK);
+    assertThat(client.startGenerationCalls).isEqualTo(1);
+    assertThat(client.generationFuture.isCancelled()).isTrue();
   }
 
   @Test

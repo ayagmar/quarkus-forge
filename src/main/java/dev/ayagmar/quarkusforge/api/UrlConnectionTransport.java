@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -11,27 +12,38 @@ import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 final class UrlConnectionTransport implements ApiTransport {
   private static final int MAX_THREADS = 4;
 
   private final ExecutorService executorService;
+  private final ConnectionFactory connectionFactory;
 
   UrlConnectionTransport() {
+    this(newExecutorService(), uri -> (HttpURLConnection) uri.toURL().openConnection());
+  }
+
+  UrlConnectionTransport(ExecutorService executorService, ConnectionFactory connectionFactory) {
+    this.executorService = Objects.requireNonNull(executorService);
+    this.connectionFactory = Objects.requireNonNull(connectionFactory);
+  }
+
+  private static ExecutorService newExecutorService() {
     AtomicInteger threadId = new AtomicInteger(1);
-    this.executorService =
-        Executors.newFixedThreadPool(
-            MAX_THREADS,
-            runnable -> {
-              Thread thread = new Thread(runnable, "qf-api-http-" + threadId.getAndIncrement());
-              thread.setDaemon(true);
-              return thread;
-            });
+    return Executors.newFixedThreadPool(
+        MAX_THREADS,
+        runnable -> {
+          Thread thread = new Thread(runnable, "qf-api-http-" + threadId.getAndIncrement());
+          thread.setDaemon(true);
+          return thread;
+        });
   }
 
   @Override
@@ -54,15 +66,37 @@ final class UrlConnectionTransport implements ApiTransport {
 
   private <R extends ApiHttpResponse> CompletableFuture<R> sendAsync(
       ApiRequest request, ResponseReader<R> responseReader) {
-    return CompletableFuture.supplyAsync(
-        () -> {
-          try {
-            return execute(request, responseReader);
-          } catch (IOException ioException) {
-            throw new CompletionException(ioException);
+    AtomicReference<HttpURLConnection> connectionReference = new AtomicReference<>();
+    CompletableFuture<R> responseFuture =
+        new CompletableFuture<>() {
+          @Override
+          public boolean cancel(boolean mayInterruptIfRunning) {
+            boolean cancelled = super.cancel(mayInterruptIfRunning);
+            if (cancelled) {
+              disconnectQuietly(connectionReference.get());
+            }
+            return cancelled;
           }
-        },
-        executorService);
+        };
+    try {
+      executorService.execute(
+          () -> {
+            if (responseFuture.isCancelled()) {
+              return;
+            }
+            try {
+              R response = execute(request, responseReader, responseFuture, connectionReference);
+              responseFuture.complete(response);
+            } catch (IOException ioException) {
+              responseFuture.completeExceptionally(new CompletionException(ioException));
+            } catch (RuntimeException runtimeException) {
+              responseFuture.completeExceptionally(runtimeException);
+            }
+          });
+    } catch (RuntimeException runtimeException) {
+      responseFuture.completeExceptionally(runtimeException);
+    }
+    return responseFuture;
   }
 
   @Override
@@ -71,8 +105,20 @@ final class UrlConnectionTransport implements ApiTransport {
   }
 
   private <R extends ApiHttpResponse> R execute(
-      ApiRequest request, ResponseReader<R> responseReader) throws IOException {
-    HttpURLConnection connection = (HttpURLConnection) request.uri().toURL().openConnection();
+      ApiRequest request,
+      ResponseReader<R> responseReader,
+      CompletableFuture<?> responseFuture,
+      AtomicReference<HttpURLConnection> connectionReference)
+      throws IOException {
+    if (Thread.currentThread().isInterrupted() || responseFuture.isCancelled()) {
+      throw new CancellationException("Request was interrupted before execution");
+    }
+    HttpURLConnection connection = connectionFactory.open(request.uri());
+    connectionReference.set(connection);
+    if (Thread.currentThread().isInterrupted() || responseFuture.isCancelled()) {
+      disconnectQuietly(connection);
+      throw new CancellationException("Request was cancelled before response handling");
+    }
     connection.setRequestMethod("GET");
     connection.setRequestProperty("Accept", request.acceptHeader());
     long timeoutMillisLong = Math.max(1L, request.timeout().toMillis());
@@ -87,6 +133,12 @@ final class UrlConnectionTransport implements ApiTransport {
     try (InputStream inputStream = openBodyStream(connection, statusCode)) {
       return responseReader.read(statusCode, headers, inputStream);
     } finally {
+      connection.disconnect();
+    }
+  }
+
+  private static void disconnectQuietly(HttpURLConnection connection) {
+    if (connection != null) {
       connection.disconnect();
     }
   }
@@ -114,5 +166,10 @@ final class UrlConnectionTransport implements ApiTransport {
   private interface ResponseReader<R extends ApiHttpResponse> {
     R read(int statusCode, Map<String, List<String>> headers, InputStream inputStream)
         throws IOException;
+  }
+
+  @FunctionalInterface
+  interface ConnectionFactory {
+    HttpURLConnection open(URI uri) throws IOException;
   }
 }

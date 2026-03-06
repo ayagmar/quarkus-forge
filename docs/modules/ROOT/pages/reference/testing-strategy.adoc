@@ -75,7 +75,7 @@ Or using the included https://github.com/casey/just[justfile]:
 ----
 just format-check      # spotless:check
 just test-unit         # unit tests only
-just test-it           # integration tests only
+just test-it           # full verify alias (same as `just test` in this build)
 just test              # unit + integration (verify)
 just headless-check    # headless profile compile
 just verify            # format-check + headless-check + test

@@ -4,71 +4,55 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 class HeadlessTimeoutsTest {
+  private static final String HEADLESS_CATALOG_TIMEOUT_PROPERTY =
+      "quarkus.forge.headless.catalog-timeout-ms";
+  private static final String HEADLESS_GENERATION_TIMEOUT_PROPERTY =
+      "quarkus.forge.headless.generation-timeout-ms";
+
+  @RegisterExtension final SystemPropertyExtension systemProperties = new SystemPropertyExtension();
+
   @Test
   void defaultCatalogTimeoutIs20Seconds() {
-    String previous = System.getProperty("quarkus.forge.headless.catalog-timeout-ms");
-    try {
-      System.clearProperty("quarkus.forge.headless.catalog-timeout-ms");
-      assertThat(HeadlessTimeouts.catalogTimeout()).isEqualTo(Duration.ofSeconds(20));
-    } finally {
-      if (previous != null) {
-        System.setProperty("quarkus.forge.headless.catalog-timeout-ms", previous);
-      }
-    }
+    systemProperties.clear(HEADLESS_CATALOG_TIMEOUT_PROPERTY);
+
+    assertThat(HeadlessTimeouts.catalogTimeout()).isEqualTo(Duration.ofSeconds(20));
   }
 
   @Test
   void defaultGenerationTimeoutIs2Minutes() {
-    String previous = System.getProperty("quarkus.forge.headless.generation-timeout-ms");
-    try {
-      System.clearProperty("quarkus.forge.headless.generation-timeout-ms");
-      assertThat(HeadlessTimeouts.generationTimeout()).isEqualTo(Duration.ofMinutes(2));
-    } finally {
-      if (previous != null) {
-        System.setProperty("quarkus.forge.headless.generation-timeout-ms", previous);
-      }
-    }
+    systemProperties.clear(HEADLESS_GENERATION_TIMEOUT_PROPERTY);
+
+    assertThat(HeadlessTimeouts.generationTimeout()).isEqualTo(Duration.ofMinutes(2));
   }
 
   @Test
   void catalogTimeoutFromSystemProperty() {
-    System.setProperty("quarkus.forge.headless.catalog-timeout-ms", "5000");
-    try {
-      assertThat(HeadlessTimeouts.catalogTimeout()).isEqualTo(Duration.ofMillis(5000));
-    } finally {
-      System.clearProperty("quarkus.forge.headless.catalog-timeout-ms");
-    }
+    systemProperties.set(HEADLESS_CATALOG_TIMEOUT_PROPERTY, "5000");
+
+    assertThat(HeadlessTimeouts.catalogTimeout()).isEqualTo(Duration.ofMillis(5000));
   }
 
   @Test
   void invalidPropertyFallsBackToDefault() {
-    System.setProperty("quarkus.forge.headless.catalog-timeout-ms", "not-a-number");
-    try {
-      assertThat(HeadlessTimeouts.catalogTimeout()).isEqualTo(Duration.ofSeconds(20));
-    } finally {
-      System.clearProperty("quarkus.forge.headless.catalog-timeout-ms");
-    }
+    systemProperties.set(HEADLESS_CATALOG_TIMEOUT_PROPERTY, "not-a-number");
+
+    assertThat(HeadlessTimeouts.catalogTimeout()).isEqualTo(Duration.ofSeconds(20));
   }
 
   @Test
   void negativeValueFallsBackToDefault() {
-    System.setProperty("quarkus.forge.headless.catalog-timeout-ms", "-100");
-    try {
-      assertThat(HeadlessTimeouts.catalogTimeout()).isEqualTo(Duration.ofSeconds(20));
-    } finally {
-      System.clearProperty("quarkus.forge.headless.catalog-timeout-ms");
-    }
+    systemProperties.set(HEADLESS_CATALOG_TIMEOUT_PROPERTY, "-100");
+
+    assertThat(HeadlessTimeouts.catalogTimeout()).isEqualTo(Duration.ofSeconds(20));
   }
 
   @Test
   void blankPropertyFallsBackToDefault() {
-    System.setProperty("quarkus.forge.headless.catalog-timeout-ms", "  ");
-    try {
-      assertThat(HeadlessTimeouts.catalogTimeout()).isEqualTo(Duration.ofSeconds(20));
-    } finally {
-      System.clearProperty("quarkus.forge.headless.catalog-timeout-ms");
-    }
+    systemProperties.set(HEADLESS_CATALOG_TIMEOUT_PROPERTY, "  ");
+
+    assertThat(HeadlessTimeouts.catalogTimeout()).isEqualTo(Duration.ofSeconds(20));
   }
 }
