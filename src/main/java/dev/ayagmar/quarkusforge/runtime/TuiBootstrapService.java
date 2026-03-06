@@ -18,12 +18,15 @@ import dev.ayagmar.quarkusforge.ui.CoreTuiController;
 import dev.ayagmar.quarkusforge.ui.ExtensionCatalogLoadResult;
 import dev.ayagmar.quarkusforge.ui.GenerationProgressUpdate;
 import dev.ayagmar.quarkusforge.ui.PostGenerationExitPlan;
+import dev.ayagmar.quarkusforge.ui.ProjectGenerationRunner;
 import dev.ayagmar.quarkusforge.ui.UiAction;
 import dev.ayagmar.quarkusforge.ui.UiScheduler;
 import dev.tamboui.tui.TuiConfig;
 import dev.tamboui.tui.TuiRunner;
 import dev.tamboui.tui.bindings.Bindings;
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -33,6 +36,22 @@ public final class TuiBootstrapService {
   private static final String PANAMA_BACKEND = "panama";
   public static final Duration STARTUP_SPLASH_MIN_DURATION = Duration.ofMillis(450);
   private static final Duration TUI_TICK_RATE = Duration.ofMillis(40);
+
+  interface CatalogLoader {
+    CompletableFuture<CatalogData> load();
+
+    CompletableFuture<CatalogData> loadForStartup();
+  }
+
+  @FunctionalInterface
+  interface PresetLoader {
+    CompletableFuture<Map<String, List<String>>> load(String streamKey);
+  }
+
+  @FunctionalInterface
+  interface TuiSessionLoop {
+    void run(CoreTuiController controller, DiagnosticLogger diagnostics) throws Exception;
+  }
 
   public static Bindings appBindingsProfile() {
     return AppBindingsProfile.bindings();
@@ -100,93 +119,130 @@ public final class TuiBootstrapService {
         CatalogDataService catalogDataService =
             new CatalogDataService(
                 apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
-        AtomicBoolean firstCatalogLoad = new AtomicBoolean(true);
         ProjectArchiveService projectArchiveService =
             new ProjectArchiveService(apiClient, new SafeZipExtractor());
-        CoreTuiController controller =
-            CoreTuiController.from(
-                initialState,
-                UiScheduler.fromScheduledExecutor(tui.scheduler(), tui::runOnRenderThread),
-                Duration.ofMillis(Math.max(0, searchDebounceMs)),
-                (generationRequest, outputDirectory, cancelled, progressListener) ->
-                    projectArchiveService.downloadAndExtract(
-                        generationRequest,
-                        outputDirectory,
-                        OverwritePolicy.FAIL_IF_EXISTS,
-                        cancelled,
-                        progress ->
-                            progressListener.accept(
-                                switch (progress) {
-                                  case REQUESTING_ARCHIVE ->
-                                      GenerationProgressUpdate.requestingArchive(
-                                          "requesting project archive from Quarkus API...");
-                                  case EXTRACTING_ARCHIVE ->
-                                      GenerationProgressUpdate.extractingArchive(
-                                          "extracting project archive...");
-                                })),
-                ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile()),
-                CoreTuiController.defaultFavoritesPersistenceExecutor(),
-                IdeDetector.detect());
-        controller.setStartupOverlayMinDuration(STARTUP_SPLASH_MIN_DURATION);
-        controller.loadExtensionCatalogAsync(
-            () -> {
-              diagnostics.info("catalog.load.start", of("mode", "tui"));
-              String presetStreamKey = controller.request().platformStream();
-              CompletableFuture<CatalogData> catalogLoadFuture =
-                  firstCatalogLoad.getAndSet(false)
-                      ? catalogDataService.loadForStartup()
-                      : catalogDataService.load();
-              return catalogLoadFuture
-                  .handle(CatalogLoadDiagnostics.catalogLoadDiagnostics(diagnostics))
-                  .thenCompose(
-                      loadResult ->
-                          apiClient
-                              .fetchPresets(presetStreamKey)
-                              .handle(
-                                  (presets, throwable) -> {
-                                    if (throwable != null) {
-                                      return CatalogLoadDiagnostics.handlePresetLoadFailure(
-                                          diagnostics, throwable, "tui");
-                                    }
-                                    diagnostics.info(
-                                        "preset.load.success",
-                                        of("mode", "tui"),
-                                        of("presetCount", presets.size()));
-                                    return presets;
-                                  })
-                              .thenApply(
-                                  presets ->
-                                      new ExtensionCatalogLoadResult(
-                                          loadResult.extensions(),
-                                          loadResult.source(),
-                                          loadResult.stale(),
-                                          loadResult.detailMessage(),
-                                          loadResult.metadata(),
-                                          presets)));
-            });
-
-        tui.run(
-            (event, runner) -> {
-              UiAction action = controller.onEvent(event);
-              if (action.shouldQuit()) {
-                diagnostics.info("tui.session.quit.requested", of("reason", "user"));
-                runner.quit();
+        return runSession(
+            initialState,
+            searchDebounceMs,
+            diagnostics,
+            new CatalogLoader() {
+              @Override
+              public CompletableFuture<CatalogData> load() {
+                return catalogDataService.load();
               }
-              return action.handled();
+
+              @Override
+              public CompletableFuture<CatalogData> loadForStartup() {
+                return catalogDataService.loadForStartup();
+              }
             },
-            controller::render);
-        diagnostics.info("tui.session.exit", of("outcome", "completed"));
-        PostGenerationExitPlan exitPlan = controller.postGenerationExitPlan().orElse(null);
-        return new TuiSessionSummary(controller.request(), exitPlan);
-      } catch (Exception exception) {
-        diagnostics.error(
-            "tui.session.failure",
-            of("causeType", exception.getClass().getSimpleName()),
-            of("message", ErrorMessageMapper.userFriendlyError(exception)));
-        throw exception;
+            apiClient::fetchPresets,
+            (generationRequest, outputDirectory, cancelled, progressListener) ->
+                projectArchiveService.downloadAndExtract(
+                    generationRequest,
+                    outputDirectory,
+                    OverwritePolicy.FAIL_IF_EXISTS,
+                    cancelled,
+                    progress ->
+                        progressListener.accept(
+                            switch (progress) {
+                              case REQUESTING_ARCHIVE ->
+                                  GenerationProgressUpdate.requestingArchive(
+                                      "requesting project archive from Quarkus API...");
+                              case EXTRACTING_ARCHIVE ->
+                                  GenerationProgressUpdate.extractingArchive(
+                                      "extracting project archive...");
+                            })),
+            ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile()),
+            UiScheduler.fromScheduledExecutor(tui.scheduler(), tui::runOnRenderThread),
+            IdeDetector.detect(),
+            (controller, sessionDiagnostics) ->
+                tui.run(
+                    (event, runner) -> {
+                      UiAction action = controller.onEvent(event);
+                      if (action.shouldQuit()) {
+                        sessionDiagnostics.info("tui.session.quit.requested", of("reason", "user"));
+                        runner.quit();
+                      }
+                      return action.handled();
+                    },
+                    controller::render));
       }
     } finally {
       restoreTerminalBackendPreference(previousBackendPreference);
+    }
+  }
+
+  TuiSessionSummary runSession(
+      ForgeUiState initialState,
+      int searchDebounceMs,
+      DiagnosticLogger diagnostics,
+      CatalogLoader catalogLoader,
+      PresetLoader presetLoader,
+      ProjectGenerationRunner projectGenerationRunner,
+      ExtensionFavoritesStore favoritesStore,
+      UiScheduler scheduler,
+      List<IdeDetector.DetectedIde> detectedIdes,
+      TuiSessionLoop sessionLoop)
+      throws Exception {
+    AtomicBoolean firstCatalogLoad = new AtomicBoolean(true);
+    CoreTuiController controller =
+        CoreTuiController.from(
+            initialState,
+            scheduler,
+            Duration.ofMillis(Math.max(0, searchDebounceMs)),
+            projectGenerationRunner,
+            favoritesStore,
+            CoreTuiController.defaultFavoritesPersistenceExecutor(),
+            detectedIdes);
+    controller.setStartupOverlayMinDuration(STARTUP_SPLASH_MIN_DURATION);
+    controller.loadExtensionCatalogAsync(
+        () -> {
+          diagnostics.info("catalog.load.start", of("mode", "tui"));
+          String presetStreamKey = controller.request().platformStream();
+          CompletableFuture<CatalogData> catalogLoadFuture =
+              firstCatalogLoad.getAndSet(false)
+                  ? catalogLoader.loadForStartup()
+                  : catalogLoader.load();
+          return catalogLoadFuture
+              .handle(CatalogLoadDiagnostics.catalogLoadDiagnostics(diagnostics))
+              .thenCompose(
+                  loadResult ->
+                      presetLoader
+                          .load(presetStreamKey)
+                          .handle(
+                              (presets, throwable) -> {
+                                if (throwable != null) {
+                                  return CatalogLoadDiagnostics.handlePresetLoadFailure(
+                                      diagnostics, throwable, "tui");
+                                }
+                                diagnostics.info(
+                                    "preset.load.success",
+                                    of("mode", "tui"),
+                                    of("presetCount", presets.size()));
+                                return presets;
+                              })
+                          .thenApply(
+                              presets ->
+                                  new ExtensionCatalogLoadResult(
+                                      loadResult.extensions(),
+                                      loadResult.source(),
+                                      loadResult.stale(),
+                                      loadResult.detailMessage(),
+                                      loadResult.metadata(),
+                                      presets)));
+        });
+    try {
+      sessionLoop.run(controller, diagnostics);
+      diagnostics.info("tui.session.exit", of("outcome", "completed"));
+      PostGenerationExitPlan exitPlan = controller.postGenerationExitPlan().orElse(null);
+      return new TuiSessionSummary(controller.request(), exitPlan);
+    } catch (Exception exception) {
+      diagnostics.error(
+          "tui.session.failure",
+          of("causeType", exception.getClass().getSimpleName()),
+          of("message", ErrorMessageMapper.userFriendlyError(exception)));
+      throw exception;
     }
   }
 

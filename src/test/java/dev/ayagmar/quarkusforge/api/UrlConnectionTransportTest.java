@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -16,11 +17,14 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -298,6 +302,130 @@ class UrlConnectionTransportTest {
     }
   }
 
+  @Test
+  void cancelledRequestSkipsDeferredExecutionBeforeOpeningConnection() {
+    DeferredExecutorService executor = new DeferredExecutorService();
+    AtomicInteger openCalls = new AtomicInteger();
+    try (UrlConnectionTransport transport =
+        new UrlConnectionTransport(
+            executor,
+            uri -> {
+              openCalls.incrementAndGet();
+              return new FakeHttpURLConnection(
+                  200, Map.of(), "ok".getBytes(StandardCharsets.UTF_8), null);
+            })) {
+      var responseFuture =
+          transport.sendStringAsync(
+              new ApiRequest(
+                  URI.create("https://example.test/deferred"),
+                  "application/json",
+                  Duration.ofSeconds(2)));
+
+      assertThat(responseFuture.cancel(true)).isTrue();
+      executor.runDeferredTask();
+
+      assertThat(responseFuture).isCancelled();
+      assertThat(openCalls).hasValue(0);
+    }
+  }
+
+  @Test
+  void sendStringAsyncWrapsRuntimeFailureFromConnectionFactory() {
+    try (UrlConnectionTransport transport =
+        new UrlConnectionTransport(
+            Executors.newSingleThreadExecutor(),
+            uri -> {
+              throw new IllegalStateException("boom");
+            })) {
+      assertThatThrownBy(
+              () ->
+                  transport
+                      .sendStringAsync(
+                          new ApiRequest(
+                              URI.create("https://example.test/runtime-failure"),
+                              "application/json",
+                              Duration.ofSeconds(2)))
+                      .join())
+          .isInstanceOf(CompletionException.class)
+          .rootCause()
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessage("boom");
+    }
+  }
+
+  @Test
+  void interruptedWorkerCancelsBeforeOpeningConnection() {
+    AtomicInteger openCalls = new AtomicInteger();
+    try (UrlConnectionTransport transport =
+        new UrlConnectionTransport(
+            new InterruptingExecutorService(),
+            uri -> {
+              openCalls.incrementAndGet();
+              return new FakeHttpURLConnection(
+                  200, Map.of(), "ok".getBytes(StandardCharsets.UTF_8), null);
+            })) {
+      assertThatThrownBy(
+              () -> {
+                Throwable thrown =
+                    catchThrowable(
+                        () ->
+                            transport
+                                .sendStringAsync(
+                                    new ApiRequest(
+                                        URI.create("https://example.test/interrupted-before-open"),
+                                        "application/json",
+                                        Duration.ofSeconds(2)))
+                                .join());
+                assertThat(thrown).isInstanceOf(java.util.concurrent.CancellationException.class);
+                assertThat(thrown)
+                    .hasCauseInstanceOf(java.util.concurrent.CancellationException.class);
+                assertThat(thrown.getCause()).hasMessageContaining("interrupted before execution");
+                throw (RuntimeException) thrown;
+              })
+          .isInstanceOf(java.util.concurrent.CancellationException.class);
+      assertThat(openCalls).hasValue(0);
+    }
+  }
+
+  @Test
+  void interruptedWorkerDisconnectsConnectionAfterOpen() {
+    AtomicReference<FakeHttpURLConnection> connectionReference = new AtomicReference<>();
+    try (UrlConnectionTransport transport =
+        new UrlConnectionTransport(
+            Executors.newSingleThreadExecutor(),
+            uri -> {
+              Thread.currentThread().interrupt();
+              FakeHttpURLConnection connection =
+                  new FakeHttpURLConnection(
+                      200, Map.of(), "ok".getBytes(StandardCharsets.UTF_8), null);
+              connectionReference.set(connection);
+              return connection;
+            })) {
+      assertThatThrownBy(
+              () -> {
+                Throwable thrown =
+                    catchThrowable(
+                        () ->
+                            transport
+                                .sendStringAsync(
+                                    new ApiRequest(
+                                        URI.create("https://example.test/interrupted-after-open"),
+                                        "application/json",
+                                        Duration.ofSeconds(2)))
+                                .join());
+                assertThat(thrown).isInstanceOf(java.util.concurrent.CancellationException.class);
+                assertThat(thrown)
+                    .hasCauseInstanceOf(java.util.concurrent.CancellationException.class);
+                assertThat(thrown.getCause())
+                    .hasMessageContaining("cancelled before response handling");
+                throw (RuntimeException) thrown;
+              })
+          .isInstanceOf(java.util.concurrent.CancellationException.class);
+      assertThat(connectionReference.get()).isNotNull();
+      assertThat(connectionReference.get().disconnected).isTrue();
+    }
+  }
+
   private static void awaitDisconnectionOrInterruption(CountDownLatch latch) {
     try {
       if (!latch.await(1, TimeUnit.SECONDS)) {
@@ -305,6 +433,87 @@ class UrlConnectionTransportTest {
       }
     } catch (InterruptedException interruptedException) {
       Thread.currentThread().interrupt();
+    }
+  }
+
+  private static final class DeferredExecutorService extends AbstractExecutorService {
+    private Runnable deferredTask;
+    private boolean shutdown;
+
+    @Override
+    public void shutdown() {
+      shutdown = true;
+    }
+
+    @Override
+    public java.util.List<Runnable> shutdownNow() {
+      shutdown = true;
+      return java.util.List.of();
+    }
+
+    @Override
+    public boolean isShutdown() {
+      return shutdown;
+    }
+
+    @Override
+    public boolean isTerminated() {
+      return shutdown;
+    }
+
+    @Override
+    public boolean awaitTermination(long timeout, TimeUnit unit) {
+      return shutdown;
+    }
+
+    @Override
+    public void execute(Runnable command) {
+      deferredTask = command;
+    }
+
+    private void runDeferredTask() {
+      assertThat(deferredTask).isNotNull();
+      deferredTask.run();
+    }
+  }
+
+  private static final class InterruptingExecutorService extends AbstractExecutorService {
+    private boolean shutdown;
+
+    @Override
+    public void shutdown() {
+      shutdown = true;
+    }
+
+    @Override
+    public java.util.List<Runnable> shutdownNow() {
+      shutdown = true;
+      return java.util.List.of();
+    }
+
+    @Override
+    public boolean isShutdown() {
+      return shutdown;
+    }
+
+    @Override
+    public boolean isTerminated() {
+      return shutdown;
+    }
+
+    @Override
+    public boolean awaitTermination(long timeout, TimeUnit unit) {
+      return shutdown;
+    }
+
+    @Override
+    public void execute(Runnable command) {
+      Thread.currentThread().interrupt();
+      try {
+        command.run();
+      } finally {
+        Thread.interrupted();
+      }
     }
   }
 

@@ -100,6 +100,24 @@ class ForgefileStoreTest {
   }
 
   @Test
+  void saveOmitsBlankTopLevelStringFields() throws Exception {
+    Path file = tempDir.resolve("blank-top-level.json");
+    Forgefile forgefile = new Forgefile(" ", "app", "", "   ", " ", "", "", "", null, null);
+
+    ForgefileStore.save(file, forgefile);
+    String raw = Files.readString(file);
+
+    assertThat(raw).contains("\"artifactId\"");
+    assertThat(raw).doesNotContain("\"groupId\"");
+    assertThat(raw).doesNotContain("\"version\"");
+    assertThat(raw).doesNotContain("\"packageName\"");
+    assertThat(raw).doesNotContain("\"outputDirectory\"");
+    assertThat(raw).doesNotContain("\"platformStream\"");
+    assertThat(raw).doesNotContain("\"buildTool\"");
+    assertThat(raw).doesNotContain("\"javaVersion\"");
+  }
+
+  @Test
   void loadPreservesMissingFieldsAsNull() throws Exception {
     Path file = tempDir.resolve("missing-fields.json");
     Files.writeString(
@@ -139,6 +157,19 @@ class ForgefileStoreTest {
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("Failed to parse Forgefile '")
         .hasMessageContaining("bad.json");
+  }
+
+  @Test
+  void saveDirectoryTargetThrowsWriteError() throws Exception {
+    Path directoryTarget = tempDir.resolve("existing-directory");
+    Files.createDirectory(directoryTarget);
+    Forgefile forgefile =
+        new Forgefile("com.acme", "demo", "1.0.0", null, null, null, "maven", "25", null, null);
+
+    assertThatThrownBy(() -> ForgefileStore.save(directoryTarget, forgefile))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Failed to write Forgefile '")
+        .hasMessageContaining("existing-directory");
   }
 
   @Test
