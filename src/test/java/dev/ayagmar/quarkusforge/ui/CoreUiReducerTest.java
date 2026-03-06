@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class CoreUiReducerTest {
@@ -143,6 +144,39 @@ class CoreUiReducerTest {
 
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
     assertThat(result.effects()).containsExactly(new UiEffect.RequestGenerationCancellation());
+  }
+
+  @Test
+  void catalogLoadRequestProducesCatalogEffect() {
+    ExtensionCatalogLoader loader = () -> null;
+
+    ReduceResult result =
+        reducer.reduce(baseState(), new UiIntent.CatalogLoadRequestedIntent(loader));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects()).containsExactly(new UiEffect.StartCatalogLoad(loader));
+  }
+
+  @Test
+  void catalogLoadSuccessUpdatesReducerStateAndRequestsCatalogApply() {
+    CatalogLoadSuccess success =
+        new CatalogLoadSuccess(
+            List.of(new ExtensionCatalogItem("io.quarkus:quarkus-rest", "REST", "rest", "Web", 10)),
+            null,
+            java.util.Map.of(),
+            CatalogLoadState.loaded("live", false),
+            "Loaded extension catalog from live API");
+
+    ReduceResult result =
+        reducer.reduce(baseState(), new UiIntent.CatalogLoadSucceededIntent(success, true));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.nextState().catalogLoad().sourceLabel()).isEqualTo("live");
+    assertThat(result.nextState().startupOverlay().visible()).isTrue();
+    assertThat(result.nextState().errorMessage()).isEmpty();
+    assertThat(result.effects())
+        .containsExactly(
+            new UiEffect.ApplyCatalogLoadSuccess(success), new UiEffect.RequestAsyncRepaint());
   }
 
   @Test

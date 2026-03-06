@@ -9,9 +9,16 @@ interface CompactInputRenderer {
       Rect area,
       String label,
       String value,
+      MetadataFieldRenderContext context,
       FocusTarget target,
       int selectedIndex,
       int totalOptions);
 
-  void renderCompactText(Frame frame, Rect area, String label, String value, FocusTarget target);
+  void renderCompactText(
+      Frame frame,
+      Rect area,
+      String label,
+      String value,
+      MetadataFieldRenderContext context,
+      FocusTarget target);
 }

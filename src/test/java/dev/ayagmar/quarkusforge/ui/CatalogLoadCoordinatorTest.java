@@ -160,7 +160,7 @@ class CatalogLoadCoordinatorTest {
         List.of(new ExtensionDto(id, id, "web")), CatalogSource.LIVE, false, "", null);
   }
 
-  private static final class TestCallbacks implements CatalogLoadFlowCallbacks {
+  private static final class TestCallbacks implements CatalogLoadIntentPort {
     private CatalogLoadState currentState;
     private final List<CatalogLoadSuccess> successes = new ArrayList<>();
     private final List<CatalogLoadFailure> failures = new ArrayList<>();
@@ -185,30 +185,23 @@ class CatalogLoadCoordinatorTest {
     }
 
     @Override
-    public void onCatalogLoadStarted(CatalogLoadState nextState, String statusMessage) {
-      currentState = nextState;
-    }
-
-    @Override
-    public void onCatalogLoadCancelled(CatalogLoadState nextState) {
-      currentState = nextState;
-    }
-
-    @Override
-    public void onCatalogReloadUnavailable() {
-      reloadUnavailable = true;
-    }
-
-    @Override
-    public void onCatalogLoadSucceeded(CatalogLoadSuccess success) {
-      currentState = success.nextState();
-      successes.add(success);
-    }
-
-    @Override
-    public void onCatalogLoadFailed(CatalogLoadFailure failure) {
-      currentState = failure.nextState();
-      failures.add(failure);
+    public void dispatchIntent(UiIntent intent) {
+      switch (intent) {
+        case UiIntent.CatalogLoadStartedIntent startedIntent ->
+            currentState = startedIntent.nextState();
+        case UiIntent.CatalogLoadCancelledIntent cancelledIntent ->
+            currentState = cancelledIntent.nextState();
+        case UiIntent.CatalogReloadUnavailableIntent _ -> reloadUnavailable = true;
+        case UiIntent.CatalogLoadSucceededIntent succeededIntent -> {
+          currentState = succeededIntent.success().nextState();
+          successes.add(succeededIntent.success());
+        }
+        case UiIntent.CatalogLoadFailedIntent failedIntent -> {
+          currentState = failedIntent.failure().nextState();
+          failures.add(failedIntent.failure());
+        }
+        default -> throw new AssertionError("Unexpected intent: " + intent);
+      }
     }
   }
 }
