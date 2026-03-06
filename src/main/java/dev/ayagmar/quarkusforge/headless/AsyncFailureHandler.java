@@ -10,6 +10,7 @@ import dev.ayagmar.quarkusforge.cli.ExitCodes;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import java.time.Duration;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
@@ -56,6 +57,15 @@ final class AsyncFailureHandler {
       }
       case ExecutionException executionException -> {
         Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);
+        diagnostics.error(
+            diagnosticPrefix + ".failure",
+            of("causeType", cause.getClass().getSimpleName()),
+            of("message", ErrorMessageMapper.userFriendlyError(cause)));
+        System.err.println(userMessagePrefix + ": " + ErrorMessageMapper.userFriendlyError(cause));
+        yield mapFailureToExitCode(cause);
+      }
+      case CompletionException completionException -> {
+        Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(completionException);
         diagnostics.error(
             diagnosticPrefix + ".failure",
             of("causeType", cause.getClass().getSimpleName()),

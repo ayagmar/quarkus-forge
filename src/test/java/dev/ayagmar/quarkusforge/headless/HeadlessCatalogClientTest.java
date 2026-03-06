@@ -11,6 +11,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
+import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.cli.CliCommandTestSupport;
 import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
@@ -58,7 +59,7 @@ class HeadlessCatalogClientTest {
 
       assertThat(catalogData.source()).isEqualTo(CatalogSource.LIVE);
       assertThat(catalogData.extensions())
-          .extracting(dev.ayagmar.quarkusforge.api.ExtensionDto::id)
+          .extracting(ExtensionDto::id)
           .containsExactly("io.quarkus:quarkus-rest");
       assertThat(catalogData.metadata().buildTools()).contains("maven");
     }
@@ -72,9 +73,9 @@ class HeadlessCatalogClientTest {
     CliCommandTestSupport.stubLiveMetadataWithAllBuildTools(wireMockServer);
 
     try (HeadlessCatalogClient client = new HeadlessCatalogClient(runtimeConfig())) {
-      assertThatThrownBy(() -> client.loadCatalogData(Duration.ofMillis(50)))
+      assertThatThrownBy(() -> client.loadCatalogData(Duration.ofMillis(100)))
           .isInstanceOf(TimeoutException.class)
-          .hasMessage("catalog load timed out after 50ms");
+          .hasMessage("catalog load timed out after 100ms");
     }
   }
 
@@ -101,9 +102,9 @@ class HeadlessCatalogClientTest {
 
     try (HeadlessCatalogClient client = new HeadlessCatalogClient(runtimeConfig())) {
       assertThatThrownBy(
-              () -> client.loadBuiltInPresets("io.quarkus.platform:3.31", Duration.ofMillis(50)))
+              () -> client.loadBuiltInPresets("io.quarkus.platform:3.31", Duration.ofMillis(100)))
           .isInstanceOf(TimeoutException.class)
-          .hasMessage("preset load timed out after 50ms");
+          .hasMessage("preset load timed out after 100ms");
     }
   }
 

@@ -72,7 +72,7 @@ class QuarkusForgeCliStartupMetadataTest {
   }
 
   @Test
-  void verboseSmokeModeEmitsTuiCatalogDiagnostics() {
+  void verboseSmokeModeEmitsHeadlessSmokeCatalogDiagnostics() {
     CliCommandTestSupport.stubLiveMetadataWithMavenOnly(wireMockServer);
     CliCommandTestSupport.stubSingleRestExtensionCatalog(wireMockServer);
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
@@ -84,7 +84,7 @@ class QuarkusForgeCliStartupMetadataTest {
     assertThat(result.standardError()).contains("\"event\":\"catalog.load.start\"");
     assertThat(result.standardError())
         .contains("\"event\":\"catalog.load.success\"")
-        .contains("\"mode\":\"tui\"");
+        .contains("\"mode\":\"headless-smoke\"");
     assertThat(result.standardError()).contains("\"event\":\"tui.session.exit\"");
   }
 

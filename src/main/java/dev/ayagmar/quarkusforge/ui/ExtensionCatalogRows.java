@@ -21,17 +21,18 @@ final class ExtensionCatalogRows {
       ExtensionCatalogFilters filters) {
     this.filteredExtensions = List.copyOf(Objects.requireNonNull(filteredExtensions));
     filteredRows =
-        CatalogRowBuilder.buildRows(
-            this.filteredExtensions,
-            collapsedCategoryTitles,
-            Objects.requireNonNull(recentExtensionIds),
-            filters.currentQuery(),
-            filters.favoritesOnlyFilterEnabled(),
-            filters.selectedOnlyFilterEnabled(),
-            filters.activePresetFilterName());
-    selectableRowIndexes = CatalogRowBuilder.buildSelectableIndexes(filteredRows);
-    allRowIndexes = CatalogRowBuilder.buildAllRowIndexes(filteredRows);
-    rowIndexByExtensionId = CatalogRowBuilder.buildRowIndexByExtensionId(filteredRows);
+        List.copyOf(
+            CatalogRowBuilder.buildRows(
+                this.filteredExtensions,
+                collapsedCategoryTitles,
+                Objects.requireNonNull(recentExtensionIds),
+                filters.currentQuery(),
+                filters.favoritesOnlyFilterEnabled(),
+                filters.selectedOnlyFilterEnabled(),
+                filters.activePresetFilterName()));
+    selectableRowIndexes = List.copyOf(CatalogRowBuilder.buildSelectableIndexes(filteredRows));
+    allRowIndexes = List.copyOf(CatalogRowBuilder.buildAllRowIndexes(filteredRows));
+    rowIndexByExtensionId = Map.copyOf(CatalogRowBuilder.buildRowIndexByExtensionId(filteredRows));
   }
 
   void retainAvailableCategories(Set<String> availableCategoryTitles) {
@@ -39,7 +40,9 @@ final class ExtensionCatalogRows {
   }
 
   boolean toggleCategoryCollapse(String categoryTitle) {
-    if (categoryTitle == null || categoryTitle.isBlank()) {
+    if (categoryTitle == null
+        || categoryTitle.isBlank()
+        || CatalogRowBuilder.RECENT_SECTION_TITLE.equals(categoryTitle)) {
       return false;
     }
     boolean collapsed = collapsedCategoryTitles.add(categoryTitle);

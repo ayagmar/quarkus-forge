@@ -47,18 +47,22 @@ public final class TuiBootstrapService {
   }
 
   private static void configureTerminalBackendPreference() {
-    if (isBackendPreferenceExplicitlyConfigured()) {
+    configureTerminalBackendPreference(
+        System.getProperty(BACKEND_PROPERTY_NAME), System.getenv(BACKEND_ENV_NAME));
+  }
+
+  private static void configureTerminalBackendPreference(String propertyValue, String envValue) {
+    if (isBackendPreferenceExplicitlyConfigured(propertyValue, envValue)) {
       return;
     }
     System.setProperty(BACKEND_PROPERTY_NAME, defaultBackendPreference());
   }
 
-  private static boolean isBackendPreferenceExplicitlyConfigured() {
-    String propertyValue = System.getProperty(BACKEND_PROPERTY_NAME);
+  private static boolean isBackendPreferenceExplicitlyConfigured(
+      String propertyValue, String envValue) {
     if (propertyValue != null && !propertyValue.isBlank()) {
       return true;
     }
-    String envValue = System.getenv(BACKEND_ENV_NAME);
     return envValue != null && !envValue.isBlank();
   }
 
@@ -68,7 +72,7 @@ public final class TuiBootstrapService {
       CatalogDataService catalogDataService =
           new CatalogDataService(
               apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
-      diagnostics.info("catalog.load.start", of("mode", "tui"));
+      diagnostics.info("catalog.load.start", of("mode", "headless-smoke"));
       catalogDataService
           .load()
           .handle(CatalogLoadDiagnostics.catalogLoadDiagnostics(diagnostics))
@@ -87,97 +91,110 @@ public final class TuiBootstrapService {
         "tui.session.start",
         of("smokeMode", false),
         of("searchDebounceMs", Math.max(0, searchDebounceMs)));
-    configureTerminalBackendPreference();
-    TuiConfig tuiConfig = appTuiConfig();
-    try (var tui = TuiRunner.create(tuiConfig);
-        QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri())) {
-      CatalogDataService catalogDataService =
-          new CatalogDataService(
-              apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
-      AtomicBoolean firstCatalogLoad = new AtomicBoolean(true);
-      ProjectArchiveService projectArchiveService =
-          new ProjectArchiveService(apiClient, new SafeZipExtractor());
-      CoreTuiController controller =
-          CoreTuiController.from(
-              initialState,
-              UiScheduler.fromScheduledExecutor(tui.scheduler(), tui::runOnRenderThread),
-              Duration.ofMillis(Math.max(0, searchDebounceMs)),
-              (generationRequest, outputDirectory, cancelled, progressListener) ->
-                  projectArchiveService.downloadAndExtract(
-                      generationRequest,
-                      outputDirectory,
-                      OverwritePolicy.FAIL_IF_EXISTS,
-                      cancelled,
-                      progress ->
-                          progressListener.accept(
-                              switch (progress) {
-                                case REQUESTING_ARCHIVE ->
-                                    GenerationProgressUpdate.requestingArchive(
-                                        "requesting project archive from Quarkus API...");
-                                case EXTRACTING_ARCHIVE ->
-                                    GenerationProgressUpdate.extractingArchive(
-                                        "extracting project archive...");
-                              })),
-              ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile()),
-              CoreTuiController.defaultFavoritesPersistenceExecutor(),
-              IdeDetector.detect());
-      controller.setStartupOverlayMinDuration(STARTUP_SPLASH_MIN_DURATION);
-      controller.loadExtensionCatalogAsync(
-          () -> {
-            diagnostics.info("catalog.load.start", of("mode", "tui"));
-            String presetStreamKey = controller.request().platformStream();
-            CompletableFuture<CatalogData> catalogLoadFuture =
-                firstCatalogLoad.getAndSet(false)
-                    ? catalogDataService.loadForStartup()
-                    : catalogDataService.load();
-            return catalogLoadFuture
-                .handle(CatalogLoadDiagnostics.catalogLoadDiagnostics(diagnostics))
-                .thenCompose(
-                    loadResult ->
-                        apiClient
-                            .fetchPresets(presetStreamKey)
-                            .handle(
-                                (presets, throwable) -> {
-                                  if (throwable != null) {
-                                    return CatalogLoadDiagnostics.handlePresetLoadFailure(
-                                        diagnostics, throwable);
-                                  }
-                                  diagnostics.info(
-                                      "preset.load.success",
-                                      of("mode", "tui"),
-                                      of("presetCount", presets.size()));
-                                  return presets;
-                                })
-                            .thenApply(
-                                presets ->
-                                    new ExtensionCatalogLoadResult(
-                                        loadResult.extensions(),
-                                        loadResult.source(),
-                                        loadResult.stale(),
-                                        loadResult.detailMessage(),
-                                        loadResult.metadata(),
-                                        presets)));
-          });
+    String previousBackendPreference = System.getProperty(BACKEND_PROPERTY_NAME);
+    try {
+      configureTerminalBackendPreference();
+      TuiConfig tuiConfig = appTuiConfig();
+      try (var tui = TuiRunner.create(tuiConfig);
+          QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri())) {
+        CatalogDataService catalogDataService =
+            new CatalogDataService(
+                apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
+        AtomicBoolean firstCatalogLoad = new AtomicBoolean(true);
+        ProjectArchiveService projectArchiveService =
+            new ProjectArchiveService(apiClient, new SafeZipExtractor());
+        CoreTuiController controller =
+            CoreTuiController.from(
+                initialState,
+                UiScheduler.fromScheduledExecutor(tui.scheduler(), tui::runOnRenderThread),
+                Duration.ofMillis(Math.max(0, searchDebounceMs)),
+                (generationRequest, outputDirectory, cancelled, progressListener) ->
+                    projectArchiveService.downloadAndExtract(
+                        generationRequest,
+                        outputDirectory,
+                        OverwritePolicy.FAIL_IF_EXISTS,
+                        cancelled,
+                        progress ->
+                            progressListener.accept(
+                                switch (progress) {
+                                  case REQUESTING_ARCHIVE ->
+                                      GenerationProgressUpdate.requestingArchive(
+                                          "requesting project archive from Quarkus API...");
+                                  case EXTRACTING_ARCHIVE ->
+                                      GenerationProgressUpdate.extractingArchive(
+                                          "extracting project archive...");
+                                })),
+                ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile()),
+                CoreTuiController.defaultFavoritesPersistenceExecutor(),
+                IdeDetector.detect());
+        controller.setStartupOverlayMinDuration(STARTUP_SPLASH_MIN_DURATION);
+        controller.loadExtensionCatalogAsync(
+            () -> {
+              diagnostics.info("catalog.load.start", of("mode", "tui"));
+              String presetStreamKey = controller.request().platformStream();
+              CompletableFuture<CatalogData> catalogLoadFuture =
+                  firstCatalogLoad.getAndSet(false)
+                      ? catalogDataService.loadForStartup()
+                      : catalogDataService.load();
+              return catalogLoadFuture
+                  .handle(CatalogLoadDiagnostics.catalogLoadDiagnostics(diagnostics))
+                  .thenCompose(
+                      loadResult ->
+                          apiClient
+                              .fetchPresets(presetStreamKey)
+                              .handle(
+                                  (presets, throwable) -> {
+                                    if (throwable != null) {
+                                      return CatalogLoadDiagnostics.handlePresetLoadFailure(
+                                          diagnostics, throwable);
+                                    }
+                                    diagnostics.info(
+                                        "preset.load.success",
+                                        of("mode", "tui"),
+                                        of("presetCount", presets.size()));
+                                    return presets;
+                                  })
+                              .thenApply(
+                                  presets ->
+                                      new ExtensionCatalogLoadResult(
+                                          loadResult.extensions(),
+                                          loadResult.source(),
+                                          loadResult.stale(),
+                                          loadResult.detailMessage(),
+                                          loadResult.metadata(),
+                                          presets)));
+            });
 
-      tui.run(
-          (event, runner) -> {
-            UiAction action = controller.onEvent(event);
-            if (action.shouldQuit()) {
-              diagnostics.info("tui.session.quit.requested", of("reason", "user"));
-              runner.quit();
-            }
-            return action.handled();
-          },
-          controller::render);
-      diagnostics.info("tui.session.exit", of("outcome", "completed"));
-      PostGenerationExitPlan exitPlan = controller.postGenerationExitPlan().orElse(null);
-      return new TuiSessionSummary(controller.request(), exitPlan);
-    } catch (Exception exception) {
-      diagnostics.error(
-          "tui.session.failure",
-          of("causeType", exception.getClass().getSimpleName()),
-          of("message", ErrorMessageMapper.userFriendlyError(exception)));
-      throw exception;
+        tui.run(
+            (event, runner) -> {
+              UiAction action = controller.onEvent(event);
+              if (action.shouldQuit()) {
+                diagnostics.info("tui.session.quit.requested", of("reason", "user"));
+                runner.quit();
+              }
+              return action.handled();
+            },
+            controller::render);
+        diagnostics.info("tui.session.exit", of("outcome", "completed"));
+        PostGenerationExitPlan exitPlan = controller.postGenerationExitPlan().orElse(null);
+        return new TuiSessionSummary(controller.request(), exitPlan);
+      } catch (Exception exception) {
+        diagnostics.error(
+            "tui.session.failure",
+            of("causeType", exception.getClass().getSimpleName()),
+            of("message", ErrorMessageMapper.userFriendlyError(exception)));
+        throw exception;
+      }
+    } finally {
+      restoreTerminalBackendPreference(previousBackendPreference);
     }
+  }
+
+  private static void restoreTerminalBackendPreference(String previousBackendPreference) {
+    if (previousBackendPreference == null) {
+      System.clearProperty(BACKEND_PROPERTY_NAME);
+      return;
+    }
+    System.setProperty(BACKEND_PROPERTY_NAME, previousBackendPreference);
   }
 }

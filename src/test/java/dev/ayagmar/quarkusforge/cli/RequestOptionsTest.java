@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge.cli;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -71,5 +72,35 @@ class RequestOptionsTest {
   void isExplicitlySetReturnsFalseForEmptyPlatformStreamDefault() {
     RequestOptions opts = new RequestOptions();
     assertThat(opts.isExplicitlySet(RequestOptions.OPT_PLATFORM_STREAM, "", "")).isFalse();
+  }
+
+  @Test
+  void fromCliPrefillDoesNotTreatPrefilledValuesAsCliExplicit() {
+    RequestOptions opts =
+        RequestOptions.fromCliPrefill(
+            new CliPrefill(
+                "com.example",
+                "demo-app",
+                "1.2.3",
+                "com.example.demo",
+                "generated",
+                "io.quarkus.platform:3.31",
+                "gradle",
+                "21"));
+
+    assertThat(
+            opts.isExplicitlySet(
+                RequestOptions.OPT_GROUP_ID, opts.groupId, RequestOptions.DEFAULT_GROUP_ID))
+        .isFalse();
+    assertThat(
+            opts.isExplicitlySet(
+                RequestOptions.OPT_BUILD_TOOL, opts.buildTool, RequestOptions.DEFAULT_BUILD_TOOL))
+        .isFalse();
+    assertThat(
+            opts.isExplicitlySet(
+                RequestOptions.OPT_JAVA_VERSION,
+                opts.javaVersion,
+                RequestOptions.DEFAULT_JAVA_VERSION))
+        .isFalse();
   }
 }

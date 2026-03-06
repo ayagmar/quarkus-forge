@@ -129,7 +129,7 @@ class UrlConnectionTransportTest {
   }
 
   @Test
-  void sendStringAsyncCoercesTimeoutsIntoHttpURLConnectionRange() {
+  void sendStringAsyncCoercesMinimalTimeoutIntoHttpURLConnectionRange() {
     FakeHttpURLConnection minimalTimeoutConnection =
         new FakeHttpURLConnection(200, Map.of(), "ok".getBytes(StandardCharsets.UTF_8), null);
     try (UrlConnectionTransport minimalTimeoutTransport =
@@ -146,7 +146,10 @@ class UrlConnectionTransportTest {
       assertThat(minimalTimeoutConnection.connectTimeout).isEqualTo(1);
       assertThat(minimalTimeoutConnection.readTimeout).isEqualTo(1);
     }
+  }
 
+  @Test
+  void sendStringAsyncCoercesMaxTimeoutIntoHttpURLConnectionRange() {
     FakeHttpURLConnection maxTimeoutConnection =
         new FakeHttpURLConnection(200, Map.of(), "ok".getBytes(StandardCharsets.UTF_8), null);
     try (UrlConnectionTransport maxTimeoutTransport =

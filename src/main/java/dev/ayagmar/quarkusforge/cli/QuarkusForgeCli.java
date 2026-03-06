@@ -107,7 +107,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
     StartupState startupState = loadStartupState(requestOptions, diagnostics);
     StartupMetadataSelection startupMetadataSelection = startupState.metadataSelection();
     ForgeUiState initialState = startupState.initialState();
-    if (!initialState.canSubmit() && shouldBlockOnStartupValidation(dryRun)) {
+    if (!initialState.canSubmit() && dryRun) {
       diagnostics.error(
           "cli.validation.failed", of("errorCount", initialState.validation().errors().size()));
       HeadlessOutputPrinter.printValidationErrors(
@@ -142,10 +142,6 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
     return new CommandLine(new QuarkusForgeCli(runtimeConfig)).execute(args);
   }
 
-  static boolean shouldBlockOnStartupValidation(boolean dryRunMode) {
-    return dryRunMode;
-  }
-
   public static void main(String[] args) {
     int exitCode = runWithArgs(args);
     if (exitCode != 0) {
@@ -166,7 +162,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
     DiagnosticLogger diagnostics = DiagnosticLogger.create(verbose);
     diagnostics.info("cli.start", of("mode", "smoke-test"));
 
-    StartupState startupState = loadStartupState(defaultRequestOptions(), diagnostics);
+    StartupState startupState = loadStartupState(RequestOptions.defaults(), diagnostics);
     StartupMetadataSelection startupMetadataSelection = startupState.metadataSelection();
     ForgeUiState initialState = startupState.initialState();
     if (!initialState.canSubmit()) {
@@ -188,16 +184,12 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
     return requestOptions;
   }
 
-  private static RequestOptions defaultRequestOptions() {
-    return RequestOptions.defaults();
-  }
-
   /** Package-private for testing. */
   static void applyStoredRequestDefaults(RequestOptions requestOptions, CliPrefill storedPrefill) {
     if (storedPrefill == null) {
       return;
     }
-    RequestOptions defaults = defaultRequestOptions();
+    RequestOptions defaults = RequestOptions.defaults();
     requestOptions.groupId =
         applyIfNotExplicit(
             requestOptions,
@@ -270,6 +262,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
     if (!requestOptions.isExplicitlySet(optionName, current, defaultValue)
         && stored != null
         && !stored.isBlank()) {
+      requestOptions.markPrefilled(optionName);
       return stored;
     }
     return current;

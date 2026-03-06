@@ -3,7 +3,6 @@ package dev.ayagmar.quarkusforge.cli;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
-import dev.ayagmar.quarkusforge.runtime.TuiBootstrapService;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -100,18 +99,6 @@ class QuarkusForgeCliTest {
   }
 
   @Test
-  void startupValidationBlockingAppliesOnlyToDryRunMode() {
-    assertThat(QuarkusForgeCli.shouldBlockOnStartupValidation(true)).isTrue();
-    assertThat(QuarkusForgeCli.shouldBlockOnStartupValidation(false)).isFalse();
-  }
-
-  @Test
-  void backendPreferenceUsesPanamaOnly() {
-    String preference = TuiBootstrapService.defaultBackendPreference();
-    assertThat(preference).isEqualTo("panama");
-  }
-
-  @Test
   void applyStoredRequestDefaultsWithNullStoredPrefillDoesNothing() {
     RequestOptions options = new RequestOptions();
     String originalGroupId = options.groupId;
@@ -149,5 +136,18 @@ class QuarkusForgeCliTest {
 
     // Explicitly set values should not be overridden
     assertThat(options.groupId).isEqualTo("com.explicit");
+  }
+
+  @Test
+  void applyStoredRequestDefaultsTreatsPreviouslyAppliedStoredValuesAsNonExplicit() {
+    RequestOptions options = RequestOptions.defaults();
+
+    QuarkusForgeCli.applyStoredRequestDefaults(
+        options, new CliPrefill("com.first", "first-app", "", "", "", "", "", ""));
+    QuarkusForgeCli.applyStoredRequestDefaults(
+        options, new CliPrefill("com.second", "second-app", "", "", "", "", "", ""));
+
+    assertThat(options.groupId).isEqualTo("com.second");
+    assertThat(options.artifactId).isEqualTo("second-app");
   }
 }

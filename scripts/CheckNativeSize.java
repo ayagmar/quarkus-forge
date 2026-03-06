@@ -1,4 +1,5 @@
 import java.io.IOException;
+import java.io.BufferedReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -89,25 +90,28 @@ final class CheckNativeSize {
     List<OriginEntry> origins = new ArrayList<>();
     boolean inSection = false;
 
-    for (String line : Files.readAllLines(logPath)) {
-      if (line.contains(ORIGINS_HEADER)) {
-        inSection = true;
-        continue;
-      }
-      if (!inSection) {
-        continue;
-      }
-      if (line.contains(OBJECT_TYPES_HEADER) || line.contains(DETAILS_FOOTER)) {
-        break;
-      }
+    try (BufferedReader reader = Files.newBufferedReader(logPath)) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        if (line.contains(ORIGINS_HEADER)) {
+          inSection = true;
+          continue;
+        }
+        if (!inSection) {
+          continue;
+        }
+        if (line.contains(OBJECT_TYPES_HEADER) || line.contains(DETAILS_FOOTER)) {
+          break;
+        }
 
-      Matcher match = LEFT_ORIGIN_PATTERN.matcher(line);
-      if (!match.matches()) {
-        continue;
-      }
-      origins.add(new OriginEntry(match.group(2).trim(), match.group(1)));
-      if (origins.size() >= topCount) {
-        break;
+        Matcher match = LEFT_ORIGIN_PATTERN.matcher(line);
+        if (!match.matches()) {
+          continue;
+        }
+        origins.add(new OriginEntry(match.group(2).trim(), match.group(1)));
+        if (origins.size() >= topCount) {
+          break;
+        }
       }
     }
 
