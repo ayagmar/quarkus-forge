@@ -243,6 +243,61 @@ class UrlConnectionTransportTest {
     }
   }
 
+  @Test
+  void sendStringAsyncWrapsConnectionFactoryIoFailure() {
+    try (UrlConnectionTransport transport =
+        new UrlConnectionTransport(
+            Executors.newSingleThreadExecutor(),
+            uri -> {
+              throw new IOException("dns failure");
+            })) {
+      assertThatThrownBy(
+              () ->
+                  transport
+                      .sendStringAsync(
+                          new ApiRequest(
+                              URI.create("https://example.test/unreachable"),
+                              "application/json",
+                              Duration.ofSeconds(2)))
+                      .join())
+          .isInstanceOf(CompletionException.class)
+          .rootCause()
+          .isInstanceOf(IOException.class)
+          .hasMessage("dns failure");
+    }
+  }
+
+  @Test
+  void sendStringAsyncWrapsBodyReadIoFailure() {
+    FakeHttpURLConnection connection =
+        new FakeHttpURLConnection(200, Map.of(), "ignored".getBytes(StandardCharsets.UTF_8), null);
+    connection.inputStreamFactory =
+        () ->
+            new InputStream() {
+              @Override
+              public int read() throws IOException {
+                throw new IOException("body read failed");
+              }
+            };
+    try (UrlConnectionTransport transport =
+        new UrlConnectionTransport(Executors.newSingleThreadExecutor(), uri -> connection)) {
+      assertThatThrownBy(
+              () ->
+                  transport
+                      .sendStringAsync(
+                          new ApiRequest(
+                              URI.create("https://example.test/body-error"),
+                              "application/json",
+                              Duration.ofSeconds(2)))
+                      .join())
+          .isInstanceOf(CompletionException.class)
+          .rootCause()
+          .isInstanceOf(IOException.class)
+          .hasMessage("body read failed");
+      assertThat(connection.disconnected).isTrue();
+    }
+  }
+
   private static void awaitDisconnectionOrInterruption(CountDownLatch latch) {
     try {
       if (!latch.await(1, TimeUnit.SECONDS)) {
@@ -260,6 +315,7 @@ class UrlConnectionTransportTest {
 
     private Runnable responseCodeHook = () -> {};
     private Runnable disconnectHook = () -> {};
+    private InputStreamFactory inputStreamFactory;
     private String acceptHeader;
     private String requestMethod;
     private int connectTimeout;
@@ -330,6 +386,9 @@ class UrlConnectionTransportTest {
       if (inputBody == null) {
         throw new AssertionError("Input stream not expected");
       }
+      if (inputStreamFactory != null) {
+        return inputStreamFactory.open();
+      }
       return new ByteArrayInputStream(inputBody);
     }
 
@@ -348,5 +407,10 @@ class UrlConnectionTransportTest {
         throw new IllegalStateException(ioException);
       }
     }
+  }
+
+  @FunctionalInterface
+  private interface InputStreamFactory {
+    InputStream open();
   }
 }

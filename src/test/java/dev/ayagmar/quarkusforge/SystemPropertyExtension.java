@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge;
 
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -12,6 +13,20 @@ public final class SystemPropertyExtension implements AfterEachCallback {
   public void set(String key, String value) {
     rememberOriginalValue(key);
     System.setProperty(key, value);
+  }
+
+  public void set(String key, long value) {
+    set(key, Long.toString(value));
+  }
+
+  public void set(String key, Path value) {
+    Objects.requireNonNull(value);
+    set(key, value.toString());
+  }
+
+  public void setAll(Map<String, String> values) {
+    Objects.requireNonNull(values);
+    values.forEach(this::set);
   }
 
   public void clear(String key) {

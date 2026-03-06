@@ -19,6 +19,10 @@ graph TD
         TBS[TuiBootstrapService]
     end
 
+    subgraph Persistence["Persistence Layer (persistence/)"]
+        UPS[UserPreferencesStore]
+    end
+
     subgraph TUI["UI Layer (ui/)"]
         CTC[CoreTuiController]
     end
@@ -31,7 +35,7 @@ graph TD
     end
 
     subgraph App["Application Layer (application/)"]
-        PRF[ProjectRequestFactory]
+        IRS[InputResolutionService]
     end
 
     subgraph Forge["Forge Layer (forge/)"]
@@ -58,12 +62,13 @@ graph TD
     end
 
     CLI --> TBS
+    CLI --> UPS
     CLI --> HGS
     HCLI --> HGS
     HGS --> HCC
     HGS --> HOP
     HGS --> HT
-    HGS --> PRF
+    HGS --> IRS
     TBS --> CTC
     CTC --> QAC
     CTC --> FFS
@@ -118,13 +123,13 @@ CoreTuiController (Orchestration Shell)
     │       ├── MetadataSelectorManager  Platform/build/java selectors
     │       ├── ExtensionCatalogState    Search, filter, favorites, presets
     │       ├── CatalogLoadState         Sealed type: Loading → Loaded | Failed
-    │       ├── StartupOverlayTracker    Startup overlay timing
     │       └── GenerationStateTracker   Generation progress tracking
     │
     └── Extracted Helpers
             ├── ExtensionInteractionHandler  Bridge to catalog interactions
             ├── CatalogRowBuilder            Pure function: row building
             ├── UiTextConstants              UI text content
+            ├── CatalogLoadCoordinator       Async catalog lifecycle + startup overlay timing
             ├── GenerationFlowCoordinator    Async generation lifecycle
             └── UiTextInputKeys              Text-input edit-key normalization
 ....
@@ -247,7 +252,7 @@ Headless/TUI boundaries are protected by ArchUnit tests to prevent dependency dr
 
 * Headless orchestration classes must not depend on `dev.ayagmar.quarkusforge.ui.*`.
 * Headless orchestration classes must not depend on `dev.tamboui.*`.
-* Core non-UI layers (`application`, `api`, `archive`, `diagnostics`, `domain`, `forge`, `headless`, `util`) must not depend on `ui`.
+* Core non-UI layers (`application`, `api`, `archive`, `diagnostics`, `domain`, `forge`, `headless`, `persistence`, `util`) must not depend on `ui`.
 
 See xref:reference/headless-maintenance.adoc[Headless Maintenance Guardrails].
 
@@ -312,7 +317,7 @@ graph LR
     end
 
     subgraph App["Application Layer (application/)"]
-        PRF["ProjectRequestFactory"]
+        IRS["InputResolutionService"]
     end
 
     subgraph Forge["Forge Layer (forge/)"]
@@ -320,7 +325,9 @@ graph LR
         FFS["ForgefileStore"]
     end
 
-    PRF -->|creates| PR
+    IRS -->|resolves| PR
+    IRS -->|uses| CPM
+    IRS -->|uses| MCC
     PRV -->|validates| PR
     MCC -->|constrains| PR
     CPM -->|maps CLI options| PR
@@ -358,13 +365,13 @@ graph TD
 | `MetadataPanelSnapshot`, `ExtensionsPanelSnapshot`, `FooterSnapshot` are immutable records passed to renderers — no side effects.
 
 | *DRY*
-| `JsonFieldReader` deduplicates JSON helpers across 5+ classes. `renderCompactField` consolidates two near-identical rendering methods. `AsyncFailureHandler` centralizes 4-exception async failure mapping. `applyFavoritesAndPresetFilters` eliminates duplicate filter pipeline.
+| `JsonFieldReader` deduplicates JSON helpers across 5+ classes. `renderCompactField` consolidates two near-identical rendering methods. `BoundaryFailure` centralizes boundary failure classification. `applyFavoritesAndPresetFilters` eliminates duplicate filter pipeline.
 
 | *Derived State Elimination*
 | `successHint` is computed from `PostGenerationMenuState` rather than stored as a separate mutable field.
 
 | *Encapsulation*
-| `PostGenerationMenuState`, `StartupOverlayTracker`, `MetadataSelectorManager` each own their state and expose it through focused APIs.
+| `PostGenerationMenuState`, `CatalogLoadCoordinator`, and `MetadataSelectorManager` each own their state and expose it through focused APIs.
 
 | *Resource Safety*
 | `QuarkusApiClient` implements `AutoCloseable`; all instantiation sites use try-with-resources or `whenComplete` callbacks to prevent thread pool leaks.

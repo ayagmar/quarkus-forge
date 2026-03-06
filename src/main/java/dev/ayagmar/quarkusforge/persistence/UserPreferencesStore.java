@@ -1,4 +1,4 @@
-package dev.ayagmar.quarkusforge.ui;
+package dev.ayagmar.quarkusforge.persistence;
 
 import dev.ayagmar.quarkusforge.api.AtomicFileStore;
 import dev.ayagmar.quarkusforge.api.ForgeDataPaths;

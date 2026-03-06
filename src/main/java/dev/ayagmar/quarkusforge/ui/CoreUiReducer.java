@@ -71,21 +71,29 @@ final class CoreUiReducer implements UiReducer {
   private static ReduceResult reduceFocusNavigation(
       UiState state, KeyEvent keyEvent, FocusTarget focusTarget) {
     if (keyEvent.isFocusPrevious()) {
-      return new ReduceResult(state, List.of(new UiEffect.MoveFocus(-1)), UiAction.handled(false));
+      return moveFocus(state, focusTarget, -1);
     }
     if (keyEvent.isFocusNext()) {
-      return new ReduceResult(state, List.of(new UiEffect.MoveFocus(1)), UiAction.handled(false));
+      return moveFocus(state, focusTarget, 1);
     }
     if (focusTarget == FocusTarget.SUBMIT) {
       if (UiKeyMatchers.isVimDownKey(keyEvent)) {
-        return new ReduceResult(state, List.of(new UiEffect.MoveFocus(1)), UiAction.handled(false));
+        return moveFocus(state, focusTarget, 1);
       }
       if (UiKeyMatchers.isVimUpKey(keyEvent)) {
-        return new ReduceResult(
-            state, List.of(new UiEffect.MoveFocus(-1)), UiAction.handled(false));
+        return moveFocus(state, focusTarget, -1);
       }
     }
     return new ReduceResult(state, List.of(), UiAction.ignored());
+  }
+
+  private static ReduceResult moveFocus(UiState state, FocusTarget focusTarget, int offset) {
+    FocusTarget nextFocusTarget = UiFocusTargets.move(focusTarget, offset);
+    return new ReduceResult(
+        state.withFocusAndValidationFeedback(
+            nextFocusTarget, "Focus moved to " + UiFocusTargets.nameOf(nextFocusTarget)),
+        List.of(),
+        UiAction.handled(false));
   }
 
   private static ReduceResult reduceMetadataInput(

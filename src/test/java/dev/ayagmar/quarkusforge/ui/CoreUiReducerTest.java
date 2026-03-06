@@ -255,14 +255,18 @@ class CoreUiReducerTest {
   }
 
   @Test
-  void focusNavigationIntentProducesMoveFocusEffect() {
+  void focusNavigationIntentUpdatesFocusStateDirectly() {
     ReduceResult result =
         reducer.reduce(
             baseState(),
             new UiIntent.FocusNavigationIntent(KeyEvent.ofKey(KeyCode.TAB), FocusTarget.GROUP_ID));
 
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
-    assertThat(result.effects()).containsExactly(new UiEffect.MoveFocus(1));
+    assertThat(result.effects()).isEmpty();
+    assertThat(result.nextState().focusTarget()).isEqualTo(FocusTarget.ARTIFACT_ID);
+    assertThat(result.nextState().statusMessage()).isEqualTo("Focus moved to artifactId");
+    assertThat(result.nextState().errorMessage()).isEmpty();
+    assertThat(result.nextState().submitBlockedByValidation()).isFalse();
   }
 
   @Test

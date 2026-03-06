@@ -1,4 +1,4 @@
-package dev.ayagmar.quarkusforge.ui;
+package dev.ayagmar.quarkusforge.persistence;
 
 record UserPreferencesPayload(
     int schemaVersion,

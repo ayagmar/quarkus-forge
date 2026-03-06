@@ -1,6 +1,8 @@
 package dev.ayagmar.quarkusforge.cli;
 
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
+import dev.ayagmar.quarkusforge.domain.ProjectInputDefaults;
+import dev.ayagmar.quarkusforge.forge.Forgefile;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -17,19 +19,19 @@ final class RequestOptions {
    */
   @Spec CommandSpec spec;
 
-  static final String DEFAULT_GROUP_ID = "org.acme";
-  static final String DEFAULT_ARTIFACT_ID = "quarkus-app";
-  static final String DEFAULT_VERSION = "1.0.0-SNAPSHOT";
-  static final String DEFAULT_OUTPUT_DIRECTORY = ".";
-  static final String DEFAULT_PLATFORM_STREAM = "";
-  static final String DEFAULT_BUILD_TOOL = "maven";
+  static final String DEFAULT_GROUP_ID = ProjectInputDefaults.GROUP_ID;
+  static final String DEFAULT_ARTIFACT_ID = ProjectInputDefaults.ARTIFACT_ID;
+  static final String DEFAULT_VERSION = ProjectInputDefaults.VERSION;
+  static final String DEFAULT_OUTPUT_DIRECTORY = ProjectInputDefaults.OUTPUT_DIRECTORY;
+  static final String DEFAULT_PLATFORM_STREAM = ProjectInputDefaults.PLATFORM_STREAM;
+  static final String DEFAULT_BUILD_TOOL = ProjectInputDefaults.BUILD_TOOL;
 
   /**
    * Default Java version. Update this constant each release when the recommended LTS advances. The
    * live metadata from {@code code.quarkus.io} is used at runtime to recommend the appropriate
    * stream, but this value is the fallback when metadata is unavailable.
    */
-  static final String DEFAULT_JAVA_VERSION = "25";
+  static final String DEFAULT_JAVA_VERSION = ProjectInputDefaults.JAVA_VERSION;
 
   static final String OPT_GROUP_ID = "--group-id";
   static final String OPT_ARTIFACT_ID = "--artifact-id";
@@ -113,24 +115,54 @@ final class RequestOptions {
         javaVersion);
   }
 
+  Forgefile toExplicitTemplate() {
+    return new Forgefile(
+        explicitValue(OPT_GROUP_ID, groupId, DEFAULT_GROUP_ID),
+        explicitValue(OPT_ARTIFACT_ID, artifactId, DEFAULT_ARTIFACT_ID),
+        explicitValue(OPT_VERSION, version, DEFAULT_VERSION),
+        explicitValue(OPT_PACKAGE_NAME, packageName, null),
+        explicitValue(OPT_OUTPUT_DIR, outputDirectory, DEFAULT_OUTPUT_DIRECTORY),
+        explicitValue(OPT_PLATFORM_STREAM, platformStream, DEFAULT_PLATFORM_STREAM),
+        explicitValue(OPT_BUILD_TOOL, buildTool, DEFAULT_BUILD_TOOL),
+        explicitValue(OPT_JAVA_VERSION, javaVersion, DEFAULT_JAVA_VERSION),
+        null,
+        null);
+  }
+
   static RequestOptions fromCliPrefill(CliPrefill prefill) {
+    return fromCliPrefill(prefill, true);
+  }
+
+  static RequestOptions explicitFromCliPrefill(CliPrefill prefill) {
+    return fromCliPrefill(prefill, false);
+  }
+
+  private static RequestOptions fromCliPrefill(CliPrefill prefill, boolean markPrefilled) {
     RequestOptions options = defaults();
     if (prefill == null) {
       return options;
     }
-    options.groupId = options.applyPrefill(OPT_GROUP_ID, prefill.groupId(), options.groupId);
+    options.groupId =
+        options.applyCliValue(OPT_GROUP_ID, prefill.groupId(), options.groupId, markPrefilled);
     options.artifactId =
-        options.applyPrefill(OPT_ARTIFACT_ID, prefill.artifactId(), options.artifactId);
-    options.version = options.applyPrefill(OPT_VERSION, prefill.version(), options.version);
-    options.packageName = options.applyPrefill(OPT_PACKAGE_NAME, prefill.packageName(), null);
+        options.applyCliValue(
+            OPT_ARTIFACT_ID, prefill.artifactId(), options.artifactId, markPrefilled);
+    options.version =
+        options.applyCliValue(OPT_VERSION, prefill.version(), options.version, markPrefilled);
+    options.packageName =
+        options.applyCliValue(OPT_PACKAGE_NAME, prefill.packageName(), null, markPrefilled);
     options.outputDirectory =
-        options.applyPrefill(OPT_OUTPUT_DIR, prefill.outputDirectory(), options.outputDirectory);
+        options.applyCliValue(
+            OPT_OUTPUT_DIR, prefill.outputDirectory(), options.outputDirectory, markPrefilled);
     options.platformStream =
-        options.applyPrefill(OPT_PLATFORM_STREAM, prefill.platformStream(), options.platformStream);
+        options.applyCliValue(
+            OPT_PLATFORM_STREAM, prefill.platformStream(), options.platformStream, markPrefilled);
     options.buildTool =
-        options.applyPrefill(OPT_BUILD_TOOL, prefill.buildTool(), options.buildTool);
+        options.applyCliValue(
+            OPT_BUILD_TOOL, prefill.buildTool(), options.buildTool, markPrefilled);
     options.javaVersion =
-        options.applyPrefill(OPT_JAVA_VERSION, prefill.javaVersion(), options.javaVersion);
+        options.applyCliValue(
+            OPT_JAVA_VERSION, prefill.javaVersion(), options.javaVersion, markPrefilled);
     return options;
   }
 
@@ -157,11 +189,21 @@ final class RequestOptions {
     return !Objects.equals(currentValue, defaultValue);
   }
 
-  private String applyPrefill(String optionName, String prefilledValue, String fallbackValue) {
-    if (prefilledValue == null || prefilledValue.isBlank()) {
+  private String explicitValue(String optionName, String currentValue, String defaultValue) {
+    if (!isExplicitlySet(optionName, currentValue, defaultValue)) {
+      return null;
+    }
+    return currentValue;
+  }
+
+  private String applyCliValue(
+      String optionName, String cliValue, String fallbackValue, boolean markPrefilled) {
+    if (cliValue == null || cliValue.isBlank()) {
       return fallbackValue;
     }
-    prefilledOptions.add(optionName);
-    return prefilledValue;
+    if (markPrefilled) {
+      prefilledOptions.add(optionName);
+    }
+    return cliValue;
   }
 }

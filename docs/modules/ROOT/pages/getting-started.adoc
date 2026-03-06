@@ -33,6 +33,15 @@ TIP: A https://github.com/casey/just[justfile] is included with common recipes. 
 
 == Choose Your Mode
 
+[cols="1,1,2", options="header"]
+|===
+| Goal | Use | Why
+| Interactive exploration | `quarkus-forge.jar` | Includes the full TUI
+| CI / container automation | `quarkus-forge-headless.jar` | Smaller and avoids TUI dependencies
+| One local developer artifact | `quarkus-forge.jar` | Supports both TUI and `generate`
+| Smallest runtime footprint | native binary | No JVM required at runtime
+|===
+
 TUI mode (interactive):
 
 [source,bash]
@@ -101,6 +110,45 @@ Install as a local command:
 ----
 jbang app install --name quarkus-forge quarkus-forge@ayagmar
 quarkus-forge
+----
+
+== Bash Completion
+
+Generate completion scripts after building the jars:
+
+[source,bash]
+----
+just completion-bash
+----
+
+This writes:
+
+* `target/completions/quarkus-forge.bash`
+* `target/completions/quarkus-forge-headless.bash`
+
+Load them into the current shell:
+
+[source,bash]
+----
+source target/completions/quarkus-forge.bash
+source target/completions/quarkus-forge-headless.bash
+----
+
+== Release Checksums
+
+Generate `.sha256` files for the release jars:
+
+[source,bash]
+----
+just release-checksums
+----
+
+Verify artifacts:
+
+[source,bash]
+----
+sha256sum -c target/quarkus-forge.jar.sha256
+sha256sum -c target/quarkus-forge-headless.jar.sha256
 ----
 
 == Next Steps

@@ -20,6 +20,24 @@ mvn clean package -DskipTests
 mvn clean package -Pheadless
 ----
 
+== Bash Completion
+
+Generate bash completion scripts for both entry points:
+
+[source,bash]
+----
+just completion-bash
+----
+
+The headless entry script is written to `target/completions/quarkus-forge-headless.bash`.
+
+Load it into the current shell:
+
+[source,bash]
+----
+source target/completions/quarkus-forge-headless.bash
+----
+
 == Command
 
 Use `generate` for non-interactive project generation:
@@ -158,6 +176,22 @@ The optional `locked` section pins exact resolved values for deterministic build
 
 * Output path resolves to `<output-dir>/<artifact-id>`.
 * Extension IDs are validated against the loaded catalog.
+
+== Release Checksums
+
+Generate checksum files for release artifacts:
+
+[source,bash]
+----
+just release-checksums
+----
+
+Verify a downloaded headless jar:
+
+[source,bash]
+----
+sha256sum -c target/quarkus-forge-headless.jar.sha256
+----
 * When `--from` is set, request metadata fields come from the Forgefile; CLI `--preset` and `--extension` are appended.
 * `--from <name>` falls back to `~/.quarkus-forge/recipes/<name>` when no local file exists.
 * `--save-as <name>` writes to `~/.quarkus-forge/recipes/<name>` when `<name>` has no path separators.

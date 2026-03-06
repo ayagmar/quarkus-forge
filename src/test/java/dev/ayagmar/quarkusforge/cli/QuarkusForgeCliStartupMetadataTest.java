@@ -4,13 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import picocli.CommandLine;
 
 class QuarkusForgeCliStartupMetadataTest {
   @TempDir Path tempDir;
@@ -83,8 +87,8 @@ class QuarkusForgeCliStartupMetadataTest {
     assertThat(result.standardError()).contains("\"event\":\"tui.session.start\"");
     assertThat(result.standardError()).contains("\"event\":\"catalog.load.start\"");
     assertThat(result.standardError())
-        .contains("\"event\":\"catalog.load.success\"")
-        .contains("\"mode\":\"headless-smoke\"");
+        .containsPattern(
+            "(?s).*\"event\":\"catalog.load.success\"[^\\n]*\"mode\":\"headless-smoke\".*");
     assertThat(result.standardError()).contains("\"event\":\"tui.session.exit\"");
   }
 
@@ -136,6 +140,23 @@ class QuarkusForgeCliStartupMetadataTest {
     assertThat(result.exitCode()).isZero();
     assertThat(result.standardOut()).contains("metadataSource: snapshot fallback");
     assertThat(result.standardOut()).contains("metadataDetail: Live metadata unavailable");
+  }
+
+  @Test
+  void dryRunFallsBackToSnapshotWhenMetadataClientFailsSynchronously() {
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
+    QuarkusForgeCli cli =
+        new QuarkusForgeCli(
+            runtimeConfig,
+            uri -> {
+              throw new IllegalStateException("boom");
+            });
+
+    CliCommandTestSupport.CommandResult result =
+        runCommand(cli, "--dry-run", "--group-id", "com.example", "--artifact-id", "forge-app");
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(result.standardOut()).contains("metadataSource: snapshot fallback");
   }
 
   @Test
@@ -203,5 +224,24 @@ class QuarkusForgeCliStartupMetadataTest {
   private CliCommandTestSupport.CommandResult runSmoke(
       RuntimeConfig runtimeConfig, boolean verbose) {
     return CliCommandTestSupport.runSmoke(runtimeConfig, verbose);
+  }
+
+  private CliCommandTestSupport.CommandResult runCommand(QuarkusForgeCli cli, String... args) {
+    PrintStream originalOut = System.out;
+    PrintStream originalErr = System.err;
+    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+    ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+    try {
+      System.setOut(new PrintStream(stdout, true, StandardCharsets.UTF_8));
+      System.setErr(new PrintStream(stderr, true, StandardCharsets.UTF_8));
+      int exitCode = new CommandLine(cli).execute(args);
+      return new CliCommandTestSupport.CommandResult(
+          exitCode,
+          stdout.toString(StandardCharsets.UTF_8),
+          stderr.toString(StandardCharsets.UTF_8));
+    } finally {
+      System.setOut(originalOut);
+      System.setErr(originalErr);
+    }
   }
 }

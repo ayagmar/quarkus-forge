@@ -2,31 +2,30 @@ package dev.ayagmar.quarkusforge.cli;
 
 import static dev.ayagmar.quarkusforge.diagnostics.DiagnosticField.of;
 
-import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
-import dev.ayagmar.quarkusforge.api.ThrowableUnwrapper;
-import dev.ayagmar.quarkusforge.application.ProjectRequestFactory;
+import dev.ayagmar.quarkusforge.application.InputResolutionService;
 import dev.ayagmar.quarkusforge.application.StartupMetadataSelection;
+import dev.ayagmar.quarkusforge.diagnostics.BoundaryFailure;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
 import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
-import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.headless.HeadlessCatalogClient;
 import dev.ayagmar.quarkusforge.headless.HeadlessGenerationService;
 import dev.ayagmar.quarkusforge.headless.HeadlessOutputPrinter;
+import dev.ayagmar.quarkusforge.persistence.UserPreferencesStore;
 import dev.ayagmar.quarkusforge.postgen.PostTuiActionExecutor;
 import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
 import dev.ayagmar.quarkusforge.runtime.TuiBootstrapService;
 import dev.ayagmar.quarkusforge.runtime.TuiSessionSummary;
-import dev.ayagmar.quarkusforge.ui.UserPreferencesStore;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
@@ -46,6 +45,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
   @Mixin private RequestOptions requestOptions = new RequestOptions();
 
   private final RuntimeConfig runtimeConfig;
+  private final Function<java.net.URI, QuarkusApiClient> apiClientFactory;
 
   @Option(
       names = "--dry-run",
@@ -91,7 +91,13 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
   }
 
   QuarkusForgeCli(RuntimeConfig runtimeConfig) {
+    this(runtimeConfig, QuarkusApiClient::new);
+  }
+
+  QuarkusForgeCli(
+      RuntimeConfig runtimeConfig, Function<java.net.URI, QuarkusApiClient> apiClientFactory) {
     this.runtimeConfig = Objects.requireNonNull(runtimeConfig);
+    this.apiClientFactory = Objects.requireNonNull(apiClientFactory);
   }
 
   @Override
@@ -270,19 +276,15 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
 
   private StartupState loadStartupState(
       RequestOptions requestOptions, DiagnosticLogger diagnostics) {
-    ProjectRequest request = ProjectRequestFactory.fromCliPrefill(requestOptions.toCliPrefill());
     StartupMetadataSelection startupMetadataSelection = loadStartupMetadataSelection(diagnostics);
-    ProjectRequest requestWithResolvedStream =
-        ProjectRequestFactory.applyRecommendedPlatformStream(
-            request, startupMetadataSelection.metadataCompatibility());
     ForgeUiState initialState =
-        ProjectRequestFactory.buildInitialState(
-            requestWithResolvedStream, startupMetadataSelection.metadataCompatibility());
+        InputResolutionService.resolveInitialState(
+            requestOptions.toCliPrefill(), startupMetadataSelection.metadataCompatibility());
     return new StartupState(initialState, startupMetadataSelection);
   }
 
   private StartupMetadataSelection loadStartupMetadataSelection(DiagnosticLogger diagnostics) {
-    try (QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri())) {
+    try (QuarkusApiClient apiClient = apiClientFactory.apply(runtimeConfig.apiBaseUri())) {
       MetadataDto metadata =
           apiClient
               .fetchMetadata()
@@ -291,38 +293,42 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
       return new StartupMetadataSelection(
           MetadataCompatibilityContext.success(metadata), "live", "");
     } catch (InterruptedException interruptedException) {
-      Thread.currentThread().interrupt();
-      StartupMetadataSelection selection =
-          snapshotFallbackSelection("Live metadata refresh interrupted");
-      diagnostics.warn(
-          "metadata.load.fallback",
-          of("source", selection.sourceLabel()),
-          of("detail", selection.detailMessage()));
-      return selection;
+      return fallbackStartupMetadataSelection(interruptedException, diagnostics);
     } catch (TimeoutException timeoutException) {
-      StartupMetadataSelection selection =
-          snapshotFallbackSelection(
-              "Live metadata refresh timed out after "
-                  + STARTUP_METADATA_REFRESH_TIMEOUT.toMillis()
-                  + "ms");
-      diagnostics.warn(
-          "metadata.load.fallback",
-          of("source", selection.sourceLabel()),
-          of("detail", selection.detailMessage()));
-      return selection;
+      return fallbackStartupMetadataSelection(timeoutException, diagnostics);
     } catch (ExecutionException executionException) {
-      Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(executionException);
-      StartupMetadataSelection selection =
-          snapshotFallbackSelection(
-              "Live metadata unavailable (%s)"
-                  .formatted(ErrorMessageMapper.userFriendlyError(cause)));
-      diagnostics.warn(
-          "metadata.load.fallback",
-          of("source", selection.sourceLabel()),
-          of("detail", selection.detailMessage()),
-          of("causeType", cause.getClass().getSimpleName()));
-      return selection;
+      return fallbackStartupMetadataSelection(executionException, diagnostics);
+    } catch (RuntimeException runtimeException) {
+      return fallbackStartupMetadataSelection(runtimeException, diagnostics);
     }
+  }
+
+  private StartupMetadataSelection fallbackStartupMetadataSelection(
+      Throwable throwable, DiagnosticLogger diagnostics) {
+    BoundaryFailure.Details failure = BoundaryFailure.fromThrowable(throwable);
+    if ("interrupted".equals(failure.cancellationPhase())) {
+      Thread.currentThread().interrupt();
+    }
+    StartupMetadataSelection selection = snapshotFallbackSelection(fallbackReason(failure));
+    diagnostics.warn(
+        "metadata.load.fallback",
+        of("source", selection.sourceLabel()),
+        of("detail", selection.detailMessage()),
+        of("causeType", failure.causeType()));
+    return selection;
+  }
+
+  private static String fallbackReason(BoundaryFailure.Details failure) {
+    return switch (failure.kind()) {
+      case CANCELLED ->
+          "Live metadata refresh "
+              + ("interrupted".equals(failure.cancellationPhase()) ? "interrupted" : "cancelled");
+      case TIMEOUT ->
+          "Live metadata refresh timed out after "
+              + STARTUP_METADATA_REFRESH_TIMEOUT.toMillis()
+              + "ms";
+      case FAILURE -> "Live metadata unavailable (%s)".formatted(failure.userMessage());
+    };
   }
 
   private static StartupMetadataSelection snapshotFallbackSelection(String fallbackReason) {

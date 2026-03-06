@@ -31,14 +31,14 @@ class HeadlessTimeoutsTest {
 
   @Test
   void catalogTimeoutFromSystemProperty() {
-    systemProperties.set(HEADLESS_CATALOG_TIMEOUT_PROPERTY, "5000");
+    systemProperties.set(HEADLESS_CATALOG_TIMEOUT_PROPERTY, 5000L);
 
     assertThat(HeadlessTimeouts.catalogTimeout()).isEqualTo(Duration.ofMillis(5000));
   }
 
   @Test
   void generationTimeoutFromSystemProperty() {
-    systemProperties.set(HEADLESS_GENERATION_TIMEOUT_PROPERTY, "60000");
+    systemProperties.set(HEADLESS_GENERATION_TIMEOUT_PROPERTY, 60000L);
 
     assertThat(HeadlessTimeouts.generationTimeout()).isEqualTo(Duration.ofMillis(60000));
   }

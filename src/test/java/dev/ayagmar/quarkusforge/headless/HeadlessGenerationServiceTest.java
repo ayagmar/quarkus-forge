@@ -8,11 +8,14 @@ import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
+import dev.ayagmar.quarkusforge.api.JsonSupport;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.api.PlatformStream;
 import dev.ayagmar.quarkusforge.cli.ExitCodes;
 import dev.ayagmar.quarkusforge.cli.GenerateCommand;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
+import dev.ayagmar.quarkusforge.forge.Forgefile;
+import dev.ayagmar.quarkusforge.forge.ForgefileStore;
 import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -67,7 +70,7 @@ class HeadlessGenerationServiceTest {
     HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
     GenerateCommand command = commandWithOutput();
-    systemProperties.set(HEADLESS_GENERATION_TIMEOUT_PROPERTY, "1");
+    systemProperties.set(HEADLESS_GENERATION_TIMEOUT_PROPERTY, 1L);
 
     int exitCode = service.run(command, false, false);
 
@@ -206,6 +209,18 @@ class HeadlessGenerationServiceTest {
   }
 
   @Test
+  void presetNamesAreTrimmedAndMatchedCaseInsensitively() {
+    StubCatalogOperations client = new StubCatalogOperations();
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+
+    GenerateCommand command = commandWithOutput();
+    command.presets().add("  Web  ");
+    int exitCode = service.run(command, true, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.OK);
+  }
+
+  @Test
   void unknownPresetReturnsValidationExitCode() {
     StubCatalogOperations client = new StubCatalogOperations();
     HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
@@ -310,6 +325,83 @@ class HeadlessGenerationServiceTest {
 
     assertThat(exitCode).isEqualTo(ExitCodes.OK);
     assertThat(java.nio.file.Files.exists(saveAsPath)).isTrue();
+  }
+
+  @Test
+  void saveAsFromExistingForgefilePreservesOmittedFieldsAndExistingLock() throws Exception {
+    Path sourcePath = tempDir.resolve("source.forgefile.json");
+    Path saveAsPath = tempDir.resolve("copy.forgefile.json");
+    java.nio.file.Files.writeString(
+        sourcePath,
+        """
+        {
+          "artifactId": "team-svc",
+          "javaVersion": "21",
+          "extensions": ["io.quarkus:quarkus-rest"],
+          "locked": {
+            "platformStream": "io.quarkus.platform:3.31",
+            "buildTool": "maven",
+            "javaVersion": "21",
+            "presets": [],
+            "extensions": ["io.quarkus:quarkus-rest"]
+          }
+        }
+        """);
+
+    StubCatalogOperations client = new StubCatalogOperations();
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+
+    GenerateCommand command = new GenerateCommand();
+    command.setFromFile(sourcePath.toString());
+    command.setSaveAsFile(saveAsPath.toString());
+
+    int exitCode = service.run(command, true, false);
+
+    Forgefile saved = ForgefileStore.load(saveAsPath);
+    Map<String, Object> root = JsonSupport.parseObject(java.nio.file.Files.readString(saveAsPath));
+    assertThat(exitCode).isEqualTo(ExitCodes.OK);
+    assertThat(saved.groupId()).isNull();
+    assertThat(saved.version()).isNull();
+    assertThat(saved.outputDirectory()).isNull();
+    assertThat(saved.buildTool()).isNull();
+    assertThat(saved.locked()).isNotNull();
+    assertThat(saved.locked().buildTool()).isEqualTo("maven");
+    assertThat(root).doesNotContainKeys("groupId", "version", "outputDirectory", "buildTool");
+  }
+
+  @Test
+  void lockUpdateOnExistingForgefilePreservesOmittedTopLevelFields() throws Exception {
+    Path sourcePath = tempDir.resolve("locked-source.forgefile.json");
+    java.nio.file.Files.writeString(
+        sourcePath,
+        """
+        {
+          "artifactId": "team-svc",
+          "javaVersion": "21",
+          "extensions": []
+        }
+        """);
+
+    StubCatalogOperations client = new StubCatalogOperations();
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+
+    GenerateCommand command = new GenerateCommand();
+    command.setFromFile(sourcePath.toString());
+    command.setLock(true);
+
+    int exitCode = service.run(command, true, false);
+
+    Forgefile saved = ForgefileStore.load(sourcePath);
+    Map<String, Object> root = JsonSupport.parseObject(java.nio.file.Files.readString(sourcePath));
+    assertThat(exitCode).isEqualTo(ExitCodes.OK);
+    assertThat(saved.groupId()).isNull();
+    assertThat(saved.version()).isNull();
+    assertThat(saved.outputDirectory()).isNull();
+    assertThat(saved.buildTool()).isNull();
+    assertThat(saved.locked()).isNotNull();
+    assertThat(saved.locked().buildTool()).isEqualTo("maven");
+    assertThat(saved.locked().javaVersion()).isEqualTo("21");
+    assertThat(root).doesNotContainKeys("groupId", "version", "outputDirectory", "buildTool");
   }
 
   private GenerateCommand commandWithOutput() {

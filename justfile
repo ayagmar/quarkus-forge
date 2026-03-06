@@ -30,6 +30,25 @@ test:
 test-unit:
     {{mvn}} test
 
+# Run integration tests only (Failsafe)
+test-it:
+    {{mvn}} test-compile failsafe:integration-test failsafe:verify
+
+# Generate bash completion scripts for both entry points
+completion-bash:
+    {{mvn}} -DskipTests package -Pheadless
+    {{mvn}} -DskipTests package
+    mkdir -p target/completions
+    {{java_bin}} -cp {{jar}} picocli.AutoComplete -f -o target/completions/quarkus-forge.bash -n quarkus-forge dev.ayagmar.quarkusforge.cli.QuarkusForgeCli
+    java -cp {{hjar}} picocli.AutoComplete -f -o target/completions/quarkus-forge-headless.bash -n quarkus-forge-headless dev.ayagmar.quarkusforge.cli.HeadlessCli
+
+# Generate sha256 checksum files for release artifacts
+release-checksums:
+    {{mvn}} -DskipTests package -Pheadless
+    {{mvn}} -DskipTests package
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum {{jar}} > {{jar}}.sha256; else shasum -a 256 {{jar}} > {{jar}}.sha256; fi
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum {{hjar}} > {{hjar}}.sha256; else shasum -a 256 {{hjar}} > {{hjar}}.sha256; fi
+
 # Run a full clean verify and print merged coverage report paths
 coverage:
     {{mvn}} clean verify

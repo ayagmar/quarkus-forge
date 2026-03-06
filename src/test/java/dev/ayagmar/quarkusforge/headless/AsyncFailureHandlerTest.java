@@ -1,7 +1,6 @@
 package dev.ayagmar.quarkusforge.headless;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.ayagmar.quarkusforge.api.ApiClientException;
 import dev.ayagmar.quarkusforge.archive.ArchiveException;
@@ -107,16 +106,12 @@ class AsyncFailureHandlerTest {
   }
 
   @Test
-  void unexpectedExceptionTypeThrowsIllegalArgument() {
-    assertThatThrownBy(
-            () ->
-                AsyncFailureHandler.handleFailure(
-                    new IllegalStateException("unexpected"),
-                    timeout,
-                    "test.op",
-                    "Op failed",
-                    diagnostics))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("Unexpected exception type");
+  void unexpectedExceptionTypeReturnsInternalExitCode() {
+    int exitCode =
+        AsyncFailureHandler.handleFailure(
+            new IllegalStateException("unexpected"), timeout, "test.op", "Op failed", diagnostics);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.INTERNAL);
+    assertThat(stderr.toString(StandardCharsets.UTF_8)).contains("unexpected");
   }
 }
