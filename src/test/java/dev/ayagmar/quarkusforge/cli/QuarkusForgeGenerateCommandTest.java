@@ -711,7 +711,7 @@ class QuarkusForgeGenerateCommandTest {
                       {"key":"messaging","extensions":["io.quarkus:quarkus-messaging","io.quarkus:quarkus-smallrye-health"]}
                     ]
                     """)));
-    CliCommandTestSupport.stubLiveMetadataWithAllBuildTools();
+    CliCommandTestSupport.stubLiveMetadataWithAllBuildTools(wireMockServer);
   }
 
   private void stubDownloadEndpoint(String artifactId) throws Exception {

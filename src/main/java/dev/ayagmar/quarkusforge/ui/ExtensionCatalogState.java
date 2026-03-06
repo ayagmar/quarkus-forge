@@ -73,7 +73,7 @@ final class ExtensionCatalogState {
     for (ExtensionCatalogItem item : items) {
       availableExtensionIds.add(item.id());
     }
-    navigation.selectedIdsView().removeIf(id -> !availableExtensionIds.contains(id));
+    navigation.retainAvailableSelections(availableExtensionIds);
     preferences.retainAvailable(availableExtensionIds);
     catalogIndex = new ExtensionCatalogIndex(items);
     applyFiltered(query, searchResultGate.nextToken(), onFiltered);

@@ -21,8 +21,6 @@ class QuarkusForgeCliStartupMetadataTest {
   void setUp() {
     wireMockServer = new WireMockServer(0);
     wireMockServer.start();
-    com.github.tomakehurst.wiremock.client.WireMock.configureFor(
-        "localhost", wireMockServer.port());
   }
 
   @AfterEach
@@ -34,7 +32,7 @@ class QuarkusForgeCliStartupMetadataTest {
 
   @Test
   void dryRunUsesLiveMetadataForInitialValidationWhenAvailable() {
-    CliCommandTestSupport.stubLiveMetadataWithMavenOnly();
+    CliCommandTestSupport.stubLiveMetadataWithMavenOnly(wireMockServer);
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
     CliCommandTestSupport.CommandResult result =
@@ -55,7 +53,7 @@ class QuarkusForgeCliStartupMetadataTest {
 
   @Test
   void verboseDryRunEmitsMetadataLoadDiagnostics() {
-    CliCommandTestSupport.stubLiveMetadataWithMavenOnly();
+    CliCommandTestSupport.stubLiveMetadataWithMavenOnly(wireMockServer);
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
     CliCommandTestSupport.CommandResult result =
@@ -75,8 +73,8 @@ class QuarkusForgeCliStartupMetadataTest {
 
   @Test
   void verboseSmokeModeEmitsTuiCatalogDiagnostics() {
-    CliCommandTestSupport.stubLiveMetadataWithMavenOnly();
-    CliCommandTestSupport.stubSingleRestExtensionCatalog();
+    CliCommandTestSupport.stubLiveMetadataWithMavenOnly(wireMockServer);
+    CliCommandTestSupport.stubSingleRestExtensionCatalog(wireMockServer);
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
     CliCommandTestSupport.CommandResult result = runSmoke(runtimeConfig, true);
@@ -92,8 +90,8 @@ class QuarkusForgeCliStartupMetadataTest {
 
   @Test
   void smokeModeWithoutInteractiveConsoleAvoidsTerminalEscapeOutput() {
-    CliCommandTestSupport.stubLiveMetadataWithMavenOnly();
-    CliCommandTestSupport.stubSingleRestExtensionCatalog();
+    CliCommandTestSupport.stubLiveMetadataWithMavenOnly(wireMockServer);
+    CliCommandTestSupport.stubSingleRestExtensionCatalog(wireMockServer);
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
     CliCommandTestSupport.CommandResult result = runSmoke(runtimeConfig, true);
@@ -105,7 +103,7 @@ class QuarkusForgeCliStartupMetadataTest {
 
   @Test
   void dryRunUsesRecommendedPlatformStreamWhenOptionIsOmitted() {
-    CliCommandTestSupport.stubLiveMetadataWithMavenOnly();
+    CliCommandTestSupport.stubLiveMetadataWithMavenOnly(wireMockServer);
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
     CliCommandTestSupport.CommandResult result =
@@ -119,7 +117,7 @@ class QuarkusForgeCliStartupMetadataTest {
 
   @Test
   void dryRunFallsBackToSnapshotWhenLiveMetadataIsUnavailable() {
-    CliCommandTestSupport.stubStreamsUnavailable();
+    CliCommandTestSupport.stubStreamsUnavailable(wireMockServer);
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
     CliCommandTestSupport.CommandResult result =
@@ -142,7 +140,7 @@ class QuarkusForgeCliStartupMetadataTest {
 
   @Test
   void fallbackMetadataSelectionKeepsValidationDeterministicAfterLiveFailure() {
-    CliCommandTestSupport.stubStreamsUnavailable();
+    CliCommandTestSupport.stubStreamsUnavailable(wireMockServer);
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
     CliCommandTestSupport.CommandResult result =
@@ -168,7 +166,7 @@ class QuarkusForgeCliStartupMetadataTest {
 
   @Test
   void dryRunIgnoresStoredTuiPreferences() throws Exception {
-    CliCommandTestSupport.stubLiveMetadataWithMavenOnly();
+    CliCommandTestSupport.stubLiveMetadataWithMavenOnly(wireMockServer);
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
     Files.writeString(
         tempDir.resolve("preferences.json"),

@@ -8,16 +8,17 @@ import java.util.regex.Pattern;
 
 final class CheckNativeSize {
   private static final Pattern IMAGE_TOTAL_PATTERN =
-      Pattern.compile("\"title\":\"Image Details\",\"subtitle\":\"([^\"]+) in total\"");
-  private static final Pattern CODE_AREA_PATTERN =
-      Pattern.compile("\"label\":\"Code Area\",\"text\":\"([^\"]+)\"");
-  private static final Pattern IMAGE_HEAP_PATTERN =
-      Pattern.compile("\"label\":\"Image Heap\",\"text\":\"([^\"]+)\"");
+      Pattern.compile(
+          "\"title\"\\s*:\\s*\"Image Details\"\\s*,\\s*\"subtitle\"\\s*:\\s*\"([^\"]+?)\\s+in\\s+total\"",
+          Pattern.DOTALL);
+  private static final String CODE_AREA_LABEL = "Code Area";
+  private static final String IMAGE_HEAP_LABEL = "Image Heap";
   private static final Pattern LEFT_ORIGIN_PATTERN =
-      Pattern.compile("^\\s*([0-9.]+(?:MB|kB|B))\\s+(.+?)\\s{2,}[0-9.]+(?:MB|kB|B)\\s+.+$");
-  private static final String ORIGINS_HEADER = "Top 10 origins of code area:";
-  private static final String OBJECT_TYPES_HEADER = "Top 10 object types in image heap:";
-  private static final String DETAILS_FOOTER = "                           For more details";
+      Pattern.compile(
+          "^\\s*([0-9.]+\\s*(?:GiB|MiB|KiB|GB|MB|kB|KB|B))\\s+(.+?)\\s{2,}[0-9.]+\\s*(?:GiB|MiB|KiB|GB|MB|kB|KB|B)\\s+.+$");
+  private static final String ORIGINS_HEADER = "origins of code area:";
+  private static final String OBJECT_TYPES_HEADER = "object types in image heap:";
+  private static final String DETAILS_FOOTER = "For more details";
 
   public static void main(String[] args) {
     try {
@@ -77,12 +78,11 @@ final class CheckNativeSize {
   private static ReportSummary parseReport(Path reportPath) throws IOException {
     String text = Files.readString(reportPath);
     Matcher total = IMAGE_TOTAL_PATTERN.matcher(text);
-    Matcher codeArea = CODE_AREA_PATTERN.matcher(text);
-    Matcher imageHeap = IMAGE_HEAP_PATTERN.matcher(text);
-    if (!total.find() || !codeArea.find() || !imageHeap.find()) {
+    if (!total.find()) {
       throw new IllegalArgumentException("failed to parse native build report: " + reportPath);
     }
-    return new ReportSummary(total.group(1), codeArea.group(1), imageHeap.group(1));
+    return new ReportSummary(
+        total.group(1), extractMetric(text, CODE_AREA_LABEL, reportPath), extractMetric(text, IMAGE_HEAP_LABEL, reportPath));
   }
 
   private static List<OriginEntry> parseOrigins(Path logPath, int topCount) throws IOException {
@@ -97,7 +97,7 @@ final class CheckNativeSize {
       if (!inSection) {
         continue;
       }
-      if (line.contains(OBJECT_TYPES_HEADER) || line.startsWith(DETAILS_FOOTER)) {
+      if (line.contains(OBJECT_TYPES_HEADER) || line.contains(DETAILS_FOOTER)) {
         break;
       }
 
@@ -112,6 +112,18 @@ final class CheckNativeSize {
     }
 
     return origins;
+  }
+
+  private static String extractMetric(String text, String label, Path reportPath) {
+    Pattern pattern =
+        Pattern.compile(
+            "\"label\"\\s*:\\s*\"" + Pattern.quote(label) + "\"\\s*,\\s*\"text\"\\s*:\\s*\"([^\"]+)\"",
+            Pattern.DOTALL);
+    Matcher matcher = pattern.matcher(text);
+    if (!matcher.find()) {
+      throw new IllegalArgumentException("failed to parse native build report: " + reportPath);
+    }
+    return matcher.group(1);
   }
 
   private static String formatBytes(long sizeBytes) {
@@ -132,7 +144,7 @@ final class CheckNativeSize {
       Long maxBytes = null;
       int topCount = 5;
 
-      for (int index = 0; index < args.length; index++) {
+      for (int index = 0; index < args.length; index += 2) {
         String argument = args[index];
         String value = requireValue(args, index, argument);
         switch (argument) {
@@ -144,7 +156,6 @@ final class CheckNativeSize {
           case "--top-count" -> topCount = parseInt(value, "--top-count");
           default -> throw usage("unknown argument: " + argument);
         }
-        index++;
       }
 
       if (label == null || label.isBlank()) {

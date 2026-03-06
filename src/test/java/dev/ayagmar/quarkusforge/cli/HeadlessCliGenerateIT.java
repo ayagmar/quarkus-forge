@@ -48,8 +48,6 @@ class HeadlessCliGenerateIT {
   void setUp() {
     wireMockServer = new WireMockServer(0);
     wireMockServer.start();
-    com.github.tomakehurst.wiremock.client.WireMock.configureFor(
-        "localhost", wireMockServer.port());
   }
 
   @AfterEach
@@ -246,7 +244,7 @@ class HeadlessCliGenerateIT {
     wireMockServer.stubFor(
         get(urlPathEqualTo("/api/presets/stream/io.quarkus.platform%3A3.31"))
             .willReturn(aResponse().withFixedDelay(500).withStatus(200).withBody("[]")));
-    CliCommandTestSupport.stubLiveMetadataWithAllBuildTools();
+    CliCommandTestSupport.stubLiveMetadataWithAllBuildTools(wireMockServer);
     systemProperties.set(HEADLESS_CATALOG_TIMEOUT_PROPERTY, "50");
 
     CliCommandTestSupport.CommandResult result =
@@ -407,7 +405,7 @@ class HeadlessCliGenerateIT {
                       {"key":"web","extensions":["io.quarkus:quarkus-rest","io.quarkus:quarkus-arc"]}
                     ]
                     """)));
-    stubLiveMetadataWithAllBuildTools();
+    CliCommandTestSupport.stubLiveMetadataWithAllBuildTools(wireMockServer);
   }
 
   private void stubDownloadEndpoint(String artifactId) throws Exception {
@@ -417,65 +415,7 @@ class HeadlessCliGenerateIT {
   }
 
   private void stubSingleRestExtensionCatalog() {
-    wireMockServer.stubFor(
-        get(urlPathEqualTo("/api/extensions"))
-            .willReturn(
-                okJson(
-                    """
-                    [
-                      {
-                        "id":"io.quarkus:quarkus-rest",
-                        "name":"REST",
-                        "shortName":"rest",
-                        "category":"Web",
-                        "order":10
-                      }
-                    ]
-                    """)));
-  }
-
-  private void stubLiveMetadataWithAllBuildTools() {
-    wireMockServer.stubFor(
-        get(urlPathEqualTo("/api/streams"))
-            .willReturn(
-                aResponse()
-                    .withStatus(200)
-                    .withHeader("Content-Type", "application/json")
-                    .withBody(
-                        """
-                        [
-                          {
-                            "key":"io.quarkus.platform:3.31",
-                            "javaCompatibility": {
-                              "versions":[17,21,25],
-                              "recommended":25
-                            },
-                            "recommended":true,
-                            "status":"FINAL"
-                          }
-                        ]
-                        """)));
-
-    wireMockServer.stubFor(
-        get(urlPathEqualTo("/q/openapi"))
-            .willReturn(
-                aResponse()
-                    .withStatus(200)
-                    .withHeader("Content-Type", "application/json")
-                    .withBody(
-                        """
-                        {
-                          "paths": {
-                            "/api/download": {
-                              "get": {
-                                "parameters": [
-                                  {"name":"b","schema":{"enum":["MAVEN","GRADLE","GRADLE_KOTLIN_DSL"]}}
-                                ]
-                              }
-                            }
-                          }
-                        }
-                        """)));
+    CliCommandTestSupport.stubSingleRestExtensionCatalog(wireMockServer);
   }
 
   private static byte[] generatedZipPayload(String artifactId) throws Exception {

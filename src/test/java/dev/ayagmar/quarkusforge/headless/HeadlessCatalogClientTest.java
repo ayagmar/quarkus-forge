@@ -40,8 +40,6 @@ class HeadlessCatalogClientTest {
   void setUp() {
     wireMockServer = new WireMockServer(0);
     wireMockServer.start();
-    com.github.tomakehurst.wiremock.client.WireMock.configureFor(
-        "localhost", wireMockServer.port());
   }
 
   @AfterEach
@@ -71,7 +69,7 @@ class HeadlessCatalogClientTest {
     wireMockServer.stubFor(
         get(urlPathEqualTo("/api/extensions"))
             .willReturn(aResponse().withFixedDelay(500).withStatus(200).withBody("[]")));
-    CliCommandTestSupport.stubLiveMetadataWithAllBuildTools();
+    CliCommandTestSupport.stubLiveMetadataWithAllBuildTools(wireMockServer);
 
     try (HeadlessCatalogClient client = new HeadlessCatalogClient(runtimeConfig())) {
       assertThatThrownBy(() -> client.loadCatalogData(Duration.ofMillis(50)))
@@ -143,7 +141,7 @@ class HeadlessCatalogClientTest {
   }
 
   private void stubCatalogEndpoints() {
-    CliCommandTestSupport.stubSingleRestExtensionCatalog();
+    CliCommandTestSupport.stubSingleRestExtensionCatalog(wireMockServer);
     wireMockServer.stubFor(
         get(urlPathEqualTo("/api/presets/stream/io.quarkus.platform%3A3.31"))
             .willReturn(
@@ -153,7 +151,7 @@ class HeadlessCatalogClientTest {
                       {"key":"web","extensions":["io.quarkus:quarkus-rest","io.quarkus:quarkus-arc"]}
                     ]
                     """)));
-    CliCommandTestSupport.stubLiveMetadataWithAllBuildTools();
+    CliCommandTestSupport.stubLiveMetadataWithAllBuildTools(wireMockServer);
   }
 
   private static byte[] generatedZipPayload(String artifactId) throws Exception {

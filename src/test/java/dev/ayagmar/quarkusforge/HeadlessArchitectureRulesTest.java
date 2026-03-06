@@ -54,22 +54,22 @@ class HeadlessArchitectureRulesTest {
           .resideInAnyPackage("dev.tamboui..");
 
   @ArchTest
-  static final ArchRule applicationLayerDoesNotDependOnCliOrUiFrameworks =
+  static final ArchRule applicationLayerDoesNotDependOnPicocli =
       noClasses()
           .that()
           .resideInAnyPackage("dev.ayagmar.quarkusforge.application..")
           .should()
           .dependOnClassesThat()
-          .resideInAnyPackage("dev.ayagmar.quarkusforge.ui..", "dev.tamboui..", "picocli..");
+          .resideInAnyPackage("picocli..");
 
   @ArchTest
-  static final ArchRule runtimeLayerDoesNotDependOnPicocli =
+  static final ArchRule runtimeLayerDoesNotDependOnCliOrPicocli =
       noClasses()
           .that()
           .resideInAnyPackage("dev.ayagmar.quarkusforge.runtime..")
           .should()
           .dependOnClassesThat()
-          .resideInAnyPackage("picocli..");
+          .resideInAnyPackage("dev.ayagmar.quarkusforge.cli..", "picocli..");
 
   @ArchTest
   static final ArchRule uiLayerDoesNotDependOnPicocli =
