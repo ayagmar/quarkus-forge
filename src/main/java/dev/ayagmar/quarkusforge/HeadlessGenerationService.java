@@ -30,10 +30,10 @@ import java.util.stream.Collectors;
 final class HeadlessGenerationService implements AutoCloseable {
   private static final String PRESET_FAVORITES = "favorites";
 
-  private final HeadlessCatalogClient catalogClient;
+  private final HeadlessCatalogOperations catalogClient;
   private final RuntimeConfig runtimeConfig;
 
-  HeadlessGenerationService(HeadlessCatalogClient catalogClient, RuntimeConfig runtimeConfig) {
+  HeadlessGenerationService(HeadlessCatalogOperations catalogClient, RuntimeConfig runtimeConfig) {
     this.catalogClient = catalogClient;
     this.runtimeConfig = runtimeConfig;
   }
