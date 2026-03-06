@@ -2,7 +2,6 @@ package dev.ayagmar.quarkusforge.runtime;
 
 import static dev.ayagmar.quarkusforge.diagnostics.DiagnosticField.of;
 
-import dev.ayagmar.quarkusforge.IdeDetector;
 import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogDataService;
 import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
@@ -14,6 +13,7 @@ import dev.ayagmar.quarkusforge.archive.ProjectArchiveService;
 import dev.ayagmar.quarkusforge.archive.SafeZipExtractor;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
+import dev.ayagmar.quarkusforge.postgen.IdeDetector;
 import dev.ayagmar.quarkusforge.ui.CoreTuiController;
 import dev.ayagmar.quarkusforge.ui.ExtensionCatalogLoadResult;
 import dev.ayagmar.quarkusforge.ui.GenerationProgressUpdate;

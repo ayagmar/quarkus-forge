@@ -6,15 +6,15 @@ import java.util.Objects;
 import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
-final class SystemPropertyExtension implements AfterEachCallback {
+public final class SystemPropertyExtension implements AfterEachCallback {
   private final Map<String, String> originalValues = new LinkedHashMap<>();
 
-  void set(String key, String value) {
+  public void set(String key, String value) {
     rememberOriginalValue(key);
     System.setProperty(key, value);
   }
 
-  void clear(String key) {
+  public void clear(String key) {
     rememberOriginalValue(key);
     System.clearProperty(key);
   }

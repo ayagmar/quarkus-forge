@@ -15,6 +15,8 @@ class HeadlessArchitectureRulesTest {
     "dev.ayagmar.quarkusforge.archive..",
     "dev.ayagmar.quarkusforge.domain..",
     "dev.ayagmar.quarkusforge.diagnostics..",
+    "dev.ayagmar.quarkusforge.forge..",
+    "dev.ayagmar.quarkusforge.headless..",
     "dev.ayagmar.quarkusforge.util.."
   };
 
@@ -22,7 +24,9 @@ class HeadlessArchitectureRulesTest {
   static final ArchRule headlessComponentsDoNotDependOnTuiOrTamboui =
       classes()
           .that()
-          .haveSimpleNameStartingWith("Headless")
+          .resideInAnyPackage("dev.ayagmar.quarkusforge.headless..")
+          .or()
+          .haveSimpleName("HeadlessCli")
           .or()
           .haveSimpleName("GenerateCommand")
           .or()

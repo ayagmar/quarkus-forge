@@ -10,25 +10,35 @@ Quarkus Forge follows a layered architecture that separates HTTP transport, JSON
 ++++
 <pre class="mermaid">
 graph TD
-    subgraph Entry["Entry Points"]
+    subgraph Entry["CLI Layer (cli/)"]
         CLI[QuarkusForgeCli]
         HCLI[HeadlessCli]
-        HGS[HeadlessGenerationService]
     end
 
-    subgraph TUI["TUI Layer"]
+    subgraph Runtime["Runtime Layer (runtime/)"]
         TBS[TuiBootstrapService]
+    end
+
+    subgraph TUI["UI Layer (ui/)"]
         CTC[CoreTuiController]
     end
 
-    subgraph Headless["Headless Layer"]
-        PRF[ProjectRequestFactory]
+    subgraph Headless["Headless Layer (headless/)"]
+        HGS[HeadlessGenerationService]
         HCC[HeadlessCatalogClient]
         HOP[HeadlessOutputPrinter]
         HT[HeadlessTimeouts]
     end
 
-    subgraph API["API Layer"]
+    subgraph App["Application Layer (application/)"]
+        PRF[ProjectRequestFactory]
+    end
+
+    subgraph Forge["Forge Layer (forge/)"]
+        FFS[ForgefileStore]
+    end
+
+    subgraph API["API Layer (api/)"]
         QAC[QuarkusApiClient]
         APP[ApiPayloadParser]
         JFR[JsonFieldReader]
@@ -36,12 +46,12 @@ graph TD
         CDS[CatalogDataService]
     end
 
-    subgraph Archive["Archive Layer"]
+    subgraph Archive["Archive Layer (archive/)"]
         PAS[ProjectArchiveService]
         SZE[SafeZipExtractor]
     end
 
-    subgraph PostGen["Post-Generation"]
+    subgraph PostGen["Post-Generation Layer (postgen/)"]
         PTA[PostTuiActionExecutor]
         SE[ShellExecutor]
         ID[IdeDetector]
@@ -50,12 +60,13 @@ graph TD
     CLI --> TBS
     CLI --> HGS
     HCLI --> HGS
-    HGS --> PRF
     HGS --> HCC
     HGS --> HOP
     HGS --> HT
+    HGS --> PRF
     TBS --> CTC
     CTC --> QAC
+    CTC --> FFS
     HCC --> QAC
     QAC --> APP
     APP --> JFR
@@ -114,7 +125,6 @@ CoreTuiController (Orchestration Shell)
             ├── ExtensionInteractionHandler  Bridge to catalog interactions
             ├── CatalogRowBuilder            Pure function: row building
             ├── UiTextConstants              UI text content
-            ├── AsyncFailureHandler          Reusable async exception mapping
             ├── GenerationFlowCoordinator    Async generation lifecycle
             └── UiTextInputKeys              Text-input edit-key normalization
 ....
@@ -237,7 +247,7 @@ Headless/TUI boundaries are protected by ArchUnit tests to prevent dependency dr
 
 * Headless orchestration classes must not depend on `dev.ayagmar.quarkusforge.ui.*`.
 * Headless orchestration classes must not depend on `dev.tamboui.*`.
-* Core non-UI layers (`api`, `archive`, `domain`, `diagnostics`, `util`) must not depend on `ui`.
+* Core non-UI layers (`application`, `api`, `archive`, `diagnostics`, `domain`, `forge`, `headless`, `util`) must not depend on `ui`.
 
 See xref:reference/headless-maintenance.adoc[Headless Maintenance Guardrails].
 
@@ -294,12 +304,18 @@ graph TD
 ++++
 <pre class="mermaid">
 graph LR
-    subgraph Domain["Domain Model"]
+    subgraph Domain["Domain Layer (domain/)"]
         PR["ProjectRequest<br/>(immutable)"]
-        PRF["ProjectRequestFactory"]
         PRV["ProjectRequestValidator"]
         MCC["MetadataCompatibilityContext"]
         CPM["CliPrefillMapper"]
+    end
+
+    subgraph App["Application Layer (application/)"]
+        PRF["ProjectRequestFactory"]
+    end
+
+    subgraph Forge["Forge Layer (forge/)"]
         FF["Forgefile + ForgefileLock"]
         FFS["ForgefileStore"]
     end
@@ -333,7 +349,7 @@ graph TD
 | Principle | Application
 
 | *Single Responsibility*
-| Each class has one reason to change. `QuarkusApiClient` handles HTTP; `ApiPayloadParser` handles JSON; `OverlayRenderer` handles overlay rendering. `QuarkusForgeCli` owns TUI bootstrap; `HeadlessCli` owns headless-only entry.
+| Each class has one reason to change. `QuarkusApiClient` handles HTTP; `ApiPayloadParser` handles JSON; `OverlayRenderer` handles overlay rendering. `QuarkusForgeCli` owns CLI entry; `TuiBootstrapService` owns runtime bootstrap; `HeadlessCli` owns the headless-only entry path.
 
 | *Sealed Types*
 | `CatalogLoadState` (Loading/Loaded/Failed) and `MenuKeyResult` (Handled/Quit/ExportRecipe/GenerateAgain) make state transitions explicit and exhaustive.

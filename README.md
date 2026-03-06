@@ -242,14 +242,32 @@ The codebase is organized into focused modules that follow SOLID principles and 
 - **`ExtensionCatalogState`** — Extension catalog search, filtering, favorites, presets, and category navigation.
 - **`BodyPanelRenderer`** / **`FooterLinesComposer`** — Layout rendering helpers.
 
-### CLI Layer (root package)
+### Runtime Layer (`runtime/`)
+- **`TuiBootstrapService`** — Runtime wiring for TUI startup, catalog bootstrap, Tamboui backend preference, and session execution.
+- **`TuiSessionSummary`** — Immutable summary of the final request and post-generation exit plan.
+
+### Application Layer (`application/`)
+- **`ProjectRequestFactory`** — Shared request assembly and startup normalization outside Picocli and TUI state.
+- **`StartupMetadataSelection`** — Startup metadata source selection and fallback detail.
+
+### CLI Layer (`cli/`)
 - **`QuarkusForgeCli`** — Picocli command entry point for TUI mode, runtime configuration, and startup metadata resolution.
 - **`HeadlessCli`** — Lightweight entry point for headless/CI mode (no TUI or terminal dependencies).
-- **`HeadlessGenerationService`** — Decoupled headless generation engine for CI/scripting, with `AsyncFailureHandler` for consistent error handling.
+- **`GenerateCommand`** / **`RequestOptions`** — Headless generation command model and option parsing.
 - **`ExitCodes`** — Central exit code constants shared by both entry points.
+
+### Headless Layer (`headless/`)
+- **`HeadlessGenerationService`** — Decoupled headless generation engine for CI/scripting, with `AsyncFailureHandler` for consistent error handling.
+- **`HeadlessCatalogClient`** — Timeout-aware catalog and preset loading plus archive generation orchestration.
+- **`HeadlessOutputPrinter`** — Text-mode summaries and validation/error output.
+
+### Forge Layer (`forge/`)
+- **`ForgefileStore`** — Forgefile persistence (with optional locked section).
+- **`Forgefile`** / **`ForgefileLock`** — Shareable generation templates and deterministic lock data.
+
+### Post-Generation Layer (`postgen/`)
 - **`PostTuiActionExecutor`** — Post-generation shell actions (IDE open, GitHub publish, terminal handoff).
 - **`IdeDetector`** — Cross-platform IDE auto-detection (macOS, Linux, Windows).
-- **`ForgefileStore`** — Forgefile persistence (with optional locked section).
 
 ### Archive Layer (`archive/`)
 - **`SafeZipExtractor`** — Hardened ZIP extraction with Zip-Bomb and Zip-Slip protections.
