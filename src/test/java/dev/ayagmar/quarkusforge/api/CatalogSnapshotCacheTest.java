@@ -188,6 +188,54 @@ class CatalogSnapshotCacheTest {
     assertThat(Files.exists(cacheFile)).isFalse();
   }
 
+  @Test
+  void readReturnsEmptyWhenCodecReportsMalformedPayload() {
+    Path cacheFile = tempDir.resolve("catalog-snapshot.json");
+    CatalogSnapshotCache.SnapshotPayloadCodec malformedCodec =
+        new CatalogSnapshotCache.SnapshotPayloadCodec() {
+          @Override
+          public CatalogSnapshotPayload read(Path file) {
+            throw new ApiContractException("Malformed JSON payload");
+          }
+
+          @Override
+          public byte[] write(CatalogSnapshotPayload payload) throws java.io.IOException {
+            return CatalogSnapshotCache.defaultPayloadCodec().write(payload);
+          }
+        };
+    CatalogSnapshotCache cache =
+        new CatalogSnapshotCache(
+            cacheFile, malformedCodec, Clock.systemUTC(), Duration.ofHours(6), 2L * 1024L * 1024L);
+
+    assertThat(cache.write(sampleMetadata(), sampleExtensions()).written()).isTrue();
+    assertThat(cache.read()).isEmpty();
+  }
+
+  @Test
+  void readPropagatesUnexpectedRuntimeFailureFromCodec() {
+    Path cacheFile = tempDir.resolve("catalog-snapshot.json");
+    CatalogSnapshotCache.SnapshotPayloadCodec failingCodec =
+        new CatalogSnapshotCache.SnapshotPayloadCodec() {
+          @Override
+          public CatalogSnapshotPayload read(Path file) {
+            throw new IllegalStateException("codec bug");
+          }
+
+          @Override
+          public byte[] write(CatalogSnapshotPayload payload) throws java.io.IOException {
+            return CatalogSnapshotCache.defaultPayloadCodec().write(payload);
+          }
+        };
+    CatalogSnapshotCache cache =
+        new CatalogSnapshotCache(
+            cacheFile, failingCodec, Clock.systemUTC(), Duration.ofHours(6), 2L * 1024L * 1024L);
+
+    assertThat(cache.write(sampleMetadata(), sampleExtensions()).written()).isTrue();
+    assertThatThrownBy(cache::read)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("codec bug");
+  }
+
   private static MetadataDto sampleMetadata() {
     return new MetadataDto(
         List.of("21", "25"),

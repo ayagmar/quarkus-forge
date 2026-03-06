@@ -37,6 +37,17 @@ public final class CatalogDataService {
     return load();
   }
 
+  public Optional<CatalogData> fallbackToCachedSnapshot(String unavailableReason) {
+    Optional<CachedCatalogSnapshot> cachedSnapshot = snapshotCache.read();
+    if (cachedSnapshot.isEmpty()) {
+      return Optional.empty();
+    }
+    CachedCatalogSnapshot snapshot = cachedSnapshot.get();
+    String detail =
+        unavailableReason + "; using " + (snapshot.stale() ? "stale " : "") + "cached snapshot";
+    return Optional.of(toCachedCatalogData(snapshot, detail));
+  }
+
   private CatalogData toLiveCatalogData(
       List<ExtensionDto> extensions, MetadataSelection metadataSelection) {
     if (extensions.isEmpty()) {
@@ -83,13 +94,11 @@ public final class CatalogDataService {
 
   private CompletableFuture<CatalogData> fallbackToCache(Throwable throwable) {
     Throwable cause = ThrowableUnwrapper.unwrapCompletionCause(throwable);
-    Optional<CachedCatalogSnapshot> cachedSnapshot = snapshotCache.read();
-    if (cachedSnapshot.isPresent()) {
-      CachedCatalogSnapshot snapshot = cachedSnapshot.get();
-      String detail =
-          "Live catalog unavailable (%s); using %scached snapshot"
-              .formatted(ErrorMessageMapper.simpleError(cause), snapshot.stale() ? "stale " : "");
-      return CompletableFuture.completedFuture(toCachedCatalogData(snapshot, detail));
+    Optional<CatalogData> cachedCatalog =
+        fallbackToCachedSnapshot(
+            "Live catalog unavailable (%s)".formatted(ErrorMessageMapper.simpleError(cause)));
+    if (cachedCatalog.isPresent()) {
+      return CompletableFuture.completedFuture(cachedCatalog.get());
     }
 
     return CompletableFuture.failedFuture(

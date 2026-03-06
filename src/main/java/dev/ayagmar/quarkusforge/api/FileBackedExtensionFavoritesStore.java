@@ -11,6 +11,9 @@ import java.util.Set;
 import java.util.TreeSet;
 
 final class FileBackedExtensionFavoritesStore implements ExtensionFavoritesStore {
+  private static final System.Logger LOGGER =
+      System.getLogger(FileBackedExtensionFavoritesStore.class.getName());
+
   private final Path file;
 
   FileBackedExtensionFavoritesStore(Path file) {
@@ -45,7 +48,9 @@ final class FileBackedExtensionFavoritesStore implements ExtensionFavoritesStore
               List.copyOf(ExtensionFavoriteIds.normalizeList(recentExtensionIds)));
       AtomicFileStore.writeBytes(
           file, JsonSupport.writeBytes(toJsonMap(payload)), "extension-favorites-");
-    } catch (IOException ignored) {
+    } catch (IOException ioException) {
+      LOGGER.log(
+          System.Logger.Level.DEBUG, "Failed to save extension favorites to " + file, ioException);
       // Best-effort persistence only.
     }
   }
@@ -64,7 +69,9 @@ final class FileBackedExtensionFavoritesStore implements ExtensionFavoritesStore
           schemaVersion,
           JsonFieldReader.readStringSet(root, "favoriteExtensionIds"),
           JsonFieldReader.readStringList(root, "recentExtensionIds"));
-    } catch (IOException | RuntimeException ignored) {
+    } catch (IOException | ApiContractException exception) {
+      LOGGER.log(
+          System.Logger.Level.DEBUG, "Failed to load extension favorites from " + file, exception);
       return null;
     }
   }
