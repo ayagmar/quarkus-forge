@@ -10,12 +10,10 @@ sealed interface UiEffect {
 
   record StartGeneration() implements UiEffect {}
 
-  record RequestGenerationCancellation() implements UiEffect {}
-
-  record ShowPostGenerationSuccess(java.nio.file.Path generatedPath, String nextCommand)
+  record TransitionGenerationState(CoreTuiController.GenerationState targetState)
       implements UiEffect {}
 
-  record HidePostGenerationMenu() implements UiEffect {}
+  record RequestGenerationCancellation() implements UiEffect {}
 
   record RequestAsyncRepaint() implements UiEffect {}
 

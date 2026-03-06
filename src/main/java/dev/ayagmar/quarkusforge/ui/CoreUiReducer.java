@@ -10,52 +10,85 @@ final class CoreUiReducer implements UiReducer {
   public ReduceResult reduce(UiState state, UiIntent intent) {
     return switch (intent) {
       case UiIntent.PostGenerationIntent postGenerationIntent ->
-          reducePostGeneration(state, postGenerationIntent.transition());
-      case UiIntent.PrepareForGenerationIntent _ ->
-          new ReduceResult(
-              state, List.of(new UiEffect.PrepareForGeneration()), UiAction.handled(false));
-      case UiIntent.SubmitReadyIntent _ ->
-          new ReduceResult(state, List.of(new UiEffect.StartGeneration()), UiAction.handled(false));
+          reducePostGeneration(state, postGenerationIntent.command());
+      case UiIntent.SubmitRequestedIntent submitIntent ->
+          reduceSubmitRequest(state, submitIntent.evaluation());
+      case UiIntent.SubmitEditRecoveryIntent recoveryIntent ->
+          reduceSubmitRecovery(state, recoveryIntent.recovery());
       case UiIntent.CancelGenerationIntent _ ->
           new ReduceResult(
               state,
               List.of(new UiEffect.RequestGenerationCancellation()),
               UiAction.handled(false));
       case UiIntent.GenerationProgressIntent progressIntent -> {
-        GenerationProgressUpdate progressUpdate = progressIntent.progressUpdate();
-        String rawProgressMessage =
-            progressUpdate.message() == null ? "" : progressUpdate.message();
-        String progressMessage = rawProgressMessage.isBlank() ? "working..." : rawProgressMessage;
         yield new ReduceResult(
-            state.withFeedback("Generation in progress: " + progressMessage, "", ""),
+            state.withSubmissionState(
+                progressIntent.statusMessage(),
+                "",
+                "",
+                state.submitRequested(),
+                false,
+                false,
+                false),
             List.of(),
             UiAction.handled(false));
       }
       case UiIntent.GenerationSuccessIntent successIntent ->
           new ReduceResult(
-              state.withFeedback("Generation succeeded: " + successIntent.generatedPath(), "", ""),
-              List.of(
-                  new UiEffect.ShowPostGenerationSuccess(
-                      successIntent.generatedPath(), successIntent.nextCommand()),
-                  new UiEffect.RequestAsyncRepaint()),
+              state
+                  .withSubmissionState(
+                      "Generation succeeded: " + successIntent.generatedPath(),
+                      "",
+                      "",
+                      state.submitRequested(),
+                      false,
+                      false,
+                      false)
+                  .withPostGeneration(
+                      successPostGenerationState(
+                          state.postGeneration(),
+                          successIntent.generatedPath(),
+                          successIntent.nextCommand())),
+              List.of(new UiEffect.RequestAsyncRepaint()),
               UiAction.handled(false));
       case UiIntent.GenerationCancelledIntent _ ->
           new ReduceResult(
-              state.withFeedback(
-                  "Generation cancelled. Update inputs and press Enter to retry.", "", ""),
-              List.of(new UiEffect.HidePostGenerationMenu(), new UiEffect.RequestAsyncRepaint()),
+              state
+                  .withSubmissionState(
+                      "Generation cancelled. Update inputs and press Enter to retry.",
+                      "",
+                      "",
+                      state.submitRequested(),
+                      false,
+                      false,
+                      false)
+                  .withPostGeneration(hiddenPostGenerationState(state.postGeneration())),
+              List.of(new UiEffect.RequestAsyncRepaint()),
               UiAction.handled(false));
       case UiIntent.GenerationFailedIntent failedIntent ->
           new ReduceResult(
-              state.withFeedback(
-                  "Generation failed.",
-                  failedIntent.userErrorMessage(),
-                  failedIntent.verboseErrorDetails()),
-              List.of(new UiEffect.HidePostGenerationMenu(), new UiEffect.RequestAsyncRepaint()),
+              state
+                  .withSubmissionState(
+                      "Generation failed.",
+                      failedIntent.userErrorMessage(),
+                      failedIntent.verboseErrorDetails(),
+                      state.submitRequested(),
+                      false,
+                      false,
+                      false)
+                  .withPostGeneration(hiddenPostGenerationState(state.postGeneration())),
+              List.of(new UiEffect.RequestAsyncRepaint()),
               UiAction.handled(false));
       case UiIntent.GenerationCancellationRequestedIntent _ ->
           new ReduceResult(
-              state.withStatusAndError("Cancellation requested. Waiting for cleanup...", ""),
+              state.withSubmissionState(
+                  "Cancellation requested. Waiting for cleanup...",
+                  "",
+                  "",
+                  state.submitRequested(),
+                  false,
+                  false,
+                  false),
               List.of(),
               UiAction.handled(false));
       case UiIntent.FocusNavigationIntent navigationIntent ->
@@ -64,8 +97,148 @@ final class CoreUiReducer implements UiReducer {
           reduceMetadataInput(state, metadataIntent.keyEvent(), metadataIntent.focusTarget());
       case UiIntent.TextInputIntent textInputIntent ->
           reduceTextInput(state, textInputIntent.keyEvent(), textInputIntent.focusTarget());
+      case UiIntent.ToggleErrorDetailsIntent toggleIntent ->
+          reduceToggleErrorDetails(state, toggleIntent.activeErrorPresent());
       default -> new ReduceResult(state, List.of(), UiAction.ignored());
     };
+  }
+
+  private static ReduceResult reduceSubmitRequest(
+      UiState state, UiIntent.SubmitEvaluation evaluation) {
+    UiState preparedState =
+        state.withPostGeneration(resetPostGenerationState(state.postGeneration()));
+    if (evaluation.hasValidationError()) {
+      FocusTarget nextFocusTarget =
+          evaluation.firstInvalidTarget() == null
+              ? state.focusTarget()
+              : evaluation.firstInvalidTarget();
+      int issueCount = evaluation.validationIssueCount();
+      String statusMessage =
+          evaluation.firstInvalidTarget() == null
+              ? "Submit blocked: invalid input ("
+                  + issueCount
+                  + " issue"
+                  + (issueCount == 1 ? "" : "s")
+                  + ")"
+              : "Submit blocked: fix "
+                  + UiFocusTargets.nameOf(evaluation.firstInvalidTarget())
+                  + " ("
+                  + issueCount
+                  + " issue"
+                  + (issueCount == 1 ? "" : "s")
+                  + ")";
+      return new ReduceResult(
+          preparedState.withSubmitFeedback(
+              nextFocusTarget, statusMessage, evaluation.firstValidationError(), true, false),
+          List.of(
+              new UiEffect.PrepareForGeneration(),
+              new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.VALIDATING),
+              new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.ERROR)),
+          UiAction.handled(false));
+    }
+    if (evaluation.hasTargetConflict()) {
+      return new ReduceResult(
+          preparedState.withSubmitFeedback(
+              FocusTarget.OUTPUT_DIR,
+              "Submit blocked: target folder exists (change output/artifact)",
+              evaluation.targetConflictErrorMessage(),
+              false,
+              true),
+          List.of(
+              new UiEffect.PrepareForGeneration(),
+              new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.VALIDATING),
+              new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.ERROR)),
+          UiAction.handled(false));
+    }
+    if (!evaluation.generationConfigured()) {
+      return new ReduceResult(
+          preparedState.withSubmissionState(
+              "Submit requested with "
+                  + evaluation.selectedExtensionCount()
+                  + " extension(s), but generation service is not configured.",
+              "",
+              "",
+              true,
+              false,
+              false,
+              false),
+          List.of(
+              new UiEffect.PrepareForGeneration(),
+              new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.VALIDATING),
+              new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.IDLE)),
+          UiAction.handled(false));
+    }
+    return new ReduceResult(
+        preparedState.withSubmissionState(
+            "Submit requested with " + evaluation.selectedExtensionCount() + " extension(s)",
+            "",
+            "",
+            true,
+            false,
+            false,
+            false),
+        List.of(
+            new UiEffect.PrepareForGeneration(),
+            new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.VALIDATING),
+            new UiEffect.StartGeneration()),
+        UiAction.handled(false));
+  }
+
+  private static ReduceResult reduceSubmitRecovery(
+      UiState state, UiIntent.SubmitEditRecovery recovery) {
+    if (recovery.targetConflictResolved()) {
+      return new ReduceResult(
+          state.withSubmissionState(
+              "Target folder conflict resolved",
+              "",
+              state.verboseErrorDetails(),
+              state.submitRequested(),
+              false,
+              false,
+              false),
+          List.of(),
+          UiAction.handled(false));
+    }
+    if (recovery.submitBlockedByTargetConflict()) {
+      return new ReduceResult(
+          state.withSubmissionState(
+              state.statusMessage(),
+              recovery.targetConflictErrorMessage(),
+              state.verboseErrorDetails(),
+              state.submitRequested(),
+              state.submitBlockedByValidation(),
+              true,
+              false),
+          List.of(),
+          UiAction.handled(false));
+    }
+    if (recovery.validationRecovered()) {
+      return new ReduceResult(
+          state.withSubmissionState(
+              "Validation restored",
+              "",
+              state.verboseErrorDetails(),
+              state.submitRequested(),
+              false,
+              false,
+              false),
+          List.of(),
+          UiAction.handled(false));
+    }
+    if (recovery.submitBlockedByValidation()) {
+      return new ReduceResult(
+          state.withSubmissionState(
+              state.statusMessage(),
+              recovery.firstValidationError(),
+              state.verboseErrorDetails(),
+              state.submitRequested(),
+              true,
+              false,
+              false),
+          List.of(),
+          UiAction.handled(false));
+    }
+    return new ReduceResult(state, List.of(), UiAction.ignored());
   }
 
   private static ReduceResult reduceFocusNavigation(
@@ -135,21 +308,87 @@ final class CoreUiReducer implements UiReducer {
   }
 
   private static ReduceResult reducePostGeneration(
-      UiState state, UiIntent.PostGenerationTransition transition) {
-    return switch (transition) {
-      case HANDLED -> new ReduceResult(state, List.of(), UiAction.handled(false));
-      case QUIT ->
+      UiState state, UiIntent.PostGenerationCommand command) {
+    UiState.PostGenerationView postGeneration = state.postGeneration();
+    return switch (command) {
+      case UiIntent.PostGenerationCommand.Noop _ ->
+          new ReduceResult(state, List.of(), UiAction.handled(false));
+      case UiIntent.PostGenerationCommand.MoveActionSelection moveCommand ->
           new ReduceResult(
-              state, List.of(new UiEffect.CancelPendingAsync()), UiAction.handled(true));
-      case EXPORT_RECIPE ->
-          new ReduceResult(
-              state, List.of(new UiEffect.ExportRecipeAndLock()), UiAction.handled(false));
-      case GENERATE_AGAIN ->
-          new ReduceResult(
-              state.withStatusAndError("Ready for next generation", ""),
-              List.of(new UiEffect.PrepareForGeneration()),
+              state.withPostGeneration(
+                  withActionSelection(
+                      postGeneration, moveCommand.delta(), postGeneration.actions().size())),
+              List.of(),
               UiAction.handled(false));
+      case UiIntent.PostGenerationCommand.MoveGithubVisibilitySelection moveCommand ->
+          new ReduceResult(
+              state.withPostGeneration(
+                  withGithubVisibilitySelection(
+                      postGeneration,
+                      moveCommand.delta(),
+                      UiTextConstants.GITHUB_VISIBILITY_LABELS.size())),
+              List.of(),
+              UiAction.handled(false));
+      case UiIntent.PostGenerationCommand.SelectActionIndex selectCommand ->
+          executePostGenerationSelection(
+              state, withExactActionSelection(postGeneration, selectCommand.index()));
+      case UiIntent.PostGenerationCommand.SelectGithubVisibilityIndex selectCommand ->
+          confirmGithubVisibilitySelection(
+              state,
+              new UiState.PostGenerationView(
+                  postGeneration.visible(),
+                  postGeneration.githubVisibilityVisible(),
+                  postGeneration.actionSelection(),
+                  selectCommand.index(),
+                  postGeneration.actions(),
+                  postGeneration.lastGeneratedProjectPath(),
+                  postGeneration.lastGeneratedNextCommand(),
+                  postGeneration.exitPlan()));
+      case UiIntent.PostGenerationCommand.ConfirmSelection _ ->
+          postGeneration.githubVisibilityVisible()
+              ? confirmGithubVisibilitySelection(state, postGeneration)
+              : executePostGenerationSelection(state, postGeneration);
+      case UiIntent.PostGenerationCommand.CancelGithubVisibility _ ->
+          new ReduceResult(
+              state.withPostGeneration(
+                  new UiState.PostGenerationView(
+                      postGeneration.visible(),
+                      false,
+                      postGeneration.actionSelection(),
+                      0,
+                      postGeneration.actions(),
+                      postGeneration.lastGeneratedProjectPath(),
+                      postGeneration.lastGeneratedNextCommand(),
+                      postGeneration.exitPlan())),
+              List.of(),
+              UiAction.handled(false));
+      case UiIntent.PostGenerationCommand.Quit _ ->
+          closePostGenerationWithExitPlan(
+              state,
+              postGeneration,
+              new PostGenerationExitPlan(
+                  PostGenerationExitAction.QUIT,
+                  postGeneration.lastGeneratedProjectPath(),
+                  postGeneration.lastGeneratedNextCommand(),
+                  GitHubVisibility.PRIVATE,
+                  null));
     };
+  }
+
+  private static ReduceResult reduceToggleErrorDetails(UiState state, boolean activeErrorPresent) {
+    if (!activeErrorPresent) {
+      return new ReduceResult(
+          state.withShowErrorDetails(false, "No error details available"),
+          List.of(),
+          UiAction.handled(false));
+    }
+    boolean nextShowErrorDetails = !state.showErrorDetails();
+    return new ReduceResult(
+        state.withShowErrorDetails(
+            nextShowErrorDetails,
+            nextShowErrorDetails ? "Expanded error details" : "Collapsed error details"),
+        List.of(),
+        UiAction.handled(false));
   }
 
   private static boolean hasSelectorOptions(UiState state, FocusTarget focusTarget) {
@@ -161,5 +400,157 @@ final class CoreUiReducer implements UiReducer {
           default -> MetadataPanelSnapshot.SelectorInfo.EMPTY;
         };
     return selectorInfo.totalOptions() > 0;
+  }
+
+  private static UiState.PostGenerationView withActionSelection(
+      UiState.PostGenerationView state, int delta, int size) {
+    int nextSelection =
+        size > 0 ? Math.floorMod(state.actionSelection() + delta, size) : state.actionSelection();
+    return new UiState.PostGenerationView(
+        state.visible(),
+        state.githubVisibilityVisible(),
+        nextSelection,
+        state.githubVisibilitySelection(),
+        state.actions(),
+        state.lastGeneratedProjectPath(),
+        state.lastGeneratedNextCommand(),
+        state.exitPlan());
+  }
+
+  private static UiState.PostGenerationView withGithubVisibilitySelection(
+      UiState.PostGenerationView state, int delta, int size) {
+    int nextSelection =
+        size > 0
+            ? Math.floorMod(state.githubVisibilitySelection() + delta, size)
+            : state.githubVisibilitySelection();
+    return new UiState.PostGenerationView(
+        state.visible(),
+        state.githubVisibilityVisible(),
+        state.actionSelection(),
+        nextSelection,
+        state.actions(),
+        state.lastGeneratedProjectPath(),
+        state.lastGeneratedNextCommand(),
+        state.exitPlan());
+  }
+
+  private static UiState.PostGenerationView withExactActionSelection(
+      UiState.PostGenerationView state, int index) {
+    return new UiState.PostGenerationView(
+        state.visible(),
+        state.githubVisibilityVisible(),
+        index,
+        state.githubVisibilitySelection(),
+        state.actions(),
+        state.lastGeneratedProjectPath(),
+        state.lastGeneratedNextCommand(),
+        state.exitPlan());
+  }
+
+  private static ReduceResult executePostGenerationSelection(
+      UiState state, UiState.PostGenerationView postGeneration) {
+    UiTextConstants.PostGenerationAction selected =
+        (postGeneration.actionSelection() >= 0
+                && postGeneration.actionSelection() < postGeneration.actions().size())
+            ? postGeneration.actions().get(postGeneration.actionSelection())
+            : null;
+    PostGenerationExitAction action =
+        selected != null ? selected.action() : PostGenerationExitAction.QUIT;
+    if (action == PostGenerationExitAction.EXPORT_RECIPE_LOCK) {
+      return new ReduceResult(
+          state.withPostGeneration(postGeneration),
+          List.of(new UiEffect.ExportRecipeAndLock()),
+          UiAction.handled(false));
+    }
+    if (action == PostGenerationExitAction.PUBLISH_GITHUB) {
+      return new ReduceResult(
+          state.withPostGeneration(
+              new UiState.PostGenerationView(
+                  true,
+                  true,
+                  postGeneration.actionSelection(),
+                  0,
+                  postGeneration.actions(),
+                  postGeneration.lastGeneratedProjectPath(),
+                  postGeneration.lastGeneratedNextCommand(),
+                  null)),
+          List.of(),
+          UiAction.handled(false));
+    }
+    if (action == PostGenerationExitAction.GENERATE_AGAIN) {
+      return new ReduceResult(
+          state
+              .withSubmissionState(
+                  "Ready for next generation", "", "", state.submitRequested(), false, false, false)
+              .withPostGeneration(resetPostGenerationState(postGeneration)),
+          List.of(new UiEffect.PrepareForGeneration()),
+          UiAction.handled(false));
+    }
+    return closePostGenerationWithExitPlan(
+        state,
+        postGeneration,
+        new PostGenerationExitPlan(
+            action,
+            postGeneration.lastGeneratedProjectPath(),
+            postGeneration.lastGeneratedNextCommand(),
+            GitHubVisibility.PRIVATE,
+            selected != null ? selected.ideCommand() : null));
+  }
+
+  private static ReduceResult confirmGithubVisibilitySelection(
+      UiState state, UiState.PostGenerationView postGeneration) {
+    return closePostGenerationWithExitPlan(
+        state,
+        postGeneration,
+        new PostGenerationExitPlan(
+            PostGenerationExitAction.PUBLISH_GITHUB,
+            postGeneration.lastGeneratedProjectPath(),
+            postGeneration.lastGeneratedNextCommand(),
+            postGeneration.selectedGithubVisibility(),
+            null));
+  }
+
+  private static ReduceResult closePostGenerationWithExitPlan(
+      UiState state, UiState.PostGenerationView postGeneration, PostGenerationExitPlan exitPlan) {
+    return new ReduceResult(
+        state.withPostGeneration(
+            new UiState.PostGenerationView(
+                false,
+                false,
+                0,
+                0,
+                postGeneration.actions(),
+                postGeneration.lastGeneratedProjectPath(),
+                postGeneration.lastGeneratedNextCommand(),
+                exitPlan)),
+        List.of(new UiEffect.CancelPendingAsync()),
+        UiAction.handled(true));
+  }
+
+  private static UiState.PostGenerationView successPostGenerationState(
+      UiState.PostGenerationView currentState,
+      java.nio.file.Path generatedPath,
+      String nextCommand) {
+    return new UiState.PostGenerationView(
+        true, false, 0, 0, currentState.actions(), generatedPath, nextCommand, null);
+  }
+
+  private static UiState.PostGenerationView hiddenPostGenerationState(
+      UiState.PostGenerationView currentState) {
+    return new UiState.PostGenerationView(
+        false,
+        false,
+        currentState.actionSelection(),
+        0,
+        currentState.actions(),
+        currentState.lastGeneratedProjectPath(),
+        currentState.lastGeneratedNextCommand(),
+        null);
+  }
+
+  private static UiState.PostGenerationView resetPostGenerationState(
+      UiState.PostGenerationView currentState) {
+    return new UiState.PostGenerationView(
+        false, false, 0, 0, currentState.actions(), null, "", null);
   }
 }

@@ -105,12 +105,14 @@ CoreTuiController (Orchestration Shell)
     │
     ├── CoreUiReducer            Pure transition logic for migrated slices
     │       ├── post-generation intent handling
+    │       ├── submit + blocked-submit authority
     │       ├── generation callback intent handling
-    │       └── focus/input intent handling
+    │       ├── focus/input intent handling
+    │       └── error-details expansion/reset state
     │
     ├── UiEffectsRunner          Executes side effects emitted by reducer
     │       ├── generation start/cancel
-    │       ├── post-generation menu updates
+    │       ├── generation-state transitions for submit lifecycle
     │       └── repaint + async coordination hooks
     │
     ├── UiRenderer               State-driven render orchestration

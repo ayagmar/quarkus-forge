@@ -515,7 +515,9 @@ public final class CoreTuiController
   @Override
   public void onProgress(GenerationProgressUpdate progressUpdate) {
     generationStateTracker.updateProgress(progressUpdate);
-    dispatchIntent(new UiIntent.GenerationProgressIntent(progressUpdate));
+    dispatchIntent(
+        new UiIntent.GenerationProgressIntent(
+            "Generation in progress: " + generationStateTracker.progressPhase()));
   }
 
   @Override
@@ -573,6 +575,7 @@ public final class CoreTuiController
     catalogLoadState = success.nextState();
     errorMessage = "";
     verboseErrorDetails = "";
+    showErrorDetails = false;
     statusMessage = success.statusMessage();
     extensionCatalogState.replaceCatalog(
         success.items(), inputStates.get(FocusTarget.EXTENSION_SEARCH).text(), ignored -> {});
@@ -586,6 +589,7 @@ public final class CoreTuiController
     catalogLoadState = failure.nextState();
     errorMessage = failure.errorMessage();
     verboseErrorDetails = failure.errorMessage();
+    showErrorDetails = false;
     statusMessage = failure.statusMessage();
     requestAsyncRepaint();
   }
@@ -616,7 +620,8 @@ public final class CoreTuiController
             submitBlockedByTargetConflict,
             statusMessage,
             errorMessage,
-            verboseErrorDetails),
+            verboseErrorDetails,
+            showErrorDetails),
         new UiStateSnapshotMapper.ViewState(
             new UiState.OverlayState(
                 isGenerationActive(),
@@ -634,13 +639,7 @@ public final class CoreTuiController
                 catalogLoadState.sourceLabel(),
                 catalogLoadState.isStale(),
                 catalogLoadState.errorMessage()),
-            new UiState.PostGenerationView(
-                postGenerationMenu.isVisible(),
-                postGenerationMenu.isGithubVisibilityMenuVisible(),
-                postGenerationMenu.actionSelection(),
-                postGenerationMenu.githubVisibilitySelection(),
-                postGenerationMenu.actionLabels(),
-                postGenerationMenu.successHint()),
+            postGenerationMenu.snapshot(),
             new UiState.StartupOverlayView(startupOverlayVisible, startupStatusLines),
             new UiState.ExtensionView(
                 extensionCatalogState.filteredExtensions().size(),
@@ -1295,24 +1294,11 @@ public final class CoreTuiController
 
   @Override
   public UiAction handlePostGenerationMenuKey(KeyEvent keyEvent) {
-    PostGenerationMenuState.MenuKeyResult result = postGenerationMenu.handleKey(keyEvent);
-    if (result == null) {
+    UiIntent.PostGenerationCommand command = postGenerationMenu.handleKey(keyEvent);
+    if (command == null) {
       return null;
     }
-    return routeIntent(mapPostGenerationIntent(result));
-  }
-
-  private static UiIntent mapPostGenerationIntent(PostGenerationMenuState.MenuKeyResult result) {
-    return switch (result) {
-      case PostGenerationMenuState.MenuKeyResult.Handled _ ->
-          new UiIntent.PostGenerationIntent(UiIntent.PostGenerationTransition.HANDLED);
-      case PostGenerationMenuState.MenuKeyResult.Quit _ ->
-          new UiIntent.PostGenerationIntent(UiIntent.PostGenerationTransition.QUIT);
-      case PostGenerationMenuState.MenuKeyResult.ExportRecipe _ ->
-          new UiIntent.PostGenerationIntent(UiIntent.PostGenerationTransition.EXPORT_RECIPE);
-      case PostGenerationMenuState.MenuKeyResult.GenerateAgain _ ->
-          new UiIntent.PostGenerationIntent(UiIntent.PostGenerationTransition.GENERATE_AGAIN);
-    };
+    return routeIntent(new UiIntent.PostGenerationIntent(command));
   }
 
   private void applyReducerState(UiState reducedState) {
@@ -1320,9 +1306,11 @@ public final class CoreTuiController
     statusMessage = reducedState.statusMessage();
     errorMessage = reducedState.errorMessage();
     verboseErrorDetails = reducedState.verboseErrorDetails();
+    showErrorDetails = reducedState.showErrorDetails();
     submitRequested = reducedState.submitRequested();
     submitBlockedByValidation = reducedState.submitBlockedByValidation();
     submitBlockedByTargetConflict = reducedState.submitBlockedByTargetConflict();
+    postGenerationMenu.apply(reducedState.postGeneration());
   }
 
   private ReduceResult dispatchIntent(UiIntent intent) {
@@ -1716,27 +1704,19 @@ public final class CoreTuiController
   }
 
   private void refreshValidationFeedbackAfterEdit() {
-    if (submitBlockedByTargetConflict) {
-      Path generatedProjectDirectory = safeResolveGeneratedProjectDirectory();
-      if (generatedProjectDirectory != null && Files.exists(generatedProjectDirectory)) {
-        errorMessage = targetExistsMessage(generatedProjectDirectory);
-        return;
-      }
-      submitBlockedByTargetConflict = false;
-      errorMessage = "";
-      statusMessage = "Target folder conflict resolved";
-    }
-
-    if (!submitBlockedByValidation) {
-      return;
-    }
-    if (validation.isValid()) {
-      submitBlockedByValidation = false;
-      errorMessage = "";
-      statusMessage = "Validation restored";
-      return;
-    }
-    errorMessage = firstValidationError(validation);
+    Path generatedProjectDirectory = safeResolveGeneratedProjectDirectory();
+    String targetConflictErrorMessage =
+        generatedProjectDirectory != null && Files.exists(generatedProjectDirectory)
+            ? targetExistsMessage(generatedProjectDirectory)
+            : "";
+    dispatchIntent(
+        new UiIntent.SubmitEditRecoveryIntent(
+            new UiIntent.SubmitEditRecovery(
+                submitBlockedByValidation,
+                validation.isValid(),
+                firstValidationError(validation),
+                submitBlockedByTargetConflict,
+                targetConflictErrorMessage)));
   }
 
   private void cancelPendingAsyncOperations() {
@@ -1770,7 +1750,6 @@ public final class CoreTuiController
   }
 
   void prepareForGenerationForReducer() {
-    postGenerationMenu.reset();
     resetGenerationStateAfterTerminalOutcome();
   }
 
@@ -1791,16 +1770,12 @@ public final class CoreTuiController
         projectGenerationRunner, toGenerationRequest(), resolveGeneratedProjectDirectory(), this);
   }
 
+  void transitionGenerationStateForReducer(GenerationState targetState) {
+    transitionGenerationState(targetState);
+  }
+
   void requestGenerationCancellationForReducer() {
     generationFlowCoordinator.requestCancellation(this);
-  }
-
-  void showPostGenerationSuccessForReducer(Path generatedPath, String nextCommand) {
-    postGenerationMenu.showAfterSuccess(generatedPath, nextCommand);
-  }
-
-  void hidePostGenerationForReducer() {
-    postGenerationMenu.hideAfterFailureOrCancel();
   }
 
   void requestAsyncRepaintForReducer() {
@@ -1892,65 +1867,24 @@ public final class CoreTuiController
   }
 
   private void handleSubmitRequest() {
-    submitRequested = true;
-    dispatchIntent(new UiIntent.PrepareForGenerationIntent());
-    if (!transitionGenerationState(GenerationState.VALIDATING)) {
-      statusMessage = "Submit ignored in state: " + generationStateLabel();
-      return;
+    Path generatedProjectDirectory = safeResolveGeneratedProjectDirectory();
+    String targetConflictErrorMessage =
+        generatedProjectDirectory != null && Files.exists(generatedProjectDirectory)
+            ? targetExistsMessage(generatedProjectDirectory)
+            : "";
+    dispatchIntent(
+        new UiIntent.SubmitRequestedIntent(
+            new UiIntent.SubmitEvaluation(
+                projectGenerationRunner != NOOP_PROJECT_GENERATION_RUNNER,
+                extensionCatalogState.selectedExtensionCount(),
+                firstInvalidFocusableTarget(validation),
+                validation.errors().size(),
+                firstValidationError(validation),
+                targetConflictErrorMessage)));
+    if (isTextInputFocus(focusTarget)
+        && (focusTarget == FocusTarget.OUTPUT_DIR || hasValidationErrorFor(focusTarget))) {
+      inputStates.get(focusTarget).moveCursorToEnd();
     }
-    if (!validation.isValid()) {
-      submitBlockedByValidation = true;
-      submitBlockedByTargetConflict = false;
-      errorMessage = firstValidationError(validation);
-      FocusTarget invalidTarget = firstInvalidFocusableTarget(validation);
-      int issueCount = validation.errors().size();
-      if (invalidTarget != null) {
-        focusTarget = invalidTarget;
-        if (isTextInputFocus(invalidTarget)) {
-          inputStates.get(invalidTarget).moveCursorToEnd();
-        }
-        statusMessage =
-            "Submit blocked: fix "
-                + UiFocusTargets.nameOf(invalidTarget)
-                + " ("
-                + issueCount
-                + " issue"
-                + (issueCount == 1 ? "" : "s")
-                + ")";
-      } else {
-        statusMessage =
-            "Submit blocked: invalid input ("
-                + issueCount
-                + " issue"
-                + (issueCount == 1 ? "" : "s")
-                + ")";
-      }
-      transitionGenerationState(GenerationState.ERROR);
-      return;
-    }
-
-    submitBlockedByValidation = false;
-    submitBlockedByTargetConflict = false;
-    errorMessage = "";
-    Path generatedProjectDirectory = resolveGeneratedProjectDirectory();
-    if (Files.exists(generatedProjectDirectory)) {
-      focusTarget = FocusTarget.OUTPUT_DIR;
-      inputStates.get(FocusTarget.OUTPUT_DIR).moveCursorToEnd();
-      submitBlockedByTargetConflict = true;
-      errorMessage = targetExistsMessage(generatedProjectDirectory);
-      statusMessage = "Submit blocked: target folder exists (change output/artifact)";
-      transitionGenerationState(GenerationState.ERROR);
-      return;
-    }
-    if (projectGenerationRunner == NOOP_PROJECT_GENERATION_RUNNER) {
-      statusMessage =
-          "Submit requested with "
-              + extensionCatalogState.selectedExtensionCount()
-              + " extension(s), but generation service is not configured.";
-      transitionGenerationState(GenerationState.IDLE);
-      return;
-    }
-    dispatchIntent(new UiIntent.SubmitReadyIntent());
   }
 
   private void updateExtensionFilterStatus(int filteredCount) {
@@ -2040,14 +1974,7 @@ public final class CoreTuiController
   }
 
   private void toggleErrorDetails() {
-    String activeError = activeErrorDetails();
-    if (activeError.isBlank()) {
-      showErrorDetails = false;
-      statusMessage = "No error details available";
-      return;
-    }
-    showErrorDetails = !showErrorDetails;
-    statusMessage = showErrorDetails ? "Expanded error details" : "Collapsed error details";
+    dispatchIntent(new UiIntent.ToggleErrorDetailsIntent(!activeErrorDetails().isBlank()));
   }
 
   private void requestCatalogReload() {
@@ -2120,6 +2047,7 @@ public final class CoreTuiController
     inputStates.get(FocusTarget.EXTENSION_SEARCH).moveCursorToEnd();
     statusMessage = "Focus moved to " + UiFocusTargets.nameOf(focusTarget);
     errorMessage = "";
+    showErrorDetails = false;
     submitBlockedByValidation = false;
   }
 
@@ -2127,6 +2055,7 @@ public final class CoreTuiController
     focusTarget = FocusTarget.EXTENSION_LIST;
     statusMessage = "Focus moved to " + UiFocusTargets.nameOf(focusTarget);
     errorMessage = "";
+    showErrorDetails = false;
     submitBlockedByValidation = false;
   }
 
