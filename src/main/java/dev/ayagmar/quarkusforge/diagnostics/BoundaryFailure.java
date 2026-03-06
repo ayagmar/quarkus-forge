@@ -20,10 +20,9 @@ public final class BoundaryFailure {
       case CancellationException _ -> cancelled("execution");
       case InterruptedException _ -> cancelled("interrupted");
       case TimeoutException _ -> timeout(timeout);
-      case ExecutionException executionException ->
-          fromThrowable(ThrowableUnwrapper.unwrapAsyncFailure(executionException));
+      case ExecutionException executionException -> fromAsyncWrapper(executionException, timeout);
       case CompletionException completionException ->
-          fromThrowable(ThrowableUnwrapper.unwrapAsyncFailure(completionException));
+          fromAsyncWrapper(completionException, timeout);
       default -> fromThrowable(exception);
     };
   }
@@ -70,6 +69,14 @@ public final class BoundaryFailure {
         cause == null ? "UnknownFailure" : cause.getClass().getSimpleName(),
         userMessage,
         "");
+  }
+
+  private static Details fromAsyncWrapper(Throwable wrapper, Duration timeout) {
+    Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(wrapper);
+    if (cause instanceof TimeoutException) {
+      return timeout(timeout);
+    }
+    return fromThrowable(cause);
   }
 
   public enum Kind {

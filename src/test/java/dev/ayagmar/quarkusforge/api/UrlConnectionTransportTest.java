@@ -197,6 +197,35 @@ class UrlConnectionTransportTest {
       assertThat(responseFuture.cancel(true)).isTrue();
 
       assertThat(disconnected.await(1, TimeUnit.SECONDS)).isTrue();
+      assertThat(responseFuture).isCancelled();
+      assertThat(connection.disconnected).isTrue();
+    }
+  }
+
+  @Test
+  void sendStringAsyncDisconnectsWhenResponseCodeLookupFails() {
+    FakeHttpURLConnection connection =
+        new FakeHttpURLConnection(200, Map.of(), "ignored".getBytes(StandardCharsets.UTF_8), null);
+    connection.responseCodeHook =
+        () -> {
+          throw new IllegalStateException("response code failed");
+        };
+    try (UrlConnectionTransport transport =
+        new UrlConnectionTransport(Executors.newSingleThreadExecutor(), uri -> connection)) {
+      assertThatThrownBy(
+              () ->
+                  transport
+                      .sendStringAsync(
+                          new ApiRequest(
+                              URI.create("https://example.test/response-code-error"),
+                              "application/json",
+                              Duration.ofSeconds(2)))
+                      .join())
+          .isInstanceOf(CompletionException.class)
+          .rootCause()
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessage("response code failed");
+
       assertThat(connection.disconnected).isTrue();
     }
   }

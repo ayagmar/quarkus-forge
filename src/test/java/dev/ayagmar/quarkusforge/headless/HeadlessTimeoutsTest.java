@@ -6,7 +6,10 @@ import dev.ayagmar.quarkusforge.SystemPropertyExtension;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.Resources;
 
+@ResourceLock(Resources.SYSTEM_PROPERTIES)
 class HeadlessTimeoutsTest {
   private static final String HEADLESS_CATALOG_TIMEOUT_PROPERTY =
       "quarkus.forge.headless.catalog-timeout-ms";

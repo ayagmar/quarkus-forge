@@ -712,12 +712,13 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('e'));
     controller.onEvent(KeyEvent.ofChar('s'));
     controller.onEvent(KeyEvent.ofChar('t'));
-    assertThat(controller.filteredExtensionCount()).isZero();
-    assertThat(UiControllerTestHarness.renderToString(controller)).contains("Filter: Core");
+    assertThat(controller.filteredExtensionCount()).isEqualTo(1);
+    assertThat(controller.catalogSectionHeaders()).containsExactly("Web");
+    assertThat(UiControllerTestHarness.renderToString(controller)).doesNotContain("Filter: Core");
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
-    assertThat(controller.filteredExtensionCount()).isEqualTo(1);
-    assertThat(controller.catalogSectionHeaders()).containsExactly("Core");
+    assertThat(controller.filteredExtensionCount()).isEqualTo(2);
+    assertThat(controller.catalogSectionHeaders()).containsExactly("Core", "Web");
   }
 
   @Test

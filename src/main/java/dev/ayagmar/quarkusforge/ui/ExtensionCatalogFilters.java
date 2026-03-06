@@ -126,10 +126,11 @@ final class ExtensionCatalogFilters {
   }
 
   List<String> filterableCategoryTitles(
+      String query,
       ExtensionCatalogIndex catalogIndex,
       Set<String> selectedExtensionIds,
       Set<String> favoriteExtensionIds) {
-    List<ExtensionCatalogItem> rankedResults = catalogIndex.search("", favoriteExtensionIds);
+    List<ExtensionCatalogItem> rankedResults = catalogIndex.search(query, favoriteExtensionIds);
     rankedResults =
         applyPreCategoryFilters(rankedResults, selectedExtensionIds, favoriteExtensionIds);
     return List.copyOf(CatalogRowBuilder.availableCategoryTitles(rankedResults));

@@ -93,6 +93,7 @@ final class ExtensionCatalogState {
     }
     boolean isNowFavorite = preferences.toggleFavorite(selected.id());
     projection.reapplyAfterSelectionMutation(navigation, preferences);
+    onFiltered.accept(projection.filteredExtensions().size());
     return new FavoriteToggleResult(true, selected.name(), isNowFavorite);
   }
 

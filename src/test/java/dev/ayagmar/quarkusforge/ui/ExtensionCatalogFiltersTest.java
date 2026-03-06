@@ -58,7 +58,7 @@ class ExtensionCatalogFiltersTest {
 
     List<String> categories =
         filters.filterableCategoryTitles(
-            new ExtensionCatalogIndex(ITEMS), Set.of(), Set.of(JDBC.id()));
+            "", new ExtensionCatalogIndex(ITEMS), Set.of(), Set.of(JDBC.id()));
 
     assertThat(categories).containsExactly("Data");
 
@@ -85,5 +85,16 @@ class ExtensionCatalogFiltersTest {
 
     assertThat(filters.activePresetFilterName()).isEmpty();
     assertThat(filters.activeCategoryFilterTitle()).isEmpty();
+  }
+
+  @Test
+  void categoryTitlesRespectActiveSearchQuery() {
+    ExtensionCatalogFilters filters = new ExtensionCatalogFilters("rest");
+
+    List<String> categories =
+        filters.filterableCategoryTitles(
+            "rest", new ExtensionCatalogIndex(ITEMS), Set.of(), Set.of());
+
+    assertThat(categories).containsExactly("Web");
   }
 }

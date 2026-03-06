@@ -177,7 +177,7 @@ The optional `locked` section pins exact resolved values for deterministic build
 * Output path resolves to `<output-dir>/<artifact-id>`.
 * Extension IDs are validated against the loaded catalog.
 
-== Release Checksums
+=== Release Checksums
 
 Generate checksum files for release artifacts:
 
@@ -186,11 +186,11 @@ Generate checksum files for release artifacts:
 just release-checksums
 ----
 
-Verify a downloaded headless jar:
+Verify a downloaded headless jar after downloading both the jar and its `.sha256` file:
 
 [source,bash]
 ----
-sha256sum -c target/quarkus-forge-headless.jar.sha256
+sha256sum -c quarkus-forge-headless.jar.sha256
 ----
 * When `--from` is set, request metadata fields come from the Forgefile; CLI `--preset` and `--extension` are appended.
 * `--from <name>` falls back to `~/.quarkus-forge/recipes/<name>` when no local file exists.

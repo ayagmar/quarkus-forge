@@ -9,11 +9,8 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import dev.ayagmar.quarkusforge.application.StartupMetadataSelection;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
 import java.lang.reflect.Method;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CancellationException;
@@ -307,21 +304,12 @@ class QuarkusForgeCliStartupMetadataTest {
   }
 
   private CliCommandTestSupport.CommandResult runCommand(QuarkusForgeCli cli, String... args) {
-    PrintStream originalOut = System.out;
-    PrintStream originalErr = System.err;
-    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
-    ByteArrayOutputStream stderr = new ByteArrayOutputStream();
     try {
-      System.setOut(new PrintStream(stdout, true, StandardCharsets.UTF_8));
-      System.setErr(new PrintStream(stderr, true, StandardCharsets.UTF_8));
-      int exitCode = new CommandLine(cli).execute(args);
-      return new CliCommandTestSupport.CommandResult(
-          exitCode,
-          stdout.toString(StandardCharsets.UTF_8),
-          stderr.toString(StandardCharsets.UTF_8));
-    } finally {
-      System.setOut(originalOut);
-      System.setErr(originalErr);
+      return CliCommandTestSupport.captureCommandOutput(() -> new CommandLine(cli).execute(args));
+    } catch (RuntimeException runtimeException) {
+      throw runtimeException;
+    } catch (Exception exception) {
+      throw new RuntimeException(exception);
     }
   }
 

@@ -5,16 +5,19 @@ import dev.ayagmar.quarkusforge.api.ThrowableUnwrapper;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
 final class CatalogLoadCoordinator {
   private final StartupOverlayTracker startupOverlay = new StartupOverlayTracker();
   private volatile long loadToken;
   private ExtensionCatalogLoader loader;
+  private CompletableFuture<?> currentLoadFuture;
 
   void startLoad(ExtensionCatalogLoader loader, CatalogLoadFlowCallbacks callbacks) {
     Objects.requireNonNull(loader);
     this.loader = loader;
+    cancelCurrentLoad();
 
     long token = ++loadToken;
     callbacks.onCatalogLoadStarted(
@@ -32,11 +35,13 @@ final class CatalogLoadCoordinator {
       loadFuture =
           CompletableFuture.failedFuture(new IllegalStateException("loader returned null future"));
     }
+    CompletableFuture<ExtensionCatalogLoadResult> observedLoadFuture = loadFuture;
+    currentLoadFuture = observedLoadFuture;
 
-    loadFuture.whenComplete(
+    observedLoadFuture.whenComplete(
         (result, throwable) ->
             callbacks.scheduleOnRenderThread(
-                () -> onCompleted(token, result, throwable, callbacks)));
+                () -> onCompleted(token, observedLoadFuture, result, throwable, callbacks)));
   }
 
   void requestReload(CatalogLoadFlowCallbacks callbacks) {
@@ -48,6 +53,7 @@ final class CatalogLoadCoordinator {
   }
 
   void cancel(CatalogLoadFlowCallbacks callbacks) {
+    cancelCurrentLoad();
     loadToken++;
     CatalogLoadState currentState = callbacks.currentCatalogLoadState();
     if (currentState instanceof CatalogLoadState.Loading loading) {
@@ -70,10 +76,17 @@ final class CatalogLoadCoordinator {
 
   private void onCompleted(
       long token,
+      CompletableFuture<?> loadFuture,
       ExtensionCatalogLoadResult result,
       Throwable throwable,
       CatalogLoadFlowCallbacks callbacks) {
+    if (currentLoadFuture == loadFuture) {
+      currentLoadFuture = null;
+    }
     if (token != loadToken) {
+      return;
+    }
+    if (throwable instanceof CancellationException) {
       return;
     }
     if (throwable != null) {
@@ -140,5 +153,15 @@ final class CatalogLoadCoordinator {
       return "Live catalog/cache unavailable. Using bundled snapshot (Ctrl+R to retry).";
     }
     return "Catalog load failed: " + message;
+  }
+
+  private void cancelCurrentLoad() {
+    CompletableFuture<?> inFlight = currentLoadFuture;
+    if (inFlight != null) {
+      inFlight.cancel(true);
+      if (currentLoadFuture == inFlight) {
+        currentLoadFuture = null;
+      }
+    }
   }
 }

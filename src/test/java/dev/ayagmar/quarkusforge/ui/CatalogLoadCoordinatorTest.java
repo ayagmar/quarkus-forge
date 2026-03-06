@@ -6,6 +6,7 @@ import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
@@ -71,6 +72,34 @@ class CatalogLoadCoordinatorTest {
     coordinator.cancel(callbacks);
 
     assertThat(callbacks.currentState).isEqualTo(CatalogLoadState.loaded("live", false));
+  }
+
+  @Test
+  void startingNewLoadCancelsPreviousFuture() {
+    CatalogLoadCoordinator coordinator = new CatalogLoadCoordinator();
+    TestCallbacks callbacks = new TestCallbacks();
+    CompletableFuture<ExtensionCatalogLoadResult> firstLoad = new CompletableFuture<>();
+    CompletableFuture<ExtensionCatalogLoadResult> secondLoad =
+        CompletableFuture.completedFuture(successResult("second"));
+
+    coordinator.startLoad(() -> firstLoad, callbacks);
+    coordinator.startLoad(() -> secondLoad, callbacks);
+
+    assertThat(firstLoad).isCancelled();
+    assertThat(callbacks.failures).isEmpty();
+  }
+
+  @Test
+  void cancelledFutureDoesNotEmitFailureCallback() {
+    CatalogLoadCoordinator coordinator = new CatalogLoadCoordinator();
+    TestCallbacks callbacks = new TestCallbacks();
+    CompletableFuture<ExtensionCatalogLoadResult> cancelled =
+        CompletableFuture.failedFuture(new CancellationException("cancelled"));
+
+    coordinator.startLoad(() -> cancelled, callbacks);
+
+    assertThat(callbacks.failures).isEmpty();
+    assertThat(callbacks.successes).isEmpty();
   }
 
   @Test

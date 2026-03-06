@@ -28,27 +28,25 @@ public final class ForgefileStore {
           "Failed to read Forgefile '" + file + "': " + ioException.getMessage(), ioException);
     }
 
-    Map<String, Object> root;
     try {
-      root = JsonSupport.parseObject(content);
-    } catch (IOException ioException) {
+      Map<String, Object> root = JsonSupport.parseObject(content);
+      ForgefileLock locked = readLockedSection(root);
+      return new Forgefile(
+          JsonFieldReader.readString(root, "groupId"),
+          JsonFieldReader.readString(root, "artifactId"),
+          JsonFieldReader.readString(root, "version"),
+          JsonFieldReader.readString(root, "packageName"),
+          JsonFieldReader.readString(root, "outputDirectory"),
+          JsonFieldReader.readString(root, "platformStream"),
+          JsonFieldReader.readString(root, "buildTool"),
+          JsonFieldReader.readString(root, "javaVersion"),
+          JsonFieldReader.readStringList(root, "presets"),
+          JsonFieldReader.readStringList(root, "extensions"),
+          locked);
+    } catch (IOException | RuntimeException exception) {
       throw new IllegalArgumentException(
-          "Failed to parse Forgefile '" + file + "': " + ioException.getMessage(), ioException);
+          "Failed to parse Forgefile '" + file + "': " + exception.getMessage(), exception);
     }
-
-    ForgefileLock locked = readLockedSection(root);
-    return new Forgefile(
-        JsonFieldReader.readString(root, "groupId"),
-        JsonFieldReader.readString(root, "artifactId"),
-        JsonFieldReader.readString(root, "version"),
-        JsonFieldReader.readString(root, "packageName"),
-        JsonFieldReader.readString(root, "outputDirectory"),
-        JsonFieldReader.readString(root, "platformStream"),
-        JsonFieldReader.readString(root, "buildTool"),
-        JsonFieldReader.readString(root, "javaVersion"),
-        JsonFieldReader.readStringList(root, "presets"),
-        JsonFieldReader.readStringList(root, "extensions"),
-        locked);
   }
 
   public static void save(Path file, Forgefile forgefile) {

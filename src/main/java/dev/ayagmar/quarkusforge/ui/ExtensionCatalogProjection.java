@@ -160,7 +160,10 @@ final class ExtensionCatalogProjection {
     Objects.requireNonNull(onFiltered);
     List<String> categoryTitles =
         filters.filterableCategoryTitles(
-            catalogIndex, navigation.selectedIdsView(), preferences.favoriteIdsView());
+            filters.currentQuery(),
+            catalogIndex,
+            navigation.selectedIdsView(),
+            preferences.favoriteIdsView());
     filters.cycleCategoryFilter(categoryTitles);
     applyFiltered(
         filters.currentQuery(), searchResultGate.nextToken(), navigation, preferences, onFiltered);
@@ -280,7 +283,8 @@ final class ExtensionCatalogProjection {
         catalogIndex.search(filters.currentQuery(), favoriteIds);
     Set<String> availableCategoryTitles =
         new LinkedHashSet<>(
-            filters.filterableCategoryTitles(catalogIndex, selectedIds, favoriteIds));
+            filters.filterableCategoryTitles(
+                filters.currentQuery(), catalogIndex, selectedIds, favoriteIds));
     filters.reconcileAvailableCategories(availableCategoryTitles);
     rankedResults = filters.apply(rankedResults, selectedIds, favoriteIds);
 

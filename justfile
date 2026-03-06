@@ -32,7 +32,7 @@ test-unit:
 
 # Run integration tests only (Failsafe)
 test-it:
-    {{mvn}} test-compile failsafe:integration-test failsafe:verify
+    {{mvn}} test-compile verify
 
 # Generate bash completion scripts for both entry points
 completion-bash:

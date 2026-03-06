@@ -8,6 +8,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -220,9 +225,28 @@ class CheckNativeSizeScriptTest {
     command.addAll(List.of(args));
 
     Process process = new ProcessBuilder(command).directory(REPO_ROOT.toFile()).start();
-    String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-    String stderr = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
-    int exitCode = process.waitFor();
+    ExecutorService streamReaders = Executors.newFixedThreadPool(2);
+    Future<String> stdoutFuture =
+        streamReaders.submit(
+            () -> new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8));
+    Future<String> stderrFuture =
+        streamReaders.submit(
+            () -> new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8));
+    boolean finished = process.waitFor(30, TimeUnit.SECONDS);
+    if (!finished) {
+      process.destroyForcibly();
+      process.waitFor(5, TimeUnit.SECONDS);
+    }
+    streamReaders.shutdown();
+    String stdout = readProcessStream(stdoutFuture);
+    String stderr = readProcessStream(stderrFuture);
+    int exitCode = finished ? process.exitValue() : 124;
+    if (!finished) {
+      stderr =
+          stderr.isBlank()
+              ? "Process timed out after 30s"
+              : stderr + System.lineSeparator() + "Process timed out after 30s";
+    }
     return new ProcessResult(exitCode, stdout, stderr);
   }
 
@@ -243,4 +267,14 @@ class CheckNativeSizeScriptTest {
   }
 
   private record ProcessResult(int exitCode, String stdout, String stderr) {}
+
+  private static String readProcessStream(Future<String> streamFuture) throws InterruptedException {
+    try {
+      return streamFuture.get(5, TimeUnit.SECONDS);
+    } catch (ExecutionException executionException) {
+      throw new IllegalStateException("Failed to read script output", executionException);
+    } catch (java.util.concurrent.TimeoutException timeoutException) {
+      throw new IllegalStateException("Timed out reading script output", timeoutException);
+    }
+  }
 }

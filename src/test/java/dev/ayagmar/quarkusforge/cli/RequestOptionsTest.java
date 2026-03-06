@@ -88,6 +88,12 @@ class RequestOptionsTest {
                 "gradle",
                 "21"));
 
+    assertThat(opts.groupId).isEqualTo("com.example");
+    assertThat(opts.artifactId).isEqualTo("demo-app");
+    assertThat(opts.version).isEqualTo("1.2.3");
+    assertThat(opts.packageName).isEqualTo("com.example.demo");
+    assertThat(opts.buildTool).isEqualTo("gradle");
+    assertThat(opts.javaVersion).isEqualTo("21");
     assertThat(
             opts.isExplicitlySet(
                 RequestOptions.OPT_GROUP_ID, opts.groupId, RequestOptions.DEFAULT_GROUP_ID))
@@ -118,9 +124,19 @@ class RequestOptionsTest {
                 "gradle",
                 "21"));
 
+    assertThat(opts.groupId).isEqualTo("com.example");
+    assertThat(opts.artifactId).isEqualTo("demo-app");
+    assertThat(opts.version).isEqualTo("1.2.3");
+    assertThat(opts.packageName).isEqualTo("com.example.demo");
+    assertThat(opts.buildTool).isEqualTo("gradle");
+    assertThat(opts.javaVersion).isEqualTo("21");
+    assertThat(opts.platformStream).isBlank();
     assertThat(opts.toExplicitTemplate().groupId()).isEqualTo("com.example");
     assertThat(opts.toExplicitTemplate().artifactId()).isEqualTo("demo-app");
+    assertThat(opts.toExplicitTemplate().version()).isEqualTo("1.2.3");
+    assertThat(opts.toExplicitTemplate().packageName()).isEqualTo("com.example.demo");
     assertThat(opts.toExplicitTemplate().buildTool()).isEqualTo("gradle");
+    assertThat(opts.toExplicitTemplate().javaVersion()).isEqualTo("21");
     assertThat(opts.toExplicitTemplate().platformStream()).isNull();
   }
 }

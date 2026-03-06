@@ -145,8 +145,8 @@ public final class HeadlessGenerationService implements AutoCloseable {
           of("stale", catalogData.stale()));
       HeadlessOutputPrinter.printDryRunSummary(
           validatedState.request(), extensionIds, catalogData.sourceLabel());
-      saveForgefileIfRequested(inputs, validatedState.request(), extensionIds);
-      return ExitCodes.OK;
+      return persistForgefileAndReturn(
+          inputs, validatedState.request(), extensionIds, diagnostics, ExitCodes.OK);
     }
 
     Path outputPath = HeadlessOutputPrinter.resolveProjectDirectory(validatedState.request());
@@ -160,24 +160,30 @@ public final class HeadlessGenerationService implements AutoCloseable {
             validatedState.request().javaVersion(),
             extensionIds);
 
-    CompletableFuture<Path> generationFuture =
-        catalogClient.startGeneration(generationRequest, outputPath, System.out::println);
+    CompletableFuture<Path> generationFuture = null;
     Duration generationTimeout = HeadlessTimeouts.generationTimeout();
     diagnostics.info(
         "generate.execute.start",
         of("outputPath", outputPath.toString()),
         of("extensionCount", extensionIds.size()));
     try {
+      generationFuture =
+          catalogClient.startGeneration(generationRequest, outputPath, System.out::println);
       Path generatedProjectRoot =
           generationFuture.get(generationTimeout.toMillis(), TimeUnit.MILLISECONDS);
       diagnostics.info(
           "generate.execute.success", of("projectRoot", generatedProjectRoot.toString()));
-      saveForgefileIfRequested(inputs, validatedState.request(), extensionIds);
+      int persistExitCode =
+          persistForgefileAndReturn(
+              inputs, validatedState.request(), extensionIds, diagnostics, ExitCodes.OK);
+      if (persistExitCode != ExitCodes.OK) {
+        return persistExitCode;
+      }
       System.out.println(
           "Generation succeeded: " + generatedProjectRoot.toAbsolutePath().normalize());
       return ExitCodes.OK;
     } catch (Exception e) {
-      if (e instanceof TimeoutException) {
+      if (e instanceof TimeoutException && generationFuture != null) {
         generationFuture.cancel(true);
       }
       return AsyncFailureHandler.handleFailure(
@@ -378,6 +384,23 @@ public final class HeadlessGenerationService implements AutoCloseable {
       return;
     }
     ForgefileStore.save(writePath, forgefile);
+  }
+
+  private static int persistForgefileAndReturn(
+      EffectiveInputs inputs,
+      ProjectRequest request,
+      List<String> extensionIds,
+      DiagnosticLogger diagnostics,
+      int successExitCode) {
+    try {
+      saveForgefileIfRequested(inputs, request, extensionIds);
+      return successExitCode;
+    } catch (IllegalArgumentException illegalArgumentException) {
+      diagnostics.error(
+          "generate.forgefile.save.failed", of("message", illegalArgumentException.getMessage()));
+      System.err.println("Failed to save Forgefile: " + illegalArgumentException.getMessage());
+      return ExitCodes.INTERNAL;
+    }
   }
 
   private static List<String> safeSelections(List<String> values) {

@@ -29,11 +29,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 
 public final class TuiBootstrapService {
   private static final String BACKEND_PROPERTY_NAME = "tamboui.backend";
   private static final String BACKEND_ENV_NAME = "TAMBOUI_BACKEND";
   private static final String PANAMA_BACKEND = "panama";
+  private static final ReentrantLock BACKEND_PROPERTY_LOCK = new ReentrantLock();
   public static final Duration STARTUP_SPLASH_MIN_DURATION = Duration.ofMillis(450);
   private static final Duration TUI_TICK_RATE = Duration.ofMillis(40);
 
@@ -110,6 +112,7 @@ public final class TuiBootstrapService {
         "tui.session.start",
         of("smokeMode", false),
         of("searchDebounceMs", Math.max(0, searchDebounceMs)));
+    BACKEND_PROPERTY_LOCK.lock();
     String previousBackendPreference = System.getProperty(BACKEND_PROPERTY_NAME);
     try {
       configureTerminalBackendPreference();
@@ -169,7 +172,11 @@ public final class TuiBootstrapService {
                     controller::render));
       }
     } finally {
-      restoreTerminalBackendPreference(previousBackendPreference);
+      try {
+        restoreTerminalBackendPreference(previousBackendPreference);
+      } finally {
+        BACKEND_PROPERTY_LOCK.unlock();
+      }
     }
   }
 

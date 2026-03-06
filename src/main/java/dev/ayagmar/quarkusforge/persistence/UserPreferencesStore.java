@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge.persistence;
 
+import dev.ayagmar.quarkusforge.api.ApiContractException;
 import dev.ayagmar.quarkusforge.api.AtomicFileStore;
 import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
 import dev.ayagmar.quarkusforge.api.JsonFieldReader;
@@ -15,6 +16,8 @@ import java.util.Objects;
 
 public final class UserPreferencesStore {
   private static final int SCHEMA_VERSION = 1;
+  private static final System.Logger LOGGER =
+      System.getLogger(UserPreferencesStore.class.getName());
 
   private final Path file;
 
@@ -87,7 +90,9 @@ public final class UserPreferencesStore {
           JsonFieldReader.readString(root, "platformStream"),
           JsonFieldReader.readString(root, "buildTool"),
           JsonFieldReader.readString(root, "javaVersion"));
-    } catch (IOException | RuntimeException ignored) {
+    } catch (IOException | ApiContractException exception) {
+      LOGGER.log(
+          System.Logger.Level.DEBUG, "Failed to load user preferences from " + file, exception);
       return null;
     }
   }

@@ -27,7 +27,8 @@ final class ExtensionCatalogPreferences {
     this.favoritesStore = Objects.requireNonNull(favoritesStore);
     this.favoritesPersistenceExecutor = Objects.requireNonNull(favoritesPersistenceExecutor);
     favoriteExtensionIds = new LinkedHashSet<>(favoritesStore.loadFavoriteExtensionIds());
-    recentExtensionIds = new ArrayList<>(favoritesStore.loadRecentExtensionIds());
+    recentExtensionIds =
+        new ArrayList<>(normalizeRecentIds(favoritesStore.loadRecentExtensionIds()));
     preferencePersistenceChain = new AtomicReference<>(CompletableFuture.completedFuture(null));
   }
 
@@ -70,11 +71,9 @@ final class ExtensionCatalogPreferences {
 
   void recordRecentSelection(String extensionId) {
     Objects.requireNonNull(extensionId);
-    recentExtensionIds.remove(extensionId);
+    recentExtensionIds.removeIf(extensionId::equals);
     recentExtensionIds.add(0, extensionId);
-    while (recentExtensionIds.size() > CatalogRowBuilder.MAX_RECENT_SELECTIONS) {
-      recentExtensionIds.remove(recentExtensionIds.size() - 1);
-    }
+    trimRecentIds();
     persistUserStateAsync();
   }
 
@@ -106,5 +105,22 @@ final class ExtensionCatalogPreferences {
     }
     LOGGER.log(
         System.Logger.Level.WARNING, "Failed to persist extension catalog preferences", cause);
+  }
+
+  private static List<String> normalizeRecentIds(List<String> recentIds) {
+    if (recentIds == null || recentIds.isEmpty()) {
+      return List.of();
+    }
+    List<String> normalized = new ArrayList<>(new LinkedHashSet<>(recentIds));
+    if (normalized.size() > CatalogRowBuilder.MAX_RECENT_SELECTIONS) {
+      normalized = new ArrayList<>(normalized.subList(0, CatalogRowBuilder.MAX_RECENT_SELECTIONS));
+    }
+    return List.copyOf(normalized);
+  }
+
+  private void trimRecentIds() {
+    while (recentExtensionIds.size() > CatalogRowBuilder.MAX_RECENT_SELECTIONS) {
+      recentExtensionIds.remove(recentExtensionIds.size() - 1);
+    }
   }
 }

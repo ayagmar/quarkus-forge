@@ -25,6 +25,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.Resources;
 
 /**
  * Integration tests exercising the {@link HeadlessCli} entry point end-to-end. These complement
@@ -32,6 +34,7 @@ import org.junit.jupiter.api.io.TempDir;
  * verifying the headless-only jar surface: generate, dry-run, Forgefile loading, lock-check, and
  * verbose diagnostics.
  */
+@ResourceLock(Resources.SYSTEM_PROPERTIES)
 class HeadlessCliGenerateIT {
   private static final String HEADLESS_CATALOG_TIMEOUT_PROPERTY =
       "quarkus.forge.headless.catalog-timeout-ms";
