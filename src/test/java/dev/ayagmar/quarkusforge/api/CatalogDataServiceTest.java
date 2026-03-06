@@ -22,6 +22,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class CatalogDataServiceTest {
+  private static final Duration SNAPSHOT_TTL = Duration.ofHours(6);
+  private static final long DEFAULT_CACHE_MAX_BYTES = 2L * 1024L * 1024L;
+
   @TempDir Path tempDir;
 
   private WireMockServer wireMockServer;
@@ -47,27 +50,14 @@ class CatalogDataServiceTest {
     try (QuarkusApiClient onlineApiClient = onlineClient();
         QuarkusApiClient offlineApiClient = offlineClient()) {
       CatalogDataService onlineService =
-          new CatalogDataService(
-              onlineApiClient,
-              new CatalogSnapshotCache(
-                  cacheFile,
-                  CatalogSnapshotCache.defaultPayloadCodec(),
-                  Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
-                  Duration.ofHours(6),
-                  2L * 1024L * 1024L));
+          new CatalogDataService(onlineApiClient, snapshotCache(cacheFile, "2026-02-22T00:00:00Z"));
 
       CatalogData liveData = onlineService.load().join();
       assertThat(liveData.source()).isEqualTo(CatalogSource.LIVE);
 
       CatalogDataService offlineService =
           new CatalogDataService(
-              offlineApiClient,
-              new CatalogSnapshotCache(
-                  cacheFile,
-                  CatalogSnapshotCache.defaultPayloadCodec(),
-                  Clock.fixed(Instant.parse("2026-02-22T01:00:00Z"), ZoneOffset.UTC),
-                  Duration.ofHours(6),
-                  2L * 1024L * 1024L));
+              offlineApiClient, snapshotCache(cacheFile, "2026-02-22T01:00:00Z"));
 
       CatalogData cachedData = offlineService.load().join();
       assertThat(cachedData.source()).isEqualTo(CatalogSource.CACHE);
@@ -85,25 +75,12 @@ class CatalogDataServiceTest {
     try (QuarkusApiClient onlineApiClient = onlineClient();
         QuarkusApiClient offlineApiClient = offlineClient()) {
       CatalogDataService onlineService =
-          new CatalogDataService(
-              onlineApiClient,
-              new CatalogSnapshotCache(
-                  cacheFile,
-                  CatalogSnapshotCache.defaultPayloadCodec(),
-                  Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
-                  Duration.ofHours(6),
-                  2L * 1024L * 1024L));
+          new CatalogDataService(onlineApiClient, snapshotCache(cacheFile, "2026-02-22T00:00:00Z"));
       onlineService.load().join();
 
       CatalogDataService offlineService =
           new CatalogDataService(
-              offlineApiClient,
-              new CatalogSnapshotCache(
-                  cacheFile,
-                  CatalogSnapshotCache.defaultPayloadCodec(),
-                  Clock.fixed(Instant.parse("2026-02-22T06:00:01Z"), ZoneOffset.UTC),
-                  Duration.ofHours(6),
-                  2L * 1024L * 1024L));
+              offlineApiClient, snapshotCache(cacheFile, "2026-02-22T06:00:01Z"));
 
       CatalogData cachedData = offlineService.load().join();
       assertThat(cachedData.source()).isEqualTo(CatalogSource.CACHE);
@@ -118,13 +95,7 @@ class CatalogDataServiceTest {
     try (QuarkusApiClient offlineApiClient = offlineClient()) {
       CatalogDataService offlineService =
           new CatalogDataService(
-              offlineApiClient,
-              new CatalogSnapshotCache(
-                  cacheFile,
-                  CatalogSnapshotCache.defaultPayloadCodec(),
-                  Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
-                  Duration.ofHours(6),
-                  2L * 1024L * 1024L));
+              offlineApiClient, snapshotCache(cacheFile, "2026-02-22T00:00:00Z"));
 
       assertThatThrownBy(() -> offlineService.load().join())
           .hasCauseInstanceOf(ApiClientException.class)
@@ -140,14 +111,7 @@ class CatalogDataServiceTest {
 
     try (QuarkusApiClient onlineApiClient = onlineClient()) {
       CatalogDataService service =
-          new CatalogDataService(
-              onlineApiClient,
-              new CatalogSnapshotCache(
-                  cacheFile,
-                  CatalogSnapshotCache.defaultPayloadCodec(),
-                  Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
-                  Duration.ofHours(6),
-                  2L * 1024L * 1024L));
+          new CatalogDataService(onlineApiClient, snapshotCache(cacheFile, "2026-02-22T00:00:00Z"));
 
       CatalogData liveData = service.load().join();
 
@@ -179,13 +143,7 @@ class CatalogDataServiceTest {
     try (QuarkusApiClient offlineApiClient = offlineClient()) {
       CatalogDataService service =
           new CatalogDataService(
-              offlineApiClient,
-              new CatalogSnapshotCache(
-                  cacheFile,
-                  CatalogSnapshotCache.defaultPayloadCodec(),
-                  Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
-                  Duration.ofHours(6),
-                  2L * 1024L * 1024L));
+              offlineApiClient, snapshotCache(cacheFile, "2026-02-22T00:00:00Z"));
 
       assertThatThrownBy(() -> service.load().join())
           .hasCauseInstanceOf(ApiClientException.class)
@@ -202,13 +160,7 @@ class CatalogDataServiceTest {
     try (QuarkusApiClient onlineApiClient = onlineClient()) {
       CatalogDataService service =
           new CatalogDataService(
-              onlineApiClient,
-              new CatalogSnapshotCache(
-                  cacheFile,
-                  CatalogSnapshotCache.defaultPayloadCodec(),
-                  Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
-                  Duration.ofHours(6),
-                  128L));
+              onlineApiClient, snapshotCache(cacheFile, "2026-02-22T00:00:00Z", 128L));
 
       CatalogData liveData = service.load().join();
 
@@ -225,26 +177,12 @@ class CatalogDataServiceTest {
 
     try (QuarkusApiClient onlineApiClient = onlineClient()) {
       CatalogDataService onlineService =
-          new CatalogDataService(
-              onlineApiClient,
-              new CatalogSnapshotCache(
-                  cacheFile,
-                  CatalogSnapshotCache.defaultPayloadCodec(),
-                  Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
-                  Duration.ofHours(6),
-                  2L * 1024L * 1024L));
+          new CatalogDataService(onlineApiClient, snapshotCache(cacheFile, "2026-02-22T00:00:00Z"));
       onlineService.load().join();
 
       wireMockServer.resetRequests();
       CatalogDataService startupService =
-          new CatalogDataService(
-              onlineApiClient,
-              new CatalogSnapshotCache(
-                  cacheFile,
-                  CatalogSnapshotCache.defaultPayloadCodec(),
-                  Clock.fixed(Instant.parse("2026-02-22T01:00:00Z"), ZoneOffset.UTC),
-                  Duration.ofHours(6),
-                  2L * 1024L * 1024L));
+          new CatalogDataService(onlineApiClient, snapshotCache(cacheFile, "2026-02-22T01:00:00Z"));
 
       CatalogData startupData = startupService.loadForStartup().join();
 
@@ -264,26 +202,13 @@ class CatalogDataServiceTest {
     try (QuarkusApiClient onlineApiClient = onlineClient();
         QuarkusApiClient offlineApiClient = offlineClient()) {
       CatalogDataService onlineService =
-          new CatalogDataService(
-              onlineApiClient,
-              new CatalogSnapshotCache(
-                  cacheFile,
-                  CatalogSnapshotCache.defaultPayloadCodec(),
-                  Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
-                  Duration.ofHours(6),
-                  2L * 1024L * 1024L));
+          new CatalogDataService(onlineApiClient, snapshotCache(cacheFile, "2026-02-22T00:00:00Z"));
       onlineService.load().join();
 
       // Use startup after TTL expired -> stale cache
       CatalogDataService startupService =
           new CatalogDataService(
-              offlineApiClient,
-              new CatalogSnapshotCache(
-                  cacheFile,
-                  CatalogSnapshotCache.defaultPayloadCodec(),
-                  Clock.fixed(Instant.parse("2026-02-22T10:00:00Z"), ZoneOffset.UTC),
-                  Duration.ofHours(6),
-                  2L * 1024L * 1024L));
+              offlineApiClient, snapshotCache(cacheFile, "2026-02-22T10:00:00Z"));
 
       CatalogData startupData = startupService.loadForStartup().join();
 
@@ -300,14 +225,7 @@ class CatalogDataServiceTest {
 
     try (QuarkusApiClient onlineApiClient = onlineClient()) {
       CatalogDataService service =
-          new CatalogDataService(
-              onlineApiClient,
-              new CatalogSnapshotCache(
-                  cacheFile,
-                  CatalogSnapshotCache.defaultPayloadCodec(),
-                  Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
-                  Duration.ofHours(6),
-                  2L * 1024L * 1024L));
+          new CatalogDataService(onlineApiClient, snapshotCache(cacheFile, "2026-02-22T00:00:00Z"));
 
       CatalogData startupData = service.loadForStartup().join();
 
@@ -425,5 +343,19 @@ class CatalogDataServiceTest {
         delay -> CompletableFuture.completedFuture(null),
         Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
         () -> 0.5d);
+  }
+
+  private static CatalogSnapshotCache snapshotCache(Path cacheFile, String instantUtc) {
+    return snapshotCache(cacheFile, instantUtc, DEFAULT_CACHE_MAX_BYTES);
+  }
+
+  private static CatalogSnapshotCache snapshotCache(
+      Path cacheFile, String instantUtc, long maxBytes) {
+    return new CatalogSnapshotCache(
+        cacheFile,
+        CatalogSnapshotCache.defaultPayloadCodec(),
+        Clock.fixed(Instant.parse(instantUtc), ZoneOffset.UTC),
+        SNAPSHOT_TTL,
+        maxBytes);
   }
 }

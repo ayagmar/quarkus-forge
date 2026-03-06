@@ -70,8 +70,7 @@ class ProjectArchiveServiceTest {
       ProjectArchiveService service =
           new ProjectArchiveService(apiClient, new SafeZipExtractor(), () -> tempArchive);
 
-      GenerationRequest request =
-          new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+      GenerationRequest request = defaultGenerationRequest();
 
       assertThatThrownBy(
               () ->
@@ -102,8 +101,7 @@ class ProjectArchiveServiceTest {
       ProjectArchiveService service =
           new ProjectArchiveService(apiClient, new SafeZipExtractor(), () -> tempArchive);
 
-      GenerationRequest request =
-          new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+      GenerationRequest request = defaultGenerationRequest();
 
       assertThatThrownBy(
               () ->
@@ -134,8 +132,7 @@ class ProjectArchiveServiceTest {
       ProjectArchiveService service =
           new ProjectArchiveService(apiClient, new SafeZipExtractor(), () -> tempArchive);
 
-      GenerationRequest request =
-          new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+      GenerationRequest request = defaultGenerationRequest();
 
       Path output = tempDir.resolve("generated-project");
       Path extracted =
@@ -163,8 +160,7 @@ class ProjectArchiveServiceTest {
       ProjectArchiveService service =
           new ProjectArchiveService(apiClient, new SafeZipExtractor(), () -> tempArchive);
 
-      GenerationRequest request =
-          new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+      GenerationRequest request = defaultGenerationRequest();
 
       Path output = tempDir.resolve("generated-project");
       service.downloadAndExtract(request, output, OverwritePolicy.FAIL_IF_EXISTS).join();
@@ -200,8 +196,7 @@ class ProjectArchiveServiceTest {
             new ProjectArchiveService(
                 apiClient, new SafeZipExtractor(), () -> tempArchive, extractionExecutor);
 
-        GenerationRequest request =
-            new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+        GenerationRequest request = defaultGenerationRequest();
 
         AtomicReference<String> extractionThreadName = new AtomicReference<>();
         Path output = tempDir.resolve("generated-project");
@@ -246,8 +241,7 @@ class ProjectArchiveServiceTest {
           new ProjectArchiveService(
               apiClient, new SafeZipExtractor(), () -> tempArchive, rejectingExecutor);
 
-      GenerationRequest request =
-          new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+      GenerationRequest request = defaultGenerationRequest();
 
       assertThatThrownBy(
               () ->
@@ -278,8 +272,7 @@ class ProjectArchiveServiceTest {
       ProjectArchiveService service =
           new ProjectArchiveService(apiClient, new SafeZipExtractor(), () -> tempArchive);
 
-      GenerationRequest request =
-          new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+      GenerationRequest request = defaultGenerationRequest();
 
       AtomicBoolean cancelled = new AtomicBoolean(false);
       assertThatThrownBy(
@@ -316,8 +309,7 @@ class ProjectArchiveServiceTest {
       ProjectArchiveService service =
           new ProjectArchiveService(apiClient, new SafeZipExtractor(), () -> tempArchive);
 
-      GenerationRequest request =
-          new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
+      GenerationRequest request = defaultGenerationRequest();
 
       assertThatThrownBy(
               () ->
@@ -344,6 +336,10 @@ class ProjectArchiveServiceTest {
         delay -> java.util.concurrent.CompletableFuture.completedFuture(null),
         Clock.fixed(Instant.parse("2026-02-21T00:00:00Z"), ZoneOffset.UTC),
         () -> 0.5d);
+  }
+
+  private static GenerationRequest defaultGenerationRequest() {
+    return new GenerationRequest("com.example", "demo", "1.0.0", "maven", "25", List.of());
   }
 
   private static byte[] createZipPayload(String entryName, String content) throws Exception {
