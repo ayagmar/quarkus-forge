@@ -62,6 +62,21 @@ public final class TuiBootstrapService {
     return envValue != null && !envValue.isBlank();
   }
 
+  public static void runHeadlessSmoke(RuntimeConfig runtimeConfig, DiagnosticLogger diagnostics) {
+    diagnostics.info("tui.session.start", of("smokeMode", true), of("mode", "headless-smoke"));
+    try (QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri())) {
+      CatalogDataService catalogDataService =
+          new CatalogDataService(
+              apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
+      diagnostics.info("catalog.load.start", of("mode", "tui"));
+      catalogDataService
+          .load()
+          .handle(CatalogLoadDiagnostics.catalogLoadDiagnostics(diagnostics))
+          .join();
+      diagnostics.info("tui.session.exit", of("outcome", "completed"));
+    }
+  }
+
   public TuiSessionSummary run(
       ForgeUiState initialState,
       int searchDebounceMs,

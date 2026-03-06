@@ -195,6 +195,7 @@ final class PostGenerationMenuState {
       return MenuKeyResult.handled();
     }
     if (action == PostGenerationExitAction.GENERATE_AGAIN) {
+      reset();
       return MenuKeyResult.generateAgain();
     }
     selectExit(action, selected != null ? selected.ideCommand() : null);

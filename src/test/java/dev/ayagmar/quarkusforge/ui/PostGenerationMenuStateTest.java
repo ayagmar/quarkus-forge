@@ -145,11 +145,13 @@ class PostGenerationMenuStateTest {
     }
 
     @Test
-    void enterOnGenerateAgainReturnsWithoutResettingMenuState() {
+    void enterOnGenerateAgainResetsMenuState() {
       moveSelectionToLabel("Generate again");
       MenuKeyResult result = state.handleKey(KeyEvent.ofKey(KeyCode.ENTER));
       assertThat(result).isInstanceOf(MenuKeyResult.GenerateAgain.class);
-      assertThat(state.isVisible()).isTrue();
+      assertThat(state.isVisible()).isFalse();
+      assertThat(state.isGithubVisibilityMenuVisible()).isFalse();
+      assertThat(state.lastGeneratedProjectPath()).isNull();
       assertThat(state.exitPlan()).isNull();
     }
 
