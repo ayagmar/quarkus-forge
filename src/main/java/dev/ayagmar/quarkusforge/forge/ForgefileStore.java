@@ -34,10 +34,6 @@ public final class ForgefileStore {
     } catch (IOException ioException) {
       throw new IllegalArgumentException(
           "Failed to parse Forgefile '" + file + "': " + ioException.getMessage(), ioException);
-    } catch (RuntimeException runtimeException) {
-      throw new IllegalArgumentException(
-          "Failed to parse Forgefile '" + file + "': " + runtimeException.getMessage(),
-          runtimeException);
     }
 
     ForgefileLock locked = readLockedSection(root);

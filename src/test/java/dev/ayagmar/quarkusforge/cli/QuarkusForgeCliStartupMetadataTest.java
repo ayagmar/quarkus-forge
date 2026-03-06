@@ -1,15 +1,22 @@
 package dev.ayagmar.quarkusforge.cli;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
+import dev.ayagmar.quarkusforge.application.StartupMetadataSelection;
+import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.CancellationException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -160,6 +167,53 @@ class QuarkusForgeCliStartupMetadataTest {
   }
 
   @Test
+  void dryRunFallsBackToSnapshotWhenMetadataRefreshTimesOut() {
+    wireMockServer.stubFor(
+        get(urlPathEqualTo("/api/streams"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withFixedDelay(2_500)
+                    .withBody(
+                        """
+                        [
+                          {
+                            "key":"io.quarkus.platform:3.31",
+                            "javaCompatibility":{"versions":[21,25],"recommended":25},
+                            "recommended":true,
+                            "status":"FINAL"
+                          }
+                        ]
+                        """)));
+    wireMockServer.stubFor(
+        get(urlPathEqualTo("/q/openapi"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        {
+                          "paths": {
+                            "/api/download": {
+                              "get": {"parameters": [{"name":"b","schema":{"enum":["MAVEN"]}}]}
+                            }
+                          }
+                        }
+                        """)));
+    RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
+
+    CliCommandTestSupport.CommandResult result =
+        runCommand(
+            runtimeConfig, "--dry-run", "--group-id", "com.example", "--artifact-id", "forge-app");
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(result.standardOut()).contains("metadataSource: snapshot fallback");
+    assertThat(result.standardOut()).contains("timed out after 2000ms");
+  }
+
+  @Test
   void fallbackMetadataSelectionKeepsValidationDeterministicAfterLiveFailure() {
     CliCommandTestSupport.stubStreamsUnavailable(wireMockServer);
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
@@ -183,6 +237,32 @@ class QuarkusForgeCliStartupMetadataTest {
         .contains(
             "unsupported combination: platform stream 'io.quarkus.platform:3.20' does not support"
                 + " Java 25");
+  }
+
+  @Test
+  void fallbackStartupMetadataSelectionInterruptsThreadForInterruptedFailure() throws Exception {
+    QuarkusForgeCli cli = new QuarkusForgeCli(runtimeConfig(URI.create(wireMockServer.baseUrl())));
+
+    StartupMetadataSelection selection =
+        invokeFallbackStartupMetadataSelection(
+            cli, new InterruptedException("stop"), DiagnosticLogger.create(false));
+
+    assertThat(selection.sourceLabel()).isEqualTo("snapshot fallback");
+    assertThat(selection.detailMessage()).contains("Live metadata refresh interrupted");
+    assertThat(Thread.currentThread().isInterrupted()).isTrue();
+    Thread.interrupted();
+  }
+
+  @Test
+  void fallbackStartupMetadataSelectionUsesCancelledReasonForCancellation() throws Exception {
+    QuarkusForgeCli cli = new QuarkusForgeCli(runtimeConfig(URI.create(wireMockServer.baseUrl())));
+
+    StartupMetadataSelection selection =
+        invokeFallbackStartupMetadataSelection(
+            cli, new CancellationException("cancelled"), DiagnosticLogger.create(false));
+
+    assertThat(selection.sourceLabel()).isEqualTo("snapshot fallback");
+    assertThat(selection.detailMessage()).contains("Live metadata refresh cancelled");
   }
 
   @Test
@@ -243,5 +323,14 @@ class QuarkusForgeCliStartupMetadataTest {
       System.setOut(originalOut);
       System.setErr(originalErr);
     }
+  }
+
+  private static StartupMetadataSelection invokeFallbackStartupMetadataSelection(
+      QuarkusForgeCli cli, Throwable throwable, DiagnosticLogger diagnostics) throws Exception {
+    Method method =
+        QuarkusForgeCli.class.getDeclaredMethod(
+            "fallbackStartupMetadataSelection", Throwable.class, DiagnosticLogger.class);
+    method.setAccessible(true);
+    return (StartupMetadataSelection) method.invoke(cli, throwable, diagnostics);
   }
 }

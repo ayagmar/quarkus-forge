@@ -73,6 +73,59 @@ class CatalogLoadCoordinatorTest {
     assertThat(callbacks.currentState).isEqualTo(CatalogLoadState.loaded("live", false));
   }
 
+  @Test
+  void requestReloadWithoutPriorLoaderMarksReloadUnavailable() {
+    CatalogLoadCoordinator coordinator = new CatalogLoadCoordinator();
+    TestCallbacks callbacks = new TestCallbacks();
+
+    coordinator.requestReload(callbacks);
+
+    assertThat(callbacks.reloadUnavailable).isTrue();
+  }
+
+  @Test
+  void nullLoadFutureProducesFallbackFailureEvent() {
+    CatalogLoadCoordinator coordinator = new CatalogLoadCoordinator();
+    TestCallbacks callbacks = new TestCallbacks();
+
+    coordinator.startLoad(() -> null, callbacks);
+
+    assertThat(callbacks.failures).hasSize(1);
+    assertThat(callbacks.failures.getFirst().errorMessage())
+        .contains("loader returned null future");
+    assertThat(callbacks.currentState).isInstanceOf(CatalogLoadState.Failed.class);
+  }
+
+  @Test
+  void nullLoadResultProducesFailureEvent() {
+    CatalogLoadCoordinator coordinator = new CatalogLoadCoordinator();
+    TestCallbacks callbacks = new TestCallbacks();
+
+    coordinator.startLoad(() -> CompletableFuture.completedFuture(null), callbacks);
+
+    assertThat(callbacks.failures).hasSize(1);
+    assertThat(callbacks.failures.getFirst().errorMessage()).contains("empty load result");
+  }
+
+  @Test
+  void firstLoadFailureUsesFallbackCatalogState() {
+    CatalogLoadCoordinator coordinator = new CatalogLoadCoordinator();
+    TestCallbacks callbacks = new TestCallbacks();
+
+    coordinator.startLoad(
+        () ->
+            CompletableFuture.failedFuture(
+                new IllegalStateException("no valid cache snapshot found")),
+        callbacks);
+
+    assertThat(callbacks.failures).hasSize(1);
+    assertThat(callbacks.failures.getFirst().errorMessage())
+        .isEqualTo("Live catalog/cache unavailable. Using bundled snapshot (Ctrl+R to retry).");
+    assertThat(callbacks.failures.getFirst().statusMessage())
+        .isEqualTo("Using fallback extension catalog");
+    assertThat(callbacks.currentState).isInstanceOf(CatalogLoadState.Failed.class);
+  }
+
   private static ExtensionCatalogLoadResult successResult(String id) {
     return new ExtensionCatalogLoadResult(
         List.of(new ExtensionDto(id, id, "web")), CatalogSource.LIVE, false, "", null);
@@ -82,6 +135,7 @@ class CatalogLoadCoordinatorTest {
     private CatalogLoadState currentState;
     private final List<CatalogLoadSuccess> successes = new ArrayList<>();
     private final List<CatalogLoadFailure> failures = new ArrayList<>();
+    private boolean reloadUnavailable;
 
     private TestCallbacks() {
       this(CatalogLoadState.initial());
@@ -112,7 +166,9 @@ class CatalogLoadCoordinatorTest {
     }
 
     @Override
-    public void onCatalogReloadUnavailable() {}
+    public void onCatalogReloadUnavailable() {
+      reloadUnavailable = true;
+    }
 
     @Override
     public void onCatalogLoadSucceeded(CatalogLoadSuccess success) {

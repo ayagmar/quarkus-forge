@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -93,5 +94,66 @@ class CatalogLoadDiagnosticsTest {
         .contains("\"event\":\"catalog.load.cancelled\"")
         .contains("\"mode\":\"headless-smoke\"")
         .doesNotContain("\"event\":\"catalog.load.failure\"");
+  }
+
+  @Test
+  void catalogLoadDiagnosticsDefaultModeLogsTuiSuccess() {
+    CatalogData data =
+        new CatalogData(
+            new MetadataDto(java.util.List.of("25"), java.util.List.of("maven"), Map.of()),
+            java.util.List.of(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "web")),
+            CatalogSource.LIVE,
+            false,
+            "");
+
+    CatalogLoadDiagnostics.catalogLoadDiagnostics(DiagnosticLogger.create(true)).apply(data, null);
+
+    assertThat(stderr.toString(StandardCharsets.UTF_8))
+        .contains("\"event\":\"catalog.load.success\"")
+        .contains("\"mode\":\"tui\"");
+  }
+
+  @Test
+  void catalogLoadDiagnosticsTreatsTimeoutSeparately() {
+    assertThatThrownBy(
+            () ->
+                CatalogLoadDiagnostics.catalogLoadDiagnostics(
+                        DiagnosticLogger.create(true), "headless-smoke")
+                    .apply(null, new CompletionException(new TimeoutException("slow"))))
+        .isInstanceOf(CompletionException.class)
+        .hasCauseInstanceOf(TimeoutException.class);
+
+    assertThat(stderr.toString(StandardCharsets.UTF_8))
+        .contains("\"event\":\"catalog.load.timeout\"")
+        .contains("\"mode\":\"headless-smoke\"")
+        .contains("request timed out");
+  }
+
+  @Test
+  void handlePresetLoadFailureDefaultModeUsesTuiMode() {
+    Map<String, java.util.List<String>> presets =
+        CatalogLoadDiagnostics.handlePresetLoadFailure(
+            DiagnosticLogger.create(true), new CompletionException(new TimeoutException("slow")));
+
+    assertThat(presets).isEmpty();
+    assertThat(stderr.toString(StandardCharsets.UTF_8))
+        .contains("\"event\":\"preset.load.timeout\"")
+        .contains("\"mode\":\"tui\"")
+        .contains("request timed out");
+  }
+
+  @Test
+  void handlePresetLoadFailureTreatsCancellationSeparately() {
+    Map<String, java.util.List<String>> presets =
+        CatalogLoadDiagnostics.handlePresetLoadFailure(
+            DiagnosticLogger.create(true),
+            new CompletionException(new CancellationException("cancelled")),
+            "headless-smoke");
+
+    assertThat(presets).isEmpty();
+    assertThat(stderr.toString(StandardCharsets.UTF_8))
+        .contains("\"event\":\"preset.load.cancelled\"")
+        .contains("\"mode\":\"headless-smoke\"")
+        .doesNotContain("\"event\":\"preset.load.failure\"");
   }
 }

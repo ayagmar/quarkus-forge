@@ -70,9 +70,6 @@ public final class InputResolutionService {
       return request;
     }
     MetadataDto metadata = metadataCompatibility.metadataSnapshot();
-    if (metadata == null) {
-      return request;
-    }
     String recommendedStream = metadata.recommendedPlatformStreamKey();
     if (recommendedStream.isBlank()) {
       return request;
