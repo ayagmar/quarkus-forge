@@ -22,7 +22,7 @@ build-headless:
 build-native:
     {{mvn}} clean package -Pnative -DskipTests
 
-# Run all tests (unit + integration) with JaCoCo coverage
+# Run all tests (unit + integration)
 test:
     {{mvn}} verify
 
@@ -30,15 +30,15 @@ test:
 test-unit:
     {{mvn}} test
 
-# Run verify with integration tests enabled
+# Alias for the full verify lifecycle; this build does not expose an IT-only Maven shortcut
 test-it:
-    {{mvn}} verify -DskipTests=false -DskipITs=false
+    {{mvn}} verify
 
-# Run a full clean verify and print coverage report paths
+# Run a full clean verify and print merged coverage report paths
 coverage:
     {{mvn}} clean verify
-    @echo "Unit coverage:  target/site/jacoco/index.html"
-    @echo "IT coverage:    target/site/jacoco-it/index.html"
+    @echo "HTML coverage: target/site/jacoco/index.html"
+    @echo "XML coverage:  target/site/jacoco/jacoco.xml"
 
 # Auto-format all Java sources (Google Java Format)
 format:

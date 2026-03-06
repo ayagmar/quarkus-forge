@@ -21,6 +21,7 @@ import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
@@ -32,6 +33,8 @@ import org.junit.jupiter.api.io.TempDir;
 class HeadlessCliGenerateIT {
   private static final String HEADLESS_CATALOG_TIMEOUT_PROPERTY =
       "quarkus.forge.headless.catalog-timeout-ms";
+
+  @RegisterExtension final SystemPropertyExtension systemProperties = new SystemPropertyExtension();
 
   @TempDir Path tempDir;
 
@@ -184,21 +187,13 @@ class HeadlessCliGenerateIT {
         get(urlPathEqualTo("/q/openapi")).willReturn(aResponse().withStatus(200).withBody("{}")));
     stubSingleRestExtensionCatalog();
 
-    String previous = System.getProperty(HEADLESS_CATALOG_TIMEOUT_PROPERTY);
-    try {
-      System.setProperty(HEADLESS_CATALOG_TIMEOUT_PROPERTY, "50");
-      CliCommandTestSupport.CommandResult result =
-          runHeadless("generate", "--dry-run", "--extension", "io.quarkus:quarkus-rest");
+    systemProperties.set(HEADLESS_CATALOG_TIMEOUT_PROPERTY, "50");
 
-      assertThat(result.exitCode()).isEqualTo(ExitCodes.NETWORK);
-      assertThat(result.standardError()).contains("timed out");
-    } finally {
-      if (previous == null) {
-        System.clearProperty(HEADLESS_CATALOG_TIMEOUT_PROPERTY);
-      } else {
-        System.setProperty(HEADLESS_CATALOG_TIMEOUT_PROPERTY, previous);
-      }
-    }
+    CliCommandTestSupport.CommandResult result =
+        runHeadless("generate", "--dry-run", "--extension", "io.quarkus:quarkus-rest");
+
+    assertThat(result.exitCode()).isEqualTo(ExitCodes.NETWORK);
+    assertThat(result.standardError()).contains("timed out");
   }
 
   // ── Forgefile round-trip ──────────────────────────────────────────

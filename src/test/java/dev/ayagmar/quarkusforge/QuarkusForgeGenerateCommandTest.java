@@ -26,6 +26,7 @@ import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
 
 class QuarkusForgeGenerateCommandTest {
@@ -33,6 +34,8 @@ class QuarkusForgeGenerateCommandTest {
       "quarkus.forge.headless.catalog-timeout-ms";
   private static final String HEADLESS_GENERATION_TIMEOUT_PROPERTY =
       "quarkus.forge.headless.generation-timeout-ms";
+
+  @RegisterExtension final SystemPropertyExtension systemProperties = new SystemPropertyExtension();
 
   @TempDir Path tempDir;
 
@@ -332,19 +335,17 @@ class QuarkusForgeGenerateCommandTest {
                         """)));
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
+    systemProperties.set(HEADLESS_CATALOG_TIMEOUT_PROPERTY, "50");
+
     CliCommandTestSupport.CommandResult result =
-        withSystemProperty(
-            HEADLESS_CATALOG_TIMEOUT_PROPERTY,
-            "50",
-            () ->
-                runCommand(
-                    runtimeConfig,
-                    "generate",
-                    "--dry-run",
-                    "--group-id",
-                    "com.example",
-                    "--artifact-id",
-                    "headless-app"));
+        runCommand(
+            runtimeConfig,
+            "generate",
+            "--dry-run",
+            "--group-id",
+            "com.example",
+            "--artifact-id",
+            "headless-app");
 
     assertThat(result.exitCode()).isEqualTo(ExitCodes.NETWORK);
     assertThat(result.standardError()).contains("timed out");
@@ -363,18 +364,16 @@ class QuarkusForgeGenerateCommandTest {
                     .withBody(new byte[] {80, 75, 3, 4})));
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
+    systemProperties.set(HEADLESS_GENERATION_TIMEOUT_PROPERTY, "50");
+
     CliCommandTestSupport.CommandResult result =
-        withSystemProperty(
-            HEADLESS_GENERATION_TIMEOUT_PROPERTY,
-            "50",
-            () ->
-                runCommand(
-                    runtimeConfig,
-                    "generate",
-                    "--group-id",
-                    "com.example",
-                    "--artifact-id",
-                    "headless-app"));
+        runCommand(
+            runtimeConfig,
+            "generate",
+            "--group-id",
+            "com.example",
+            "--artifact-id",
+            "headless-app");
 
     assertThat(result.exitCode()).isEqualTo(ExitCodes.NETWORK);
     assertThat(result.standardError()).contains("timed out");
@@ -555,34 +554,31 @@ class QuarkusForgeGenerateCommandTest {
     stubCatalogEndpoints();
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
-    CliCommandTestSupport.CommandResult result =
-        withSystemProperty(
-            "user.home",
-            tempDir.toString(),
-            () -> {
-              Path recipePath = ForgeDataPaths.recipesRoot().resolve("starter.json");
-              assertThatCode(
-                      () -> {
-                        Files.createDirectories(recipePath.getParent());
-                        Files.writeString(
-                            recipePath,
-                            """
-                                {
-                                  "groupId": "com.example",
-                                  "artifactId": "recipe-app",
-                                  "version": "1.0.0-SNAPSHOT",
-                                  "outputDirectory": ".",
-                                  "buildTool": "maven",
-                                  "javaVersion": "25",
-                                  "presets": ["web"],
-                                  "extensions": ["io.quarkus:quarkus-hibernate-orm-panache"]
-                                }
-                                """);
-                      })
-                  .doesNotThrowAnyException();
+    systemProperties.set("user.home", tempDir.toString());
 
-              return runCommand(runtimeConfig, "generate", "--dry-run", "--from", "starter.json");
-            });
+    Path recipePath = ForgeDataPaths.recipesRoot().resolve("starter.json");
+    assertThatCode(
+            () -> {
+              Files.createDirectories(recipePath.getParent());
+              Files.writeString(
+                  recipePath,
+                  """
+                      {
+                        "groupId": "com.example",
+                        "artifactId": "recipe-app",
+                        "version": "1.0.0-SNAPSHOT",
+                        "outputDirectory": ".",
+                        "buildTool": "maven",
+                        "javaVersion": "25",
+                        "presets": ["web"],
+                        "extensions": ["io.quarkus:quarkus-hibernate-orm-panache"]
+                      }
+                      """);
+            })
+        .doesNotThrowAnyException();
+
+    CliCommandTestSupport.CommandResult result =
+        runCommand(runtimeConfig, "generate", "--dry-run", "--from", "starter.json");
 
     assertThat(result.exitCode()).isZero();
     assertThat(result.standardOut()).contains(" - artifactId: recipe-app");
@@ -593,21 +589,19 @@ class QuarkusForgeGenerateCommandTest {
     stubCatalogEndpoints();
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
+    systemProperties.set("user.home", tempDir.toString());
+
     CliCommandTestSupport.CommandResult result =
-        withSystemProperty(
-            "user.home",
-            tempDir.toString(),
-            () ->
-                runCommand(
-                    runtimeConfig,
-                    "generate",
-                    "--dry-run",
-                    "--group-id",
-                    "com.example",
-                    "--artifact-id",
-                    "headless-app",
-                    "--save-as",
-                    "team-web.json"));
+        runCommand(
+            runtimeConfig,
+            "generate",
+            "--dry-run",
+            "--group-id",
+            "com.example",
+            "--artifact-id",
+            "headless-app",
+            "--save-as",
+            "team-web.json");
 
     assertThat(result.exitCode()).isZero();
     assertThat(Files.exists(tempDir.resolve(".quarkus-forge/recipes/team-web.json"))).isTrue();
@@ -757,22 +751,5 @@ class QuarkusForgeGenerateCommandTest {
       }
     }
     return outputStream.toByteArray();
-  }
-
-  private static CliCommandTestSupport.CommandResult withSystemProperty(
-      String key,
-      String value,
-      java.util.function.Supplier<CliCommandTestSupport.CommandResult> supplier) {
-    String previous = System.getProperty(key);
-    try {
-      System.setProperty(key, value);
-      return supplier.get();
-    } finally {
-      if (previous == null) {
-        System.clearProperty(key);
-      } else {
-        System.setProperty(key, previous);
-      }
-    }
   }
 }
