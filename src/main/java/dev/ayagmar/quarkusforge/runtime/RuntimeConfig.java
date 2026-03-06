@@ -1,4 +1,4 @@
-package dev.ayagmar.quarkusforge;
+package dev.ayagmar.quarkusforge.runtime;
 
 import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
 import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
@@ -11,16 +11,16 @@ import java.util.Objects;
  * base URI so that tests can redirect to a local server or temp directory without altering global
  * state.
  */
-record RuntimeConfig(
+public record RuntimeConfig(
     URI apiBaseUri, Path catalogCacheFile, Path favoritesFile, Path preferencesFile) {
-  RuntimeConfig {
+  public RuntimeConfig {
     Objects.requireNonNull(apiBaseUri);
     Objects.requireNonNull(catalogCacheFile);
     Objects.requireNonNull(favoritesFile);
     Objects.requireNonNull(preferencesFile);
   }
 
-  static RuntimeConfig defaults() {
+  public static RuntimeConfig defaults() {
     return new RuntimeConfig(
         URI.create("https://code.quarkus.io"),
         CatalogSnapshotCache.defaultCacheFile(),

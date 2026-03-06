@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge;
 
+import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
 import java.util.Objects;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;

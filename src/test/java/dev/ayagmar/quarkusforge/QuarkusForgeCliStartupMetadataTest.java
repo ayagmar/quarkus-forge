@@ -3,6 +3,7 @@ package dev.ayagmar.quarkusforge;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
+import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;

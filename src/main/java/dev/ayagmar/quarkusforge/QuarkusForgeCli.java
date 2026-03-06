@@ -2,29 +2,29 @@ package dev.ayagmar.quarkusforge;
 
 import static dev.ayagmar.quarkusforge.diagnostics.DiagnosticField.of;
 
-import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogDataService;
 import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
 import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
 import dev.ayagmar.quarkusforge.api.ThrowableUnwrapper;
+import dev.ayagmar.quarkusforge.application.StartupMetadataSelection;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
 import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
-import dev.ayagmar.quarkusforge.ui.ExtensionCatalogLoadResult;
+import dev.ayagmar.quarkusforge.runtime.CatalogLoadDiagnostics;
+import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
+import dev.ayagmar.quarkusforge.runtime.TuiBootstrapService;
+import dev.ayagmar.quarkusforge.runtime.TuiSessionSummary;
 import dev.ayagmar.quarkusforge.ui.UserPreferencesStore;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.function.BiFunction;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
@@ -289,44 +289,12 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
           new CatalogDataService(
               apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
       diagnostics.info("catalog.load.start", of("mode", "tui"));
-      catalogDataService.load().handle(catalogLoadDiagnostics(diagnostics)).join();
+      catalogDataService
+          .load()
+          .handle(CatalogLoadDiagnostics.catalogLoadDiagnostics(diagnostics))
+          .join();
       diagnostics.info("tui.session.exit", of("outcome", "completed"));
     }
-  }
-
-  static BiFunction<CatalogData, Throwable, ExtensionCatalogLoadResult> catalogLoadDiagnostics(
-      DiagnosticLogger diagnostics) {
-    return (catalogData, throwable) -> {
-      if (throwable == null) {
-        diagnostics.info(
-            "catalog.load.success",
-            of("mode", "tui"),
-            of("source", catalogData.source().label()),
-            of("stale", catalogData.stale()),
-            of("detail", catalogData.detailMessage()));
-        return toExtensionCatalogLoadResult(catalogData);
-      }
-      Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(throwable);
-      if (cause instanceof CancellationException) {
-        diagnostics.error("catalog.load.cancelled", of("mode", "tui"));
-      } else {
-        diagnostics.error(
-            "catalog.load.failure",
-            of("mode", "tui"),
-            of("causeType", cause.getClass().getSimpleName()),
-            of("message", ErrorMessageMapper.userFriendlyError(cause)));
-      }
-      throw new CompletionException(cause);
-    };
-  }
-
-  private static ExtensionCatalogLoadResult toExtensionCatalogLoadResult(CatalogData catalogData) {
-    return new ExtensionCatalogLoadResult(
-        catalogData.extensions(),
-        catalogData.source(),
-        catalogData.stale(),
-        catalogData.detailMessage(),
-        catalogData.metadata());
   }
 
   private StartupMetadataSelection loadStartupMetadataSelection(DiagnosticLogger diagnostics) {

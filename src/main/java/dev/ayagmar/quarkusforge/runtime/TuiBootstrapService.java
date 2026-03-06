@@ -1,7 +1,8 @@
-package dev.ayagmar.quarkusforge;
+package dev.ayagmar.quarkusforge.runtime;
 
 import static dev.ayagmar.quarkusforge.diagnostics.DiagnosticField.of;
 
+import dev.ayagmar.quarkusforge.IdeDetector;
 import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogDataService;
 import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
@@ -28,22 +29,22 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-final class TuiBootstrapService {
+public final class TuiBootstrapService {
   private static final String BACKEND_PROPERTY_NAME = "tamboui.backend";
   private static final String BACKEND_ENV_NAME = "TAMBOUI_BACKEND";
   private static final String PANAMA_BACKEND = "panama";
-  static final Duration STARTUP_SPLASH_MIN_DURATION = Duration.ofMillis(450);
+  public static final Duration STARTUP_SPLASH_MIN_DURATION = Duration.ofMillis(450);
   private static final Duration TUI_TICK_RATE = Duration.ofMillis(40);
 
-  static Bindings appBindingsProfile() {
+  public static Bindings appBindingsProfile() {
     return AppBindingsProfile.bindings();
   }
 
-  static TuiConfig appTuiConfig() {
+  public static TuiConfig appTuiConfig() {
     return TuiConfig.builder().tickRate(TUI_TICK_RATE).bindings(appBindingsProfile()).build();
   }
 
-  static String defaultBackendPreference() {
+  public static String defaultBackendPreference() {
     return PANAMA_BACKEND;
   }
 
@@ -63,7 +64,7 @@ final class TuiBootstrapService {
     return envValue != null && !envValue.isBlank();
   }
 
-  TuiSessionSummary run(
+  public TuiSessionSummary run(
       ForgeUiState initialState,
       int searchDebounceMs,
       RuntimeConfig runtimeConfig,
@@ -117,7 +118,7 @@ final class TuiBootstrapService {
                     ? catalogDataService.loadForStartup()
                     : catalogDataService.load();
             return catalogLoadFuture
-                .handle(QuarkusForgeCli.catalogLoadDiagnostics(diagnostics))
+                .handle(CatalogLoadDiagnostics.catalogLoadDiagnostics(diagnostics))
                 .thenCompose(
                     loadResult ->
                         apiClient

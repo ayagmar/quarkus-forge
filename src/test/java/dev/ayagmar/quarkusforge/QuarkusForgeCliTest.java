@@ -3,6 +3,7 @@ package dev.ayagmar.quarkusforge;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticField;
+import dev.ayagmar.quarkusforge.runtime.TuiBootstrapService;
 import dev.ayagmar.quarkusforge.ui.GitHubVisibility;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;

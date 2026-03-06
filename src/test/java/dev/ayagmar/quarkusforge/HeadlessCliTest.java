@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
 import java.net.URI;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;

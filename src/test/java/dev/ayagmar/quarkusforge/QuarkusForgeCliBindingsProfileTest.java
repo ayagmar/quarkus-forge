@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.ayagmar.quarkusforge.runtime.TuiBootstrapService;
 import dev.ayagmar.quarkusforge.ui.AppKeyActions;
 import dev.tamboui.tui.bindings.Actions;
 import dev.tamboui.tui.bindings.Bindings;

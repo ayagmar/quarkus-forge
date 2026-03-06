@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.api.MetadataSnapshotLoader;
+import dev.ayagmar.quarkusforge.application.StartupMetadataSelection;
 import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import org.junit.jupiter.api.Test;
 
