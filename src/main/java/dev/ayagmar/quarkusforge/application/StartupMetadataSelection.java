@@ -1,11 +1,11 @@
-package dev.ayagmar.quarkusforge;
+package dev.ayagmar.quarkusforge.application;
 
 import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import java.util.Objects;
 
-record StartupMetadataSelection(
+public record StartupMetadataSelection(
     MetadataCompatibilityContext metadataCompatibility, String sourceLabel, String detailMessage) {
-  StartupMetadataSelection {
+  public StartupMetadataSelection {
     Objects.requireNonNull(metadataCompatibility);
     sourceLabel = sourceLabel == null ? "" : sourceLabel.strip();
     detailMessage = detailMessage == null ? "" : detailMessage.strip();

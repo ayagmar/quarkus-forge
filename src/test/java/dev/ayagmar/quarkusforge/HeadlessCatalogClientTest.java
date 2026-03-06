@@ -12,6 +12,7 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
+import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;

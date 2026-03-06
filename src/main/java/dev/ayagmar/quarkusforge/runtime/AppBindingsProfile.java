@@ -1,4 +1,4 @@
-package dev.ayagmar.quarkusforge;
+package dev.ayagmar.quarkusforge.runtime;
 
 import dev.ayagmar.quarkusforge.ui.AppKeyActions;
 import dev.tamboui.tui.bindings.Actions;

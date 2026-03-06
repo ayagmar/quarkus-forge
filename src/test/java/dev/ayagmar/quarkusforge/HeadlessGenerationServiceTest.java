@@ -8,6 +8,7 @@ import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.api.PlatformStream;
+import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;

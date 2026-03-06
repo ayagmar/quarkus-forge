@@ -6,6 +6,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 
+import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.net.URI;

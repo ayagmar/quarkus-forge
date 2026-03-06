@@ -10,6 +10,7 @@ import com.tngtech.archunit.lang.ArchRule;
 @AnalyzeClasses(packages = "dev.ayagmar.quarkusforge")
 class HeadlessArchitectureRulesTest {
   private static final String[] CORE_NON_UI_PACKAGES = {
+    "dev.ayagmar.quarkusforge.application..",
     "dev.ayagmar.quarkusforge.api..",
     "dev.ayagmar.quarkusforge.archive..",
     "dev.ayagmar.quarkusforge.domain..",
@@ -47,6 +48,24 @@ class HeadlessArchitectureRulesTest {
           .should()
           .dependOnClassesThat()
           .resideInAnyPackage("dev.tamboui..");
+
+  @ArchTest
+  static final ArchRule applicationLayerDoesNotDependOnCliOrUiFrameworks =
+      noClasses()
+          .that()
+          .resideInAnyPackage("dev.ayagmar.quarkusforge.application..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage("dev.ayagmar.quarkusforge.ui..", "dev.tamboui..", "picocli..");
+
+  @ArchTest
+  static final ArchRule runtimeLayerDoesNotDependOnPicocli =
+      noClasses()
+          .that()
+          .resideInAnyPackage("dev.ayagmar.quarkusforge.runtime..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage("picocli..");
 
   @ArchTest
   static final ArchRule uiLayerDoesNotDependOnPicocli =

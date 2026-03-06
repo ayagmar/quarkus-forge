@@ -3,6 +3,7 @@ package dev.ayagmar.quarkusforge;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
+import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
