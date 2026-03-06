@@ -156,9 +156,17 @@ class CoreUiReducerTest {
             new UiIntent.PostGenerationIntent(UiIntent.PostGenerationTransition.GENERATE_AGAIN));
 
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
-    assertThat(result.effects()).containsExactly(new UiEffect.ResetGenerationAfterOutcome());
+    assertThat(result.effects()).containsExactly(new UiEffect.PrepareForGeneration());
     assertThat(result.nextState().statusMessage()).isEqualTo("Ready for next generation");
     assertThat(result.nextState().errorMessage()).isEmpty();
+  }
+
+  @Test
+  void prepareForGenerationIntentProducesPrepareEffect() {
+    ReduceResult result = reducer.reduce(baseState(), new UiIntent.PrepareForGenerationIntent());
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects()).containsExactly(new UiEffect.PrepareForGeneration());
   }
 
   @Test

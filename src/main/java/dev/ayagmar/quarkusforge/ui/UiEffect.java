@@ -2,11 +2,11 @@ package dev.ayagmar.quarkusforge.ui;
 
 /** Reducer-emitted side effects executed outside pure transition logic. */
 sealed interface UiEffect {
+  record PrepareForGeneration() implements UiEffect {}
+
   record CancelPendingAsync() implements UiEffect {}
 
   record ExportRecipeAndLock() implements UiEffect {}
-
-  record ResetGenerationAfterOutcome() implements UiEffect {}
 
   record StartGeneration() implements UiEffect {}
 

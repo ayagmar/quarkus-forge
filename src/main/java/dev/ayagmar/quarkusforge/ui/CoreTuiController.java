@@ -529,7 +529,6 @@ public final class CoreTuiController
 
   @Override
   public void beforeGenerationStart() {
-    postGenerationMenu.resetForNewGeneration();
     extensionCatalogState.cancelPendingAsync();
   }
 
@@ -1771,8 +1770,9 @@ public final class CoreTuiController
     return outputRoot.resolve(request.artifactId()).normalize();
   }
 
-  private void resetGenerationStateAfterTerminalOutcome() {
-    generationStateTracker.resetAfterTerminalOutcome();
+  void prepareForGenerationForReducer() {
+    postGenerationMenu.reset();
+    resetGenerationStateAfterTerminalOutcome();
   }
 
   void cancelPendingAsyncForReducer() {
@@ -1783,8 +1783,8 @@ public final class CoreTuiController
     exportRecipeAndLockFiles();
   }
 
-  void resetGenerationForReducer() {
-    resetGenerationStateAfterTerminalOutcome();
+  private void resetGenerationStateAfterTerminalOutcome() {
+    generationStateTracker.resetAfterTerminalOutcome();
   }
 
   void startGenerationForReducer() {
@@ -1920,9 +1920,8 @@ public final class CoreTuiController
   }
 
   private void handleSubmitRequest() {
-    postGenerationMenu.reset();
     submitRequested = true;
-    resetGenerationStateAfterTerminalOutcome();
+    dispatchIntent(new UiIntent.PrepareForGenerationIntent());
     if (!transitionGenerationState(GenerationState.VALIDATING)) {
       statusMessage = "Submit ignored in state: " + generationStateLabel();
       return;

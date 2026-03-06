@@ -13,9 +13,9 @@ final class UiEffectsRunner {
 
   private static void run(UiEffect effect, CoreTuiController controller) {
     switch (effect) {
+      case UiEffect.PrepareForGeneration _ -> controller.prepareForGenerationForReducer();
       case UiEffect.CancelPendingAsync _ -> controller.cancelPendingAsyncForReducer();
       case UiEffect.ExportRecipeAndLock _ -> controller.exportRecipeAndLockForReducer();
-      case UiEffect.ResetGenerationAfterOutcome _ -> controller.resetGenerationForReducer();
       case UiEffect.StartGeneration _ -> controller.startGenerationForReducer();
       case UiEffect.RequestGenerationCancellation _ ->
           controller.requestGenerationCancellationForReducer();
