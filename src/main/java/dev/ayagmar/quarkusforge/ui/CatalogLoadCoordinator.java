@@ -9,21 +9,23 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
 final class CatalogLoadCoordinator {
+  record StartupOverlayTickResult(boolean visible, boolean repaintRequired) {}
+
   private final StartupOverlayTracker startupOverlay = new StartupOverlayTracker();
   private volatile long loadToken;
   private ExtensionCatalogLoader loader;
   private CompletableFuture<?> currentLoadFuture;
 
-  void startLoad(ExtensionCatalogLoader loader, CatalogLoadFlowCallbacks callbacks) {
+  void startLoad(ExtensionCatalogLoader loader, CatalogLoadIntentPort port) {
     Objects.requireNonNull(loader);
     this.loader = loader;
     cancelCurrentLoad();
 
     long token = ++loadToken;
-    callbacks.onCatalogLoadStarted(
-        CatalogLoadState.loadingFrom(callbacks.currentCatalogLoadState()),
-        "Loading extension catalog...");
+    CatalogLoadState nextState = CatalogLoadState.loadingFrom(port.currentCatalogLoadState());
     startupOverlay.activateIfFirstLoad(token);
+    port.dispatchIntent(
+        new UiIntent.CatalogLoadStartedIntent(nextState, startupOverlay.isVisible(true)));
 
     CompletableFuture<ExtensionCatalogLoadResult> loadFuture;
     try {
@@ -40,25 +42,28 @@ final class CatalogLoadCoordinator {
 
     observedLoadFuture.whenComplete(
         (result, throwable) ->
-            callbacks.scheduleOnRenderThread(
-                () -> onCompleted(token, observedLoadFuture, result, throwable, callbacks)));
+            port.scheduleOnRenderThread(
+                () -> onCompleted(token, observedLoadFuture, result, throwable, port)));
   }
 
-  void requestReload(CatalogLoadFlowCallbacks callbacks) {
+  void requestReload(CatalogLoadIntentPort port) {
     if (loader == null) {
-      callbacks.onCatalogReloadUnavailable();
+      port.dispatchIntent(new UiIntent.CatalogReloadUnavailableIntent());
       return;
     }
-    startLoad(loader, callbacks);
+    startLoad(loader, port);
   }
 
-  void cancel(CatalogLoadFlowCallbacks callbacks) {
+  void cancel(CatalogLoadIntentPort port) {
     cancelCurrentLoad();
     loadToken++;
-    CatalogLoadState currentState = callbacks.currentCatalogLoadState();
+    CatalogLoadState currentState = port.currentCatalogLoadState();
     if (currentState instanceof CatalogLoadState.Loading loading) {
-      callbacks.onCatalogLoadCancelled(
-          loading.previous() == null ? CatalogLoadState.initial() : loading.previous());
+      CatalogLoadState nextState =
+          loading.previous() == null ? CatalogLoadState.initial() : loading.previous();
+      port.dispatchIntent(
+          new UiIntent.CatalogLoadCancelledIntent(
+              nextState, startupOverlay.isVisible(nextState.isLoading())));
     }
   }
 
@@ -66,12 +71,10 @@ final class CatalogLoadCoordinator {
     startupOverlay.setMinDuration(minimumDuration);
   }
 
-  boolean isStartupOverlayVisible(CatalogLoadState loadState) {
-    return startupOverlay.isVisible(loadState.isLoading());
-  }
-
-  boolean tickStartupOverlay(CatalogLoadState loadState) {
-    return startupOverlay.tick(loadState.isLoading());
+  StartupOverlayTickResult tickStartupOverlay(CatalogLoadState loadState) {
+    boolean repaintRequired = startupOverlay.tick(loadState.isLoading());
+    return new StartupOverlayTickResult(
+        startupOverlay.isVisible(loadState.isLoading()), repaintRequired);
   }
 
   private void onCompleted(
@@ -79,7 +82,7 @@ final class CatalogLoadCoordinator {
       CompletableFuture<?> loadFuture,
       ExtensionCatalogLoadResult result,
       Throwable throwable,
-      CatalogLoadFlowCallbacks callbacks) {
+      CatalogLoadIntentPort port) {
     if (currentLoadFuture == loadFuture) {
       currentLoadFuture = null;
     }
@@ -90,12 +93,18 @@ final class CatalogLoadCoordinator {
       return;
     }
     if (throwable != null) {
-      callbacks.onCatalogLoadFailed(failure(callbacks.currentCatalogLoadState(), throwable));
+      CatalogLoadFailure failure = failure(port.currentCatalogLoadState(), throwable);
+      port.dispatchIntent(
+          new UiIntent.CatalogLoadFailedIntent(
+              failure, startupOverlay.isVisible(failure.nextState().isLoading())));
       return;
     }
     if (result == null) {
-      callbacks.onCatalogLoadFailed(
-          failure(callbacks.currentCatalogLoadState(), "Catalog load failed: empty load result"));
+      CatalogLoadFailure failure =
+          failure(port.currentCatalogLoadState(), "Catalog load failed: empty load result");
+      port.dispatchIntent(
+          new UiIntent.CatalogLoadFailedIntent(
+              failure, startupOverlay.isVisible(failure.nextState().isLoading())));
       return;
     }
 
@@ -112,8 +121,11 @@ final class CatalogLoadCoordinator {
                         extension.description()))
             .toList();
     if (items.isEmpty()) {
-      callbacks.onCatalogLoadFailed(
-          failure(callbacks.currentCatalogLoadState(), "Catalog load returned no extensions"));
+      CatalogLoadFailure failure =
+          failure(port.currentCatalogLoadState(), "Catalog load returned no extensions");
+      port.dispatchIntent(
+          new UiIntent.CatalogLoadFailedIntent(
+              failure, startupOverlay.isVisible(failure.nextState().isLoading())));
       return;
     }
 
@@ -121,13 +133,16 @@ final class CatalogLoadCoordinator {
         !result.detailMessage().isBlank()
             ? result.detailMessage()
             : CoreTuiController.catalogLoadedStatusMessage(result.source(), result.stale());
-    callbacks.onCatalogLoadSucceeded(
+    CatalogLoadSuccess success =
         new CatalogLoadSuccess(
             items,
             result.metadata(),
             result.presetExtensionsByName(),
             CatalogLoadState.loaded(result.source().label(), result.stale()),
-            statusMessage));
+            statusMessage);
+    port.dispatchIntent(
+        new UiIntent.CatalogLoadSucceededIntent(
+            success, startupOverlay.isVisible(success.nextState().isLoading())));
   }
 
   private static CatalogLoadFailure failure(CatalogLoadState currentState, Throwable throwable) {

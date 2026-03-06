@@ -201,6 +201,70 @@ record UiState(
         extensions);
   }
 
+  UiState withCatalogLoad(
+      CatalogLoadView nextCatalogLoad,
+      StartupOverlayView nextStartupOverlay,
+      String nextStatusMessage,
+      String nextErrorMessage,
+      String nextVerboseErrorDetails,
+      boolean nextShowErrorDetails) {
+    return new UiState(
+        request,
+        validation,
+        focusTarget,
+        nextStatusMessage,
+        nextErrorMessage,
+        nextVerboseErrorDetails,
+        nextShowErrorDetails,
+        submitRequested,
+        submitBlockedByValidation,
+        submitBlockedByTargetConflict,
+        commandPaletteSelection,
+        metadataPanel,
+        extensionsPanel,
+        footer,
+        new OverlayState(
+            overlays.generationVisible(),
+            overlays.commandPaletteVisible(),
+            overlays.helpOverlayVisible(),
+            overlays.postGenerationVisible(),
+            nextStartupOverlay.visible()),
+        generation,
+        nextCatalogLoad,
+        postGeneration,
+        nextStartupOverlay,
+        extensions);
+  }
+
+  UiState withStartupOverlay(StartupOverlayView nextStartupOverlay) {
+    return new UiState(
+        request,
+        validation,
+        focusTarget,
+        statusMessage,
+        errorMessage,
+        verboseErrorDetails,
+        showErrorDetails,
+        submitRequested,
+        submitBlockedByValidation,
+        submitBlockedByTargetConflict,
+        commandPaletteSelection,
+        metadataPanel,
+        extensionsPanel,
+        footer,
+        new OverlayState(
+            overlays.generationVisible(),
+            overlays.commandPaletteVisible(),
+            overlays.helpOverlayVisible(),
+            overlays.postGenerationVisible(),
+            nextStartupOverlay.visible()),
+        generation,
+        catalogLoad,
+        postGeneration,
+        nextStartupOverlay,
+        extensions);
+  }
+
   record OverlayState(
       boolean generationVisible,
       boolean commandPaletteVisible,
@@ -214,7 +278,27 @@ record UiState(
       String progressPhase,
       boolean cancellationRequested) {}
 
-  record CatalogLoadView(boolean loading, String sourceLabel, boolean stale, String errorMessage) {}
+  record CatalogLoadView(CatalogLoadState state) {
+    CatalogLoadView {
+      state = state == null ? CatalogLoadState.initial() : state;
+    }
+
+    boolean loading() {
+      return state.isLoading();
+    }
+
+    String sourceLabel() {
+      return state.sourceLabel();
+    }
+
+    boolean stale() {
+      return state.isStale();
+    }
+
+    String errorMessage() {
+      return state.errorMessage();
+    }
+  }
 
   record PostGenerationView(
       boolean visible,

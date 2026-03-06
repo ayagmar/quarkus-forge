@@ -13,9 +13,14 @@ final class UiEffectsRunner {
 
   private static void run(UiEffect effect, CoreTuiController controller) {
     switch (effect) {
+      case UiEffect.StartCatalogLoad catalogLoadEffect ->
+          controller.startCatalogLoadForReducer(catalogLoadEffect.loader());
+      case UiEffect.RequestCatalogReload _ -> controller.requestCatalogReloadForReducer();
       case UiEffect.PrepareForGeneration _ -> controller.prepareForGenerationForReducer();
       case UiEffect.CancelPendingAsync _ -> controller.cancelPendingAsyncForReducer();
       case UiEffect.ExportRecipeAndLock _ -> controller.exportRecipeAndLockForReducer();
+      case UiEffect.ApplyCatalogLoadSuccess successEffect ->
+          controller.applyCatalogLoadSuccessForReducer(successEffect.success());
       case UiEffect.StartGeneration _ -> controller.startGenerationForReducer();
       case UiEffect.TransitionGenerationState transitionEffect ->
           controller.transitionGenerationStateForReducer(transitionEffect.targetState());

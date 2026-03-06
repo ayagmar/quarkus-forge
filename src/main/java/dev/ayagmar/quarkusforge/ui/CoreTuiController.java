@@ -18,30 +18,23 @@ import dev.ayagmar.quarkusforge.forge.ForgefileLock;
 import dev.ayagmar.quarkusforge.forge.ForgefileStore;
 import dev.ayagmar.quarkusforge.postgen.IdeDetector;
 import dev.ayagmar.quarkusforge.util.OutputPathResolver;
-import dev.tamboui.layout.Constraint;
-import dev.tamboui.layout.Layout;
-import dev.tamboui.layout.Rect;
-import dev.tamboui.style.Overflow;
-import dev.tamboui.style.Style;
 import dev.tamboui.terminal.Frame;
 import dev.tamboui.tui.event.Event;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.ResizeEvent;
 import dev.tamboui.tui.event.TickEvent;
-import dev.tamboui.widgets.input.TextInput;
 import dev.tamboui.widgets.input.TextInputState;
-import dev.tamboui.widgets.paragraph.Paragraph;
-import dev.tamboui.widgets.select.Select;
-import dev.tamboui.widgets.select.SelectState;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
@@ -52,14 +45,7 @@ import java.util.concurrent.ForkJoinPool;
  * <p>Coordinates input routing, reducer/effects dispatch, async lifecycle callbacks, and
  * state-driven rendering while delegating domain-specific behavior to extracted collaborators.
  */
-public final class CoreTuiController
-    implements CompactInputRenderer,
-        UiRoutingContext,
-        GenerationFlowCallbacks,
-        CatalogLoadFlowCallbacks,
-        UiRenderer.Adapter {
-  private static final int METADATA_PANEL_HEIGHT_COMPACT = 4;
-  private static final int METADATA_PANEL_HEIGHT_NARROW = 10;
+public final class CoreTuiController implements UiRoutingContext, GenerationFlowCallbacks {
   private static final ProjectGenerationRunner NOOP_PROJECT_GENERATION_RUNNER =
       (generationRequest, outputDirectory, cancelled, progressListener) ->
           CompletableFuture.failedFuture(
@@ -68,13 +54,11 @@ public final class CoreTuiController
   private final ProjectRequestValidator requestValidator = new ProjectRequestValidator();
   private MetadataCompatibilityContext metadataCompatibility;
   private final UiScheduler scheduler;
-  private final ExtensionCatalogState extensionCatalogState;
+  private final ExtensionCatalogPreferences extensionCatalogPreferences;
+  private final ExtensionCatalogNavigation extensionCatalogNavigation;
+  private final ExtensionCatalogProjection extensionCatalogProjection;
   private final ExtensionInteractionHandler extensionInteraction;
   private final ProjectGenerationRunner projectGenerationRunner;
-  private final UiTheme theme;
-  private final BodyPanelRenderer bodyPanelRenderer;
-  private final Select focusedSelectorWidget;
-  private final Select focusedSelectorErrorWidget;
   private final MetadataSelectorManager metadataSelectors = new MetadataSelectorManager();
 
   private ProjectRequest request;
@@ -87,7 +71,6 @@ public final class CoreTuiController
   private boolean submitBlockedByValidation;
   private boolean submitBlockedByTargetConflict;
   private final GenerationStateTracker generationStateTracker;
-  private final FooterLinesComposer footerLinesComposer;
   private final AsyncRepaintSignal asyncRepaintSignal;
   private final UiEventRouter uiEventRouter;
   private final GenerationFlowCoordinator generationFlowCoordinator;
@@ -96,7 +79,10 @@ public final class CoreTuiController
   private final UiEffectsRunner uiEffectsRunner;
   private final UiStateSnapshotMapper uiStateSnapshotMapper;
   private final UiRenderer uiRenderer;
+  private final CoreUiRenderAdapter uiRenderAdapter;
+  private final CatalogLoadIntentPort catalogLoadIntentPort;
   private CatalogLoadState catalogLoadState = CatalogLoadState.initial();
+  private boolean startupOverlayVisible;
   private boolean showErrorDetails;
   private boolean commandPaletteVisible;
   private boolean helpOverlayVisible;
@@ -129,26 +115,10 @@ public final class CoreTuiController
     metadataCompatibility = initialState.metadataCompatibility();
     this.scheduler = scheduler;
     this.projectGenerationRunner = projectGenerationRunner;
-    theme = UiTheme.loadDefault();
-    bodyPanelRenderer = new BodyPanelRenderer(theme);
-    focusedSelectorWidget =
-        Select.builder()
-            .style(UiInputStyles.focusedField(theme, false))
-            .selectedColor(theme.color("focus"))
-            .indicatorColor(theme.color("focus"))
-            .leftIndicator("◀ ")
-            .rightIndicator(" ▶")
-            .build();
-    focusedSelectorErrorWidget =
-        Select.builder()
-            .style(UiInputStyles.focusedField(theme, true))
-            .selectedColor(theme.color("error"))
-            .indicatorColor(theme.color("error"))
-            .leftIndicator("◀ ")
-            .rightIndicator(" ▶")
-            .build();
+    UiTheme theme = UiTheme.loadDefault();
+    BodyPanelRenderer bodyPanelRenderer = new BodyPanelRenderer(theme);
     generationStateTracker = new GenerationStateTracker();
-    footerLinesComposer = new FooterLinesComposer();
+    FooterLinesComposer footerLinesComposer = new FooterLinesComposer();
     asyncRepaintSignal = new AsyncRepaintSignal();
     uiEventRouter = new UiEventRouter();
     generationFlowCoordinator = new GenerationFlowCoordinator();
@@ -157,6 +127,27 @@ public final class CoreTuiController
     uiEffectsRunner = new UiEffectsRunner();
     uiStateSnapshotMapper = new UiStateSnapshotMapper();
     uiRenderer = new UiRenderer();
+    uiRenderAdapter =
+        new CoreUiRenderAdapter(
+            theme, bodyPanelRenderer, footerLinesComposer, new CompactFieldRenderer(theme));
+    catalogLoadIntentPort =
+        new CatalogLoadIntentPort() {
+          @Override
+          public CatalogLoadState currentCatalogLoadState() {
+            return catalogLoadState;
+          }
+
+          @Override
+          public void scheduleOnRenderThread(Runnable task) {
+            scheduler.schedule(Duration.ZERO, task);
+          }
+
+          @Override
+          public void dispatchIntent(UiIntent intent) {
+            CoreTuiController.this.dispatchIntent(intent);
+          }
+        };
+    startupOverlayVisible = false;
     showErrorDetails = false;
 
     for (FocusTarget target : FocusTarget.values()) {
@@ -174,14 +165,18 @@ public final class CoreTuiController
         inputStates.get(target).moveCursorToEnd();
       }
     }
-    extensionCatalogState =
-        new ExtensionCatalogState(
-            scheduler,
-            debounceDelay,
-            inputStates.get(FocusTarget.EXTENSION_SEARCH).text(),
-            favoritesStore,
-            favoritesPersistenceExecutor);
-    extensionInteraction = new ExtensionInteractionHandler(extensionCatalogState);
+    extensionCatalogPreferences =
+        new ExtensionCatalogPreferences(
+            Objects.requireNonNull(favoritesStore),
+            Objects.requireNonNull(favoritesPersistenceExecutor));
+    extensionCatalogNavigation = new ExtensionCatalogNavigation();
+    extensionCatalogProjection =
+        new ExtensionCatalogProjection(
+            scheduler, debounceDelay, inputStates.get(FocusTarget.EXTENSION_SEARCH).text());
+    extensionCatalogProjection.initialize(extensionCatalogNavigation, extensionCatalogPreferences);
+    extensionInteraction =
+        new ExtensionInteractionHandler(
+            extensionCatalogPreferences, extensionCatalogNavigation, extensionCatalogProjection);
 
     revalidate();
   }
@@ -261,7 +256,7 @@ public final class CoreTuiController
   }
 
   public void loadExtensionCatalogAsync(ExtensionCatalogLoader loader) {
-    catalogLoadCoordinator.startLoad(loader, this);
+    dispatchIntent(new UiIntent.CatalogLoadRequestedIntent(loader));
   }
 
   public UiAction onEvent(Event event) {
@@ -305,19 +300,19 @@ public final class CoreTuiController
       clearExtensionSearchFilter();
       return UiAction.handled(false);
     }
-    if (extensionCatalogState.favoritesOnlyFilterEnabled()) {
+    if (extensionCatalogProjection.favoritesOnlyFilterEnabled()) {
       toggleFavoritesOnlyFilter();
       return UiAction.handled(false);
     }
-    if (extensionCatalogState.selectedOnlyFilterEnabled()) {
+    if (extensionCatalogProjection.selectedOnlyFilterEnabled()) {
       toggleSelectedOnlyFilter();
       return UiAction.handled(false);
     }
-    if (!extensionCatalogState.activePresetFilterName().isBlank()) {
+    if (!extensionCatalogProjection.activePresetFilterName().isBlank()) {
       clearPresetFilter();
       return UiAction.handled(false);
     }
-    if (!extensionCatalogState.activeCategoryFilterTitle().isBlank()) {
+    if (!extensionCatalogProjection.activeCategoryFilterTitle().isBlank()) {
       clearCategoryFilter();
       return UiAction.handled(false);
     }
@@ -417,7 +412,7 @@ public final class CoreTuiController
     }
     if (focusTarget == FocusTarget.EXTENSION_LIST
         && isUpNavigation(keyEvent)
-        && extensionCatalogState.isSelectionAtTop()) {
+        && extensionCatalogNavigation.isSelectionAtTop(extensionCatalogProjection.rows())) {
       focusExtensionSearch();
       return UiAction.handled(false);
     }
@@ -441,7 +436,8 @@ public final class CoreTuiController
     }
     if (focusTarget == FocusTarget.EXTENSION_LIST
         && keyEvent.isSelect()
-        && extensionCatalogState.isCategorySectionHeaderSelected()) {
+        && extensionCatalogProjection.isCategorySectionHeaderSelected(
+            extensionCatalogNavigation.selectedRow())) {
       toggleCategoryCollapseAtSelection();
       return UiAction.handled(false);
     }
@@ -475,7 +471,7 @@ public final class CoreTuiController
       return UiAction.handled(false);
     }
     if (focusTarget == FocusTarget.EXTENSION_LIST
-        && extensionCatalogState.handleListKeys(
+        && handleExtensionListKeys(
             keyEvent, toggledName -> statusMessage = "Toggled extension: " + toggledName)) {
       return UiAction.handled(false);
     }
@@ -494,7 +490,7 @@ public final class CoreTuiController
 
   @Override
   public void beforeGenerationStart() {
-    extensionCatalogState.cancelPendingAsync();
+    extensionCatalogProjection.cancelPendingAsync();
   }
 
   @Override
@@ -543,57 +539,6 @@ public final class CoreTuiController
     dispatchIntent(new UiIntent.GenerationCancellationRequestedIntent());
   }
 
-  @Override
-  public CatalogLoadState currentCatalogLoadState() {
-    return catalogLoadState;
-  }
-
-  @Override
-  public void onCatalogLoadStarted(CatalogLoadState nextState, String statusMessage) {
-    catalogLoadState = nextState;
-    this.statusMessage = statusMessage;
-    requestAsyncRepaint();
-  }
-
-  @Override
-  public void onCatalogLoadCancelled(CatalogLoadState nextState) {
-    catalogLoadState = nextState;
-  }
-
-  @Override
-  public void onCatalogReloadUnavailable() {
-    statusMessage = "Catalog reload unavailable";
-  }
-
-  @Override
-  public void onCatalogLoadSucceeded(CatalogLoadSuccess success) {
-    if (success.metadata() != null) {
-      metadataCompatibility = MetadataCompatibilityContext.success(success.metadata());
-      syncMetadataSelectors();
-      revalidate();
-    }
-    catalogLoadState = success.nextState();
-    errorMessage = "";
-    verboseErrorDetails = "";
-    showErrorDetails = false;
-    statusMessage = success.statusMessage();
-    extensionCatalogState.replaceCatalog(
-        success.items(), inputStates.get(FocusTarget.EXTENSION_SEARCH).text(), ignored -> {});
-    extensionCatalogState.setPresetExtensionsByName(
-        success.presetExtensionsByName(), ignored -> {});
-    requestAsyncRepaint();
-  }
-
-  @Override
-  public void onCatalogLoadFailed(CatalogLoadFailure failure) {
-    catalogLoadState = failure.nextState();
-    errorMessage = failure.errorMessage();
-    verboseErrorDetails = failure.errorMessage();
-    showErrorDetails = false;
-    statusMessage = failure.statusMessage();
-    requestAsyncRepaint();
-  }
-
   public void setStartupOverlayMinDuration(Duration minimumDuration) {
     Objects.requireNonNull(minimumDuration);
     catalogLoadCoordinator.setStartupOverlayMinDuration(minimumDuration);
@@ -601,15 +546,20 @@ public final class CoreTuiController
 
   public void render(Frame frame) {
     reconcileGenerationCompletionIfDone();
-    uiRenderer.render(frame, uiState(), this);
+    uiRenderAdapter.updateContext(
+        new CoreUiRenderAdapter.RenderContext(
+            metadataRenderContext(),
+            inputStates.get(FocusTarget.EXTENSION_SEARCH),
+            extensionCatalogNavigation.listState(),
+            extensionCatalogNavigation::isSelected,
+            extensionCatalogPreferences::isFavorite));
+    uiRenderer.render(frame, uiState(), uiRenderAdapter);
   }
 
   UiState uiState() {
     MetadataPanelSnapshot metadataPanelSnapshot = metadataPanelSnapshot();
     ExtensionsPanelSnapshot extensionsPanelSnapshot = extensionsPanelSnapshot();
     FooterSnapshot footerSnapshot = footerSnapshot();
-    boolean startupOverlayVisible = isStartupOverlayVisible();
-    List<String> startupStatusLines = startupStatusLines();
     return uiStateSnapshotMapper.map(
         request,
         focusTarget,
@@ -634,23 +584,19 @@ public final class CoreTuiController
                 generationStateTracker.progressRatio(),
                 generationStateTracker.progressPhase(),
                 generationFlowCoordinator.isCancellationRequested()),
-            new UiState.CatalogLoadView(
-                catalogLoadState.isLoading(),
-                catalogLoadState.sourceLabel(),
-                catalogLoadState.isStale(),
-                catalogLoadState.errorMessage()),
+            new UiState.CatalogLoadView(catalogLoadState),
             postGenerationMenu.snapshot(),
-            new UiState.StartupOverlayView(startupOverlayVisible, startupStatusLines),
+            new UiState.StartupOverlayView(startupOverlayVisible, startupStatusLines()),
             new UiState.ExtensionView(
-                extensionCatalogState.filteredExtensions().size(),
-                extensionCatalogState.totalCatalogExtensionCount(),
-                extensionCatalogState.selectedExtensionCount(),
-                extensionCatalogState.favoritesOnlyFilterEnabled(),
-                extensionCatalogState.selectedOnlyFilterEnabled(),
-                extensionCatalogState.activePresetFilterName(),
-                extensionCatalogState.activeCategoryFilterTitle(),
+                extensionCatalogProjection.filteredExtensions().size(),
+                extensionCatalogProjection.totalCatalogExtensionCount(),
+                extensionCatalogNavigation.selectedExtensionCount(),
+                extensionCatalogProjection.favoritesOnlyFilterEnabled(),
+                extensionCatalogProjection.selectedOnlyFilterEnabled(),
+                extensionCatalogProjection.activePresetFilterName(),
+                extensionCatalogProjection.activeCategoryFilterTitle(),
                 inputStates.get(FocusTarget.EXTENSION_SEARCH).text(),
-                extensionCatalogState.focusedExtensionId())),
+                focusedExtensionId())),
         new UiStateSnapshotMapper.PanelState(
             metadataPanelSnapshot, extensionsPanelSnapshot, footerSnapshot));
   }
@@ -668,7 +614,7 @@ public final class CoreTuiController
   }
 
   List<String> selectedExtensionIds() {
-    return extensionCatalogState.selectedExtensionIds();
+    return extensionCatalogNavigation.selectedExtensionIds();
   }
 
   String statusMessage() {
@@ -720,93 +666,37 @@ public final class CoreTuiController
   }
 
   int filteredExtensionCount() {
-    return extensionCatalogState.filteredExtensions().size();
+    return extensionCatalogProjection.filteredExtensions().size();
   }
 
   String firstFilteredExtensionId() {
-    List<ExtensionCatalogItem> filteredExtensions = extensionCatalogState.filteredExtensions();
+    List<ExtensionCatalogItem> filteredExtensions = extensionCatalogProjection.filteredExtensions();
     return filteredExtensions.isEmpty() ? "" : filteredExtensions.getFirst().id();
   }
 
   List<String> filteredExtensionIds() {
-    return extensionCatalogState.filteredExtensions().stream()
+    return extensionCatalogProjection.filteredExtensions().stream()
         .map(ExtensionCatalogItem::id)
         .toList();
   }
 
   List<String> catalogSectionHeaders() {
-    return extensionCatalogState.filteredRows().stream()
+    return extensionCatalogProjection.filteredRows().stream()
         .filter(ExtensionCatalogRow::isSectionHeader)
         .map(ExtensionCatalogRow::label)
         .toList();
   }
 
   boolean favoritesOnlyFilterEnabled() {
-    return extensionCatalogState.favoritesOnlyFilterEnabled();
+    return extensionCatalogProjection.favoritesOnlyFilterEnabled();
   }
 
   int favoriteExtensionCount() {
-    return extensionCatalogState.favoriteExtensionCount();
+    return extensionCatalogPreferences.favoriteExtensionCount();
   }
 
   String focusedListExtensionId() {
-    return extensionCatalogState.focusedExtensionId();
-  }
-
-  @Override
-  public List<String> composeFooterLines(int width, FooterSnapshot footerSnapshot) {
-    return footerLinesComposer.compose(width, footerSnapshot);
-  }
-
-  @Override
-  public int estimateFooterHeight(List<String> lines, int availableWidth) {
-    return estimateFooterHeightInternal(lines, availableWidth);
-  }
-
-  @Override
-  public void renderHeader(Frame frame, Rect area) {
-    String text = "  QUARKUS FORGE  ─  Keyboard-first project generator";
-    Paragraph header =
-        Paragraph.builder()
-            .text(text)
-            .style(Style.EMPTY.fg(theme.color("accent")).bold())
-            .overflow(Overflow.ELLIPSIS)
-            .build();
-    frame.renderWidget(header, area);
-  }
-
-  @Override
-  public void renderBody(
-      Frame frame,
-      Rect area,
-      MetadataPanelSnapshot metadataPanelSnapshot,
-      ExtensionsPanelSnapshot extensionsPanelSnapshot) {
-    int metadataHeight =
-        area.width() < UiLayoutConstants.NARROW_WIDTH_THRESHOLD
-            ? METADATA_PANEL_HEIGHT_NARROW
-            : METADATA_PANEL_HEIGHT_COMPACT;
-    List<Rect> bodyLayout =
-        Layout.vertical()
-            .constraints(Constraint.length(metadataHeight), Constraint.fill())
-            .split(area);
-
-    bodyPanelRenderer.renderMetadataPanel(
-        frame,
-        bodyLayout.get(0),
-        metadataPanelSnapshot,
-        this,
-        CoreTuiController::panelTitle,
-        this::panelBorderStyle);
-    bodyPanelRenderer.renderExtensionsPanel(
-        frame,
-        bodyLayout.get(1),
-        extensionsPanelSnapshot,
-        inputStates.get(FocusTarget.EXTENSION_SEARCH),
-        extensionCatalogState.listState(),
-        CoreTuiController::panelTitle,
-        this::panelBorderStyle,
-        extensionCatalogState::isSelected,
-        extensionCatalogState::isFavorite);
+    return focusedExtensionId();
   }
 
   private MetadataPanelSnapshot metadataPanelSnapshot() {
@@ -843,221 +733,18 @@ public final class CoreTuiController
         catalogLoadState.errorMessage(),
         catalogLoadState.sourceLabel(),
         catalogLoadState.isStale(),
-        extensionCatalogState.favoritesOnlyFilterEnabled(),
-        extensionCatalogState.selectedOnlyFilterEnabled(),
-        extensionCatalogState.favoriteExtensionCount(),
-        extensionCatalogState.activePresetFilterName(),
-        extensionCatalogState.activeCategoryFilterTitle(),
+        extensionCatalogProjection.favoritesOnlyFilterEnabled(),
+        extensionCatalogProjection.selectedOnlyFilterEnabled(),
+        extensionCatalogPreferences.favoriteExtensionCount(),
+        extensionCatalogProjection.activePresetFilterName(),
+        extensionCatalogProjection.activeCategoryFilterTitle(),
         validation.errors().size(),
-        extensionCatalogState.filteredExtensions().size(),
-        extensionCatalogState.totalCatalogExtensionCount(),
-        extensionCatalogState.filteredRows(),
-        extensionCatalogState.selectedExtensionIds(),
+        extensionCatalogProjection.filteredExtensions().size(),
+        extensionCatalogProjection.totalCatalogExtensionCount(),
+        extensionCatalogProjection.filteredRows(),
+        extensionCatalogNavigation.selectedExtensionIds(),
         inputStates.get(FocusTarget.EXTENSION_SEARCH).text(),
-        extensionCatalogState.focusedExtensionDescription());
-  }
-
-  @Override
-  public void renderCompactSelector(
-      Frame frame,
-      Rect area,
-      String label,
-      String value,
-      FocusTarget target,
-      int selectedIndex,
-      int totalOptions) {
-    if (focusTarget == target && isMetadataSelectorFocus(target)) {
-      renderCompactFocusedSelector(frame, area, label, target, selectedIndex);
-      return;
-    }
-    String displayValue = value.isBlank() ? "default" : value;
-    boolean focused = focusTarget == target;
-
-    String positionHint =
-        totalOptions > 1 ? " (" + (selectedIndex + 1) + "/" + totalOptions + ")" : "";
-    if (focused) {
-      displayValue = "◀ " + displayValue + " ▶" + positionHint;
-    } else if (totalOptions > 1) {
-      displayValue = displayValue + " ◀▶";
-    }
-
-    renderCompactField(frame, area, label, displayValue, target, "]");
-  }
-
-  private void renderCompactFocusedSelector(
-      Frame frame, Rect area, String label, FocusTarget target, int selectedIndex) {
-    List<String> options = metadataSelectors.optionsFor(target);
-    if (options.isEmpty()) {
-      renderCompactField(frame, area, label, "default", target, "]");
-      return;
-    }
-
-    List<String> displayOptions = selectorDisplayOptions(target, options);
-    int index = Math.max(0, Math.min(selectedIndex, displayOptions.size() - 1));
-
-    boolean hasError = hasValidationErrorFor(target);
-    String errorHint = validationErrorHint(target);
-    Style fieldStyle = UiInputStyles.focusedField(theme, hasError);
-    String prefix = "  " + label + ": [";
-    String suffix = "]" + (errorHint.isEmpty() ? "" : " " + errorHint);
-    int selectorWidth = area.width() - prefix.length() - suffix.length();
-    if (selectorWidth < 5) {
-      renderCompactField(frame, area, label, displayOptions.get(index), target, "]");
-      return;
-    }
-
-    frame.renderWidget(
-        Paragraph.builder().text(prefix).style(fieldStyle).overflow(Overflow.ELLIPSIS).build(),
-        new Rect(area.left(), area.top(), Math.min(prefix.length(), area.width()), area.height()));
-
-    Rect selectArea =
-        new Rect(area.left() + prefix.length(), area.top(), selectorWidth, area.height());
-    Select selectWidget = hasError ? focusedSelectorErrorWidget : focusedSelectorWidget;
-    frame.renderStatefulWidget(selectWidget, selectArea, new SelectState(displayOptions, index));
-
-    frame.renderWidget(
-        Paragraph.builder().text(suffix).style(fieldStyle).overflow(Overflow.ELLIPSIS).build(),
-        new Rect(
-            selectArea.left() + selectArea.width(),
-            area.top(),
-            area.width() - prefix.length() - selectArea.width(),
-            area.height()));
-  }
-
-  @Override
-  public void renderCompactText(
-      Frame frame, Rect area, String label, String value, FocusTarget target) {
-    if (focusTarget == target && isTextInputFocus(target)) {
-      renderCompactFocusedTextInput(frame, area, label, target);
-      return;
-    }
-    String displayValue = value.isBlank() ? defaultValueFor(target) : value;
-    renderCompactField(frame, area, label, displayValue, target, "_]");
-  }
-
-  private void renderCompactFocusedTextInput(
-      Frame frame, Rect area, String label, FocusTarget target) {
-    TextInputState state = inputStates.get(target);
-    if (state == null) {
-      renderCompactField(frame, area, label, "", target, "_]");
-      return;
-    }
-
-    String errorHint = validationErrorHint(target);
-    String prefix = "  " + label + ": [";
-    String suffix = "]" + (errorHint.isEmpty() ? "" : " " + errorHint);
-    int inputWidth = area.width() - prefix.length() - suffix.length();
-    if (inputWidth < 1) {
-      String fallbackValue = state.text().isBlank() ? defaultValueFor(target) : state.text();
-      renderCompactField(frame, area, label, fallbackValue, target, "_]");
-      return;
-    }
-
-    Style fieldStyle = UiInputStyles.focusedField(theme, hasValidationErrorFor(target));
-    frame.renderWidget(
-        Paragraph.builder().text(prefix).style(fieldStyle).overflow(Overflow.ELLIPSIS).build(),
-        new Rect(area.left(), area.top(), Math.min(prefix.length(), area.width()), area.height()));
-
-    Rect inputArea = new Rect(area.left() + prefix.length(), area.top(), inputWidth, area.height());
-    TextInput.builder()
-        .style(fieldStyle)
-        .cursorStyle(UiInputStyles.cursor(theme))
-        .placeholder(defaultValueFor(target))
-        .placeholderStyle(Style.EMPTY.fg(theme.color("muted")).italic())
-        .build()
-        .renderWithCursor(inputArea, frame.buffer(), state, frame);
-
-    frame.renderWidget(
-        Paragraph.builder().text(suffix).style(fieldStyle).overflow(Overflow.ELLIPSIS).build(),
-        new Rect(
-            inputArea.left() + inputArea.width(),
-            area.top(),
-            area.width() - prefix.length() - inputArea.width(),
-            area.height()));
-  }
-
-  private void renderCompactField(
-      Frame frame,
-      Rect area,
-      String label,
-      String displayValue,
-      FocusTarget target,
-      String focusSuffix) {
-    boolean focused = focusTarget == target;
-    String errorHint = validationErrorHint(target);
-    int reservedForError = errorHint.isEmpty() ? 0 : errorHint.length() + 1;
-    int maxValueLen = Math.max(8, area.width() - label.length() - 5 - reservedForError);
-    if (displayValue.length() > maxValueLen) {
-      displayValue = displayValue.substring(0, maxValueLen - 2) + "..";
-    }
-
-    String line = String.format("  %s: %s", label, displayValue);
-    if (focused) {
-      line = "  " + label + ": [" + displayValue + focusSuffix;
-    }
-    if (!errorHint.isEmpty()) {
-      line = line + " " + errorHint;
-    }
-
-    Style style = Style.EMPTY.fg(focused ? theme.color("focus") : theme.color("text"));
-    if (hasValidationErrorFor(target)) {
-      style = Style.EMPTY.fg(theme.color("error"));
-    }
-    if (focused) {
-      style = style.bold();
-    }
-
-    Paragraph paragraph =
-        Paragraph.builder().text(line).style(style).overflow(Overflow.ELLIPSIS).build();
-    frame.renderWidget(paragraph, area);
-  }
-
-  private String defaultValueFor(FocusTarget target) {
-    return switch (target) {
-      case GROUP_ID -> "org.acme";
-      case ARTIFACT_ID -> "quarkus-app";
-      case VERSION -> "1.0.0-SNAPSHOT";
-      case PACKAGE_NAME -> "org.acme.quarkus";
-      case OUTPUT_DIR -> ".";
-      default -> "";
-    };
-  }
-
-  @Override
-  public void renderFooter(Frame frame, Rect area, List<String> footerLines) {
-    StringBuilder sb = new StringBuilder();
-    for (int i = 0; i < footerLines.size(); i++) {
-      if (i > 0) {
-        sb.append("\n");
-      }
-      sb.append("  ").append(footerLines.get(i));
-    }
-
-    Paragraph footer =
-        Paragraph.builder()
-            .text(sb.toString())
-            .style(Style.EMPTY.fg(theme.color("muted")))
-            .overflow(Overflow.WRAP_WORD)
-            .build();
-    frame.renderWidget(footer, area);
-  }
-
-  private static int estimateFooterHeightInternal(List<String> lines, int availableWidth) {
-    if (availableWidth <= 0) {
-      return Math.max(1, lines.size());
-    }
-    int height = 0;
-    for (String line : lines) {
-      int lineWidth = line.length() + 2;
-      height += Math.max(1, (lineWidth + availableWidth - 1) / availableWidth);
-    }
-    return Math.max(1, height);
-  }
-
-  @Override
-  public void renderCommandPalette(Frame frame, Rect viewport, int selection) {
-    OverlayRenderer.renderCommandPalette(
-        frame, viewport, theme, UiTextConstants.COMMAND_PALETTE_ENTRIES, selection);
+        focusedExtensionDescription());
   }
 
   private boolean isGenerationActive() {
@@ -1065,98 +752,23 @@ public final class CoreTuiController
     return state == GenerationState.VALIDATING || state == GenerationState.LOADING;
   }
 
-  @Override
-  public void renderGenerationOverlay(
-      Frame frame, Rect viewport, UiState.GenerationView generation) {
-    OverlayRenderer.renderGenerationOverlay(
-        frame, viewport, theme, generation.progressRatio(), generation.progressPhase());
-  }
-
-  @Override
-  public void renderHelpOverlay(Frame frame, Rect viewport) {
-    OverlayRenderer.renderHelpOverlay(
-        frame, viewport, theme, helpOverlayLines(), helpOverlayTitle());
-  }
-
-  private List<String> helpOverlayLines() {
-    List<String> lines = new ArrayList<>(UiTextConstants.GLOBAL_HELP_LINES);
-    lines.add("");
-    lines.add("Context (" + contextHelpTitle() + ")");
-    lines.addAll(contextHelpLines());
-    return lines;
-  }
-
-  private String helpOverlayTitle() {
-    return "Help [focus] - " + contextHelpTitle();
-  }
-
-  private String contextHelpTitle() {
-    if (postGenerationMenu.isGithubVisibilityMenuVisible()) {
-      return "github visibility";
-    }
-    if (postGenerationMenu.isVisible()) {
-      return "post-generate";
-    }
-    if (isGenerationInProgress()) {
-      return "generation";
-    }
-    return switch (focusTarget) {
-      case EXTENSION_SEARCH -> "extension search";
-      case EXTENSION_LIST -> "extension list";
-      case SUBMIT -> "submit";
-      default -> "metadata";
-    };
-  }
-
-  private List<String> contextHelpLines() {
-    if (postGenerationMenu.isGithubVisibilityMenuVisible()) {
-      return List.of(
-          "  Up/Down or j/k  : choose repository visibility",
-          "  Enter           : confirm and publish",
-          "  Esc             : back to post-generate actions");
-    }
-    if (postGenerationMenu.isVisible()) {
-      return List.of(
-          "  Up/Down or j/k  : choose post-generate action",
-          "  Enter           : run selected action",
-          "  Esc             : quit");
-    }
-    if (isGenerationInProgress()) {
-      return List.of(
-          "  Esc / Ctrl+C    : cancel current generation",
-          "  Enter           : disabled while generation is active");
-    }
-    return switch (focusTarget) {
-      case EXTENSION_SEARCH ->
-          List.of(
-              "  Type            : filter extensions",
-              "  Down            : move focus to extension list",
-              "  Alt+S           : toggle selected-only view",
-              "  Esc             : clear filter or return to list");
-      case EXTENSION_LIST ->
-          List.of(
-              "  Up/Down or j/k  : move list selection",
-              "  Space           : toggle extension",
-              "  f               : toggle favorite",
-              "  Alt+S           : toggle selected-only view",
-              "  v               : cycle category filter");
-      case SUBMIT ->
-          List.of(
-              "  Enter / Alt+G   : submit generation",
-              "  j/k             : move focus",
-              "  Esc             : quit");
-      default ->
-          List.of(
-              "  Left/Right      : change selector value",
-              "  Type            : edit focused text field",
-              "  Enter / Alt+G   : submit generation");
-    };
-  }
-
-  @Override
-  public void renderStartupStatusOverlay(
-      Frame frame, Rect viewport, UiState.StartupOverlayView startupOverlay) {
-    OverlayRenderer.renderStartupOverlay(frame, viewport, theme, startupOverlay.statusLines());
+  private MetadataFieldRenderContext metadataRenderContext() {
+    EnumMap<FocusTarget, List<String>> selectorDisplayOptions = new EnumMap<>(FocusTarget.class);
+    selectorDisplayOptions.put(
+        FocusTarget.PLATFORM_STREAM,
+        selectorDisplayOptions(
+            FocusTarget.PLATFORM_STREAM,
+            metadataSelectors.optionsFor(FocusTarget.PLATFORM_STREAM)));
+    selectorDisplayOptions.put(
+        FocusTarget.BUILD_TOOL,
+        selectorDisplayOptions(
+            FocusTarget.BUILD_TOOL, metadataSelectors.optionsFor(FocusTarget.BUILD_TOOL)));
+    selectorDisplayOptions.put(
+        FocusTarget.JAVA_VERSION,
+        selectorDisplayOptions(
+            FocusTarget.JAVA_VERSION, metadataSelectors.optionsFor(FocusTarget.JAVA_VERSION)));
+    return new MetadataFieldRenderContext(
+        focusTarget, validation, inputStates, selectorDisplayOptions);
   }
 
   private List<String> startupStatusLines() {
@@ -1176,20 +788,60 @@ public final class CoreTuiController
     return List.copyOf(lines);
   }
 
-  @Override
-  public void renderPostGenerationOverlay(
-      Frame frame, Rect viewport, UiState.PostGenerationView postGeneration) {
-    if (postGeneration.githubVisibilityVisible()) {
-      OverlayRenderer.renderGitHubVisibilityOverlay(
-          frame,
-          viewport,
-          theme,
-          UiTextConstants.GITHUB_VISIBILITY_LABELS,
-          postGeneration.githubVisibilitySelection());
-      return;
+  private String focusedExtensionId() {
+    String focusedId =
+        extensionCatalogProjection.itemIdAtRow(extensionCatalogNavigation.selectedRow());
+    return focusedId == null ? "" : focusedId;
+  }
+
+  private String focusedExtensionDescription() {
+    Integer selectedRow = extensionCatalogNavigation.selectedRow();
+    if (selectedRow == null) {
+      return "";
     }
-    OverlayRenderer.renderPostGenerationOverlay(
-        frame, viewport, theme, postGeneration.actionLabels(), postGeneration.actionSelection());
+    ExtensionCatalogItem selected = extensionCatalogProjection.itemAtRow(selectedRow);
+    return selected == null ? "" : selected.description();
+  }
+
+  private boolean handleExtensionListKeys(
+      KeyEvent keyEvent, java.util.function.Consumer<String> onToggled) {
+    if (extensionCatalogNavigation.handleNavigationKey(
+        extensionCatalogProjection.rows(), keyEvent)) {
+      return true;
+    }
+    if (!keyEvent.isSelect()) {
+      return false;
+    }
+    Integer selectedRow = extensionCatalogNavigation.selectedRow();
+    if (selectedRow == null) {
+      return false;
+    }
+    ExtensionCatalogItem extension = extensionCatalogProjection.itemAtRow(selectedRow);
+    if (extension == null) {
+      return false;
+    }
+    if (extensionCatalogNavigation.select(extension.id())) {
+      extensionCatalogPreferences.recordRecentSelection(extension.id());
+      extensionCatalogProjection.refreshRows(
+          extension.id(), extensionCatalogNavigation, extensionCatalogPreferences);
+    } else {
+      extensionCatalogNavigation.deselect(extension.id());
+      extensionCatalogProjection.reapplyAfterSelectionMutation(
+          extensionCatalogNavigation, extensionCatalogPreferences);
+    }
+    onToggled.accept(extension.name());
+    return true;
+  }
+
+  private void replaceExtensionCatalog(List<ExtensionCatalogItem> items, String query) {
+    Set<String> availableExtensionIds = new LinkedHashSet<>();
+    for (ExtensionCatalogItem item : items) {
+      availableExtensionIds.add(item.id());
+    }
+    extensionCatalogNavigation.retainAvailableSelections(availableExtensionIds);
+    extensionCatalogPreferences.retainAvailable(availableExtensionIds);
+    extensionCatalogProjection.replaceCatalog(
+        items, query, extensionCatalogNavigation, extensionCatalogPreferences, ignored -> {});
   }
 
   private FooterSnapshot footerSnapshot() {
@@ -1310,6 +962,8 @@ public final class CoreTuiController
     submitRequested = reducedState.submitRequested();
     submitBlockedByValidation = reducedState.submitBlockedByValidation();
     submitBlockedByTargetConflict = reducedState.submitBlockedByTargetConflict();
+    catalogLoadState = reducedState.catalogLoad().state();
+    startupOverlayVisible = reducedState.startupOverlay().visible();
     postGenerationMenu.apply(reducedState.postGeneration());
   }
 
@@ -1332,7 +986,7 @@ public final class CoreTuiController
       return;
     }
     try {
-      List<String> selectedExtensions = extensionCatalogState.selectedExtensionIds();
+      List<String> selectedExtensions = extensionCatalogNavigation.selectedExtensionIds();
       ForgefileLock lock =
           ForgefileLock.of(
               request.platformStream(),
@@ -1503,39 +1157,14 @@ public final class CoreTuiController
     return validation.isValid() ? "Project Metadata" : "Project Metadata [invalid]";
   }
 
-  private Style panelBorderStyle(boolean focused, boolean hasError, boolean isLoading) {
-    if (hasError) {
-      return Style.EMPTY.fg(theme.color("error")).bold();
-    }
-    if (isLoading) {
-      return Style.EMPTY.fg(theme.color("warning")).bold();
-    }
-    if (focused) {
-      return Style.EMPTY.fg(theme.color("focus")).bold();
-    }
-    return Style.EMPTY.fg(theme.color("accent"));
-  }
-
   private boolean hasValidationErrorFor(FocusTarget target) {
-    if ((!isTextInputFocus(target) && !isMetadataSelectorFocus(target))
+    if ((!isTextInputFocus(target) && !MetadataSelectorManager.isSelectorFocus(target))
         || target == FocusTarget.EXTENSION_SEARCH) {
       return false;
     }
     String fieldName = UiFocusTargets.nameOf(target);
     return validation.errors().stream()
         .anyMatch(error -> error.field().equalsIgnoreCase(fieldName));
-  }
-
-  private String validationErrorHint(FocusTarget target) {
-    if (!hasValidationErrorFor(target)) {
-      return "";
-    }
-    String fieldName = UiFocusTargets.nameOf(target);
-    return validation.errors().stream()
-        .filter(error -> error.field().equalsIgnoreCase(fieldName))
-        .findFirst()
-        .map(error -> "⚠ " + error.message())
-        .orElse("");
   }
 
   private String activeErrorDetails() {
@@ -1561,7 +1190,11 @@ public final class CoreTuiController
   private void scheduleFilteredExtensionsRefresh() {
     String query = inputStates.get(FocusTarget.EXTENSION_SEARCH).text();
     statusMessage = "Searching extensions...";
-    extensionCatalogState.scheduleRefresh(query, this::updateExtensionFilterStatus);
+    extensionCatalogProjection.scheduleRefresh(
+        query,
+        extensionCatalogNavigation,
+        extensionCatalogPreferences,
+        this::updateExtensionFilterStatus);
   }
 
   private void syncMetadataSelectors() {
@@ -1720,8 +1353,8 @@ public final class CoreTuiController
   }
 
   private void cancelPendingAsyncOperations() {
-    catalogLoadCoordinator.cancel(this);
-    extensionCatalogState.cancelPendingAsync();
+    catalogLoadCoordinator.cancel(catalogLoadIntentPort);
+    extensionCatalogProjection.cancelPendingAsync();
   }
 
   private void reconcileGenerationCompletionIfDone() {
@@ -1741,7 +1374,7 @@ public final class CoreTuiController
         request.platformStream(),
         request.buildTool(),
         request.javaVersion(),
-        extensionCatalogState.selectedExtensionIds());
+        extensionCatalogNavigation.selectedExtensionIds());
   }
 
   private Path resolveGeneratedProjectDirectory() {
@@ -1751,6 +1384,28 @@ public final class CoreTuiController
 
   void prepareForGenerationForReducer() {
     resetGenerationStateAfterTerminalOutcome();
+  }
+
+  void startCatalogLoadForReducer(ExtensionCatalogLoader loader) {
+    catalogLoadCoordinator.startLoad(loader, catalogLoadIntentPort);
+  }
+
+  void requestCatalogReloadForReducer() {
+    catalogLoadCoordinator.requestReload(catalogLoadIntentPort);
+  }
+
+  void applyCatalogLoadSuccessForReducer(CatalogLoadSuccess success) {
+    if (success.metadata() != null) {
+      metadataCompatibility = MetadataCompatibilityContext.success(success.metadata());
+      syncMetadataSelectors();
+      revalidate();
+    }
+    replaceExtensionCatalog(success.items(), inputStates.get(FocusTarget.EXTENSION_SEARCH).text());
+    extensionCatalogProjection.setPresetExtensionsByName(
+        success.presetExtensionsByName(),
+        extensionCatalogNavigation,
+        extensionCatalogPreferences,
+        ignored -> {});
   }
 
   void cancelPendingAsyncForReducer() {
@@ -1832,10 +1487,6 @@ public final class CoreTuiController
     return UiFocusPredicates.isTextInputFocus(focusTarget);
   }
 
-  private static boolean isMetadataSelectorFocus(FocusTarget focusTarget) {
-    return MetadataSelectorManager.isSelectorFocus(focusTarget);
-  }
-
   private static String panelTitle(String baseTitle, boolean focused) {
     return focused ? baseTitle + " [focus]" : baseTitle;
   }
@@ -1848,11 +1499,12 @@ public final class CoreTuiController
 
   private UiAction handleTickEvent() {
     boolean loading = catalogLoadState.isLoading();
-    boolean shouldRender =
-        loading || catalogLoadCoordinator.isStartupOverlayVisible(catalogLoadState);
-    if (catalogLoadCoordinator.tickStartupOverlay(catalogLoadState)) {
-      shouldRender = true;
+    CatalogLoadCoordinator.StartupOverlayTickResult overlayTick =
+        catalogLoadCoordinator.tickStartupOverlay(catalogLoadState);
+    if (startupOverlayVisible != overlayTick.visible()) {
+      dispatchIntent(new UiIntent.StartupOverlayVisibilityIntent(overlayTick.visible()));
     }
+    boolean shouldRender = loading || overlayTick.visible() || overlayTick.repaintRequired();
     if (asyncRepaintSignal.consume()) {
       shouldRender = true;
     }
@@ -1876,7 +1528,7 @@ public final class CoreTuiController
         new UiIntent.SubmitRequestedIntent(
             new UiIntent.SubmitEvaluation(
                 projectGenerationRunner != NOOP_PROJECT_GENERATION_RUNNER,
-                extensionCatalogState.selectedExtensionCount(),
+                extensionCatalogNavigation.selectedExtensionCount(),
                 firstInvalidFocusableTarget(validation),
                 validation.errors().size(),
                 firstValidationError(validation),
@@ -1892,10 +1544,6 @@ public final class CoreTuiController
       return;
     }
     statusMessage = "Extensions filtered: " + filteredCount;
-  }
-
-  private boolean isStartupOverlayVisible() {
-    return catalogLoadCoordinator.isStartupOverlayVisible(catalogLoadState);
   }
 
   private void requestAsyncRepaint() {
@@ -1978,7 +1626,7 @@ public final class CoreTuiController
   }
 
   private void requestCatalogReload() {
-    catalogLoadCoordinator.requestReload(this);
+    dispatchIntent(new UiIntent.CatalogReloadRequestedIntent());
   }
 
   private static boolean shouldToggleHelpOverlay(KeyEvent keyEvent, FocusTarget currentFocus) {
@@ -2063,7 +1711,11 @@ public final class CoreTuiController
     TextInputState searchState = inputStates.get(FocusTarget.EXTENSION_SEARCH);
     searchState.setText("");
     searchState.moveCursorToStart();
-    extensionCatalogState.refreshNow("", this::updateExtensionFilterStatus);
+    extensionCatalogProjection.refreshNow(
+        "",
+        extensionCatalogNavigation,
+        extensionCatalogPreferences,
+        this::updateExtensionFilterStatus);
     statusMessage = "Extension search cleared";
   }
 
@@ -2124,7 +1776,7 @@ public final class CoreTuiController
         + " | Java "
         + request.javaVersion()
         + " | "
-        + extensionCatalogState.selectedExtensionCount()
+        + extensionCatalogNavigation.selectedExtensionCount()
         + " ext";
   }
 

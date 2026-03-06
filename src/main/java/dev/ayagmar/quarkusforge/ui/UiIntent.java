@@ -4,6 +4,26 @@ package dev.ayagmar.quarkusforge.ui;
 sealed interface UiIntent {
   record PostGenerationIntent(PostGenerationCommand command) implements UiIntent {}
 
+  record CatalogLoadRequestedIntent(ExtensionCatalogLoader loader) implements UiIntent {}
+
+  record CatalogReloadRequestedIntent() implements UiIntent {}
+
+  record CatalogLoadStartedIntent(CatalogLoadState nextState, boolean startupOverlayVisible)
+      implements UiIntent {}
+
+  record CatalogLoadCancelledIntent(CatalogLoadState nextState, boolean startupOverlayVisible)
+      implements UiIntent {}
+
+  record CatalogReloadUnavailableIntent() implements UiIntent {}
+
+  record CatalogLoadSucceededIntent(CatalogLoadSuccess success, boolean startupOverlayVisible)
+      implements UiIntent {}
+
+  record CatalogLoadFailedIntent(CatalogLoadFailure failure, boolean startupOverlayVisible)
+      implements UiIntent {}
+
+  record StartupOverlayVisibilityIntent(boolean visible) implements UiIntent {}
+
   record SubmitRequestedIntent(SubmitEvaluation evaluation) implements UiIntent {}
 
   record SubmitEditRecoveryIntent(SubmitEditRecovery recovery) implements UiIntent {}

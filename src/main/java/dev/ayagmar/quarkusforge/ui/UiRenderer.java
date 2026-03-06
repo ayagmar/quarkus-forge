@@ -31,7 +31,7 @@ final class UiRenderer {
 
     void renderCommandPalette(Frame frame, Rect viewport, int selection);
 
-    void renderHelpOverlay(Frame frame, Rect viewport);
+    void renderHelpOverlay(Frame frame, Rect viewport, UiState state);
 
     void renderPostGenerationOverlay(
         Frame frame, Rect viewport, UiState.PostGenerationView postGeneration);
@@ -59,7 +59,7 @@ final class UiRenderer {
       adapter.renderCommandPalette(frame, area, state.commandPaletteSelection());
     }
     if (state.overlays().helpOverlayVisible()) {
-      adapter.renderHelpOverlay(frame, area);
+      adapter.renderHelpOverlay(frame, area, state);
     }
     if (state.overlays().postGenerationVisible()) {
       adapter.renderPostGenerationOverlay(frame, area, state.postGeneration());

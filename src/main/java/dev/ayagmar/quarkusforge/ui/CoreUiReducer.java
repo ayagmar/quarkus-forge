@@ -11,6 +11,78 @@ final class CoreUiReducer implements UiReducer {
     return switch (intent) {
       case UiIntent.PostGenerationIntent postGenerationIntent ->
           reducePostGeneration(state, postGenerationIntent.command());
+      case UiIntent.CatalogLoadRequestedIntent loadIntent ->
+          new ReduceResult(
+              state,
+              List.of(new UiEffect.StartCatalogLoad(loadIntent.loader())),
+              UiAction.handled(false));
+      case UiIntent.CatalogReloadRequestedIntent _ ->
+          new ReduceResult(
+              state, List.of(new UiEffect.RequestCatalogReload()), UiAction.handled(false));
+      case UiIntent.CatalogLoadStartedIntent startedIntent ->
+          new ReduceResult(
+              state.withCatalogLoad(
+                  new UiState.CatalogLoadView(startedIntent.nextState()),
+                  new UiState.StartupOverlayView(
+                      startedIntent.startupOverlayVisible(), state.startupOverlay().statusLines()),
+                  "Loading extension catalog...",
+                  state.errorMessage(),
+                  state.verboseErrorDetails(),
+                  state.showErrorDetails()),
+              List.of(new UiEffect.RequestAsyncRepaint()),
+              UiAction.handled(false));
+      case UiIntent.CatalogLoadCancelledIntent cancelledIntent ->
+          new ReduceResult(
+              state.withCatalogLoad(
+                  new UiState.CatalogLoadView(cancelledIntent.nextState()),
+                  new UiState.StartupOverlayView(
+                      cancelledIntent.startupOverlayVisible(),
+                      state.startupOverlay().statusLines()),
+                  state.statusMessage(),
+                  state.errorMessage(),
+                  state.verboseErrorDetails(),
+                  state.showErrorDetails()),
+              List.of(),
+              UiAction.handled(false));
+      case UiIntent.CatalogReloadUnavailableIntent _ ->
+          new ReduceResult(
+              state.withStatusAndError("Catalog reload unavailable", state.errorMessage()),
+              List.of(),
+              UiAction.handled(false));
+      case UiIntent.CatalogLoadSucceededIntent succeededIntent ->
+          new ReduceResult(
+              state.withCatalogLoad(
+                  new UiState.CatalogLoadView(succeededIntent.success().nextState()),
+                  new UiState.StartupOverlayView(
+                      succeededIntent.startupOverlayVisible(),
+                      state.startupOverlay().statusLines()),
+                  succeededIntent.success().statusMessage(),
+                  "",
+                  "",
+                  false),
+              List.of(
+                  new UiEffect.ApplyCatalogLoadSuccess(succeededIntent.success()),
+                  new UiEffect.RequestAsyncRepaint()),
+              UiAction.handled(false));
+      case UiIntent.CatalogLoadFailedIntent failedIntent ->
+          new ReduceResult(
+              state.withCatalogLoad(
+                  new UiState.CatalogLoadView(failedIntent.failure().nextState()),
+                  new UiState.StartupOverlayView(
+                      failedIntent.startupOverlayVisible(), state.startupOverlay().statusLines()),
+                  failedIntent.failure().statusMessage(),
+                  failedIntent.failure().errorMessage(),
+                  failedIntent.failure().errorMessage(),
+                  false),
+              List.of(new UiEffect.RequestAsyncRepaint()),
+              UiAction.handled(false));
+      case UiIntent.StartupOverlayVisibilityIntent visibilityIntent ->
+          new ReduceResult(
+              state.withStartupOverlay(
+                  new UiState.StartupOverlayView(
+                      visibilityIntent.visible(), state.startupOverlay().statusLines())),
+              List.of(),
+              UiAction.handled(false));
       case UiIntent.SubmitRequestedIntent submitIntent ->
           reduceSubmitRequest(state, submitIntent.evaluation());
       case UiIntent.SubmitEditRecoveryIntent recoveryIntent ->
