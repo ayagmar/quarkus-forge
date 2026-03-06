@@ -108,14 +108,20 @@ CoreTuiController (Orchestration Shell)
     │       ├── submit + blocked-submit authority
     │       ├── generation callback intent handling
     │       ├── focus/input intent handling
+    │       ├── catalog load / reload lifecycle handling
+    │       ├── startup overlay visibility handling
     │       └── error-details expansion/reset state
     │
     ├── UiEffectsRunner          Executes side effects emitted by reducer
+    │       ├── catalog load / reload start
+    │       ├── catalog success application
     │       ├── generation start/cancel
     │       ├── generation-state transitions for submit lifecycle
     │       └── repaint + async coordination hooks
     │
     ├── UiRenderer               State-driven render orchestration
+    │       ├── CoreUiRenderAdapter      Render adapter extracted from controller
+    │       ├── CompactFieldRenderer     Metadata field widgets + validation hints
     │       ├── OverlayRenderer          Stateless overlay rendering
     │       ├── BodyPanelRenderer        Layout: metadata + extensions panels
     │       └── FooterLinesComposer      Status bar composition
@@ -123,7 +129,9 @@ CoreTuiController (Orchestration Shell)
     ├── State Managers
     │       ├── PostGenerationMenuState  Post-gen menu state machine
     │       ├── MetadataSelectorManager  Platform/build/java selectors
-    │       ├── ExtensionCatalogState    Search, filter, favorites, presets
+    │       ├── ExtensionCatalogProjection  Search/filter state + row projection
+    │       ├── ExtensionCatalogNavigation  Selection + list navigation
+    │       ├── ExtensionCatalogPreferences Favorites/recents persistence
     │       ├── CatalogLoadState         Sealed type: Loading → Loaded | Failed
     │       └── GenerationStateTracker   Generation progress tracking
     │
@@ -131,7 +139,7 @@ CoreTuiController (Orchestration Shell)
             ├── ExtensionInteractionHandler  Bridge to catalog interactions
             ├── CatalogRowBuilder            Pure function: row building
             ├── UiTextConstants              UI text content
-            ├── CatalogLoadCoordinator       Async catalog lifecycle + startup overlay timing
+            ├── CatalogLoadCoordinator       Async catalog lifecycle + startup-overlay timing via reducer intents
             ├── GenerationFlowCoordinator    Async generation lifecycle
             └── UiTextInputKeys              Text-input edit-key normalization
 ....
