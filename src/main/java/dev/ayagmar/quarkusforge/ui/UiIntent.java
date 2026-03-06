@@ -4,6 +4,8 @@ package dev.ayagmar.quarkusforge.ui;
 sealed interface UiIntent {
   record PostGenerationIntent(PostGenerationTransition transition) implements UiIntent {}
 
+  record PrepareForGenerationIntent() implements UiIntent {}
+
   record SubmitReadyIntent() implements UiIntent {}
 
   record CancelGenerationIntent() implements UiIntent {}

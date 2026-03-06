@@ -11,6 +11,9 @@ final class CoreUiReducer implements UiReducer {
     return switch (intent) {
       case UiIntent.PostGenerationIntent postGenerationIntent ->
           reducePostGeneration(state, postGenerationIntent.transition());
+      case UiIntent.PrepareForGenerationIntent _ ->
+          new ReduceResult(
+              state, List.of(new UiEffect.PrepareForGeneration()), UiAction.handled(false));
       case UiIntent.SubmitReadyIntent _ ->
           new ReduceResult(state, List.of(new UiEffect.StartGeneration()), UiAction.handled(false));
       case UiIntent.CancelGenerationIntent _ ->
@@ -136,7 +139,7 @@ final class CoreUiReducer implements UiReducer {
       case GENERATE_AGAIN ->
           new ReduceResult(
               state.withStatusAndError("Ready for next generation", ""),
-              List.of(new UiEffect.ResetGenerationAfterOutcome()),
+              List.of(new UiEffect.PrepareForGeneration()),
               UiAction.handled(false));
     };
   }
