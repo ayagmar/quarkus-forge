@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge.ui;
 
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.widgets.list.ListState;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -24,7 +25,7 @@ final class ExtensionCatalogNavigation {
   }
 
   Set<String> selectedIdsView() {
-    return selectedExtensionIds;
+    return Collections.unmodifiableSet(selectedExtensionIds);
   }
 
   int selectedExtensionCount() {
@@ -37,6 +38,11 @@ final class ExtensionCatalogNavigation {
       selectedExtensionIds.clear();
     }
     return clearedCount;
+  }
+
+  void retainAvailableSelections(Set<String> availableExtensionIds) {
+    Objects.requireNonNull(availableExtensionIds);
+    selectedExtensionIds.retainAll(availableExtensionIds);
   }
 
   boolean isSelected(String extensionId) {
@@ -70,22 +76,15 @@ final class ExtensionCatalogNavigation {
       }
 
       int firstSelectable = rows.selectableRowIndexes().getFirst();
-      if (firstSelectable > 1) {
-        Integer firstSectionHeader = rows.firstNonRecentSectionHeaderIndex();
-        if (firstSectionHeader != null) {
-          listState.select(firstSectionHeader);
-          return;
-        }
+      if (selectFirstVisibleSectionHeader(rows, firstSelectable)) {
+        return;
       }
     }
 
     int firstSelectable = rows.selectableRowIndexes().getFirst();
-    if (previouslyFocusedExtensionId == null && firstSelectable > 1) {
-      Integer firstSectionHeader = rows.firstNonRecentSectionHeaderIndex();
-      if (firstSectionHeader != null) {
-        listState.select(firstSectionHeader);
-        return;
-      }
+    if (previouslyFocusedExtensionId == null
+        && selectFirstVisibleSectionHeader(rows, firstSelectable)) {
+      return;
     }
 
     listState.select(firstSelectable);
@@ -247,5 +246,17 @@ final class ExtensionCatalogNavigation {
       break;
     }
     return nearestPreviousSelectable;
+  }
+
+  private boolean selectFirstVisibleSectionHeader(ExtensionCatalogRows rows, int firstSelectable) {
+    if (firstSelectable <= 1) {
+      return false;
+    }
+    Integer firstSectionHeader = rows.firstNonRecentSectionHeaderIndex();
+    if (firstSectionHeader == null) {
+      return false;
+    }
+    listState.select(firstSectionHeader);
+    return true;
   }
 }

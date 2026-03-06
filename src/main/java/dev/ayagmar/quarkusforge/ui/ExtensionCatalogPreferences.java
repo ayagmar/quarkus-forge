@@ -2,14 +2,19 @@ package dev.ayagmar.quarkusforge.ui;
 
 import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 
 final class ExtensionCatalogPreferences {
+  private static final System.Logger LOGGER =
+      System.getLogger(ExtensionCatalogPreferences.class.getName());
+
   private final Set<String> favoriteExtensionIds;
   private final List<String> recentExtensionIds;
   private final ExtensionFavoritesStore favoritesStore;
@@ -37,11 +42,11 @@ final class ExtensionCatalogPreferences {
   }
 
   Set<String> favoriteIdsView() {
-    return favoriteExtensionIds;
+    return Collections.unmodifiableSet(favoriteExtensionIds);
   }
 
   List<String> recentIdsView() {
-    return recentExtensionIds;
+    return Collections.unmodifiableList(recentExtensionIds);
   }
 
   int favoriteExtensionCount() {
@@ -75,9 +80,27 @@ final class ExtensionCatalogPreferences {
     List<String> recentSnapshot = List.copyOf(recentExtensionIds);
     preferencePersistenceChain =
         preferencePersistenceChain
-            .exceptionally(ignored -> null)
+            .exceptionally(
+                exception -> {
+                  logPersistenceFailure(exception);
+                  return null;
+                })
             .thenRunAsync(
                 () -> favoritesStore.saveAll(favoriteSnapshot, recentSnapshot),
-                favoritesPersistenceExecutor);
+                favoritesPersistenceExecutor)
+            .exceptionally(
+                exception -> {
+                  logPersistenceFailure(exception);
+                  return null;
+                });
+  }
+
+  private void logPersistenceFailure(Throwable exception) {
+    Throwable cause = exception;
+    while (cause instanceof CompletionException && cause.getCause() != null) {
+      cause = cause.getCause();
+    }
+    LOGGER.log(
+        System.Logger.Level.WARNING, "Failed to persist extension catalog preferences", cause);
   }
 }

@@ -20,7 +20,8 @@
     <archunit.version>1.4.1</archunit.version>
     <wiremock.version>3.13.2</wiremock.version>
 
-    <forge.main.class>dev.ayagmar.quarkusforge.QuarkusForgeCli</forge.main.class>
+    <forge.main.class>dev.ayagmar.quarkusforge.cli.QuarkusForgeCli</forge.main.class>
+    <forge.headless.main.class>dev.ayagmar.quarkusforge.cli.HeadlessCli</forge.headless.main.class>
     <forge.jar.name>quarkus-forge</forge.jar.name>
 
     <maven.compiler.plugin.version>3.15.0</maven.compiler.plugin.version>
@@ -359,7 +360,7 @@
     <profile>
       <id>headless</id>
       <properties>
-        <forge.main.class>dev.ayagmar.quarkusforge.HeadlessCli</forge.main.class>
+        <forge.main.class>${forge.headless.main.class}</forge.main.class>
         <forge.jar.name>quarkus-forge-headless</forge.jar.name>
         <maven.test.skip>true</maven.test.skip>
       </properties>
@@ -385,16 +386,13 @@
             <version>${maven.compiler.plugin.version}</version>
             <configuration>
               <excludes>
-                <exclude>dev/ayagmar/quarkusforge/QuarkusForgeCli.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/TuiBootstrapService.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/TuiSessionSummary.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/AppBindingsProfile.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/IdeDetector.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/ShellExecutor.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/ShellProcessRunner.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/ShellExecutorDiagnostics.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/PostTuiActionExecutor.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/StartupMetadataSelection.java</exclude>
+                <exclude>dev/ayagmar/quarkusforge/cli/QuarkusForgeCli.java</exclude>
+                <exclude>dev/ayagmar/quarkusforge/runtime/TuiBootstrapService.java</exclude>
+                <exclude>dev/ayagmar/quarkusforge/runtime/TuiSessionSummary.java</exclude>
+                <exclude>dev/ayagmar/quarkusforge/runtime/AppBindingsProfile.java</exclude>
+                <exclude>dev/ayagmar/quarkusforge/runtime/CatalogLoadDiagnostics.java</exclude>
+                <exclude>dev/ayagmar/quarkusforge/postgen/**</exclude>
+                <exclude>dev/ayagmar/quarkusforge/application/StartupMetadataSelection.java</exclude>
                 <exclude>dev/ayagmar/quarkusforge/ui/**</exclude>
               </excludes>
             </configuration>
@@ -407,7 +405,7 @@
       <id>headless-native</id>
       <properties>
         <native.skip>false</native.skip>
-        <forge.main.class>dev.ayagmar.quarkusforge.HeadlessCli</forge.main.class>
+        <forge.main.class>${forge.headless.main.class}</forge.main.class>
         <forge.jar.name>quarkus-forge-headless</forge.jar.name>
         <maven.test.skip>true</maven.test.skip>
       </properties>
@@ -433,16 +431,13 @@
             <version>${maven.compiler.plugin.version}</version>
             <configuration>
               <excludes>
-                <exclude>dev/ayagmar/quarkusforge/QuarkusForgeCli.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/TuiBootstrapService.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/TuiSessionSummary.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/AppBindingsProfile.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/IdeDetector.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/ShellExecutor.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/ShellProcessRunner.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/ShellExecutorDiagnostics.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/PostTuiActionExecutor.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/StartupMetadataSelection.java</exclude>
+                <exclude>dev/ayagmar/quarkusforge/cli/QuarkusForgeCli.java</exclude>
+                <exclude>dev/ayagmar/quarkusforge/runtime/TuiBootstrapService.java</exclude>
+                <exclude>dev/ayagmar/quarkusforge/runtime/TuiSessionSummary.java</exclude>
+                <exclude>dev/ayagmar/quarkusforge/runtime/AppBindingsProfile.java</exclude>
+                <exclude>dev/ayagmar/quarkusforge/runtime/CatalogLoadDiagnostics.java</exclude>
+                <exclude>dev/ayagmar/quarkusforge/postgen/**</exclude>
+                <exclude>dev/ayagmar/quarkusforge/application/StartupMetadataSelection.java</exclude>
                 <exclude>dev/ayagmar/quarkusforge/ui/**</exclude>
               </excludes>
             </configuration>

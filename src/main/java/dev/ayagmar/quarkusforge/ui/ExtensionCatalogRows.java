@@ -39,6 +39,9 @@ final class ExtensionCatalogRows {
   }
 
   boolean toggleCategoryCollapse(String categoryTitle) {
+    if (categoryTitle == null || categoryTitle.isBlank()) {
+      return false;
+    }
     boolean collapsed = collapsedCategoryTitles.add(categoryTitle);
     if (!collapsed) {
       collapsedCategoryTitles.remove(categoryTitle);

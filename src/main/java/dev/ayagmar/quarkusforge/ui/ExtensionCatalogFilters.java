@@ -165,20 +165,21 @@ final class ExtensionCatalogFilters {
       List<ExtensionCatalogItem> items,
       Set<String> selectedExtensionIds,
       Set<String> favoriteExtensionIds) {
-    List<ExtensionCatalogItem> result = items;
-    if (selectedOnlyFilterEnabled) {
-      result = result.stream().filter(item -> selectedExtensionIds.contains(item.id())).toList();
-    }
-    if (favoritesOnlyFilterEnabled) {
-      result = result.stream().filter(item -> favoriteExtensionIds.contains(item.id())).toList();
-    }
+    Set<String> allowedPresetIds = null;
     if (!activePresetFilterName.isBlank()) {
       List<String> presetExtensions = presetExtensionsByName.get(activePresetFilterName);
-      Set<String> allowedIds =
+      allowedPresetIds =
           new LinkedHashSet<>(presetExtensions == null ? List.of() : presetExtensions);
-      result = result.stream().filter(item -> allowedIds.contains(item.id())).toList();
     }
-    return result;
+    if (!selectedOnlyFilterEnabled && !favoritesOnlyFilterEnabled && allowedPresetIds == null) {
+      return items;
+    }
+    Set<String> presetIds = allowedPresetIds;
+    return items.stream()
+        .filter(item -> !selectedOnlyFilterEnabled || selectedExtensionIds.contains(item.id()))
+        .filter(item -> !favoritesOnlyFilterEnabled || favoriteExtensionIds.contains(item.id()))
+        .filter(item -> presetIds == null || presetIds.contains(item.id()))
+        .toList();
   }
 
   private static Map<String, List<String>> normalizePresetMap(Map<String, List<String>> presetMap) {

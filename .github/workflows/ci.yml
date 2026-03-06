@@ -9,6 +9,9 @@ on:
       - 'site/**'
       - 'scripts/**'
       - 'pom.xml'
+      - '.mvn/**'
+      - 'mvnw'
+      - 'mvnw.cmd'
       - 'README.md'
       - 'CONTRIBUTING.md'
       - 'justfile'
@@ -24,6 +27,9 @@ on:
       - 'site/**'
       - 'scripts/**'
       - 'pom.xml'
+      - '.mvn/**'
+      - 'mvnw'
+      - 'mvnw.cmd'
       - 'README.md'
       - 'CONTRIBUTING.md'
       - 'justfile'
@@ -190,6 +196,7 @@ jobs:
       - name: Build native image
         shell: bash
         run: |
+          mkdir -p target/native-size
           set -o pipefail
           ./mvnw package -Pnative -DskipTests -Djacoco.skip=true | tee target/native-size/native.log
 

@@ -3,9 +3,9 @@ package dev.ayagmar.quarkusforge.cli;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
-import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 
+import com.github.tomakehurst.wiremock.WireMockServer;
 import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -58,22 +58,23 @@ public final class CliCommandTestSupport {
     }
   }
 
-  public static void stubLiveMetadataWithMavenOnly() {
-    stubLiveMetadataWithBuildTools("\"MAVEN\"");
+  public static void stubLiveMetadataWithMavenOnly(WireMockServer wireMockServer) {
+    stubLiveMetadataWithBuildTools(wireMockServer, "\"MAVEN\"");
   }
 
-  public static void stubLiveMetadataWithAllBuildTools() {
-    stubLiveMetadataWithBuildTools("\"MAVEN\",\"GRADLE\",\"GRADLE_KOTLIN_DSL\"");
+  public static void stubLiveMetadataWithAllBuildTools(WireMockServer wireMockServer) {
+    stubLiveMetadataWithBuildTools(wireMockServer, "\"MAVEN\",\"GRADLE\",\"GRADLE_KOTLIN_DSL\"");
   }
 
-  public static void stubStreamsUnavailable() {
-    stubFor(get(urlPathEqualTo("/api/streams")).willReturn(aResponse().withStatus(404)));
-    stubFor(
+  public static void stubStreamsUnavailable(WireMockServer wireMockServer) {
+    wireMockServer.stubFor(
+        get(urlPathEqualTo("/api/streams")).willReturn(aResponse().withStatus(404)));
+    wireMockServer.stubFor(
         get(urlPathEqualTo("/q/openapi")).willReturn(aResponse().withStatus(200).withBody("{}")));
   }
 
-  public static void stubSingleRestExtensionCatalog() {
-    stubFor(
+  public static void stubSingleRestExtensionCatalog(WireMockServer wireMockServer) {
+    wireMockServer.stubFor(
         get(urlPathEqualTo("/api/extensions"))
             .willReturn(
                 okJson(
@@ -90,8 +91,9 @@ public final class CliCommandTestSupport {
                     """)));
   }
 
-  private static void stubLiveMetadataWithBuildTools(String buildToolEnumValues) {
-    stubFor(
+  private static void stubLiveMetadataWithBuildTools(
+      WireMockServer wireMockServer, String buildToolEnumValues) {
+    wireMockServer.stubFor(
         get(urlPathEqualTo("/api/streams"))
             .willReturn(
                 aResponse()
@@ -112,7 +114,7 @@ public final class CliCommandTestSupport {
                         ]
                         """)));
 
-    stubFor(
+    wireMockServer.stubFor(
         get(urlPathEqualTo("/q/openapi"))
             .willReturn(
                 aResponse()

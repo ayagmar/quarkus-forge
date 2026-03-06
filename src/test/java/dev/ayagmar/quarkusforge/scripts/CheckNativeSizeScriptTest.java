@@ -74,6 +74,29 @@ class CheckNativeSizeScriptTest {
   }
 
   @Test
+  void parsesFormattedBuildReportWithWhitespace() throws Exception {
+    Path binary = binaryFile("quarkus-forge", 2048);
+
+    ProcessResult result =
+        runScript(
+            "--label",
+            "native",
+            "--binary",
+            binary.toString(),
+            "--report",
+            fixture("formatted-build-report.html").toString(),
+            "--log",
+            fixture("native.log").toString(),
+            "--max-bytes",
+            "4096");
+
+    assertThat(result.exitCode()).isZero();
+    assertThat(result.stdout()).contains("- Build report image total: `23.80 MB`");
+    assertThat(result.stdout()).contains("- Build report code area: `9.48 MB`");
+    assertThat(result.stdout()).contains("- Build report image heap: `8.25 MB`");
+  }
+
+  @Test
   void rejectsMalformedReport() throws Exception {
     Path binary = binaryFile("quarkus-forge", 1024);
 

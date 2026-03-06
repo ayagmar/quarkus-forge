@@ -35,25 +35,24 @@ class UrlConnectionTransportTest {
             Map.of("X-Test", List.of("present")),
             "catalog".getBytes(StandardCharsets.UTF_8),
             null);
-    UrlConnectionTransport transport =
-        new UrlConnectionTransport(Executors.newSingleThreadExecutor(), uri -> connection);
+    try (UrlConnectionTransport transport =
+        new UrlConnectionTransport(Executors.newSingleThreadExecutor(), uri -> connection)) {
+      ApiStringResponse response =
+          transport
+              .sendStringAsync(
+                  new ApiRequest(
+                      URI.create("https://example.test/api/extensions"),
+                      "application/json",
+                      Duration.ofSeconds(2)))
+              .join();
 
-    ApiStringResponse response =
-        transport
-            .sendStringAsync(
-                new ApiRequest(
-                    URI.create("https://example.test/api/extensions"),
-                    "application/json",
-                    Duration.ofSeconds(2)))
-            .join();
-
-    assertThat(response.statusCode()).isEqualTo(200);
-    assertThat(response.headers()).containsEntry("X-Test", List.of("present"));
-    assertThat(response.body()).isEqualTo("catalog");
-    assertThat(connection.requestMethod).isEqualTo("GET");
-    assertThat(connection.acceptHeader).isEqualTo("application/json");
-    assertThat(connection.disconnected).isTrue();
-    transport.close();
+      assertThat(response.statusCode()).isEqualTo(200);
+      assertThat(response.headers()).containsEntry("X-Test", List.of("present"));
+      assertThat(response.body()).isEqualTo("catalog");
+      assertThat(connection.requestMethod).isEqualTo("GET");
+      assertThat(connection.acceptHeader).isEqualTo("application/json");
+      assertThat(connection.disconnected).isTrue();
+    }
   }
 
   @Test
@@ -64,22 +63,41 @@ class UrlConnectionTransportTest {
             Map.of("Retry-After", List.of("1")),
             null,
             "temporary failure".getBytes(StandardCharsets.UTF_8));
-    UrlConnectionTransport transport =
-        new UrlConnectionTransport(Executors.newSingleThreadExecutor(), uri -> connection);
+    try (UrlConnectionTransport transport =
+        new UrlConnectionTransport(Executors.newSingleThreadExecutor(), uri -> connection)) {
+      ApiStringResponse response =
+          transport
+              .sendStringAsync(
+                  new ApiRequest(
+                      URI.create("https://example.test/api/extensions"),
+                      "application/json",
+                      Duration.ofSeconds(2)))
+              .join();
 
-    ApiStringResponse response =
-        transport
-            .sendStringAsync(
-                new ApiRequest(
-                    URI.create("https://example.test/api/extensions"),
-                    "application/json",
-                    Duration.ofSeconds(2)))
-            .join();
+      assertThat(response.statusCode()).isEqualTo(503);
+      assertThat(response.body()).isEqualTo("temporary failure");
+      assertThat(response.headers()).containsEntry("Retry-After", List.of("1"));
+    }
+  }
 
-    assertThat(response.statusCode()).isEqualTo(503);
-    assertThat(response.body()).isEqualTo("temporary failure");
-    assertThat(response.headers()).containsEntry("Retry-After", List.of("1"));
-    transport.close();
+  @Test
+  void sendStringAsyncReturnsEmptyBodyWhenErrorStreamIsMissing() {
+    FakeHttpURLConnection connection = new FakeHttpURLConnection(404, null, null, null);
+    try (UrlConnectionTransport transport =
+        new UrlConnectionTransport(Executors.newSingleThreadExecutor(), uri -> connection)) {
+      ApiStringResponse response =
+          transport
+              .sendStringAsync(
+                  new ApiRequest(
+                      URI.create("https://example.test/missing"),
+                      "application/json",
+                      Duration.ofSeconds(2)))
+              .join();
+
+      assertThat(response.statusCode()).isEqualTo(404);
+      assertThat(response.headers()).isEmpty();
+      assertThat(response.body()).isEmpty();
+    }
   }
 
   @Test
@@ -90,62 +108,61 @@ class UrlConnectionTransportTest {
             Map.of("Content-Type", List.of("application/zip")),
             "zip-content".getBytes(StandardCharsets.UTF_8),
             null);
-    UrlConnectionTransport transport =
-        new UrlConnectionTransport(Executors.newSingleThreadExecutor(), uri -> connection);
     Path destination = tempDir.resolve("generated.zip");
+    try (UrlConnectionTransport transport =
+        new UrlConnectionTransport(Executors.newSingleThreadExecutor(), uri -> connection)) {
+      ApiFileResponse response =
+          transport
+              .sendFileAsync(
+                  new ApiRequest(
+                      URI.create("https://example.test/api/download"),
+                      "application/zip, application/octet-stream",
+                      Duration.ofSeconds(2)),
+                  destination)
+              .join();
 
-    ApiFileResponse response =
-        transport
-            .sendFileAsync(
-                new ApiRequest(
-                    URI.create("https://example.test/api/download"),
-                    "application/zip, application/octet-stream",
-                    Duration.ofSeconds(2)),
-                destination)
-            .join();
-
-    assertThat(response.statusCode()).isEqualTo(200);
-    assertThat(response.body()).isEqualTo(destination);
-    assertThat(Files.readString(destination)).isEqualTo("zip-content");
-    assertThat(connection.acceptHeader).isEqualTo("application/zip, application/octet-stream");
-    transport.close();
+      assertThat(response.statusCode()).isEqualTo(200);
+      assertThat(response.body()).isEqualTo(destination);
+      assertThat(Files.readString(destination)).isEqualTo("zip-content");
+      assertThat(connection.acceptHeader).isEqualTo("application/zip, application/octet-stream");
+    }
   }
 
   @Test
   void sendStringAsyncCoercesTimeoutsIntoHttpURLConnectionRange() {
     FakeHttpURLConnection minimalTimeoutConnection =
         new FakeHttpURLConnection(200, Map.of(), "ok".getBytes(StandardCharsets.UTF_8), null);
-    UrlConnectionTransport minimalTimeoutTransport =
+    try (UrlConnectionTransport minimalTimeoutTransport =
         new UrlConnectionTransport(
-            Executors.newSingleThreadExecutor(), uri -> minimalTimeoutConnection);
+            Executors.newSingleThreadExecutor(), uri -> minimalTimeoutConnection)) {
+      minimalTimeoutTransport
+          .sendStringAsync(
+              new ApiRequest(
+                  URI.create("https://example.test/min-timeout"),
+                  "application/json",
+                  Duration.ZERO))
+          .join();
 
-    minimalTimeoutTransport
-        .sendStringAsync(
-            new ApiRequest(
-                URI.create("https://example.test/min-timeout"), "application/json", Duration.ZERO))
-        .join();
-
-    assertThat(minimalTimeoutConnection.connectTimeout).isEqualTo(1);
-    assertThat(minimalTimeoutConnection.readTimeout).isEqualTo(1);
-    minimalTimeoutTransport.close();
+      assertThat(minimalTimeoutConnection.connectTimeout).isEqualTo(1);
+      assertThat(minimalTimeoutConnection.readTimeout).isEqualTo(1);
+    }
 
     FakeHttpURLConnection maxTimeoutConnection =
         new FakeHttpURLConnection(200, Map.of(), "ok".getBytes(StandardCharsets.UTF_8), null);
-    UrlConnectionTransport maxTimeoutTransport =
+    try (UrlConnectionTransport maxTimeoutTransport =
         new UrlConnectionTransport(
-            Executors.newSingleThreadExecutor(), uri -> maxTimeoutConnection);
+            Executors.newSingleThreadExecutor(), uri -> maxTimeoutConnection)) {
+      maxTimeoutTransport
+          .sendStringAsync(
+              new ApiRequest(
+                  URI.create("https://example.test/max-timeout"),
+                  "application/json",
+                  Duration.ofDays(30_000)))
+          .join();
 
-    maxTimeoutTransport
-        .sendStringAsync(
-            new ApiRequest(
-                URI.create("https://example.test/max-timeout"),
-                "application/json",
-                Duration.ofDays(30_000)))
-        .join();
-
-    assertThat(maxTimeoutConnection.connectTimeout).isEqualTo(Integer.MAX_VALUE);
-    assertThat(maxTimeoutConnection.readTimeout).isEqualTo(Integer.MAX_VALUE);
-    maxTimeoutTransport.close();
+      assertThat(maxTimeoutConnection.connectTimeout).isEqualTo(Integer.MAX_VALUE);
+      assertThat(maxTimeoutConnection.readTimeout).isEqualTo(Integer.MAX_VALUE);
+    }
   }
 
   @Test
@@ -160,22 +177,21 @@ class UrlConnectionTransportTest {
           awaitDisconnectionOrInterruption(disconnected);
         };
     connection.disconnectHook = disconnected::countDown;
-    UrlConnectionTransport transport =
-        new UrlConnectionTransport(Executors.newSingleThreadExecutor(), uri -> connection);
+    try (UrlConnectionTransport transport =
+        new UrlConnectionTransport(Executors.newSingleThreadExecutor(), uri -> connection)) {
+      var responseFuture =
+          transport.sendStringAsync(
+              new ApiRequest(
+                  URI.create("https://example.test/cancel"),
+                  "application/json",
+                  Duration.ofSeconds(2)));
+      assertThat(responseStarted.await(1, TimeUnit.SECONDS)).isTrue();
 
-    var responseFuture =
-        transport.sendStringAsync(
-            new ApiRequest(
-                URI.create("https://example.test/cancel"),
-                "application/json",
-                Duration.ofSeconds(2)));
-    assertThat(responseStarted.await(1, TimeUnit.SECONDS)).isTrue();
+      assertThat(responseFuture.cancel(true)).isTrue();
 
-    assertThat(responseFuture.cancel(true)).isTrue();
-
-    assertThat(disconnected.await(1, TimeUnit.SECONDS)).isTrue();
-    assertThat(connection.disconnected).isTrue();
-    transport.close();
+      assertThat(disconnected.await(1, TimeUnit.SECONDS)).isTrue();
+      assertThat(connection.disconnected).isTrue();
+    }
   }
 
   @Test
@@ -202,6 +218,26 @@ class UrlConnectionTransportTest {
                     .join())
         .isInstanceOf(CompletionException.class)
         .hasCauseInstanceOf(RejectedExecutionException.class);
+  }
+
+  @Test
+  void sendFileAsyncRejectsNullDestinationFile() {
+    try (UrlConnectionTransport transport =
+        new UrlConnectionTransport(
+            Executors.newSingleThreadExecutor(),
+            uri ->
+                new FakeHttpURLConnection(
+                    200, Map.of(), "ok".getBytes(StandardCharsets.UTF_8), null))) {
+      assertThatThrownBy(
+              () ->
+                  transport.sendFileAsync(
+                      new ApiRequest(
+                          URI.create("https://example.test/file"),
+                          "application/octet-stream",
+                          Duration.ofSeconds(2)),
+                      null))
+          .isInstanceOf(NullPointerException.class);
+    }
   }
 
   private static void awaitDisconnectionOrInterruption(CountDownLatch latch) {
