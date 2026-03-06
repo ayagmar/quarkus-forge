@@ -6,7 +6,6 @@ import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
 import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
-import dev.ayagmar.quarkusforge.api.ThrowableUnwrapper;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.CliPrefillMapper;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
@@ -54,22 +53,13 @@ import java.util.concurrent.ForkJoinPool;
  * state-driven rendering while delegating domain-specific behavior to extracted collaborators.
  */
 public final class CoreTuiController
-    implements CompactInputRenderer, UiRoutingContext, GenerationFlowCallbacks, UiRenderer.Adapter {
+    implements CompactInputRenderer,
+        UiRoutingContext,
+        GenerationFlowCallbacks,
+        CatalogLoadFlowCallbacks,
+        UiRenderer.Adapter {
   private static final int METADATA_PANEL_HEIGHT_COMPACT = 4;
   private static final int METADATA_PANEL_HEIGHT_NARROW = 10;
-  private static final List<FocusTarget> FOCUS_ORDER =
-      List.of(
-          FocusTarget.GROUP_ID,
-          FocusTarget.ARTIFACT_ID,
-          FocusTarget.BUILD_TOOL,
-          FocusTarget.PLATFORM_STREAM,
-          FocusTarget.VERSION,
-          FocusTarget.PACKAGE_NAME,
-          FocusTarget.JAVA_VERSION,
-          FocusTarget.OUTPUT_DIR,
-          FocusTarget.EXTENSION_SEARCH,
-          FocusTarget.EXTENSION_LIST,
-          FocusTarget.SUBMIT);
   private static final ProjectGenerationRunner NOOP_PROJECT_GENERATION_RUNNER =
       (generationRequest, outputDirectory, cancelled, progressListener) ->
           CompletableFuture.failedFuture(
@@ -101,19 +91,17 @@ public final class CoreTuiController
   private final AsyncRepaintSignal asyncRepaintSignal;
   private final UiEventRouter uiEventRouter;
   private final GenerationFlowCoordinator generationFlowCoordinator;
+  private final CatalogLoadCoordinator catalogLoadCoordinator;
   private final UiReducer uiReducer;
   private final UiEffectsRunner uiEffectsRunner;
   private final UiStateSnapshotMapper uiStateSnapshotMapper;
   private final UiRenderer uiRenderer;
-  private volatile long extensionCatalogLoadToken;
   private CatalogLoadState catalogLoadState = CatalogLoadState.initial();
-  private ExtensionCatalogLoader extensionCatalogLoader;
   private boolean showErrorDetails;
   private boolean commandPaletteVisible;
   private boolean helpOverlayVisible;
   private int commandPaletteSelection;
   private final PostGenerationMenuState postGenerationMenu = new PostGenerationMenuState();
-  private final StartupOverlayTracker startupOverlay = new StartupOverlayTracker();
 
   private CoreTuiController(
       ForgeUiState initialState,
@@ -164,12 +152,11 @@ public final class CoreTuiController
     asyncRepaintSignal = new AsyncRepaintSignal();
     uiEventRouter = new UiEventRouter();
     generationFlowCoordinator = new GenerationFlowCoordinator();
+    catalogLoadCoordinator = new CatalogLoadCoordinator();
     uiReducer = new CoreUiReducer();
     uiEffectsRunner = new UiEffectsRunner();
     uiStateSnapshotMapper = new UiStateSnapshotMapper();
     uiRenderer = new UiRenderer();
-    extensionCatalogLoadToken = 0L;
-    extensionCatalogLoader = null;
     showErrorDetails = false;
 
     for (FocusTarget target : FocusTarget.values()) {
@@ -182,7 +169,7 @@ public final class CoreTuiController
     inputStates.get(FocusTarget.OUTPUT_DIR).setText(request.outputDirectory());
     syncMetadataSelectors();
     postGenerationMenu.setActions(UiTextConstants.postGenerationActions(detectedIdes));
-    for (FocusTarget target : FOCUS_ORDER) {
+    for (FocusTarget target : UiFocusTargets.ordered()) {
       if (isTextInputFocus(target)) {
         inputStates.get(target).moveCursorToEnd();
       }
@@ -274,29 +261,7 @@ public final class CoreTuiController
   }
 
   public void loadExtensionCatalogAsync(ExtensionCatalogLoader loader) {
-    Objects.requireNonNull(loader);
-    extensionCatalogLoader = loader;
-    long loadToken = ++extensionCatalogLoadToken;
-    catalogLoadState = CatalogLoadState.loadingFrom(catalogLoadState);
-    statusMessage = "Loading extension catalog...";
-    startupOverlay.activateIfFirstLoad(loadToken);
-    requestAsyncRepaint();
-
-    CompletableFuture<ExtensionCatalogLoadResult> loadFuture;
-    try {
-      loadFuture = loader.load();
-    } catch (RuntimeException runtimeException) {
-      loadFuture = CompletableFuture.failedFuture(runtimeException);
-    }
-    if (loadFuture == null) {
-      loadFuture =
-          CompletableFuture.failedFuture(new IllegalStateException("loader returned null future"));
-    }
-
-    loadFuture.whenComplete(
-        (result, throwable) -> {
-          scheduleOnRenderThread(() -> applyCatalogLoadCompletion(loadToken, result, throwable));
-        });
+    catalogLoadCoordinator.startLoad(loader, this);
   }
 
   public UiAction onEvent(Event event) {
@@ -576,9 +541,58 @@ public final class CoreTuiController
     dispatchIntent(new UiIntent.GenerationCancellationRequestedIntent());
   }
 
+  @Override
+  public CatalogLoadState currentCatalogLoadState() {
+    return catalogLoadState;
+  }
+
+  @Override
+  public void onCatalogLoadStarted(CatalogLoadState nextState, String statusMessage) {
+    catalogLoadState = nextState;
+    this.statusMessage = statusMessage;
+    requestAsyncRepaint();
+  }
+
+  @Override
+  public void onCatalogLoadCancelled(CatalogLoadState nextState) {
+    catalogLoadState = nextState;
+  }
+
+  @Override
+  public void onCatalogReloadUnavailable() {
+    statusMessage = "Catalog reload unavailable";
+  }
+
+  @Override
+  public void onCatalogLoadSucceeded(CatalogLoadSuccess success) {
+    if (success.metadata() != null) {
+      metadataCompatibility = MetadataCompatibilityContext.success(success.metadata());
+      syncMetadataSelectors();
+      revalidate();
+    }
+    catalogLoadState = success.nextState();
+    errorMessage = "";
+    verboseErrorDetails = "";
+    statusMessage = success.statusMessage();
+    extensionCatalogState.replaceCatalog(
+        success.items(), inputStates.get(FocusTarget.EXTENSION_SEARCH).text(), ignored -> {});
+    extensionCatalogState.setPresetExtensionsByName(
+        success.presetExtensionsByName(), ignored -> {});
+    requestAsyncRepaint();
+  }
+
+  @Override
+  public void onCatalogLoadFailed(CatalogLoadFailure failure) {
+    catalogLoadState = failure.nextState();
+    errorMessage = failure.errorMessage();
+    verboseErrorDetails = failure.errorMessage();
+    statusMessage = failure.statusMessage();
+    requestAsyncRepaint();
+  }
+
   public void setStartupOverlayMinDuration(Duration minimumDuration) {
     Objects.requireNonNull(minimumDuration);
-    startupOverlay.setMinDuration(minimumDuration);
+    catalogLoadCoordinator.setStartupOverlayMinDuration(minimumDuration);
   }
 
   public void render(Frame frame) {
@@ -1226,25 +1240,12 @@ public final class CoreTuiController
     if (!hasValidationErrorFor(focusTarget)) {
       return "";
     }
-    String fieldName = focusTargetName(focusTarget);
+    String fieldName = UiFocusTargets.nameOf(focusTarget);
     return validation.errors().stream()
         .filter(error -> error.field().equalsIgnoreCase(fieldName))
         .findFirst()
         .map(error -> error.message())
         .orElse("");
-  }
-
-  private void moveFocus(int offset) {
-    if (postGenerationMenu.isVisible()) {
-      return;
-    }
-    int index = FOCUS_ORDER.indexOf(focusTarget);
-    int size = FOCUS_ORDER.size();
-    int nextIndex = Math.floorMod(index + offset, size);
-    focusTarget = FOCUS_ORDER.get(nextIndex);
-    statusMessage = "Focus moved to " + focusTargetName(focusTarget);
-    errorMessage = "";
-    submitBlockedByValidation = false;
   }
 
   @Override
@@ -1315,9 +1316,13 @@ public final class CoreTuiController
   }
 
   private void applyReducerState(UiState reducedState) {
+    focusTarget = reducedState.focusTarget();
     statusMessage = reducedState.statusMessage();
     errorMessage = reducedState.errorMessage();
     verboseErrorDetails = reducedState.verboseErrorDetails();
+    submitRequested = reducedState.submitRequested();
+    submitBlockedByValidation = reducedState.submitBlockedByValidation();
+    submitBlockedByTargetConflict = reducedState.submitBlockedByTargetConflict();
   }
 
   private ReduceResult dispatchIntent(UiIntent intent) {
@@ -1528,7 +1533,7 @@ public final class CoreTuiController
         || target == FocusTarget.EXTENSION_SEARCH) {
       return false;
     }
-    String fieldName = focusTargetName(target);
+    String fieldName = UiFocusTargets.nameOf(target);
     return validation.errors().stream()
         .anyMatch(error -> error.field().equalsIgnoreCase(fieldName));
   }
@@ -1537,7 +1542,7 @@ public final class CoreTuiController
     if (!hasValidationErrorFor(target)) {
       return "";
     }
-    String fieldName = focusTargetName(target);
+    String fieldName = UiFocusTargets.nameOf(target);
     return validation.errors().stream()
         .filter(error -> error.field().equalsIgnoreCase(fieldName))
         .findFirst()
@@ -1735,13 +1740,7 @@ public final class CoreTuiController
   }
 
   private void cancelPendingAsyncOperations() {
-    extensionCatalogLoadToken++;
-    if (catalogLoadState instanceof CatalogLoadState.Loading loading
-        && loading.previous() != null) {
-      catalogLoadState = loading.previous();
-    } else if (catalogLoadState.isLoading()) {
-      catalogLoadState = CatalogLoadState.initial();
-    }
+    catalogLoadCoordinator.cancel(this);
     extensionCatalogState.cancelPendingAsync();
   }
 
@@ -1808,10 +1807,6 @@ public final class CoreTuiController
     requestAsyncRepaint();
   }
 
-  void moveFocusForReducer(int offset) {
-    moveFocus(offset);
-  }
-
   void applyMetadataSelectorKeyForReducer(FocusTarget target, KeyEvent keyEvent) {
     if (handleMetadataSelectorKey(target, keyEvent)) {
       revalidate();
@@ -1850,14 +1845,6 @@ public final class CoreTuiController
     return GenerationStateTracker.isValidTransition(currentState, targetState);
   }
 
-  private static String catalogLoadFailureMessage(Throwable throwable) {
-    String message = ErrorMessageMapper.userFriendlyError(throwable);
-    if (message.contains("no valid cache snapshot found")) {
-      return "Live catalog/cache unavailable. Using bundled snapshot (Ctrl+R to retry).";
-    }
-    return "Catalog load failed: " + message;
-  }
-
   private static String nextStepCommand(String buildTool) {
     String normalizedBuildTool = BuildToolCodec.toUiValue(buildTool);
     if ("gradle".equals(normalizedBuildTool) || "gradle-kotlin-dsl".equals(normalizedBuildTool)) {
@@ -1878,22 +1865,6 @@ public final class CoreTuiController
     return focused ? baseTitle + " [focus]" : baseTitle;
   }
 
-  private static String focusTargetName(FocusTarget target) {
-    return switch (target) {
-      case GROUP_ID -> "groupId";
-      case ARTIFACT_ID -> "artifactId";
-      case VERSION -> "version";
-      case PACKAGE_NAME -> "packageName";
-      case OUTPUT_DIR -> "outputDirectory";
-      case PLATFORM_STREAM -> "platformStream";
-      case BUILD_TOOL -> "buildTool";
-      case JAVA_VERSION -> "javaVersion";
-      case EXTENSION_SEARCH -> "extensionSearch";
-      case EXTENSION_LIST -> "extensionList";
-      case SUBMIT -> "submit";
-    };
-  }
-
   private static String firstValidationError(ValidationReport report) {
     return report.errors().isEmpty()
         ? ""
@@ -1902,8 +1873,9 @@ public final class CoreTuiController
 
   private UiAction handleTickEvent() {
     boolean loading = catalogLoadState.isLoading();
-    boolean shouldRender = loading || startupOverlay.isVisible(loading);
-    if (startupOverlay.tick(loading)) {
+    boolean shouldRender =
+        loading || catalogLoadCoordinator.isStartupOverlayVisible(catalogLoadState);
+    if (catalogLoadCoordinator.tickStartupOverlay(catalogLoadState)) {
       shouldRender = true;
     }
     if (asyncRepaintSignal.consume()) {
@@ -1939,7 +1911,7 @@ public final class CoreTuiController
         }
         statusMessage =
             "Submit blocked: fix "
-                + focusTargetName(invalidTarget)
+                + UiFocusTargets.nameOf(invalidTarget)
                 + " ("
                 + issueCount
                 + " issue"
@@ -1988,77 +1960,8 @@ public final class CoreTuiController
     statusMessage = "Extensions filtered: " + filteredCount;
   }
 
-  private void applyCatalogLoadCompletion(
-      long loadToken, ExtensionCatalogLoadResult result, Throwable throwable) {
-    if (isStaleCatalogLoadToken(loadToken)) {
-      return;
-    }
-    if (throwable != null) {
-      applyCatalogLoadFailure(
-          catalogLoadFailureMessage(ThrowableUnwrapper.unwrapCompletionCause(throwable)));
-      return;
-    }
-    if (result == null) {
-      applyCatalogLoadFailure("Catalog load failed: empty load result");
-      return;
-    }
-    List<ExtensionCatalogItem> items =
-        result.extensions().stream()
-            .map(
-                extension ->
-                    new ExtensionCatalogItem(
-                        extension.id(),
-                        extension.name(),
-                        extension.shortName(),
-                        extension.category(),
-                        extension.order(),
-                        extension.description()))
-            .toList();
-    if (items.isEmpty()) {
-      applyCatalogLoadFailure("Catalog load returned no extensions");
-      return;
-    }
-    if (result.metadata() != null) {
-      metadataCompatibility = MetadataCompatibilityContext.success(result.metadata());
-      syncMetadataSelectors();
-      revalidate();
-    }
-    catalogLoadState = CatalogLoadState.loaded(result.source().label(), result.stale());
-    errorMessage = "";
-    verboseErrorDetails = "";
-    statusMessage =
-        !result.detailMessage().isBlank()
-            ? result.detailMessage()
-            : catalogLoadedStatusMessage(result.source(), result.stale());
-    extensionCatalogState.replaceCatalog(
-        items, inputStates.get(FocusTarget.EXTENSION_SEARCH).text(), ignored -> {});
-    extensionCatalogState.setPresetExtensionsByName(result.presetExtensionsByName(), ignored -> {});
-    requestAsyncRepaint();
-  }
-
-  private boolean isStaleCatalogLoadToken(long loadToken) {
-    return loadToken != extensionCatalogLoadToken;
-  }
-
-  private void applyCatalogLoadFailure(String message) {
-    CatalogLoadState previous =
-        catalogLoadState instanceof CatalogLoadState.Loading loading ? loading.previous() : null;
-    if (previous instanceof CatalogLoadState.Loaded prev && prev.isLiveLoad()) {
-      // Reload failed after a previous successful live load — keep the existing catalog
-      catalogLoadState = prev;
-      statusMessage = "Catalog reload failed; keeping current catalog";
-    } else {
-      // Initial load failed or no live catalog yet — fall back
-      catalogLoadState = CatalogLoadState.failed(message);
-      statusMessage = "Using fallback extension catalog";
-    }
-    errorMessage = message;
-    verboseErrorDetails = message;
-    requestAsyncRepaint();
-  }
-
   private boolean isStartupOverlayVisible() {
-    return startupOverlay.isVisible(catalogLoadState.isLoading());
+    return catalogLoadCoordinator.isStartupOverlayVisible(catalogLoadState);
   }
 
   private void requestAsyncRepaint() {
@@ -2148,12 +2051,7 @@ public final class CoreTuiController
   }
 
   private void requestCatalogReload() {
-    if (extensionCatalogLoader == null) {
-      statusMessage = "Catalog reload unavailable";
-      return;
-    }
-    statusMessage = "Reloading extension catalog...";
-    loadExtensionCatalogAsync(extensionCatalogLoader);
+    catalogLoadCoordinator.requestReload(this);
   }
 
   private static boolean shouldToggleHelpOverlay(KeyEvent keyEvent, FocusTarget currentFocus) {
@@ -2220,14 +2118,14 @@ public final class CoreTuiController
   private void focusExtensionSearch() {
     focusTarget = FocusTarget.EXTENSION_SEARCH;
     inputStates.get(FocusTarget.EXTENSION_SEARCH).moveCursorToEnd();
-    statusMessage = "Focus moved to extensionSearch";
+    statusMessage = "Focus moved to " + UiFocusTargets.nameOf(focusTarget);
     errorMessage = "";
     submitBlockedByValidation = false;
   }
 
   private void focusExtensionList() {
     focusTarget = FocusTarget.EXTENSION_LIST;
-    statusMessage = "Focus moved to extensionList";
+    statusMessage = "Focus moved to " + UiFocusTargets.nameOf(focusTarget);
     errorMessage = "";
     submitBlockedByValidation = false;
   }
@@ -2240,7 +2138,7 @@ public final class CoreTuiController
     statusMessage = "Extension search cleared";
   }
 
-  private static String catalogLoadedStatusMessage(CatalogSource source, boolean stale) {
+  static String catalogLoadedStatusMessage(CatalogSource source, boolean stale) {
     return switch (source) {
       case LIVE -> "Loaded extension catalog from live API";
       case CACHE ->
@@ -2267,7 +2165,7 @@ public final class CoreTuiController
     if (isTextInputFocus(focusTarget)) {
       inputStates.get(focusTarget).moveCursorToEnd();
     }
-    statusMessage = "Focus moved to invalid field: " + focusTargetName(focusTarget);
+    statusMessage = "Focus moved to invalid field: " + UiFocusTargets.nameOf(focusTarget);
   }
 
   private static List<FocusTarget> invalidFocusableTargets(ValidationReport report) {

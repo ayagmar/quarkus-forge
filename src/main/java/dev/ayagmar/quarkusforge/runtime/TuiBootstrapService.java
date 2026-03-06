@@ -75,7 +75,7 @@ public final class TuiBootstrapService {
       diagnostics.info("catalog.load.start", of("mode", "headless-smoke"));
       catalogDataService
           .load()
-          .handle(CatalogLoadDiagnostics.catalogLoadDiagnostics(diagnostics))
+          .handle(CatalogLoadDiagnostics.catalogLoadDiagnostics(diagnostics, "headless-smoke"))
           .join();
       diagnostics.info("tui.session.exit", of("outcome", "completed"));
     }
@@ -146,7 +146,7 @@ public final class TuiBootstrapService {
                                   (presets, throwable) -> {
                                     if (throwable != null) {
                                       return CatalogLoadDiagnostics.handlePresetLoadFailure(
-                                          diagnostics, throwable);
+                                          diagnostics, throwable, "tui");
                                     }
                                     diagnostics.info(
                                         "preset.load.success",

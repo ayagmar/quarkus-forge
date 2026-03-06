@@ -58,6 +58,29 @@ record UiState(
         extensions);
   }
 
+  UiState withFocusAndValidationFeedback(FocusTarget nextFocusTarget, String nextStatusMessage) {
+    return new UiState(
+        request,
+        validation,
+        nextFocusTarget,
+        nextStatusMessage,
+        "",
+        verboseErrorDetails,
+        submitRequested,
+        false,
+        submitBlockedByTargetConflict,
+        commandPaletteSelection,
+        metadataPanel,
+        extensionsPanel,
+        footer,
+        overlays,
+        generation,
+        catalogLoad,
+        postGeneration,
+        startupOverlay,
+        extensions);
+  }
+
   record OverlayState(
       boolean generationVisible,
       boolean commandPaletteVisible,

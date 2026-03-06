@@ -1,6 +1,5 @@
 package dev.ayagmar.quarkusforge.forge;
 
-import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import java.util.List;
 
 /**
@@ -41,16 +40,16 @@ public record Forgefile(
     ForgefileLock locked) {
 
   public Forgefile {
-    groupId = ForgeRecordValues.normalize(groupId);
-    artifactId = ForgeRecordValues.normalize(artifactId);
-    version = ForgeRecordValues.normalize(version);
-    packageName = ForgeRecordValues.normalize(packageName);
-    outputDirectory = ForgeRecordValues.normalize(outputDirectory);
-    platformStream = ForgeRecordValues.normalize(platformStream);
-    buildTool = ForgeRecordValues.normalize(buildTool);
-    javaVersion = ForgeRecordValues.normalize(javaVersion);
-    presets = ForgeRecordValues.copyOrEmpty(presets);
-    extensions = ForgeRecordValues.copyOrEmpty(extensions);
+    groupId = ForgeRecordValues.normalizeDocument(groupId);
+    artifactId = ForgeRecordValues.normalizeDocument(artifactId);
+    version = ForgeRecordValues.normalizeDocument(version);
+    packageName = ForgeRecordValues.normalizeDocument(packageName);
+    outputDirectory = ForgeRecordValues.normalizeDocument(outputDirectory);
+    platformStream = ForgeRecordValues.normalizeDocument(platformStream);
+    buildTool = ForgeRecordValues.normalizeDocument(buildTool);
+    javaVersion = ForgeRecordValues.normalizeDocument(javaVersion);
+    presets = ForgeRecordValues.copyOrNull(presets);
+    extensions = ForgeRecordValues.copyOrNull(extensions);
   }
 
   /** Creates a Forgefile without a locked section. */
@@ -79,18 +78,6 @@ public record Forgefile(
         null);
   }
 
-  public CliPrefill toCliPrefill() {
-    return new CliPrefill(
-        valueOrDefault(groupId, "org.acme"),
-        valueOrDefault(artifactId, "quarkus-app"),
-        valueOrDefault(version, "1.0.0-SNAPSHOT"),
-        packageName.isBlank() ? null : packageName,
-        valueOrDefault(outputDirectory, "."),
-        platformStream,
-        valueOrDefault(buildTool, "maven"),
-        valueOrDefault(javaVersion, "25"));
-  }
-
   /** Returns a new Forgefile with the locked section set or replaced. */
   public Forgefile withLock(ForgefileLock lock) {
     return new Forgefile(
@@ -107,24 +94,38 @@ public record Forgefile(
         lock);
   }
 
-  public static Forgefile from(CliPrefill prefill, List<String> presets, List<String> extensions) {
+  /** Returns a new Forgefile with updated preset/extension selections. */
+  public Forgefile withSelections(List<String> presets, List<String> extensions) {
     return new Forgefile(
-        prefill.groupId(),
-        prefill.artifactId(),
-        prefill.version(),
-        prefill.packageName(),
-        prefill.outputDirectory(),
-        prefill.platformStream(),
-        prefill.buildTool(),
-        prefill.javaVersion(),
+        groupId,
+        artifactId,
+        version,
+        packageName,
+        outputDirectory,
+        platformStream,
+        buildTool,
+        javaVersion,
         presets,
-        extensions);
+        extensions,
+        locked);
   }
 
-  private static String valueOrDefault(String value, String fallback) {
-    if (value == null || value.isBlank()) {
-      return fallback;
+  /** Returns a new Forgefile with non-null document fields from {@code overrides}. */
+  public Forgefile withOverrides(Forgefile overrides) {
+    if (overrides == null) {
+      return this;
     }
-    return value;
+    return new Forgefile(
+        overrides.groupId != null ? overrides.groupId : groupId,
+        overrides.artifactId != null ? overrides.artifactId : artifactId,
+        overrides.version != null ? overrides.version : version,
+        overrides.packageName != null ? overrides.packageName : packageName,
+        overrides.outputDirectory != null ? overrides.outputDirectory : outputDirectory,
+        overrides.platformStream != null ? overrides.platformStream : platformStream,
+        overrides.buildTool != null ? overrides.buildTool : buildTool,
+        overrides.javaVersion != null ? overrides.javaVersion : javaVersion,
+        overrides.presets != null ? overrides.presets : presets,
+        overrides.extensions != null ? overrides.extensions : extensions,
+        overrides.locked != null ? overrides.locked : locked);
   }
 }

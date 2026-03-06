@@ -1,6 +1,7 @@
 package dev.ayagmar.quarkusforge.cli;
 
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
+import dev.ayagmar.quarkusforge.forge.Forgefile;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -72,8 +73,15 @@ public final class GenerateCommand implements Callable<Integer> {
     return requestOptions.toCliPrefill();
   }
 
+  public Forgefile explicitTemplate() {
+    return requestOptions
+        .toExplicitTemplate()
+        .withSelections(
+            presets.isEmpty() ? null : presets, extensions.isEmpty() ? null : extensions);
+  }
+
   public void setCliPrefill(CliPrefill prefill) {
-    requestOptions = RequestOptions.fromCliPrefill(prefill);
+    requestOptions = RequestOptions.explicitFromCliPrefill(prefill);
   }
 
   public List<String> extensions() {

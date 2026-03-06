@@ -24,8 +24,6 @@ final class UiEffectsRunner {
               showEffect.generatedPath(), showEffect.nextCommand());
       case UiEffect.HidePostGenerationMenu _ -> controller.hidePostGenerationForReducer();
       case UiEffect.RequestAsyncRepaint _ -> controller.requestAsyncRepaintForReducer();
-      case UiEffect.MoveFocus moveFocusEffect ->
-          controller.moveFocusForReducer(moveFocusEffect.offset());
       case UiEffect.ApplyMetadataSelectorKey selectorEffect ->
           controller.applyMetadataSelectorKeyForReducer(
               selectorEffect.focusTarget(), selectorEffect.keyEvent());

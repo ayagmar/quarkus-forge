@@ -1,5 +1,18 @@
 = Troubleshooting
 
+Quick symptom index:
+
+* <<tui-start,TUI does not start or shows garbled output>>
+* <<metadata-fallback,Metadata fallback on startup>>
+* <<catalog-load-failure,Catalog load failure or timeout>>
+* <<validation-errors,Validation errors>>
+* <<generation-failure,Generation or extraction failure>>
+* <<post-generate-hook-failure,Post-generation hook failure>>
+* <<native-startup,Native image fails to start>>
+* <<theme-not-applied,Theme not applied>>
+* <<forgefile-drift,Forgefile drift detected (`--lock-check` fails)>>
+
+[id="tui-start"]
 == TUI does not start or shows garbled output
 
 Symptom: blank screen, garbled characters, or immediate crash on launch.
@@ -16,6 +29,7 @@ java --enable-native-access=ALL-UNNAMED -jar target/quarkus-forge.jar
 . Verify your terminal supports 256-color or true-color (e.g., `echo $TERM`). Recommended: `xterm-256color`, `alacritty`, `kitty`, or `wezterm`.
 . On Windows, use Windows Terminal or a recent ConEmu/Git Bash with VT mode enabled.
 
+[id="metadata-fallback"]
 == Metadata fallback on startup
 
 Symptom: startup reports metadata fallback.
@@ -26,6 +40,7 @@ Actions:
 . Retry to verify fallback clears.
 . Continue with snapshot defaults if offline — the bundled snapshot will still let you generate most projects.
 
+[id="catalog-load-failure"]
 == Catalog load failure or timeout
 
 Symptom: extension catalog does not refresh or shows a stale snapshot.
@@ -41,6 +56,7 @@ java -jar target/quarkus-forge.jar --verbose
 ----
 . Check endpoint/network health. Forge will attempt to load from `~/.quarkus-forge/catalog-snapshot.json` as a fallback.
 
+[id="validation-errors"]
 == Validation errors
 
 Symptom: generation is blocked before submit; fields show `⚠ error message`.
@@ -51,6 +67,7 @@ Actions:
 . Confirm the output directory path is valid on your OS and you have write permissions.
 . For headless mode, ensure extension IDs are from the current catalog (use `--dry-run` first to validate without generating).
 
+[id="generation-failure"]
 == Generation or extraction failure
 
 Symptom: generate fails after submit; `archive` or extraction error shown.
@@ -61,6 +78,7 @@ Actions:
 . Re-run with `--verbose` to see detailed archive safety messages.
 . Verify free disk space.
 
+[id="post-generate-hook-failure"]
 == Post-generation hook failure
 
 Symptom: hook command error shown in post-generation menu.
@@ -77,6 +95,7 @@ java -jar target/quarkus-forge.jar \
 ----
 . Check exit code: the hook runs via your system shell. Any non-zero exit is reported as a failure.
 
+[id="native-startup"]
 == Native image fails to start
 
 Symptom: native binary crashes or prints `UnsatisfiedLinkError` or SVM error.
@@ -92,6 +111,7 @@ Actions:
 ./target/quarkus-forge --verbose
 ----
 
+[id="theme-not-applied"]
 == Theme not applied
 
 Symptom: custom `.tcss` colors do not appear.
@@ -108,6 +128,7 @@ java -jar target/quarkus-forge.jar
 ----
 . Verify token names and values in the file are valid (e.g., `base = #1e1e2e`). Invalid lines are silently ignored.
 
+[id="forgefile-drift"]
 == Forgefile drift detected (`--lock-check` fails)
 
 Symptom: `--lock-check --dry-run` exits with a non-zero code and reports differences.

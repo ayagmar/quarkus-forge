@@ -337,7 +337,7 @@ class QuarkusForgeGenerateCommandTest {
                         """)));
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
-    systemProperties.set(HEADLESS_CATALOG_TIMEOUT_PROPERTY, "50");
+    systemProperties.set(HEADLESS_CATALOG_TIMEOUT_PROPERTY, 50L);
 
     CliCommandTestSupport.CommandResult result =
         runCommand(
@@ -366,7 +366,7 @@ class QuarkusForgeGenerateCommandTest {
                     .withBody(new byte[] {80, 75, 3, 4})));
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
-    systemProperties.set(HEADLESS_GENERATION_TIMEOUT_PROPERTY, "50");
+    systemProperties.set(HEADLESS_GENERATION_TIMEOUT_PROPERTY, 50L);
 
     CliCommandTestSupport.CommandResult result =
         runCommand(
@@ -556,7 +556,7 @@ class QuarkusForgeGenerateCommandTest {
     stubCatalogEndpoints();
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
-    systemProperties.set("user.home", tempDir.toString());
+    systemProperties.set("user.home", tempDir);
 
     Path recipePath = ForgeDataPaths.recipesRoot().resolve("starter.json");
     assertThatCode(
@@ -591,7 +591,7 @@ class QuarkusForgeGenerateCommandTest {
     stubCatalogEndpoints();
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
 
-    systemProperties.set("user.home", tempDir.toString());
+    systemProperties.set("user.home", tempDir);
 
     CliCommandTestSupport.CommandResult result =
         runCommand(

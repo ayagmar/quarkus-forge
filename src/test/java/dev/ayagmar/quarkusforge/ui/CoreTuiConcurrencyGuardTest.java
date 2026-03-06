@@ -12,7 +12,7 @@ class CoreTuiConcurrencyGuardTest {
     assertThat(isVolatileField(GenerationFlowCoordinator.class, "generationCancelRequested"))
         .isTrue();
     assertThat(isVolatileField(GenerationFlowCoordinator.class, "generationToken")).isTrue();
-    assertThat(isVolatileField(CoreTuiController.class, "extensionCatalogLoadToken")).isTrue();
+    assertThat(isVolatileField(CatalogLoadCoordinator.class, "loadToken")).isTrue();
   }
 
   private static boolean isVolatileField(Class<?> owner, String fieldName)

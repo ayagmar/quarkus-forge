@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /** Reads and writes {@link Forgefile} instances as JSON. */
@@ -41,32 +42,32 @@ public final class ForgefileStore {
 
     ForgefileLock locked = readLockedSection(root);
     return new Forgefile(
-        JsonFieldReader.readStringOrEmpty(root, "groupId"),
-        JsonFieldReader.readStringOrEmpty(root, "artifactId"),
-        JsonFieldReader.readStringOrEmpty(root, "version"),
-        JsonFieldReader.readStringOrEmpty(root, "packageName"),
-        JsonFieldReader.readStringOrEmpty(root, "outputDirectory"),
-        JsonFieldReader.readStringOrEmpty(root, "platformStream"),
-        JsonFieldReader.readStringOrEmpty(root, "buildTool"),
-        JsonFieldReader.readStringOrEmpty(root, "javaVersion"),
-        JsonFieldReader.readStringListOrEmpty(root, "presets"),
-        JsonFieldReader.readStringListOrEmpty(root, "extensions"),
+        JsonFieldReader.readString(root, "groupId"),
+        JsonFieldReader.readString(root, "artifactId"),
+        JsonFieldReader.readString(root, "version"),
+        JsonFieldReader.readString(root, "packageName"),
+        JsonFieldReader.readString(root, "outputDirectory"),
+        JsonFieldReader.readString(root, "platformStream"),
+        JsonFieldReader.readString(root, "buildTool"),
+        JsonFieldReader.readString(root, "javaVersion"),
+        JsonFieldReader.readStringList(root, "presets"),
+        JsonFieldReader.readStringList(root, "extensions"),
         locked);
   }
 
   public static void save(Path file, Forgefile forgefile) {
     try {
       Map<String, Object> root = new LinkedHashMap<>();
-      root.put("groupId", forgefile.groupId());
-      root.put("artifactId", forgefile.artifactId());
-      root.put("version", forgefile.version());
-      putIfNotBlank(root, "packageName", forgefile.packageName());
-      putIfNotBlank(root, "outputDirectory", forgefile.outputDirectory());
-      putIfNotBlank(root, "platformStream", forgefile.platformStream());
-      root.put("buildTool", forgefile.buildTool());
-      root.put("javaVersion", forgefile.javaVersion());
-      root.put("presets", forgefile.presets());
-      root.put("extensions", forgefile.extensions());
+      putIfPresent(root, "groupId", forgefile.groupId());
+      putIfPresent(root, "artifactId", forgefile.artifactId());
+      putIfPresent(root, "version", forgefile.version());
+      putIfPresent(root, "packageName", forgefile.packageName());
+      putIfPresent(root, "outputDirectory", forgefile.outputDirectory());
+      putIfPresent(root, "platformStream", forgefile.platformStream());
+      putIfPresent(root, "buildTool", forgefile.buildTool());
+      putIfPresent(root, "javaVersion", forgefile.javaVersion());
+      putIfPresent(root, "presets", forgefile.presets());
+      putIfPresent(root, "extensions", forgefile.extensions());
       if (forgefile.locked() != null) {
         root.put("locked", lockedToMap(forgefile.locked()));
       }
@@ -78,9 +79,15 @@ public final class ForgefileStore {
     }
   }
 
-  private static void putIfNotBlank(Map<String, Object> map, String key, String value) {
+  private static void putIfPresent(Map<String, Object> map, String key, String value) {
     if (value != null && !value.isBlank()) {
       map.put(key, value);
+    }
+  }
+
+  private static void putIfPresent(Map<String, Object> map, String key, List<String> values) {
+    if (values != null) {
+      map.put(key, values);
     }
   }
 

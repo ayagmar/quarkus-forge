@@ -3,7 +3,6 @@ package dev.ayagmar.quarkusforge.forge;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -30,20 +29,8 @@ class ForgefileStoreTest {
 
     Path file = tempDir.resolve("Forgefile");
     ForgefileStore.save(file, original);
-    Forgefile loaded = ForgefileStore.load(file);
 
-    assertThat(loaded.groupId()).isEqualTo("com.acme");
-    assertThat(loaded.artifactId()).isEqualTo("my-service");
-    assertThat(loaded.version()).isEqualTo("2.0.0");
-    assertThat(loaded.packageName()).isEqualTo("com.acme.svc");
-    assertThat(loaded.outputDirectory()).isEqualTo("/projects");
-    assertThat(loaded.platformStream()).isEqualTo("io.quarkus.platform:3.31");
-    assertThat(loaded.buildTool()).isEqualTo("gradle");
-    assertThat(loaded.javaVersion()).isEqualTo("21");
-    assertThat(loaded.presets()).containsExactly("web", "data");
-    assertThat(loaded.extensions())
-        .containsExactly("io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc");
-    assertThat(loaded.locked()).isNull();
+    assertThat(ForgefileStore.load(file)).isEqualTo(original);
   }
 
   @Test
@@ -60,9 +47,9 @@ class ForgefileStoreTest {
             "com.acme",
             "locked-app",
             "1.0.0",
-            "",
-            ".",
-            "",
+            null,
+            null,
+            null,
             "maven",
             "25",
             List.of("web"),
@@ -71,47 +58,72 @@ class ForgefileStoreTest {
 
     Path file = tempDir.resolve("Forgefile-locked");
     ForgefileStore.save(file, original);
-    Forgefile loaded = ForgefileStore.load(file);
 
-    assertThat(loaded.locked()).isNotNull();
-    assertThat(loaded.locked().platformStream()).isEqualTo("io.quarkus.platform:3.31");
-    assertThat(loaded.locked().buildTool()).isEqualTo("maven");
-    assertThat(loaded.locked().javaVersion()).isEqualTo("25");
-    assertThat(loaded.locked().presets()).containsExactly("web");
-    assertThat(loaded.locked().extensions()).containsExactly("io.quarkus:quarkus-rest");
+    assertThat(ForgefileStore.load(file).locked()).isEqualTo(lock);
   }
 
   @Test
-  void roundTripWithoutLockedSection() {
-    Forgefile original =
-        new Forgefile(
-            "org.test", "no-lock", "1.0.0", "", ".", "", "maven", "21", List.of(), List.of());
+  void saveCreatesParentDirectories() {
+    Path nested = tempDir.resolve("a/b/c/Forgefile");
+    Forgefile forgefile =
+        new Forgefile("org.test", "nested", "1.0.0", null, null, null, "maven", "21", null, null);
 
-    Path file = tempDir.resolve("no-lock");
-    ForgefileStore.save(file, original);
-    Forgefile loaded = ForgefileStore.load(file);
+    ForgefileStore.save(nested, forgefile);
 
-    assertThat(loaded.locked()).isNull();
-    assertThat(loaded.artifactId()).isEqualTo("no-lock");
+    assertThat(nested).exists();
+    assertThat(ForgefileStore.load(nested).artifactId()).isEqualTo("nested");
   }
 
   @Test
-  void withLockCreatesNewForgefileWithLockedSection() {
-    Forgefile original =
-        new Forgefile("org.test", "app", "1.0.0", "", ".", "", "maven", "21", List.of(), List.of());
-    assertThat(original.locked()).isNull();
+  void omittedTopLevelFieldsStayOmittedAcrossRoundTrip() throws Exception {
+    Path file = tempDir.resolve("omit-top-level.json");
+    Forgefile forgefile =
+        new Forgefile(null, "app", null, null, null, null, null, null, null, null);
 
-    ForgefileLock lock = ForgefileLock.of("stream:1", "maven", "21", List.of(), List.of());
-    Forgefile withLock = original.withLock(lock);
+    ForgefileStore.save(file, forgefile);
+    String raw = Files.readString(file);
+    Forgefile loaded = ForgefileStore.load(file);
 
-    assertThat(withLock.locked()).isNotNull();
-    assertThat(withLock.locked().platformStream()).isEqualTo("stream:1");
-    assertThat(withLock.artifactId()).isEqualTo("app");
+    assertThat(raw).contains("\"artifactId\"");
+    assertThat(raw).doesNotContain("\"groupId\"");
+    assertThat(raw).doesNotContain("\"version\"");
+    assertThat(raw).doesNotContain("\"buildTool\"");
+    assertThat(raw).doesNotContain("\"javaVersion\"");
+    assertThat(raw).doesNotContain("\"presets\"");
+    assertThat(raw).doesNotContain("\"extensions\"");
+    assertThat(loaded.groupId()).isNull();
+    assertThat(loaded.version()).isNull();
+    assertThat(loaded.buildTool()).isNull();
+    assertThat(loaded.javaVersion()).isNull();
+    assertThat(loaded.presets()).isNull();
+    assertThat(loaded.extensions()).isNull();
+  }
+
+  @Test
+  void loadPreservesMissingFieldsAsNull() throws Exception {
+    Path file = tempDir.resolve("missing-fields.json");
+    Files.writeString(
+        file,
+        """
+        {
+          "artifactId": "team-svc",
+          "extensions": ["io.quarkus:quarkus-rest"]
+        }
+        """);
+
+    Forgefile loaded = ForgefileStore.load(file);
+
+    assertThat(loaded.groupId()).isNull();
+    assertThat(loaded.artifactId()).isEqualTo("team-svc");
+    assertThat(loaded.extensions()).containsExactly("io.quarkus:quarkus-rest");
+    assertThat(loaded.presets()).isNull();
+    assertThat(loaded.buildTool()).isNull();
   }
 
   @Test
   void loadMissingFileThrows() {
     Path missing = tempDir.resolve("nonexistent");
+
     assertThatThrownBy(() -> ForgefileStore.load(missing))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("Forgefile not found: '")
@@ -122,6 +134,7 @@ class ForgefileStoreTest {
   void loadMalformedJsonThrows() throws Exception {
     Path file = tempDir.resolve("bad.json");
     Files.writeString(file, "not json");
+
     assertThatThrownBy(() -> ForgefileStore.load(file))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("Failed to parse Forgefile '")
@@ -140,77 +153,13 @@ class ForgefileStoreTest {
   }
 
   @Test
-  void saveCreatesParentDirectories() {
-    Path nested = tempDir.resolve("a/b/c/Forgefile");
-    Forgefile forgefile =
-        new Forgefile(
-            "org.test", "nested", "1.0.0", "", ".", "", "maven", "21", List.of(), List.of());
-
-    ForgefileStore.save(nested, forgefile);
-
-    assertThat(nested).exists();
-    Forgefile loaded = ForgefileStore.load(nested);
-    assertThat(loaded.artifactId()).isEqualTo("nested");
-  }
-
-  @Test
-  void emptyFieldsNormalizeToBlank() {
-    Path file = tempDir.resolve("empty-fields");
-    Forgefile forgefile =
-        new Forgefile(null, "app", null, null, null, null, null, null, null, null);
-
-    ForgefileStore.save(file, forgefile);
-    Forgefile loaded = ForgefileStore.load(file);
-
-    assertThat(loaded.groupId()).isEmpty();
-    assertThat(loaded.version()).isEmpty();
-    assertThat(loaded.presets()).isEmpty();
-    assertThat(loaded.extensions()).isEmpty();
-  }
-
-  @Test
-  void toCliPrefillAppliesDefaults() {
-    Forgefile forgefile = new Forgefile("", "", "", "", "", "", "", "", List.of(), List.of());
-
-    CliPrefill prefill = forgefile.toCliPrefill();
-
-    assertThat(prefill.groupId()).isEqualTo("org.acme");
-    assertThat(prefill.artifactId()).isEqualTo("quarkus-app");
-    assertThat(prefill.version()).isEqualTo("1.0.0-SNAPSHOT");
-    assertThat(prefill.buildTool()).isEqualTo("maven");
-    assertThat(prefill.javaVersion()).isEqualTo("25");
-    assertThat(prefill.outputDirectory()).isEqualTo(".");
-  }
-
-  @Test
-  void fromCliPrefillCreatesForgefileWithoutLock() {
-    CliPrefill prefill = new CliPrefill("com.test", "my-app", "", null, "", "", "gradle", "");
-
-    Forgefile forgefile = Forgefile.from(prefill, List.of("web"), List.of("ext1"));
-
-    assertThat(forgefile.groupId()).isEqualTo("com.test");
-    assertThat(forgefile.artifactId()).isEqualTo("my-app");
-    assertThat(forgefile.buildTool()).isEqualTo("gradle");
-    assertThat(forgefile.presets()).containsExactly("web");
-    assertThat(forgefile.extensions()).containsExactly("ext1");
-    assertThat(forgefile.locked()).isNull();
-  }
-
-  @Test
   void loadIgnoresNonMapLockedSection() throws Exception {
-    // Write JSON where "locked" is a string instead of a map
     Path file = tempDir.resolve("locked-string.json");
     Files.writeString(
         file,
         """
         {
-          "groupId": "org.acme",
           "artifactId": "test",
-          "version": "1.0.0",
-          "buildTool": "maven",
-          "javaVersion": "21",
-          "presets": [],
-          "extensions": [],
           "locked": "not-a-map"
         }
         """);
@@ -222,68 +171,17 @@ class ForgefileStoreTest {
   }
 
   @Test
-  void saveOmitsBlankPackageNameOutputDirectoryAndPlatformStream() throws Exception {
-    Forgefile forgefile =
-        new Forgefile("org.acme", "app", "1.0.0", "", "", "", "maven", "21", List.of(), List.of());
-
-    Path file = tempDir.resolve("omit-blanks");
-    ForgefileStore.save(file, forgefile);
-    String raw = Files.readString(file);
-    Forgefile loaded = ForgefileStore.load(file);
-
-    assertThat(raw).doesNotContain("\"packageName\"");
-    assertThat(raw).doesNotContain("\"outputDirectory\"");
-    assertThat(raw).doesNotContain("\"platformStream\"");
-    // Blank packageName and outputDirectory should be omitted in JSON, loaded as empty
-    assertThat(loaded.packageName()).isEmpty();
-    assertThat(loaded.outputDirectory()).isEmpty();
-    assertThat(loaded.platformStream()).isEmpty();
-  }
-
-  @Test
-  void saveIncludesNonBlankOptionalFields() {
-    Forgefile forgefile =
-        new Forgefile(
-            "org.acme",
-            "app",
-            "1.0.0",
-            "org.acme.app",
-            "/projects",
-            "io.quarkus.platform:3.31",
-            "maven",
-            "21",
-            List.of(),
-            List.of());
-
-    Path file = tempDir.resolve("include-optionals");
-    ForgefileStore.save(file, forgefile);
-    Forgefile loaded = ForgefileStore.load(file);
-
-    assertThat(loaded.packageName()).isEqualTo("org.acme.app");
-    assertThat(loaded.outputDirectory()).isEqualTo("/projects");
-    assertThat(loaded.platformStream()).isEqualTo("io.quarkus.platform:3.31");
-  }
-
-  @Test
   void loadFileWithNullLockedFieldReturnsNullLock() throws Exception {
     Path file = tempDir.resolve("null-locked.json");
     Files.writeString(
         file,
         """
         {
-          "groupId": "org.acme",
           "artifactId": "test",
-          "version": "1.0",
-          "buildTool": "maven",
-          "javaVersion": "21",
-          "presets": [],
-          "extensions": [],
           "locked": null
         }
         """);
 
-    Forgefile loaded = ForgefileStore.load(file);
-
-    assertThat(loaded.locked()).isNull();
+    assertThat(ForgefileStore.load(file).locked()).isNull();
   }
 }

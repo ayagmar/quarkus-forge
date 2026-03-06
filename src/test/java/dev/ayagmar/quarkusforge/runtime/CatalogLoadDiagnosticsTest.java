@@ -43,11 +43,13 @@ class CatalogLoadDiagnosticsTest {
     Map<String, java.util.List<String>> presets =
         CatalogLoadDiagnostics.handlePresetLoadFailure(
             DiagnosticLogger.create(true),
-            new CompletionException(new ApiClientException("connection refused")));
+            new CompletionException(new ApiClientException("connection refused")),
+            "headless-smoke");
 
     assertThat(presets).isEmpty();
     assertThat(stderr.toString(StandardCharsets.UTF_8))
         .contains("\"event\":\"preset.load.failure\"")
+        .contains("\"mode\":\"headless-smoke\"")
         .contains("\"causeType\":\"ApiClientException\"")
         .contains("connection refused")
         .doesNotContain("CompletionException");
@@ -64,7 +66,8 @@ class CatalogLoadDiagnosticsTest {
             "fresh");
 
     var result =
-        CatalogLoadDiagnostics.catalogLoadDiagnostics(DiagnosticLogger.create(true))
+        CatalogLoadDiagnostics.catalogLoadDiagnostics(
+                DiagnosticLogger.create(true), "headless-smoke")
             .apply(data, null);
 
     assertThat(result.extensions()).hasSize(1);
@@ -72,6 +75,7 @@ class CatalogLoadDiagnosticsTest {
     assertThat(result.detailMessage()).isEqualTo("fresh");
     assertThat(stderr.toString(StandardCharsets.UTF_8))
         .contains("\"event\":\"catalog.load.success\"")
+        .contains("\"mode\":\"headless-smoke\"")
         .contains("\"source\":\"live\"");
   }
 
@@ -79,13 +83,15 @@ class CatalogLoadDiagnosticsTest {
   void catalogLoadDiagnosticsTreatsCancellationSeparately() {
     assertThatThrownBy(
             () ->
-                CatalogLoadDiagnostics.catalogLoadDiagnostics(DiagnosticLogger.create(true))
+                CatalogLoadDiagnostics.catalogLoadDiagnostics(
+                        DiagnosticLogger.create(true), "headless-smoke")
                     .apply(null, new CompletionException(new CancellationException("cancelled"))))
         .isInstanceOf(CompletionException.class)
         .hasCauseInstanceOf(CancellationException.class);
 
     assertThat(stderr.toString(StandardCharsets.UTF_8))
         .contains("\"event\":\"catalog.load.cancelled\"")
+        .contains("\"mode\":\"headless-smoke\"")
         .doesNotContain("\"event\":\"catalog.load.failure\"");
   }
 }

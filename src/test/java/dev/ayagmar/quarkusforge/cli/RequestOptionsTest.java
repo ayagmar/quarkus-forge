@@ -103,4 +103,24 @@ class RequestOptionsTest {
                 RequestOptions.DEFAULT_JAVA_VERSION))
         .isFalse();
   }
+
+  @Test
+  void explicitFromCliPrefillProducesExplicitTemplate() {
+    RequestOptions opts =
+        RequestOptions.explicitFromCliPrefill(
+            new CliPrefill(
+                "com.example",
+                "demo-app",
+                "1.2.3",
+                "com.example.demo",
+                "generated",
+                "",
+                "gradle",
+                "21"));
+
+    assertThat(opts.toExplicitTemplate().groupId()).isEqualTo("com.example");
+    assertThat(opts.toExplicitTemplate().artifactId()).isEqualTo("demo-app");
+    assertThat(opts.toExplicitTemplate().buildTool()).isEqualTo("gradle");
+    assertThat(opts.toExplicitTemplate().platformStream()).isNull();
+  }
 }

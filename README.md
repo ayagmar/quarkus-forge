@@ -47,6 +47,16 @@ Quarkus Forge is a keyboard-first terminal UI (TUI) and headless CLI for generat
 | **Post-gen hooks** | IDE open, GitHub, shell handoff | n/a |
 | **JVM flag needed** | `--enable-native-access=ALL-UNNAMED` | none |
 
+## Which Artifact Should I Use?
+
+| If you want to... | Use | Why |
+|--|--|--|
+| Explore extensions interactively | `quarkus-forge.jar` | Includes the full TUI |
+| Run in CI or containers | `quarkus-forge-headless.jar` | Smaller and has no TUI or terminal dependencies |
+| Automate `generate` locally | `quarkus-forge-headless.jar` | Same command surface with less runtime baggage |
+| Keep one local developer jar | `quarkus-forge.jar` | Supports both TUI and `generate` |
+| Avoid the JVM at runtime | native binary | Standalone executable |
+
 ## Keyboard Quick Reference (TUI)
 
 | Key | Action |
@@ -98,6 +108,34 @@ Output: `target/quarkus-forge` — standalone binary, no JVM required at runtime
 
 > **Note:** Native image requires GraalVM or a compatible toolchain. Set `GRAALVM_HOME` before building.
 > CI also enforces native binary size budgets for `headless-native` and `native` using produced binary file size; the build report and native-image log are included for diagnostics.
+
+### Bash Completion
+Generate completion scripts after building the jars:
+```bash
+just completion-bash
+```
+
+This writes:
+- `target/completions/quarkus-forge.bash`
+- `target/completions/quarkus-forge-headless.bash`
+
+Load them into the current shell:
+```bash
+source target/completions/quarkus-forge.bash
+source target/completions/quarkus-forge-headless.bash
+```
+
+### Release Checksums
+Generate `.sha256` files for the release jars:
+```bash
+just release-checksums
+```
+
+Verify artifacts:
+```bash
+sha256sum -c target/quarkus-forge.jar.sha256
+sha256sum -c target/quarkus-forge-headless.jar.sha256
+```
 
 ## Quick Start
 
@@ -233,7 +271,8 @@ The codebase is organized into focused modules that follow SOLID principles and 
 - **`CliPrefillMapper`** — Maps CLI options to validated project requests.
 
 ### UI Layer (`ui/`)
-- **`CoreTuiController`** — TUI orchestration shell delegating transitions to reducer/effects and rendering from immutable state snapshots.
+- **`CoreTuiController`** — TUI orchestration shell and callback sink, rendering from immutable state snapshots.
+- **`CatalogLoadCoordinator`** / **`GenerationFlowCoordinator`** — Dedicated async workflow coordinators for catalog loading and generation.
 - **`CoreUiReducer`** — Pure reducer for migrated UI intents and effects.
 - **`UiStateSnapshotMapper`** — Builds immutable `UiState` snapshots from controller-managed state slices.
 - **`OverlayRenderer`** — Stateless overlay rendering (command palette, help, progress, post-generation menus).
@@ -247,7 +286,7 @@ The codebase is organized into focused modules that follow SOLID principles and 
 - **`TuiSessionSummary`** — Immutable summary of the final request and post-generation exit plan.
 
 ### Application Layer (`application/`)
-- **`ProjectRequestFactory`** — Shared request assembly and startup normalization outside Picocli and TUI state.
+- **`InputResolutionService`** — Shared pure pipeline for resolving CLI/headless prefill into validated request state.
 - **`StartupMetadataSelection`** — Startup metadata source selection and fallback detail.
 
 ### CLI Layer (`cli/`)
@@ -257,13 +296,14 @@ The codebase is organized into focused modules that follow SOLID principles and 
 - **`ExitCodes`** — Central exit code constants shared by both entry points.
 
 ### Headless Layer (`headless/`)
-- **`HeadlessGenerationService`** — Decoupled headless generation engine for CI/scripting, with `AsyncFailureHandler` for consistent error handling.
+- **`HeadlessGenerationService`** — Decoupled headless generation engine for CI/scripting, resolving Forgefiles through `InputResolutionService`.
+- **`AsyncFailureHandler`** / **`BoundaryFailure`** — Shared boundary failure policy for consistent exit codes, diagnostics, and user-facing messages.
 - **`HeadlessCatalogClient`** — Timeout-aware catalog and preset loading plus archive generation orchestration.
 - **`HeadlessOutputPrinter`** — Text-mode summaries and validation/error output.
 
 ### Forge Layer (`forge/`)
-- **`ForgefileStore`** — Forgefile persistence (with optional locked section).
-- **`Forgefile`** / **`ForgefileLock`** — Shareable generation templates and deterministic lock data.
+- **`ForgefileStore`** — Forgefile persistence with omission-preserving top-level template fields.
+- **`Forgefile`** / **`ForgefileLock`** — Shareable intent template plus explicit deterministic lock data.
 
 ### Post-Generation Layer (`postgen/`)
 - **`PostTuiActionExecutor`** — Post-generation shell actions (IDE open, GitHub publish, terminal handoff).

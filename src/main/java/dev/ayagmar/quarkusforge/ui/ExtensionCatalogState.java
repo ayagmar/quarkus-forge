@@ -14,32 +14,9 @@ import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
 final class ExtensionCatalogState {
-  private static final List<ExtensionCatalogItem> DEFAULT_EXTENSIONS =
-      List.of(
-          new ExtensionCatalogItem("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
-          new ExtensionCatalogItem("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20),
-          new ExtensionCatalogItem(
-              "io.quarkus:quarkus-rest-jackson", "REST Jackson", "rest-jackson", "Web", 21),
-          new ExtensionCatalogItem(
-              "io.quarkus:quarkus-smallrye-openapi", "OpenAPI", "openapi", "Web", 30),
-          new ExtensionCatalogItem(
-              "io.quarkus:quarkus-hibernate-orm", "Hibernate ORM", "hibernate-orm", "Data", 40),
-          new ExtensionCatalogItem(
-              "io.quarkus:quarkus-jdbc-postgresql",
-              "JDBC PostgreSQL",
-              "jdbc-postgresql",
-              "Data",
-              41),
-          new ExtensionCatalogItem(
-              "io.quarkus:quarkus-junit5", "JUnit 5", "junit5", "Testing", 90));
-
-  private final Debouncer searchDebouncer;
-  private final LatestResultGate searchResultGate;
   private final ExtensionCatalogPreferences preferences;
-  private final ExtensionCatalogFilters filters;
-  private final ExtensionCatalogRows rows;
   private final ExtensionCatalogNavigation navigation;
-  private ExtensionCatalogIndex catalogIndex;
+  private final ExtensionCatalogProjection projection;
 
   ExtensionCatalogState(UiScheduler scheduler, Duration debounceDelay, String initialQuery) {
     this(scheduler, debounceDelay, initialQuery, ExtensionFavoritesStore.inMemory(), Runnable::run);
@@ -51,19 +28,13 @@ final class ExtensionCatalogState {
       String initialQuery,
       ExtensionFavoritesStore favoritesStore,
       Executor favoritesPersistenceExecutor) {
-    Objects.requireNonNull(scheduler);
-    Objects.requireNonNull(debounceDelay);
-    searchDebouncer = new Debouncer(scheduler, debounceDelay);
-    searchResultGate = new LatestResultGate();
     preferences =
         new ExtensionCatalogPreferences(
             Objects.requireNonNull(favoritesStore),
             Objects.requireNonNull(favoritesPersistenceExecutor));
-    filters = new ExtensionCatalogFilters(initialQuery);
-    rows = new ExtensionCatalogRows();
     navigation = new ExtensionCatalogNavigation();
-    catalogIndex = new ExtensionCatalogIndex(DEFAULT_EXTENSIONS);
-    applyFiltered(filters.currentQuery(), searchResultGate.nextToken(), ignored -> {});
+    projection = new ExtensionCatalogProjection(scheduler, debounceDelay, initialQuery);
+    projection.initialize(navigation, preferences);
   }
 
   void replaceCatalog(List<ExtensionCatalogItem> items, String query, IntConsumer onFiltered) {
@@ -75,83 +46,43 @@ final class ExtensionCatalogState {
     }
     navigation.retainAvailableSelections(availableExtensionIds);
     preferences.retainAvailable(availableExtensionIds);
-    catalogIndex = new ExtensionCatalogIndex(items);
-    applyFiltered(query, searchResultGate.nextToken(), onFiltered);
+    projection.replaceCatalog(items, query, navigation, preferences, onFiltered);
   }
 
   void scheduleRefresh(String query, IntConsumer onFiltered) {
-    Objects.requireNonNull(onFiltered);
-    long token = searchResultGate.nextToken();
-    searchDebouncer.submit(() -> applyFiltered(query, token, onFiltered));
+    projection.scheduleRefresh(query, navigation, preferences, onFiltered);
   }
 
   void refreshNow(String query, IntConsumer onFiltered) {
-    Objects.requireNonNull(onFiltered);
-    applyFiltered(query, searchResultGate.nextToken(), onFiltered);
+    projection.refreshNow(query, navigation, preferences, onFiltered);
   }
 
   boolean toggleFavoritesOnlyFilter(IntConsumer onFiltered) {
-    Objects.requireNonNull(onFiltered);
-    boolean enabled = filters.toggleFavoritesOnly();
-    applyFiltered(filters.currentQuery(), searchResultGate.nextToken(), onFiltered);
-    return enabled;
+    return projection.toggleFavoritesOnlyFilter(navigation, preferences, onFiltered);
   }
 
   boolean toggleSelectedOnlyFilter(IntConsumer onFiltered) {
-    Objects.requireNonNull(onFiltered);
-    boolean enabled = filters.toggleSelectedOnly();
-    applyFiltered(filters.currentQuery(), searchResultGate.nextToken(), onFiltered);
-    return enabled;
+    return projection.toggleSelectedOnlyFilter(navigation, preferences, onFiltered);
   }
 
   boolean clearCategoryFilter(IntConsumer onFiltered) {
-    Objects.requireNonNull(onFiltered);
-    if (!filters.clearCategoryFilter()) {
-      return false;
-    }
-    applyFiltered(filters.currentQuery(), searchResultGate.nextToken(), onFiltered);
-    return true;
+    return projection.clearCategoryFilter(navigation, preferences, onFiltered);
   }
 
   void setPresetExtensionsByName(Map<String, List<String>> presetMap, IntConsumer onFiltered) {
-    Objects.requireNonNull(onFiltered);
-    filters.setPresetExtensionsByName(presetMap);
-    applyFiltered(filters.currentQuery(), searchResultGate.nextToken(), onFiltered);
+    projection.setPresetExtensionsByName(presetMap, navigation, preferences, onFiltered);
   }
 
   PresetFilterResult cyclePresetFilter(IntConsumer onFiltered) {
-    Objects.requireNonNull(onFiltered);
-    List<String> presets = filters.availablePresetNames();
-    filters.cyclePresetFilter(presets);
-    applyFiltered(filters.currentQuery(), searchResultGate.nextToken(), onFiltered);
-    if (filters.activePresetFilterName().isBlank()) {
-      return PresetFilterResult.none(rows.filteredExtensions().size());
-    }
-    return new PresetFilterResult(
-        true, filters.activePresetFilterName(), rows.filteredExtensions().size());
+    return projection.cyclePresetFilter(navigation, preferences, onFiltered);
   }
 
   boolean clearPresetFilter(IntConsumer onFiltered) {
-    Objects.requireNonNull(onFiltered);
-    if (!filters.clearPresetFilter()) {
-      return false;
-    }
-    applyFiltered(filters.currentQuery(), searchResultGate.nextToken(), onFiltered);
-    return true;
+    return projection.clearPresetFilter(navigation, preferences, onFiltered);
   }
 
   CategoryFilterResult cycleCategoryFilter(IntConsumer onFiltered) {
-    Objects.requireNonNull(onFiltered);
-    List<String> categoryTitles =
-        filters.filterableCategoryTitles(
-            catalogIndex, navigation.selectedIdsView(), preferences.favoriteIdsView());
-    filters.cycleCategoryFilter(categoryTitles);
-    applyFiltered(filters.currentQuery(), searchResultGate.nextToken(), onFiltered);
-    if (filters.activeCategoryFilterTitle().isBlank()) {
-      return CategoryFilterResult.none(rows.filteredExtensions().size());
-    }
-    return new CategoryFilterResult(
-        true, filters.activeCategoryFilterTitle(), rows.filteredExtensions().size());
+    return projection.cycleCategoryFilter(navigation, preferences, onFiltered);
   }
 
   FavoriteToggleResult toggleFavoriteAtSelection(IntConsumer onFiltered) {
@@ -161,7 +92,7 @@ final class ExtensionCatalogState {
       return FavoriteToggleResult.none();
     }
     boolean isNowFavorite = preferences.toggleFavorite(selected.id());
-    applyFiltered(filters.currentQuery(), searchResultGate.nextToken(), onFiltered);
+    projection.reapplyAfterSelectionMutation(navigation, preferences);
     return new FavoriteToggleResult(true, selected.name(), isNowFavorite);
   }
 
@@ -170,14 +101,14 @@ final class ExtensionCatalogState {
     if (selectedRow == null) {
       return CategoryCollapseResult.none();
     }
-    String categoryTitle = rows.categoryTitleForRow(selectedRow);
+    String categoryTitle = projection.categoryTitleForRow(selectedRow);
     if (categoryTitle == null) {
       return CategoryCollapseResult.none();
     }
 
-    boolean collapsed = rows.toggleCategoryCollapse(categoryTitle);
-    refreshRows(selectedListItemId());
-    Integer sectionHeaderIndex = rows.sectionHeaderRowIndex(categoryTitle);
+    boolean collapsed = projection.toggleCategoryCollapse(categoryTitle);
+    projection.refreshRows(selectedListItemId(), navigation, preferences);
+    Integer sectionHeaderIndex = projection.sectionHeaderRowIndex(categoryTitle);
     if (sectionHeaderIndex != null) {
       navigation.listState().select(sectionHeaderIndex);
     }
@@ -185,33 +116,32 @@ final class ExtensionCatalogState {
   }
 
   int expandAllCategories() {
-    int collapsedCount = rows.expandAllCategories();
+    int collapsedCount = projection.expandAllCategories();
     if (collapsedCount == 0) {
       return 0;
     }
-    refreshRows(selectedListItemId());
+    projection.refreshRows(selectedListItemId(), navigation, preferences);
     return collapsedCount;
   }
 
   JumpToFavoriteResult jumpToFavorite() {
-    return navigation.jumpToFavorite(rows, preferences.favoriteIdsView());
+    return navigation.jumpToFavorite(projection.rows(), preferences.favoriteIdsView());
   }
 
   SectionJumpResult jumpToAdjacentSection(boolean forward) {
-    return navigation.jumpToAdjacentSection(rows, forward);
+    return navigation.jumpToAdjacentSection(projection.rows(), forward);
   }
 
   void cancelPendingAsync() {
-    searchDebouncer.cancel();
-    searchResultGate.cancel();
+    projection.cancelPendingAsync();
   }
 
   List<ExtensionCatalogItem> filteredExtensions() {
-    return rows.filteredExtensions();
+    return projection.filteredExtensions();
   }
 
   List<ExtensionCatalogRow> filteredRows() {
-    return rows.filteredRows();
+    return projection.filteredRows();
   }
 
   ListState listState() {
@@ -231,7 +161,7 @@ final class ExtensionCatalogState {
     if (clearedCount == 0) {
       return 0;
     }
-    reapplyFiltersAfterSelectionMutation();
+    projection.reapplyAfterSelectionMutation(navigation, preferences);
     return clearedCount;
   }
 
@@ -240,7 +170,7 @@ final class ExtensionCatalogState {
   }
 
   int totalCatalogExtensionCount() {
-    return catalogIndex.totalItemCount();
+    return projection.totalCatalogExtensionCount();
   }
 
   String focusedExtensionId() {
@@ -254,23 +184,23 @@ final class ExtensionCatalogState {
   }
 
   boolean favoritesOnlyFilterEnabled() {
-    return filters.favoritesOnlyFilterEnabled();
+    return projection.favoritesOnlyFilterEnabled();
   }
 
   boolean selectedOnlyFilterEnabled() {
-    return filters.selectedOnlyFilterEnabled();
+    return projection.selectedOnlyFilterEnabled();
   }
 
   String activeCategoryFilterTitle() {
-    return filters.activeCategoryFilterTitle();
+    return projection.activeCategoryFilterTitle();
   }
 
   String activePresetFilterName() {
-    return filters.activePresetFilterName();
+    return projection.activePresetFilterName();
   }
 
   boolean isSelectionAtTop() {
-    return navigation.isSelectionAtTop(rows);
+    return navigation.isSelectionAtTop(projection.rows());
   }
 
   boolean isSelected(String extensionId) {
@@ -282,29 +212,29 @@ final class ExtensionCatalogState {
   }
 
   boolean isCategorySectionHeaderSelected() {
-    return rows.isCategorySectionHeaderSelected(navigation.selectedRow());
+    return projection.isCategorySectionHeaderSelected(navigation.selectedRow());
   }
 
   boolean isSelectedCategorySectionCollapsed() {
-    return rows.isSelectedCategorySectionCollapsed(navigation.selectedRow());
+    return projection.isSelectedCategorySectionCollapsed(navigation.selectedRow());
   }
 
   String selectedSectionHeaderTitle() {
-    return rows.selectedSectionHeaderTitle(navigation.selectedRow());
+    return projection.selectedSectionHeaderTitle(navigation.selectedRow());
   }
 
   SectionFocusResult focusParentSectionHeader() {
-    return navigation.focusParentSectionHeader(rows);
+    return navigation.focusParentSectionHeader(projection.rows());
   }
 
   SectionFocusResult focusFirstVisibleItemInSelectedSection() {
-    return navigation.focusFirstVisibleItemInSelectedSection(rows);
+    return navigation.focusFirstVisibleItemInSelectedSection(projection.rows());
   }
 
   boolean handleListKeys(KeyEvent keyEvent, Consumer<String> onToggled) {
     Objects.requireNonNull(keyEvent);
     Objects.requireNonNull(onToggled);
-    if (navigation.handleNavigationKey(rows, keyEvent)) {
+    if (navigation.handleNavigationKey(projection.rows(), keyEvent)) {
       return true;
     }
     if (!keyEvent.isSelect()) {
@@ -316,53 +246,21 @@ final class ExtensionCatalogState {
     }
     if (navigation.select(extension.id())) {
       preferences.recordRecentSelection(extension.id());
-      refreshRows(extension.id());
+      projection.refreshRows(extension.id(), navigation, preferences);
     } else {
       navigation.deselect(extension.id());
-      reapplyFiltersAfterSelectionMutation();
+      projection.reapplyAfterSelectionMutation(navigation, preferences);
     }
     onToggled.accept(extension.name());
     return true;
   }
 
-  private void applyFiltered(String queryText, long token, IntConsumer onFiltered) {
-    if (!searchResultGate.shouldApply(token)) {
-      return;
-    }
-    filters.updateQuery(queryText);
-    String previousFocusedId = selectedListItemId();
-    Set<String> favoriteIds = preferences.favoriteIdsView();
-    Set<String> selectedIds = navigation.selectedIdsView();
-
-    List<ExtensionCatalogItem> rankedResults =
-        catalogIndex.search(filters.currentQuery(), favoriteIds);
-    Set<String> availableCategoryTitles =
-        new LinkedHashSet<>(
-            filters.filterableCategoryTitles(catalogIndex, selectedIds, favoriteIds));
-    filters.reconcileAvailableCategories(availableCategoryTitles);
-    rankedResults = filters.apply(rankedResults, selectedIds, favoriteIds);
-
-    rows.retainAvailableCategories(availableCategoryTitles);
-    rows.update(rankedResults, preferences.recentIdsView(), filters);
-    navigation.restoreSelection(rows, previousFocusedId);
-    onFiltered.accept(rows.filteredExtensions().size());
-  }
-
-  private void refreshRows(String previousFocusedExtensionId) {
-    rows.update(rows.filteredExtensions(), preferences.recentIdsView(), filters);
-    navigation.restoreSelection(rows, previousFocusedExtensionId);
-  }
-
-  private void reapplyFiltersAfterSelectionMutation() {
-    applyFiltered(filters.currentQuery(), searchResultGate.nextToken(), ignored -> {});
-  }
-
   private String selectedListItemId() {
-    return rows.itemIdAtRow(navigation.selectedRow());
+    return projection.itemIdAtRow(navigation.selectedRow());
   }
 
   private ExtensionCatalogItem selectedListItem() {
     Integer selectedRow = navigation.selectedRow();
-    return selectedRow == null ? null : rows.itemAtRow(selectedRow);
+    return selectedRow == null ? null : projection.itemAtRow(selectedRow);
   }
 }

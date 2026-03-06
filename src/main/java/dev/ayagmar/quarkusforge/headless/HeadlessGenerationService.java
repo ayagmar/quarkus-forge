@@ -7,11 +7,10 @@ import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
-import dev.ayagmar.quarkusforge.application.ProjectRequestFactory;
+import dev.ayagmar.quarkusforge.application.InputResolutionService;
 import dev.ayagmar.quarkusforge.cli.ExitCodes;
 import dev.ayagmar.quarkusforge.cli.GenerateCommand;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
-import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
 import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
@@ -27,6 +26,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -81,13 +81,10 @@ public final class HeadlessGenerationService implements AutoCloseable {
           e, catalogTimeout, "catalog.load", "Failed to load extension catalog", diagnostics);
     }
 
-    ProjectRequest request = ProjectRequestFactory.fromCliPrefill(inputs.prefill());
     MetadataCompatibilityContext metadataCompatibility =
         MetadataCompatibilityContext.success(catalogData.metadata());
-    ProjectRequest requestWithResolvedStream =
-        ProjectRequestFactory.applyRecommendedPlatformStream(request, metadataCompatibility);
     ForgeUiState validatedState =
-        ProjectRequestFactory.buildInitialState(requestWithResolvedStream, metadataCompatibility);
+        InputResolutionService.resolveInitialState(inputs.template(), metadataCompatibility);
     if (!validatedState.canSubmit()) {
       diagnostics.error(
           "generate.validation.failed",
@@ -197,7 +194,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
     LinkedHashSet<String> resolved = new LinkedHashSet<>();
 
     for (String presetInput : presetInputs) {
-      String preset = ProjectRequestFactory.normalizePresetName(presetInput);
+      String preset = normalizePresetName(presetInput);
       if (preset.isBlank()) {
         continue;
       }
@@ -242,7 +239,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
   }
 
   private static EffectiveInputs loadEffectiveInputs(GenerateCommand command) {
-    CliPrefill prefill = command.cliPrefill();
+    Forgefile template = command.explicitTemplate();
     List<String> presetInputs = new ArrayList<>(command.presets());
     List<String> extensionInputs = new ArrayList<>(command.extensions());
     Forgefile forgefile = null;
@@ -261,10 +258,11 @@ public final class HeadlessGenerationService implements AutoCloseable {
     if (hasFromFile) {
       forgefilePath = resolveForgefileReadPath(command.fromFile());
       forgefile = ForgefileStore.load(forgefilePath);
-      prefill = forgefile.toCliPrefill();
-      presetInputs = new ArrayList<>(new LinkedHashSet<>(forgefile.presets()));
+      template = forgefile.withOverrides(template);
+      presetInputs = new ArrayList<>(new LinkedHashSet<>(safeSelections(forgefile.presets())));
       presetInputs.addAll(command.presets());
-      extensionInputs = new ArrayList<>(new LinkedHashSet<>(forgefile.extensions()));
+      extensionInputs =
+          new ArrayList<>(new LinkedHashSet<>(safeSelections(forgefile.extensions())));
       extensionInputs.addAll(command.extensions());
     }
 
@@ -274,7 +272,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
     }
 
     return new EffectiveInputs(
-        prefill,
+        template,
         List.copyOf(presetInputs),
         List.copyOf(extensionInputs),
         forgefile,
@@ -286,7 +284,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
 
   private static boolean requiresBuiltInPresets(List<String> presetInputs) {
     for (String presetInput : presetInputs) {
-      String preset = ProjectRequestFactory.normalizePresetName(presetInput);
+      String preset = normalizePresetName(presetInput);
       if (!preset.isBlank() && !PRESET_FAVORITES.equals(preset)) {
         return true;
       }
@@ -343,17 +341,24 @@ public final class HeadlessGenerationService implements AutoCloseable {
 
   private static List<String> normalizePresets(List<String> presetInputs) {
     return presetInputs.stream()
-        .map(ProjectRequestFactory::normalizePresetName)
+        .map(HeadlessGenerationService::normalizePresetName)
         .filter(s -> !s.isEmpty())
         .distinct()
         .toList();
+  }
+
+  private static String normalizePresetName(String presetName) {
+    if (presetName == null) {
+      return "";
+    }
+    return presetName.trim().toLowerCase(Locale.ROOT);
   }
 
   private static void saveForgefileIfRequested(
       EffectiveInputs inputs, ProjectRequest request, List<String> extensionIds) {
     List<String> normalizedPresets = normalizePresets(inputs.presetInputs());
     Forgefile forgefile =
-        Forgefile.from(inputs.prefill(), normalizedPresets, inputs.extensionInputs());
+        inputs.template().withSelections(normalizedPresets, inputs.extensionInputs());
     if (inputs.writeLock()) {
       ForgefileLock lock =
           ForgefileLock.of(
@@ -373,6 +378,10 @@ public final class HeadlessGenerationService implements AutoCloseable {
       return;
     }
     ForgefileStore.save(writePath, forgefile);
+  }
+
+  private static List<String> safeSelections(List<String> values) {
+    return values == null ? List.of() : values;
   }
 
   private static Path resolveForgefileReadPath(String reference) {
@@ -396,7 +405,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
   }
 
   private record EffectiveInputs(
-      CliPrefill prefill,
+      Forgefile template,
       List<String> presetInputs,
       List<String> extensionInputs,
       Forgefile forgefile,

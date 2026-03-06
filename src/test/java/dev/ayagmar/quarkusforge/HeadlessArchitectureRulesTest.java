@@ -17,6 +17,7 @@ class HeadlessArchitectureRulesTest {
     "dev.ayagmar.quarkusforge.diagnostics..",
     "dev.ayagmar.quarkusforge.forge..",
     "dev.ayagmar.quarkusforge.headless..",
+    "dev.ayagmar.quarkusforge.persistence..",
     "dev.ayagmar.quarkusforge.util.."
   };
 
@@ -30,7 +31,7 @@ class HeadlessArchitectureRulesTest {
           .or()
           .haveSimpleName("GenerateCommand")
           .or()
-          .haveSimpleName("ProjectRequestFactory")
+          .haveSimpleName("InputResolutionService")
           .should()
           .onlyDependOnClassesThat()
           .resideOutsideOfPackages("dev.ayagmar.quarkusforge.ui..", "dev.tamboui..");
@@ -79,4 +80,19 @@ class HeadlessArchitectureRulesTest {
           .should()
           .dependOnClassesThat()
           .resideInAnyPackage("picocli..");
+
+  @ArchTest
+  static final ArchRule persistenceLayerDoesNotDependOnCliHeadlessRuntimeOrUi =
+      noClasses()
+          .that()
+          .resideInAnyPackage("dev.ayagmar.quarkusforge.persistence..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage(
+              "dev.ayagmar.quarkusforge.cli..",
+              "dev.ayagmar.quarkusforge.headless..",
+              "dev.ayagmar.quarkusforge.runtime..",
+              "dev.ayagmar.quarkusforge.ui..",
+              "picocli..",
+              "dev.tamboui..");
 }

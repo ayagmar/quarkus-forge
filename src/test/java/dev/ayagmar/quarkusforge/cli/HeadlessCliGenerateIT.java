@@ -191,7 +191,7 @@ class HeadlessCliGenerateIT {
         get(urlPathEqualTo("/q/openapi")).willReturn(aResponse().withStatus(200).withBody("{}")));
     stubSingleRestExtensionCatalog();
 
-    systemProperties.set(HEADLESS_CATALOG_TIMEOUT_PROPERTY, "50");
+    systemProperties.set(HEADLESS_CATALOG_TIMEOUT_PROPERTY, 50L);
 
     CliCommandTestSupport.CommandResult result =
         runHeadless("generate", "--dry-run", "--extension", "io.quarkus:quarkus-rest");
@@ -211,7 +211,7 @@ class HeadlessCliGenerateIT {
                     .withFixedDelay(500)
                     .withHeader("Content-Type", "application/zip")
                     .withBody(generatedZipPayload("hl-app"))));
-    systemProperties.set(HEADLESS_GENERATION_TIMEOUT_PROPERTY, "50");
+    systemProperties.set(HEADLESS_GENERATION_TIMEOUT_PROPERTY, 50L);
 
     CliCommandTestSupport.CommandResult result =
         runHeadless(
@@ -245,7 +245,7 @@ class HeadlessCliGenerateIT {
         get(urlPathEqualTo("/api/presets/stream/io.quarkus.platform%3A3.31"))
             .willReturn(aResponse().withFixedDelay(500).withStatus(200).withBody("[]")));
     CliCommandTestSupport.stubLiveMetadataWithAllBuildTools(wireMockServer);
-    systemProperties.set(HEADLESS_CATALOG_TIMEOUT_PROPERTY, "50");
+    systemProperties.set(HEADLESS_CATALOG_TIMEOUT_PROPERTY, 50L);
 
     CliCommandTestSupport.CommandResult result =
         runHeadless("generate", "--dry-run", "--preset", "web");
