@@ -72,6 +72,20 @@ class AsyncFailureHandlerTest {
   }
 
   @Test
+  void wrappedTimeoutPreservesConfiguredTimeoutMessage() {
+    int exitCode =
+        AsyncFailureHandler.handleFailure(
+            new CompletionException(new TimeoutException("timed out")),
+            timeout,
+            "test.op",
+            "Operation failed",
+            diagnostics);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.NETWORK);
+    assertThat(stderr.toString(StandardCharsets.UTF_8)).contains("timed out after 5000ms");
+  }
+
+  @Test
   void executionExceptionUnwrapsCauseAndMapsArchiveExitCode() {
     ExecutionException executionException =
         new ExecutionException(new ArchiveException("root failure"));

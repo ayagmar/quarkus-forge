@@ -48,14 +48,21 @@ public final class HeadlessOutputPrinter {
   }
 
   private static void printRequestFields(ProjectRequest request) {
-    System.out.println(" - groupId: " + request.groupId());
-    System.out.println(" - artifactId: " + request.artifactId());
-    System.out.println(" - version: " + request.version());
-    System.out.println(" - packageName: " + request.packageName());
-    System.out.println(" - outputDirectory: " + request.outputDirectory());
-    System.out.println(" - platformStream: " + request.platformStream());
-    System.out.println(" - buildTool: " + request.buildTool());
-    System.out.println(" - javaVersion: " + request.javaVersion());
+    printField("groupId", request.groupId());
+    printField("artifactId", request.artifactId());
+    printField("version", request.version());
+    printField("packageName", request.packageName());
+    printField("outputDirectory", request.outputDirectory());
+    printField("platformStream", request.platformStream());
+    printField("buildTool", request.buildTool());
+    printField("javaVersion", request.javaVersion());
+  }
+
+  private static void printField(String label, String value) {
+    if (value == null || value.isBlank()) {
+      return;
+    }
+    System.out.println(" - " + label + ": " + value);
   }
 
   public static Path resolveProjectDirectory(ProjectRequest request) {

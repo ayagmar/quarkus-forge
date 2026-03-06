@@ -153,6 +153,7 @@ class PostGenerationMenuStateTest {
       assertThat(state.isGithubVisibilityMenuVisible()).isFalse();
       assertThat(state.lastGeneratedProjectPath()).isNull();
       assertThat(state.exitPlan()).isNull();
+      assertThat(state.actionSelection()).isZero();
     }
 
     @Test

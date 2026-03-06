@@ -52,7 +52,7 @@ Actions:
 +
 [source,bash]
 ----
-java -jar target/quarkus-forge.jar --verbose
+java --enable-native-access=ALL-UNNAMED -jar target/quarkus-forge.jar --verbose
 ----
 . Check endpoint/network health. Forge will attempt to load from `~/.quarkus-forge/catalog-snapshot.json` as a fallback.
 
@@ -90,7 +90,7 @@ Actions:
 +
 [source,bash]
 ----
-java -jar target/quarkus-forge.jar \
+java --enable-native-access=ALL-UNNAMED -jar target/quarkus-forge.jar \
   --post-generate-hook="git init && git add . && git commit -m 'chore: init'"
 ----
 . Check exit code: the hook runs via your system shell. Any non-zero exit is reported as a failure.
@@ -124,7 +124,7 @@ Actions:
 [source,bash]
 ----
 export QUARKUS_FORGE_THEME=/absolute/path/to/my-theme.tcss
-java -jar target/quarkus-forge.jar
+java --enable-native-access=ALL-UNNAMED -jar target/quarkus-forge.jar
 ----
 . Verify token names and values in the file are valid (e.g., `base = #1e1e2e`). Invalid lines are silently ignored.
 
@@ -148,7 +148,7 @@ java -jar target/quarkus-forge-headless.jar generate --from Forgefile --lock
 
 [source,bash]
 ----
-java -jar target/quarkus-forge.jar --verbose --dry-run
+java --enable-native-access=ALL-UNNAMED -jar target/quarkus-forge.jar --verbose --dry-run
 ----
 
 This validates inputs, resolves catalog and metadata, and prints full diagnostics without generating any files.

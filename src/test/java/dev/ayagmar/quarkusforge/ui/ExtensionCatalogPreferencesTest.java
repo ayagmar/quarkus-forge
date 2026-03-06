@@ -89,6 +89,41 @@ class ExtensionCatalogPreferencesTest {
         NullPointerException.class, () -> preferences.recordRecentSelection(null));
   }
 
+  @Test
+  void normalizesStoredRecentsAndBoundsReselectionHistory() {
+    RecordingFavoritesStore store =
+        new RecordingFavoritesStore(
+            Set.of(),
+            List.of(
+                "rest",
+                "jdbc",
+                "rest",
+                "mongo",
+                "grpc",
+                "kafka",
+                "scheduler",
+                "security",
+                "mailer",
+                "oidc",
+                "smallrye"));
+    ExtensionCatalogPreferences preferences = new ExtensionCatalogPreferences(store, Runnable::run);
+
+    preferences.recordRecentSelection("jdbc");
+
+    assertThat(preferences.recentIdsView())
+        .containsExactly(
+            "jdbc",
+            "rest",
+            "mongo",
+            "grpc",
+            "kafka",
+            "scheduler",
+            "security",
+            "mailer",
+            "oidc",
+            "smallrye");
+  }
+
   private static final class RecordingFavoritesStore implements ExtensionFavoritesStore {
     private final Set<String> loadedFavorites;
     private final List<String> loadedRecents;

@@ -24,6 +24,7 @@ import org.junit.jupiter.api.parallel.ResourceLock;
 import org.junit.jupiter.api.parallel.Resources;
 
 @ResourceLock(Resources.SYSTEM_ERR)
+@ResourceLock(Resources.SYSTEM_PROPERTIES)
 class TuiBootstrapServiceTest {
   @TempDir Path tempDir;
 

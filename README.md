@@ -297,9 +297,11 @@ The codebase is organized into focused modules that follow SOLID principles and 
 
 ### Headless Layer (`headless/`)
 - **`HeadlessGenerationService`** — Decoupled headless generation engine for CI/scripting, resolving Forgefiles through `InputResolutionService`.
-- **`AsyncFailureHandler`** / **`BoundaryFailure`** — Shared boundary failure policy for consistent exit codes, diagnostics, and user-facing messages.
+- **`AsyncFailureHandler`** — Headless boundary adapter for consistent exit codes, diagnostics, and user-facing messages.
 - **`HeadlessCatalogClient`** — Timeout-aware catalog and preset loading plus archive generation orchestration.
 - **`HeadlessOutputPrinter`** — Text-mode summaries and validation/error output.
+
+Shared timeout/cancellation/failure classification is provided by `dev.ayagmar.quarkusforge.diagnostics.BoundaryFailure` and reused by headless and runtime code.
 
 ### Forge Layer (`forge/`)
 - **`ForgefileStore`** — Forgefile persistence with omission-preserving top-level template fields.

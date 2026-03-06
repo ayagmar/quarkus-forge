@@ -160,6 +160,23 @@ class ForgefileStoreTest {
   }
 
   @Test
+  void loadWrongFieldTypeThrowsParseErrorWithFileContext() throws Exception {
+    Path file = tempDir.resolve("bad-field.json");
+    Files.writeString(
+        file,
+        """
+        {
+          "artifactId": ["wrong-type"]
+        }
+        """);
+
+    assertThatThrownBy(() -> ForgefileStore.load(file))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Failed to parse Forgefile '")
+        .hasMessageContaining("bad-field.json");
+  }
+
+  @Test
   void saveDirectoryTargetThrowsWriteError() throws Exception {
     Path directoryTarget = tempDir.resolve("existing-directory");
     Files.createDirectory(directoryTarget);

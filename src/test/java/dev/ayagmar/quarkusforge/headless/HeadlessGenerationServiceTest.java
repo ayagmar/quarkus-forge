@@ -28,7 +28,10 @@ import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.Resources;
 
+@ResourceLock(Resources.SYSTEM_PROPERTIES)
 class HeadlessGenerationServiceTest {
   private static final String HEADLESS_GENERATION_TIMEOUT_PROPERTY =
       "quarkus.forge.headless.generation-timeout-ms";
@@ -255,6 +258,18 @@ class HeadlessGenerationServiceTest {
     int exitCode = service.run(command, false, false);
 
     assertThat(exitCode).isEqualTo(ExitCodes.NETWORK);
+    assertThat(client.lastPresetPlatformStream).isEqualTo("io.quarkus.platform:3.31");
+  }
+
+  @Test
+  void synchronousGenerationStartFailureReturnsInternalExitCode() {
+    StubCatalogOperations client = new StubCatalogOperations();
+    client.startGenerationFailure = new IllegalStateException("boom");
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+
+    int exitCode = service.run(commandWithOutput(), false, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.INTERNAL);
   }
 
   @Test
@@ -404,6 +419,22 @@ class HeadlessGenerationServiceTest {
     assertThat(root).doesNotContainKeys("groupId", "version", "outputDirectory", "buildTool");
   }
 
+  @Test
+  void saveAsFailureReturnsInternalExitCode() {
+    Path directoryTarget = tempDir.resolve("forgefile-dir");
+    directoryTarget.toFile().mkdirs();
+
+    StubCatalogOperations client = new StubCatalogOperations();
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+
+    GenerateCommand command = commandWithOutput();
+    command.setSaveAsFile(directoryTarget.toString());
+
+    int exitCode = service.run(command, true, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.INTERNAL);
+  }
+
   private GenerateCommand commandWithOutput() {
     GenerateCommand cmd = new GenerateCommand();
     cmd.setCliPrefill(
@@ -423,8 +454,8 @@ class HeadlessGenerationServiceTest {
     return new RuntimeConfig(
         java.net.URI.create("https://code.quarkus.io"),
         tempDir.resolve("cache.json"),
-        tempDir.resolve("preferences.json"),
-        tempDir.resolve("favorites.json"));
+        tempDir.resolve("favorites.json"),
+        tempDir.resolve("preferences.json"));
   }
 
   private static final class StubCatalogOperations implements HeadlessCatalogOperations {
@@ -433,7 +464,9 @@ class HeadlessGenerationServiceTest {
     TimeoutException presetLoadTimeout;
     CompletableFuture<Path> generationFuture =
         CompletableFuture.completedFuture(Path.of("output/demo-app"));
+    RuntimeException startGenerationFailure;
     int startGenerationCalls;
+    String lastPresetPlatformStream;
 
     @Override
     public CatalogData loadCatalogData(Duration timeout)
@@ -450,6 +483,7 @@ class HeadlessGenerationServiceTest {
     @Override
     public Map<String, List<String>> loadBuiltInPresets(String platformStream, Duration timeout)
         throws ExecutionException, InterruptedException, TimeoutException {
+      lastPresetPlatformStream = platformStream;
       if (presetLoadTimeout != null) {
         throw presetLoadTimeout;
       }
@@ -461,6 +495,9 @@ class HeadlessGenerationServiceTest {
         GenerationRequest generationRequest,
         Path outputPath,
         Consumer<String> progressLineConsumer) {
+      if (startGenerationFailure != null) {
+        throw startGenerationFailure;
+      }
       startGenerationCalls++;
       return generationFuture;
     }

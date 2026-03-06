@@ -39,7 +39,7 @@ TIP: A https://github.com/casey/just[justfile] is included with common recipes. 
 | Interactive exploration | `quarkus-forge.jar` | Includes the full TUI
 | CI / container automation | `quarkus-forge-headless.jar` | Smaller and avoids TUI dependencies
 | One local developer artifact | `quarkus-forge.jar` | Supports both TUI and `generate`
-| Smallest runtime footprint | native binary | No JVM required at runtime
+| Smallest runtime footprint | native binary | No JVM required at runtime (build separately with GraalVM Native Image prerequisites)
 |===
 
 TUI mode (interactive):
@@ -135,6 +135,8 @@ source target/completions/quarkus-forge-headless.bash
 ----
 
 == Release Checksums
+
+For locally built release jars in `target/`:
 
 Generate `.sha256` files for the release jars:
 

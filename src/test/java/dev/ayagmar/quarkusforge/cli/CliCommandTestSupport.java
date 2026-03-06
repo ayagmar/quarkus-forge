@@ -28,18 +28,19 @@ public final class CliCommandTestSupport {
   }
 
   public static CommandResult runCommand(RuntimeConfig runtimeConfig, String... args) {
-    return captureCommandOutput(() -> QuarkusForgeCli.runWithArgs(args, runtimeConfig));
+    return captureCommandOutputUnchecked(() -> QuarkusForgeCli.runWithArgs(args, runtimeConfig));
   }
 
   public static CommandResult runHeadlessCommand(RuntimeConfig runtimeConfig, String... args) {
-    return captureCommandOutput(() -> HeadlessCli.runWithArgs(args, runtimeConfig));
+    return captureCommandOutputUnchecked(() -> HeadlessCli.runWithArgs(args, runtimeConfig));
   }
 
   public static CommandResult runSmoke(RuntimeConfig runtimeConfig, boolean verbose) {
-    return captureCommandOutput(() -> new QuarkusForgeCli(runtimeConfig).runSmokeForTest(verbose));
+    return captureCommandOutputUnchecked(
+        () -> new QuarkusForgeCli(runtimeConfig).runSmokeForTest(verbose));
   }
 
-  private static CommandResult captureCommandOutput(Callable<Integer> action) {
+  static CommandResult captureCommandOutput(Callable<Integer> action) throws Exception {
     synchronized (STREAM_LOCK) {
       PrintStream originalOut = System.out;
       PrintStream originalErr = System.err;
@@ -53,12 +54,23 @@ public final class CliCommandTestSupport {
             exitCode,
             stdout.toString(StandardCharsets.UTF_8),
             stderr.toString(StandardCharsets.UTF_8));
-      } catch (Exception exception) {
-        throw new RuntimeException(exception);
       } finally {
         System.setOut(originalOut);
         System.setErr(originalErr);
       }
+    }
+  }
+
+  private static CommandResult captureCommandOutputUnchecked(Callable<Integer> action) {
+    try {
+      return captureCommandOutput(action);
+    } catch (InterruptedException interruptedException) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(interruptedException);
+    } catch (RuntimeException runtimeException) {
+      throw runtimeException;
+    } catch (Exception exception) {
+      throw new RuntimeException(exception);
     }
   }
 

@@ -115,25 +115,26 @@ final class UrlConnectionTransport implements ApiTransport {
     }
     HttpURLConnection connection = connectionFactory.open(request.uri());
     connectionReference.set(connection);
-    if (Thread.currentThread().isInterrupted() || responseFuture.isCancelled()) {
-      disconnectQuietly(connection);
-      throw new CancellationException("Request was cancelled before response handling");
-    }
-    connection.setRequestMethod("GET");
-    connection.setRequestProperty("Accept", request.acceptHeader());
-    long timeoutMillisLong = Math.max(1L, request.timeout().toMillis());
-    int timeoutMillis = Math.toIntExact(Math.min(Integer.MAX_VALUE, timeoutMillisLong));
-    connection.setConnectTimeout(timeoutMillis);
-    connection.setReadTimeout(timeoutMillis);
+    try {
+      if (Thread.currentThread().isInterrupted() || responseFuture.isCancelled()) {
+        throw new CancellationException("Request was cancelled before response handling");
+      }
+      connection.setRequestMethod("GET");
+      connection.setRequestProperty("Accept", request.acceptHeader());
+      long timeoutMillisLong = Math.max(1L, request.timeout().toMillis());
+      int timeoutMillis = Math.toIntExact(Math.min(Integer.MAX_VALUE, timeoutMillisLong));
+      connection.setConnectTimeout(timeoutMillis);
+      connection.setReadTimeout(timeoutMillis);
 
-    int statusCode = connection.getResponseCode();
-    Map<String, List<String>> headers =
-        connection.getHeaderFields() == null ? Map.of() : connection.getHeaderFields();
+      int statusCode = connection.getResponseCode();
+      Map<String, List<String>> headers =
+          connection.getHeaderFields() == null ? Map.of() : connection.getHeaderFields();
 
-    try (InputStream inputStream = openBodyStream(connection, statusCode)) {
-      return responseReader.read(statusCode, headers, inputStream);
+      try (InputStream inputStream = openBodyStream(connection, statusCode)) {
+        return responseReader.read(statusCode, headers, inputStream);
+      }
     } finally {
-      connection.disconnect();
+      disconnectQuietly(connection);
     }
   }
 
