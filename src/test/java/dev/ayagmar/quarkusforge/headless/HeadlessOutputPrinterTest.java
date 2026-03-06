@@ -18,6 +18,7 @@ import org.junit.jupiter.api.parallel.Resources;
 
 @ResourceLock(Resources.SYSTEM_OUT)
 @ResourceLock(Resources.SYSTEM_ERR)
+@ResourceLock(Resources.SYSTEM_PROPERTIES)
 class HeadlessOutputPrinterTest {
   private PrintStream originalOut;
   private PrintStream originalErr;
@@ -198,5 +199,25 @@ class HeadlessOutputPrinterTest {
     Path resolved = HeadlessOutputPrinter.resolveProjectDirectory(request);
 
     assertThat(resolved.getFileName().toString()).isEqualTo("my-app");
+  }
+
+  @Test
+  void resolveProjectDirectoryExpandsTildeAgainstUserHome() {
+    String originalUserHome = System.getProperty("user.home");
+    System.setProperty("user.home", Path.of("/tmp/test-home").toString());
+    try {
+      ProjectRequest request =
+          new ProjectRequest("org.acme", "my-app", "1.0.0", "", "~/Projects", "", "maven", "25");
+
+      Path resolved = HeadlessOutputPrinter.resolveProjectDirectory(request);
+
+      assertThat(resolved).isEqualTo(Path.of("/tmp/test-home/Projects/my-app"));
+    } finally {
+      if (originalUserHome == null) {
+        System.clearProperty("user.home");
+      } else {
+        System.setProperty("user.home", originalUserHome);
+      }
+    }
   }
 }

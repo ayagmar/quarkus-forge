@@ -41,14 +41,21 @@ public final class HeadlessCatalogClient implements HeadlessCatalogOperations {
 
   public CatalogData loadCatalogData(Duration timeout)
       throws ExecutionException, InterruptedException, TimeoutException {
-    CatalogDataService catalogDataService =
-        new CatalogDataService(
-            apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
+    CatalogSnapshotCache snapshotCache = new CatalogSnapshotCache(runtimeConfig.catalogCacheFile());
+    CatalogDataService catalogDataService = new CatalogDataService(apiClient, snapshotCache);
     CompletableFuture<CatalogData> loadFuture = catalogDataService.load();
     try {
       return loadFuture.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
     } catch (TimeoutException timeoutException) {
       loadFuture.cancel(true);
+      CatalogData cachedCatalog =
+          catalogDataService
+              .fallbackToCachedSnapshot(
+                  "Live catalog unavailable (timed out after " + timeout.toMillis() + "ms)")
+              .orElse(null);
+      if (cachedCatalog != null) {
+        return cachedCatalog;
+      }
       TimeoutException wrapped =
           new TimeoutException("catalog load timed out after " + timeout.toMillis() + "ms");
       wrapped.initCause(timeoutException);
