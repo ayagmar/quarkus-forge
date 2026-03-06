@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import re
+from collections.abc import Sequence
 from pathlib import Path
 
 
@@ -18,7 +19,7 @@ LEFT_ORIGIN_PATTERN = re.compile(
 )
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--label", required=True)
     parser.add_argument("--binary", required=True, type=Path)
@@ -26,7 +27,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--log", required=True, type=Path)
     parser.add_argument("--max-bytes", required=True, type=int)
     parser.add_argument("--top-count", type=int, default=5)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.max_bytes < 0:
         parser.error("--max-bytes must be >= 0")
     if args.top_count < 1:
@@ -75,8 +76,8 @@ def format_bytes(size_bytes: int) -> str:
     return f"{size_bytes / (1024 * 1024):.2f} MiB"
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: Sequence[str] | None = None) -> None:
+    args = parse_args(argv)
     require_file(args.binary)
     require_file(args.report)
     require_file(args.log)
