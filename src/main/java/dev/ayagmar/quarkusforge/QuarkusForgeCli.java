@@ -2,8 +2,6 @@ package dev.ayagmar.quarkusforge;
 
 import static dev.ayagmar.quarkusforge.diagnostics.DiagnosticField.of;
 
-import dev.ayagmar.quarkusforge.api.CatalogDataService;
-import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
 import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
@@ -14,7 +12,6 @@ import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
 import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
-import dev.ayagmar.quarkusforge.runtime.CatalogLoadDiagnostics;
 import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
 import dev.ayagmar.quarkusforge.runtime.TuiBootstrapService;
 import dev.ayagmar.quarkusforge.runtime.TuiSessionSummary;
@@ -83,6 +80,9 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
       description = "Shell command executed in generated project directory after TUI exits")
   private String postGenerateHookCommand;
 
+  private record StartupState(
+      ForgeUiState initialState, StartupMetadataSelection metadataSelection) {}
+
   public QuarkusForgeCli() {
     this(RuntimeConfig.defaults());
   }
@@ -101,14 +101,9 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
     if (!dryRun) {
       applyStoredRequestDefaults(requestOptions, preferencesStore.loadLastRequest());
     }
-    ProjectRequest request = ProjectRequestFactory.fromOptions(requestOptions);
-    StartupMetadataSelection startupMetadataSelection = loadStartupMetadataSelection(diagnostics);
-    ProjectRequest requestWithResolvedStream =
-        ProjectRequestFactory.applyRecommendedPlatformStream(
-            request, startupMetadataSelection.metadataCompatibility());
-    ForgeUiState initialState =
-        ProjectRequestFactory.buildInitialState(
-            requestWithResolvedStream, startupMetadataSelection.metadataCompatibility());
+    StartupState startupState = loadStartupState(requestOptions, diagnostics);
+    StartupMetadataSelection startupMetadataSelection = startupState.metadataSelection();
+    ForgeUiState initialState = startupState.initialState();
     if (!initialState.canSubmit() && shouldBlockOnStartupValidation(dryRun)) {
       diagnostics.error(
           "cli.validation.failed", of("errorCount", initialState.validation().errors().size()));
@@ -168,14 +163,9 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
     DiagnosticLogger diagnostics = DiagnosticLogger.create(verbose);
     diagnostics.info("cli.start", of("mode", "smoke-test"));
 
-    ProjectRequest request = ProjectRequestFactory.fromOptions(defaultRequestOptions());
-    StartupMetadataSelection startupMetadataSelection = loadStartupMetadataSelection(diagnostics);
-    ProjectRequest requestWithResolvedStream =
-        ProjectRequestFactory.applyRecommendedPlatformStream(
-            request, startupMetadataSelection.metadataCompatibility());
-    ForgeUiState initialState =
-        ProjectRequestFactory.buildInitialState(
-            requestWithResolvedStream, startupMetadataSelection.metadataCompatibility());
+    StartupState startupState = loadStartupState(defaultRequestOptions(), diagnostics);
+    StartupMetadataSelection startupMetadataSelection = startupState.metadataSelection();
+    ForgeUiState initialState = startupState.initialState();
     if (!initialState.canSubmit()) {
       diagnostics.error(
           "cli.validation.failed", of("errorCount", initialState.validation().errors().size()));
@@ -186,7 +176,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
       return ExitCodes.VALIDATION;
     }
 
-    runHeadlessSmoke(runtimeConfig, diagnostics);
+    TuiBootstrapService.runHeadlessSmoke(runtimeConfig, diagnostics);
     return ExitCodes.OK;
   }
 
@@ -282,19 +272,17 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
     return current;
   }
 
-  static void runHeadlessSmoke(RuntimeConfig runtimeConfig, DiagnosticLogger diagnostics) {
-    diagnostics.info("tui.session.start", of("smokeMode", true), of("mode", "headless-smoke"));
-    try (QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri())) {
-      CatalogDataService catalogDataService =
-          new CatalogDataService(
-              apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
-      diagnostics.info("catalog.load.start", of("mode", "tui"));
-      catalogDataService
-          .load()
-          .handle(CatalogLoadDiagnostics.catalogLoadDiagnostics(diagnostics))
-          .join();
-      diagnostics.info("tui.session.exit", of("outcome", "completed"));
-    }
+  private StartupState loadStartupState(
+      RequestOptions requestOptions, DiagnosticLogger diagnostics) {
+    ProjectRequest request = ProjectRequestFactory.fromOptions(requestOptions);
+    StartupMetadataSelection startupMetadataSelection = loadStartupMetadataSelection(diagnostics);
+    ProjectRequest requestWithResolvedStream =
+        ProjectRequestFactory.applyRecommendedPlatformStream(
+            request, startupMetadataSelection.metadataCompatibility());
+    ForgeUiState initialState =
+        ProjectRequestFactory.buildInitialState(
+            requestWithResolvedStream, startupMetadataSelection.metadataCompatibility());
+    return new StartupState(initialState, startupMetadataSelection);
   }
 
   private StartupMetadataSelection loadStartupMetadataSelection(DiagnosticLogger diagnostics) {

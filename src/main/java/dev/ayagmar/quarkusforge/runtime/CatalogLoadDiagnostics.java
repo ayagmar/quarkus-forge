@@ -13,11 +13,11 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionException;
 import java.util.function.BiFunction;
 
-public final class CatalogLoadDiagnostics {
+final class CatalogLoadDiagnostics {
   private CatalogLoadDiagnostics() {}
 
-  public static BiFunction<CatalogData, Throwable, ExtensionCatalogLoadResult>
-      catalogLoadDiagnostics(DiagnosticLogger diagnostics) {
+  static BiFunction<CatalogData, Throwable, ExtensionCatalogLoadResult> catalogLoadDiagnostics(
+      DiagnosticLogger diagnostics) {
     return (catalogData, throwable) -> {
       if (throwable == null) {
         diagnostics.info(

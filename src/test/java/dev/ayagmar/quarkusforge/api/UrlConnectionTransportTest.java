@@ -157,7 +157,7 @@ class UrlConnectionTransportTest {
     connection.responseCodeHook =
         () -> {
           responseStarted.countDown();
-          await(disconnected);
+          awaitDisconnectionOrInterruption(disconnected);
         };
     connection.disconnectHook = disconnected::countDown;
     UrlConnectionTransport transport =
@@ -204,14 +204,13 @@ class UrlConnectionTransportTest {
         .hasCauseInstanceOf(RejectedExecutionException.class);
   }
 
-  private static void await(CountDownLatch latch) {
+  private static void awaitDisconnectionOrInterruption(CountDownLatch latch) {
     try {
       if (!latch.await(1, TimeUnit.SECONDS)) {
         throw new AssertionError("Timed out waiting on latch");
       }
     } catch (InterruptedException interruptedException) {
       Thread.currentThread().interrupt();
-      throw new AssertionError("Interrupted while waiting on latch", interruptedException);
     }
   }
 
