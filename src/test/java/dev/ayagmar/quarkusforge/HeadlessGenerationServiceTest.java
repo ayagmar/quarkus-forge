@@ -44,7 +44,7 @@ class HeadlessGenerationServiceTest {
 
   @Test
   void dryRunSkipsGenerationExecution() {
-    StubCatalogClient client = new StubCatalogClient();
+    StubCatalogOperations client = new StubCatalogOperations();
     HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
     GenerateCommand command = commandWithOutput();
@@ -56,7 +56,7 @@ class HeadlessGenerationServiceTest {
 
   @Test
   void generationTimeoutCancelsRunningFuture() {
-    StubCatalogClient client = new StubCatalogClient();
+    StubCatalogOperations client = new StubCatalogOperations();
     client.generationFuture = new CompletableFuture<>();
     HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
@@ -72,7 +72,7 @@ class HeadlessGenerationServiceTest {
 
   @Test
   void catalogTimeoutReturnsNetworkExitCodeBeforeValidation() {
-    StubCatalogClient client = new StubCatalogClient();
+    StubCatalogOperations client = new StubCatalogOperations();
     client.catalogLoadTimeout = new TimeoutException("timeout");
     HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
@@ -85,7 +85,7 @@ class HeadlessGenerationServiceTest {
 
   @Test
   void catalogCancellationReturnsCancelledExitCode() {
-    StubCatalogClient client = new StubCatalogClient();
+    StubCatalogOperations client = new StubCatalogOperations();
     client.catalogLoadCancellation = new java.util.concurrent.CancellationException("cancelled");
     HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
@@ -97,7 +97,7 @@ class HeadlessGenerationServiceTest {
 
   @Test
   void validationFailureReturnsValidationExitCode() {
-    StubCatalogClient client = new StubCatalogClient();
+    StubCatalogOperations client = new StubCatalogOperations();
     HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
     GenerateCommand command = commandWithOutput();
@@ -109,7 +109,7 @@ class HeadlessGenerationServiceTest {
 
   @Test
   void unknownExtensionReturnsValidationExitCode() {
-    StubCatalogClient client = new StubCatalogClient();
+    StubCatalogOperations client = new StubCatalogOperations();
     HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
     GenerateCommand command = commandWithOutput();
@@ -121,7 +121,7 @@ class HeadlessGenerationServiceTest {
 
   @Test
   void generationExecutionFailureReturnsCorrectExitCode() {
-    StubCatalogClient client = new StubCatalogClient();
+    StubCatalogOperations client = new StubCatalogOperations();
     client.generationFuture =
         CompletableFuture.failedFuture(
             new dev.ayagmar.quarkusforge.api.ApiClientException("connection refused", null));
@@ -135,7 +135,7 @@ class HeadlessGenerationServiceTest {
 
   @Test
   void verboseModeEmitsDiagnostics() {
-    StubCatalogClient client = new StubCatalogClient();
+    StubCatalogOperations client = new StubCatalogOperations();
     HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
     GenerateCommand command = commandWithOutput();
@@ -147,7 +147,7 @@ class HeadlessGenerationServiceTest {
 
   @Test
   void blankExtensionInputReturnsValidationExitCode() {
-    StubCatalogClient client = new StubCatalogClient();
+    StubCatalogOperations client = new StubCatalogOperations();
     HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
     GenerateCommand command = commandWithOutput();
@@ -168,7 +168,7 @@ class HeadlessGenerationServiceTest {
         {"extensions":["io.quarkus:quarkus-rest"]}
         """);
 
-    StubCatalogClient client = new StubCatalogClient();
+    StubCatalogOperations client = new StubCatalogOperations();
     HeadlessGenerationService service = new HeadlessGenerationService(client, config);
 
     GenerateCommand command = commandWithOutput();
@@ -180,7 +180,7 @@ class HeadlessGenerationServiceTest {
 
   @Test
   void builtInPresetResolvesExtensions() {
-    StubCatalogClient client = new StubCatalogClient();
+    StubCatalogOperations client = new StubCatalogOperations();
     HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
     GenerateCommand command = commandWithOutput();
@@ -193,7 +193,7 @@ class HeadlessGenerationServiceTest {
 
   @Test
   void unknownPresetReturnsValidationExitCode() {
-    StubCatalogClient client = new StubCatalogClient();
+    StubCatalogOperations client = new StubCatalogOperations();
     HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
     GenerateCommand command = commandWithOutput();
@@ -205,7 +205,7 @@ class HeadlessGenerationServiceTest {
 
   @Test
   void blankPresetInputIsSkipped() {
-    StubCatalogClient client = new StubCatalogClient();
+    StubCatalogOperations client = new StubCatalogOperations();
     HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
     GenerateCommand command = commandWithOutput();
@@ -217,7 +217,7 @@ class HeadlessGenerationServiceTest {
 
   @Test
   void presetLoadFailureReturnsNetworkExitCode() {
-    StubCatalogClient client = new StubCatalogClient();
+    StubCatalogOperations client = new StubCatalogOperations();
     client.presetLoadTimeout = new TimeoutException("presets timeout");
     HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
@@ -230,7 +230,7 @@ class HeadlessGenerationServiceTest {
 
   @Test
   void lockWithoutFromOrSaveAsReturnsValidation() {
-    StubCatalogClient client = new StubCatalogClient();
+    StubCatalogOperations client = new StubCatalogOperations();
     HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
     GenerateCommand command = commandWithOutput();
@@ -243,7 +243,7 @@ class HeadlessGenerationServiceTest {
 
   @Test
   void lockCheckWithoutFromReturnsValidation() {
-    StubCatalogClient client = new StubCatalogClient();
+    StubCatalogOperations client = new StubCatalogOperations();
     HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
     GenerateCommand command = commandWithOutput();
@@ -272,7 +272,7 @@ class HeadlessGenerationServiceTest {
         }
         """);
 
-    StubCatalogClient client = new StubCatalogClient();
+    StubCatalogOperations client = new StubCatalogOperations();
     HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
     GenerateCommand command = commandWithOutput();
@@ -286,7 +286,7 @@ class HeadlessGenerationServiceTest {
   void saveAsWritesForgefileOnDryRun() throws Exception {
     java.nio.file.Path saveAsPath = tempDir.resolve("saved.forgefile.json");
 
-    StubCatalogClient client = new StubCatalogClient();
+    StubCatalogOperations client = new StubCatalogOperations();
     HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
     GenerateCommand command = commandWithOutput();
@@ -319,7 +319,7 @@ class HeadlessGenerationServiceTest {
         tempDir.resolve("favorites.json"));
   }
 
-  private static final class StubCatalogClient extends HeadlessCatalogClient {
+  private static final class StubCatalogOperations implements HeadlessCatalogOperations {
     TimeoutException catalogLoadTimeout;
     java.util.concurrent.CancellationException catalogLoadCancellation;
     TimeoutException presetLoadTimeout;
@@ -327,12 +327,8 @@ class HeadlessGenerationServiceTest {
         CompletableFuture.completedFuture(Path.of("output/demo-app"));
     int startGenerationCalls;
 
-    StubCatalogClient() {
-      // Use the no-arg constructor: no real HttpClient is created.
-    }
-
     @Override
-    CatalogData loadCatalogData(Duration timeout)
+    public CatalogData loadCatalogData(Duration timeout)
         throws ExecutionException, InterruptedException, TimeoutException {
       if (catalogLoadTimeout != null) {
         throw catalogLoadTimeout;
@@ -344,7 +340,7 @@ class HeadlessGenerationServiceTest {
     }
 
     @Override
-    Map<String, List<String>> loadBuiltInPresets(String platformStream, Duration timeout)
+    public Map<String, List<String>> loadBuiltInPresets(String platformStream, Duration timeout)
         throws ExecutionException, InterruptedException, TimeoutException {
       if (presetLoadTimeout != null) {
         throw presetLoadTimeout;
@@ -353,12 +349,15 @@ class HeadlessGenerationServiceTest {
     }
 
     @Override
-    CompletableFuture<Path> startGeneration(
+    public CompletableFuture<Path> startGeneration(
         GenerationRequest generationRequest,
         Path outputPath,
         Consumer<String> progressLineConsumer) {
       startGenerationCalls++;
       return generationFuture;
     }
+
+    @Override
+    public void close() {}
   }
 }

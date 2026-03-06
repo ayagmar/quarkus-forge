@@ -33,6 +33,8 @@ import org.junit.jupiter.api.io.TempDir;
 class HeadlessCliGenerateIT {
   private static final String HEADLESS_CATALOG_TIMEOUT_PROPERTY =
       "quarkus.forge.headless.catalog-timeout-ms";
+  private static final String HEADLESS_GENERATION_TIMEOUT_PROPERTY =
+      "quarkus.forge.headless.generation-timeout-ms";
 
   @RegisterExtension final SystemPropertyExtension systemProperties = new SystemPropertyExtension();
 
@@ -44,6 +46,8 @@ class HeadlessCliGenerateIT {
   void setUp() {
     wireMockServer = new WireMockServer(0);
     wireMockServer.start();
+    com.github.tomakehurst.wiremock.client.WireMock.configureFor(
+        "localhost", wireMockServer.port());
   }
 
   @AfterEach
@@ -191,6 +195,60 @@ class HeadlessCliGenerateIT {
 
     CliCommandTestSupport.CommandResult result =
         runHeadless("generate", "--dry-run", "--extension", "io.quarkus:quarkus-rest");
+
+    assertThat(result.exitCode()).isEqualTo(ExitCodes.NETWORK);
+    assertThat(result.standardError()).contains("timed out");
+  }
+
+  @Test
+  void generationTimeoutReturnsNetworkExitCode() throws Exception {
+    stubCatalogEndpoints();
+    wireMockServer.stubFor(
+        get(urlPathEqualTo("/api/download"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withFixedDelay(500)
+                    .withHeader("Content-Type", "application/zip")
+                    .withBody(generatedZipPayload("hl-app"))));
+    systemProperties.set(HEADLESS_GENERATION_TIMEOUT_PROPERTY, "50");
+
+    CliCommandTestSupport.CommandResult result =
+        runHeadless(
+            "generate",
+            "--group-id",
+            "com.example",
+            "--artifact-id",
+            "hl-app",
+            "--output-dir",
+            tempDir.resolve("output").toString(),
+            "--extension",
+            "io.quarkus:quarkus-rest");
+
+    assertThat(result.exitCode()).isEqualTo(ExitCodes.NETWORK);
+    assertThat(result.standardError()).contains("timed out");
+  }
+
+  @Test
+  void presetLoadTimeoutReturnsNetworkExitCode() {
+    wireMockServer.stubFor(
+        get(urlPathEqualTo("/api/extensions"))
+            .willReturn(
+                okJson(
+                    """
+                    [
+                      {"id":"io.quarkus:quarkus-rest","name":"REST","shortName":"rest"},
+                      {"id":"io.quarkus:quarkus-arc","name":"CDI","shortName":"cdi"}
+                    ]
+                    """)));
+    wireMockServer.stubFor(
+        get(urlPathEqualTo("/api/presets/stream/io.quarkus.platform%3A3.31"))
+            .willReturn(aResponse().withFixedDelay(500).withStatus(200).withBody("[]")));
+    CliCommandTestSupport.stubLiveMetadataWithAllBuildTools();
+    systemProperties.set(HEADLESS_CATALOG_TIMEOUT_PROPERTY, "50");
+
+    CliCommandTestSupport.CommandResult result =
+        runHeadless("generate", "--dry-run", "--preset", "web");
 
     assertThat(result.exitCode()).isEqualTo(ExitCodes.NETWORK);
     assertThat(result.standardError()).contains("timed out");

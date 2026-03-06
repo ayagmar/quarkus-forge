@@ -24,7 +24,7 @@ import java.util.function.Consumer;
  * single {@link QuarkusApiClient} across all calls within one generation session. Must be closed
  * after use to release transport resources.
  */
-class HeadlessCatalogClient implements AutoCloseable {
+class HeadlessCatalogClient implements HeadlessCatalogOperations {
   private final RuntimeConfig runtimeConfig;
   private final QuarkusApiClient apiClient;
 
@@ -33,23 +33,12 @@ class HeadlessCatalogClient implements AutoCloseable {
     this.apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
   }
 
-  /**
-   * Constructor for subclasses that override all methods and manage their own resources. Does not
-   * create a {@link QuarkusApiClient}; {@link #close()} is a no-op for this path.
-   */
-  HeadlessCatalogClient() {
-    this.runtimeConfig = null;
-    this.apiClient = null;
-  }
-
   @Override
   public void close() {
-    if (apiClient != null) {
-      apiClient.close();
-    }
+    apiClient.close();
   }
 
-  CatalogData loadCatalogData(Duration timeout)
+  public CatalogData loadCatalogData(Duration timeout)
       throws ExecutionException, InterruptedException, TimeoutException {
     CatalogDataService catalogDataService =
         new CatalogDataService(
@@ -66,7 +55,7 @@ class HeadlessCatalogClient implements AutoCloseable {
     }
   }
 
-  Map<String, List<String>> loadBuiltInPresets(String platformStream, Duration timeout)
+  public Map<String, List<String>> loadBuiltInPresets(String platformStream, Duration timeout)
       throws ExecutionException, InterruptedException, TimeoutException {
     CompletableFuture<Map<String, List<String>>> presetsFuture =
         apiClient.fetchPresets(platformStream);
@@ -81,7 +70,7 @@ class HeadlessCatalogClient implements AutoCloseable {
     }
   }
 
-  CompletableFuture<Path> startGeneration(
+  public CompletableFuture<Path> startGeneration(
       GenerationRequest generationRequest, Path outputPath, Consumer<String> progressLineConsumer) {
     ProjectArchiveService archiveService =
         new ProjectArchiveService(apiClient, new SafeZipExtractor());
