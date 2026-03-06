@@ -47,6 +47,10 @@ Desktop.ini
 hs_err_pid*
 replay_pid*
 
+# ── Python ─────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+
 # ── Node / docs-site tooling ──────────────────────────
 /site/node_modules/
 /site/build/
