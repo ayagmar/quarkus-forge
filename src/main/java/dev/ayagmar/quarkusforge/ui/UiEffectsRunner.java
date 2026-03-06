@@ -5,34 +5,32 @@ import java.util.List;
 /** Executes reducer-emitted effects by invoking controller-owned imperative operations. */
 final class UiEffectsRunner {
 
-  void run(List<UiEffect> effects, CoreTuiController controller) {
+  void run(List<UiEffect> effects, UiEffectsPort effectsPort) {
     for (UiEffect effect : effects) {
-      run(effect, controller);
+      run(effect, effectsPort);
     }
   }
 
-  private static void run(UiEffect effect, CoreTuiController controller) {
+  private static void run(UiEffect effect, UiEffectsPort effectsPort) {
     switch (effect) {
       case UiEffect.StartCatalogLoad catalogLoadEffect ->
-          controller.startCatalogLoadForReducer(catalogLoadEffect.loader());
-      case UiEffect.RequestCatalogReload _ -> controller.requestCatalogReloadForReducer();
-      case UiEffect.PrepareForGeneration _ -> controller.prepareForGenerationForReducer();
-      case UiEffect.CancelPendingAsync _ -> controller.cancelPendingAsyncForReducer();
-      case UiEffect.ExportRecipeAndLock _ -> controller.exportRecipeAndLockForReducer();
+          effectsPort.startCatalogLoad(catalogLoadEffect.loader());
+      case UiEffect.RequestCatalogReload _ -> effectsPort.requestCatalogReload();
+      case UiEffect.PrepareForGeneration _ -> effectsPort.prepareForGeneration();
+      case UiEffect.CancelPendingAsync _ -> effectsPort.cancelPendingAsync();
+      case UiEffect.ExportRecipeAndLock _ -> effectsPort.exportRecipeAndLock();
       case UiEffect.ApplyCatalogLoadSuccess successEffect ->
-          controller.applyCatalogLoadSuccessForReducer(successEffect.success());
-      case UiEffect.StartGeneration _ -> controller.startGenerationForReducer();
+          effectsPort.applyCatalogLoadSuccess(successEffect.success());
+      case UiEffect.StartGeneration _ -> effectsPort.startGeneration();
       case UiEffect.TransitionGenerationState transitionEffect ->
-          controller.transitionGenerationStateForReducer(transitionEffect.targetState());
-      case UiEffect.RequestGenerationCancellation _ ->
-          controller.requestGenerationCancellationForReducer();
-      case UiEffect.RequestAsyncRepaint _ -> controller.requestAsyncRepaintForReducer();
+          effectsPort.transitionGenerationState(transitionEffect.targetState());
+      case UiEffect.RequestGenerationCancellation _ -> effectsPort.requestGenerationCancellation();
+      case UiEffect.RequestAsyncRepaint _ -> effectsPort.requestAsyncRepaint();
       case UiEffect.ApplyMetadataSelectorKey selectorEffect ->
-          controller.applyMetadataSelectorKeyForReducer(
+          effectsPort.applyMetadataSelectorKey(
               selectorEffect.focusTarget(), selectorEffect.keyEvent());
       case UiEffect.ApplyTextInputKey textInputEffect ->
-          controller.applyTextInputKeyForReducer(
-              textInputEffect.focusTarget(), textInputEffect.keyEvent());
+          effectsPort.applyTextInputKey(textInputEffect.focusTarget(), textInputEffect.keyEvent());
     }
   }
 }
