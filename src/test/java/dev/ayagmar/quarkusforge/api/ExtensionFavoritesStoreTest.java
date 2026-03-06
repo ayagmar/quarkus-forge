@@ -97,4 +97,22 @@ class ExtensionFavoritesStoreTest {
     assertThat(store.loadFavoriteExtensionIds()).isEmpty();
     assertThat(store.loadRecentExtensionIds()).isEmpty();
   }
+
+  @Test
+  void fileBackedStoreLoadsEmptyFromWrongTypedPayload() throws Exception {
+    Path favoritesFile = tempDir.resolve("typed-favorites.json");
+    Files.writeString(
+        favoritesFile,
+        """
+        {
+          "schemaVersion": 1,
+          "favoriteExtensionIds": "io.quarkus:quarkus-rest",
+          "recentExtensionIds": ["io.quarkus:quarkus-arc"]
+        }
+        """);
+
+    ExtensionFavoritesStore store = ExtensionFavoritesStore.fileBacked(favoritesFile);
+    assertThat(store.loadFavoriteExtensionIds()).isEmpty();
+    assertThat(store.loadRecentExtensionIds()).isEmpty();
+  }
 }

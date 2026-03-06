@@ -17,6 +17,8 @@ public final class CatalogSnapshotCache {
   static final int SCHEMA_VERSION = 1;
   static final Duration DEFAULT_TTL = Duration.ofHours(6);
   static final long DEFAULT_MAX_BYTES = 2L * 1024L * 1024L;
+  private static final System.Logger LOGGER =
+      System.getLogger(CatalogSnapshotCache.class.getName());
 
   private final Path cacheFile;
   private final SnapshotPayloadCodec payloadCodec;
@@ -115,7 +117,11 @@ public final class CatalogSnapshotCache {
       Instant fetchedAt = Instant.ofEpochMilli(fetchedAtMillis);
       boolean stale = isStale(fetchedAt);
       return Optional.of(new CachedCatalogSnapshot(metadata, extensions, fetchedAt, stale));
-    } catch (IOException | RuntimeException ignored) {
+    } catch (IOException | ApiContractException exception) {
+      LOGGER.log(
+          System.Logger.Level.DEBUG,
+          "Failed to read catalog snapshot cache from " + cacheFile,
+          exception);
       return Optional.empty();
     }
   }
