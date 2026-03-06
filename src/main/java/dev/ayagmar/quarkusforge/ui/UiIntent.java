@@ -1,5 +1,7 @@
 package dev.ayagmar.quarkusforge.ui;
 
+import dev.ayagmar.quarkusforge.domain.ValidationReport;
+
 /** Normalized user/system events consumed by the reducer. */
 sealed interface UiIntent {
   record PostGenerationIntent(PostGenerationCommand command) implements UiIntent {}
@@ -78,6 +80,20 @@ sealed interface UiIntent {
       int validationIssueCount,
       String firstValidationError,
       String targetConflictErrorMessage) {
+    static SubmitEvaluation from(
+        boolean generationConfigured,
+        int selectedExtensionCount,
+        ValidationReport validation,
+        String targetConflictErrorMessage) {
+      return new SubmitEvaluation(
+          generationConfigured,
+          selectedExtensionCount,
+          ValidationFocusTargets.firstInvalid(validation),
+          validation.errors().size(),
+          UiIntent.firstValidationError(validation),
+          targetConflictErrorMessage);
+    }
+
     boolean hasValidationError() {
       return !firstValidationError.isBlank();
     }
@@ -93,6 +109,19 @@ sealed interface UiIntent {
       String firstValidationError,
       boolean submitBlockedByTargetConflict,
       String targetConflictErrorMessage) {
+    static SubmitEditRecovery from(
+        ValidationReport validation,
+        boolean submitBlockedByValidation,
+        boolean submitBlockedByTargetConflict,
+        String targetConflictErrorMessage) {
+      return new SubmitEditRecovery(
+          submitBlockedByValidation,
+          validation.isValid(),
+          UiIntent.firstValidationError(validation),
+          submitBlockedByTargetConflict,
+          targetConflictErrorMessage);
+    }
+
     boolean targetConflictResolved() {
       return submitBlockedByTargetConflict && targetConflictErrorMessage.isBlank();
     }
@@ -100,5 +129,11 @@ sealed interface UiIntent {
     boolean validationRecovered() {
       return submitBlockedByValidation && validationValid;
     }
+  }
+
+  private static String firstValidationError(ValidationReport report) {
+    return report.errors().isEmpty()
+        ? ""
+        : report.errors().getFirst().field() + ": " + report.errors().getFirst().message();
   }
 }

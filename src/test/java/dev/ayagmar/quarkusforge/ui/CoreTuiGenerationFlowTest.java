@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.ayagmar.quarkusforge.SystemPropertyExtension;
 import dev.ayagmar.quarkusforge.api.ApiHttpException;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
 import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
@@ -16,9 +17,15 @@ import java.time.Duration;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.Resources;
 
+@ResourceLock(Resources.SYSTEM_PROPERTIES)
 class CoreTuiGenerationFlowTest {
+  @RegisterExtension final SystemPropertyExtension systemProperties = new SystemPropertyExtension();
+
   @TempDir Path tempDir;
 
   private record ConflictFixture(
@@ -131,65 +138,53 @@ class CoreTuiGenerationFlowTest {
 
   @Test
   void postGenerationMenuCanWriteLockAndStayOpen() throws Exception {
-    withSystemProperty(
-        "user.home",
-        tempDir.toString(),
-        () -> {
-          UiControllerTestHarness.ControlledGenerationRunner generationRunner =
-              new UiControllerTestHarness.ControlledGenerationRunner();
-          Path generated = tempDir.resolve("generated-project");
-          try {
-            Files.createDirectories(generated);
-          } catch (java.io.IOException ioException) {
-            throw new RuntimeException(ioException);
-          }
-          CoreTuiController controller =
-              UiControllerTestHarness.controller(
-                  UiScheduler.immediate(), Duration.ZERO, generationRunner);
+    systemProperties.set("user.home", tempDir);
 
-          controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
-          generationRunner.complete(generated);
-          UiControllerTestHarness.moveSelectionToLabel(controller, "Export Forgefile");
-          UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
+    Path generated = tempDir.resolve("generated-project");
+    Files.createDirectories(generated);
+    CoreTuiController controller =
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
-          assertThat(action.shouldQuit()).isFalse();
-          assertThat(controller.postGenerationExitPlan()).isEmpty();
-          assertThat(generated.resolve("Forgefile")).exists();
-        });
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    generationRunner.complete(generated);
+    UiControllerTestHarness.moveSelectionToLabel(controller, "Export Forgefile");
+    UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    assertThat(action.shouldQuit()).isFalse();
+    assertThat(controller.postGenerationExitPlan()).isEmpty();
+    assertThat(generated.resolve("Forgefile")).exists();
   }
 
   @Test
   void submitResolvesTildeOutputDirectoryAgainstUserHome() {
-    withSystemProperty(
-        "user.home",
-        tempDir.toString(),
-        () -> {
-          UiControllerTestHarness.ControlledGenerationRunner generationRunner =
-              new UiControllerTestHarness.ControlledGenerationRunner();
-          ProjectRequest request =
-              new ProjectRequest(
-                  "com.example",
-                  "forge-app",
-                  "1.0.0-SNAPSHOT",
-                  "com.example.forge.app",
-                  "~/Projects/Quarkus",
-                  "maven",
-                  "25");
-          ForgeUiState state =
-              new ForgeUiState(
-                  request,
-                  new ProjectRequestValidator().validate(request),
-                  MetadataCompatibilityContext.loadDefault());
-          CoreTuiController controller =
-              CoreTuiController.from(
-                  state, UiScheduler.immediate(), Duration.ZERO, generationRunner);
+    systemProperties.set("user.home", tempDir);
 
-          controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    UiControllerTestHarness.ControlledGenerationRunner generationRunner =
+        new UiControllerTestHarness.ControlledGenerationRunner();
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example",
+            "forge-app",
+            "1.0.0-SNAPSHOT",
+            "com.example.forge.app",
+            "~/Projects/Quarkus",
+            "maven",
+            "25");
+    ForgeUiState state =
+        new ForgeUiState(
+            request,
+            new ProjectRequestValidator().validate(request),
+            MetadataCompatibilityContext.loadDefault());
+    CoreTuiController controller =
+        CoreTuiController.from(state, UiScheduler.immediate(), Duration.ZERO, generationRunner);
 
-          assertThat(generationRunner.lastOutputDirectory())
-              .isEqualTo(
-                  tempDir.resolve("Projects").resolve("Quarkus").resolve("forge-app").normalize());
-        });
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    assertThat(generationRunner.lastOutputDirectory())
+        .isEqualTo(tempDir.resolve("Projects").resolve("Quarkus").resolve("forge-app").normalize());
   }
 
   @Test
@@ -393,20 +388,6 @@ class CoreTuiGenerationFlowTest {
     assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.ERROR);
     assertThat(controller.statusMessage()).contains("Generation failed");
     assertThat(controller.errorMessage()).contains("Generation service returned null future");
-  }
-
-  private static void withSystemProperty(String key, String value, Runnable runnable) {
-    String previous = System.getProperty(key);
-    try {
-      System.setProperty(key, value);
-      runnable.run();
-    } finally {
-      if (previous == null) {
-        System.clearProperty(key);
-      } else {
-        System.setProperty(key, previous);
-      }
-    }
   }
 
   @Test

@@ -77,6 +77,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   private final CatalogLoadCoordinator catalogLoadCoordinator;
   private final UiReducer uiReducer;
   private final UiEffectsRunner uiEffectsRunner;
+  private final UiEffectsPort uiEffectsPort;
   private final UiStateSnapshotMapper uiStateSnapshotMapper;
   private final UiRenderer uiRenderer;
   private final CoreUiRenderAdapter uiRenderAdapter;
@@ -125,6 +126,68 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     catalogLoadCoordinator = new CatalogLoadCoordinator();
     uiReducer = new CoreUiReducer();
     uiEffectsRunner = new UiEffectsRunner();
+    uiEffectsPort =
+        new UiEffectsPort() {
+          @Override
+          public void startCatalogLoad(ExtensionCatalogLoader loader) {
+            runCatalogLoadEffect(loader);
+          }
+
+          @Override
+          public void requestCatalogReload() {
+            runCatalogReloadEffect();
+          }
+
+          @Override
+          public void prepareForGeneration() {
+            prepareForGenerationEffect();
+          }
+
+          @Override
+          public void cancelPendingAsync() {
+            cancelPendingAsyncEffect();
+          }
+
+          @Override
+          public void exportRecipeAndLock() {
+            exportRecipeAndLockEffect();
+          }
+
+          @Override
+          public void applyCatalogLoadSuccess(CatalogLoadSuccess success) {
+            applyCatalogLoadSuccessEffect(success);
+          }
+
+          @Override
+          public void startGeneration() {
+            startGenerationEffect();
+          }
+
+          @Override
+          public void transitionGenerationState(GenerationState targetState) {
+            transitionGenerationStateEffect(targetState);
+          }
+
+          @Override
+          public void requestGenerationCancellation() {
+            requestGenerationCancellationEffect();
+          }
+
+          @Override
+          public void requestAsyncRepaint() {
+            requestAsyncRepaintEffect();
+          }
+
+          @Override
+          public void applyMetadataSelectorKey(FocusTarget target, KeyEvent keyEvent) {
+            applyMetadataSelectorKeyEffect(target, keyEvent);
+          }
+
+          @Override
+          public void applyTextInputKey(FocusTarget target, KeyEvent keyEvent) {
+            applyTextInputKeyEffect(target, keyEvent);
+          }
+        };
     uiStateSnapshotMapper = new UiStateSnapshotMapper();
     uiRenderer = new UiRenderer();
     uiRenderAdapter =
@@ -398,8 +461,16 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   @Override
   public UiAction handleSubmitFlow(KeyEvent keyEvent) {
     if (keyEvent.isConfirm() || AppKeyActions.isGenerateShortcutKey(keyEvent)) {
-      handleSubmitRequest();
-      return UiAction.handled(false);
+      UiAction action =
+          routeIntent(
+              new UiIntent.SubmitRequestedIntent(
+                  UiIntent.SubmitEvaluation.from(
+                      projectGenerationRunner != NOOP_PROJECT_GENERATION_RUNNER,
+                      extensionCatalogNavigation.selectedExtensionCount(),
+                      validation,
+                      currentTargetConflictErrorMessage())));
+      moveFocusedInputCursorToEndAfterSubmitFeedback();
+      return action != null ? action : UiAction.handled(false);
     }
     return null;
   }
@@ -970,7 +1041,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   private ReduceResult dispatchIntent(UiIntent intent) {
     ReduceResult reduceResult = uiReducer.reduce(uiState(), intent);
     applyReducerState(reduceResult.nextState());
-    uiEffectsRunner.run(reduceResult.effects(), this);
+    uiEffectsRunner.run(reduceResult.effects(), uiEffectsPort);
     return reduceResult;
   }
 
@@ -1336,22 +1407,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     validation = report.merge(metadataCompatibility.validate(request));
   }
 
-  private void refreshValidationFeedbackAfterEdit() {
-    Path generatedProjectDirectory = safeResolveGeneratedProjectDirectory();
-    String targetConflictErrorMessage =
-        generatedProjectDirectory != null && Files.exists(generatedProjectDirectory)
-            ? targetExistsMessage(generatedProjectDirectory)
-            : "";
-    dispatchIntent(
-        new UiIntent.SubmitEditRecoveryIntent(
-            new UiIntent.SubmitEditRecovery(
-                submitBlockedByValidation,
-                validation.isValid(),
-                firstValidationError(validation),
-                submitBlockedByTargetConflict,
-                targetConflictErrorMessage)));
-  }
-
   private void cancelPendingAsyncOperations() {
     catalogLoadCoordinator.cancel(catalogLoadIntentPort);
     extensionCatalogProjection.cancelPendingAsync();
@@ -1382,19 +1437,19 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     return outputRoot.resolve(request.artifactId()).normalize();
   }
 
-  void prepareForGenerationForReducer() {
+  private void prepareForGenerationEffect() {
     resetGenerationStateAfterTerminalOutcome();
   }
 
-  void startCatalogLoadForReducer(ExtensionCatalogLoader loader) {
+  private void runCatalogLoadEffect(ExtensionCatalogLoader loader) {
     catalogLoadCoordinator.startLoad(loader, catalogLoadIntentPort);
   }
 
-  void requestCatalogReloadForReducer() {
+  private void runCatalogReloadEffect() {
     catalogLoadCoordinator.requestReload(catalogLoadIntentPort);
   }
 
-  void applyCatalogLoadSuccessForReducer(CatalogLoadSuccess success) {
+  private void applyCatalogLoadSuccessEffect(CatalogLoadSuccess success) {
     if (success.metadata() != null) {
       metadataCompatibility = MetadataCompatibilityContext.success(success.metadata());
       syncMetadataSelectors();
@@ -1408,11 +1463,11 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         ignored -> {});
   }
 
-  void cancelPendingAsyncForReducer() {
+  private void cancelPendingAsyncEffect() {
     cancelPendingAsyncOperations();
   }
 
-  void exportRecipeAndLockForReducer() {
+  private void exportRecipeAndLockEffect() {
     exportRecipeAndLockFiles();
   }
 
@@ -1420,31 +1475,31 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     generationStateTracker.resetAfterTerminalOutcome();
   }
 
-  void startGenerationForReducer() {
+  private void startGenerationEffect() {
     generationFlowCoordinator.startFlow(
         projectGenerationRunner, toGenerationRequest(), resolveGeneratedProjectDirectory(), this);
   }
 
-  void transitionGenerationStateForReducer(GenerationState targetState) {
+  private void transitionGenerationStateEffect(GenerationState targetState) {
     transitionGenerationState(targetState);
   }
 
-  void requestGenerationCancellationForReducer() {
+  private void requestGenerationCancellationEffect() {
     generationFlowCoordinator.requestCancellation(this);
   }
 
-  void requestAsyncRepaintForReducer() {
+  private void requestAsyncRepaintEffect() {
     requestAsyncRepaint();
   }
 
-  void applyMetadataSelectorKeyForReducer(FocusTarget target, KeyEvent keyEvent) {
+  private void applyMetadataSelectorKeyEffect(FocusTarget target, KeyEvent keyEvent) {
     if (handleMetadataSelectorKey(target, keyEvent)) {
       revalidate();
-      refreshValidationFeedbackAfterEdit();
+      dispatchSubmitEditRecovery();
     }
   }
 
-  void applyTextInputKeyForReducer(FocusTarget target, KeyEvent keyEvent) {
+  private void applyTextInputKeyEffect(FocusTarget target, KeyEvent keyEvent) {
     if (!handleTextInputKey(inputStates.get(target), keyEvent)) {
       return;
     }
@@ -1454,7 +1509,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     }
     rebuildRequestFromInputs();
     revalidate();
-    refreshValidationFeedbackAfterEdit();
+    dispatchSubmitEditRecovery();
   }
 
   @Override
@@ -1491,12 +1546,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     return focused ? baseTitle + " [focus]" : baseTitle;
   }
 
-  private static String firstValidationError(ValidationReport report) {
-    return report.errors().isEmpty()
-        ? ""
-        : report.errors().getFirst().field() + ": " + report.errors().getFirst().message();
-  }
-
   private UiAction handleTickEvent() {
     boolean loading = catalogLoadState.isLoading();
     CatalogLoadCoordinator.StartupOverlayTickResult overlayTick =
@@ -1516,27 +1565,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
       shouldRender = true;
     }
     return shouldRender ? new UiAction(true, false) : UiAction.ignored();
-  }
-
-  private void handleSubmitRequest() {
-    Path generatedProjectDirectory = safeResolveGeneratedProjectDirectory();
-    String targetConflictErrorMessage =
-        generatedProjectDirectory != null && Files.exists(generatedProjectDirectory)
-            ? targetExistsMessage(generatedProjectDirectory)
-            : "";
-    dispatchIntent(
-        new UiIntent.SubmitRequestedIntent(
-            new UiIntent.SubmitEvaluation(
-                projectGenerationRunner != NOOP_PROJECT_GENERATION_RUNNER,
-                extensionCatalogNavigation.selectedExtensionCount(),
-                firstInvalidFocusableTarget(validation),
-                validation.errors().size(),
-                firstValidationError(validation),
-                targetConflictErrorMessage)));
-    if (isTextInputFocus(focusTarget)
-        && (focusTarget == FocusTarget.OUTPUT_DIR || hasValidationErrorFor(focusTarget))) {
-      inputStates.get(focusTarget).moveCursorToEnd();
-    }
   }
 
   private void updateExtensionFilterStatus(int filteredCount) {
@@ -1650,44 +1678,34 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     return AppKeyActions.isFocusExtensionSearchCtrlKey(keyEvent);
   }
 
-  private static String targetExistsMessage(Path generatedProjectDirectory) {
-    return "Output directory already exists: "
-        + generatedProjectDirectory.toAbsolutePath().normalize();
-  }
-
-  private Path safeResolveGeneratedProjectDirectory() {
+  private String currentTargetConflictErrorMessage() {
     try {
-      return resolveGeneratedProjectDirectory();
-    } catch (RuntimeException runtimeException) {
-      return null;
-    }
-  }
-
-  private static FocusTarget firstInvalidFocusableTarget(ValidationReport report) {
-    for (var error : report.errors()) {
-      FocusTarget target = fieldToFocusTarget(error.field());
-      if (target != null) {
-        return target;
+      Path generatedProjectDirectory = resolveGeneratedProjectDirectory();
+      if (!Files.exists(generatedProjectDirectory)) {
+        return "";
       }
+      return "Output directory already exists: "
+          + generatedProjectDirectory.toAbsolutePath().normalize();
+    } catch (RuntimeException runtimeException) {
+      return "";
     }
-    return null;
   }
 
-  private static FocusTarget fieldToFocusTarget(String fieldName) {
-    if (fieldName == null || fieldName.isBlank()) {
-      return null;
+  private void dispatchSubmitEditRecovery() {
+    dispatchIntent(
+        new UiIntent.SubmitEditRecoveryIntent(
+            UiIntent.SubmitEditRecovery.from(
+                validation,
+                submitBlockedByValidation,
+                submitBlockedByTargetConflict,
+                currentTargetConflictErrorMessage())));
+  }
+
+  private void moveFocusedInputCursorToEndAfterSubmitFeedback() {
+    if (isTextInputFocus(focusTarget)
+        && (focusTarget == FocusTarget.OUTPUT_DIR || hasValidationErrorFor(focusTarget))) {
+      inputStates.get(focusTarget).moveCursorToEnd();
     }
-    return switch (fieldName.trim().toLowerCase()) {
-      case "groupid" -> FocusTarget.GROUP_ID;
-      case "artifactid" -> FocusTarget.ARTIFACT_ID;
-      case "version" -> FocusTarget.VERSION;
-      case "packagename" -> FocusTarget.PACKAGE_NAME;
-      case "outputdirectory" -> FocusTarget.OUTPUT_DIR;
-      case "platformstream" -> FocusTarget.PLATFORM_STREAM;
-      case "buildtool" -> FocusTarget.BUILD_TOOL;
-      case "javaversion" -> FocusTarget.JAVA_VERSION;
-      default -> null;
-    };
   }
 
   private void focusExtensionSearch() {
@@ -1730,7 +1748,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   private void moveFocusToAdjacentInvalidField(boolean forward) {
-    List<FocusTarget> invalidTargets = invalidFocusableTargets(validation);
+    List<FocusTarget> invalidTargets = ValidationFocusTargets.orderedInvalid(validation);
     if (invalidTargets.isEmpty()) {
       statusMessage = "No invalid fields";
       return;
@@ -1747,17 +1765,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
       inputStates.get(focusTarget).moveCursorToEnd();
     }
     statusMessage = "Focus moved to invalid field: " + UiFocusTargets.nameOf(focusTarget);
-  }
-
-  private static List<FocusTarget> invalidFocusableTargets(ValidationReport report) {
-    List<FocusTarget> targets = new ArrayList<>();
-    for (var error : report.errors()) {
-      FocusTarget target = fieldToFocusTarget(error.field());
-      if (target != null && !targets.contains(target)) {
-        targets.add(target);
-      }
-    }
-    return targets;
   }
 
   private String preGeneratePlan() {

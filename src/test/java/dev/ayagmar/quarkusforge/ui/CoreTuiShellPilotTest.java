@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.ayagmar.quarkusforge.SystemPropertyExtension;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
@@ -19,8 +20,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.Resources;
 
+@ResourceLock(Resources.SYSTEM_PROPERTIES)
 class CoreTuiShellPilotTest {
+  @RegisterExtension final SystemPropertyExtension systemProperties = new SystemPropertyExtension();
+
   @Test
   void focusTraversalCyclesWithTabAndShiftTab() {
     CoreTuiController controller = UiControllerTestHarness.controller();
@@ -192,34 +199,31 @@ class CoreTuiShellPilotTest {
         expectedOutputPath.substring(0, Math.min(expectedOutputPath.length(), 48));
     String expectedPlanPath =
         homePath.resolve("Projects").resolve("Quarkus").resolve("forge-app").toString();
-    withSystemProperty(
-        "user.home",
-        homePath.toString(),
-        () -> {
-          MetadataCompatibilityContext metadata = MetadataCompatibilityContext.loadDefault();
-          ProjectRequest request =
-              new ProjectRequest(
-                  "com.example",
-                  "forge-app",
-                  "1.0.0-SNAPSHOT",
-                  "com.example.forge.app",
-                  "~/Projects/Quarkus",
-                  "maven",
-                  "25");
-          ForgeUiState state =
-              new ForgeUiState(
-                  request,
-                  new ProjectRequestValidator().validate(request).merge(metadata.validate(request)),
-                  metadata);
-          CoreTuiController controller =
-              CoreTuiController.from(state, UiScheduler.immediate(), java.time.Duration.ZERO);
+    systemProperties.set("user.home", homePath);
 
-          String rendered = UiControllerTestHarness.renderToString(controller, 260, 34);
+    MetadataCompatibilityContext metadata = MetadataCompatibilityContext.loadDefault();
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example",
+            "forge-app",
+            "1.0.0-SNAPSHOT",
+            "com.example.forge.app",
+            "~/Projects/Quarkus",
+            "maven",
+            "25");
+    ForgeUiState state =
+        new ForgeUiState(
+            request,
+            new ProjectRequestValidator().validate(request).merge(metadata.validate(request)),
+            metadata);
+    CoreTuiController controller =
+        CoreTuiController.from(state, UiScheduler.immediate(), java.time.Duration.ZERO);
 
-          assertThat(rendered).doesNotContain("Output: ~/Projects/Quarkus");
-          assertThat(rendered).contains("Output: " + expectedOutputPrefix);
-          assertThat(rendered).contains("Plan: " + expectedPlanPath);
-        });
+    String rendered = UiControllerTestHarness.renderToString(controller, 260, 34);
+
+    assertThat(rendered).doesNotContain("Output: ~/Projects/Quarkus");
+    assertThat(rendered).contains("Output: " + expectedOutputPrefix);
+    assertThat(rendered).contains("Plan: " + expectedPlanPath);
   }
 
   @Test
@@ -1201,19 +1205,5 @@ class CoreTuiShellPilotTest {
         List.of(
             new PlatformStream("io.quarkus.platform:3.31", "3.31", true, List.of("17", "21", "25")),
             new PlatformStream("io.quarkus.platform:3.20", "3.20", false, List.of("17", "21"))));
-  }
-
-  private static void withSystemProperty(String key, String value, Runnable runnable) {
-    String previous = System.getProperty(key);
-    try {
-      System.setProperty(key, value);
-      runnable.run();
-    } finally {
-      if (previous == null) {
-        System.clearProperty(key);
-      } else {
-        System.setProperty(key, previous);
-      }
-    }
   }
 }
