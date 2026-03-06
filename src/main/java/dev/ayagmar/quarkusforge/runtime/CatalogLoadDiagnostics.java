@@ -7,6 +7,8 @@ import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
 import dev.ayagmar.quarkusforge.api.ThrowableUnwrapper;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.ui.ExtensionCatalogLoadResult;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionException;
 import java.util.function.BiFunction;
@@ -43,5 +45,16 @@ public final class CatalogLoadDiagnostics {
       }
       throw new CompletionException(cause);
     };
+  }
+
+  static Map<String, List<String>> handlePresetLoadFailure(
+      DiagnosticLogger diagnostics, Throwable throwable) {
+    Throwable cause = ThrowableUnwrapper.unwrapAsyncFailure(throwable);
+    diagnostics.error(
+        "preset.load.failure",
+        of("mode", "tui"),
+        of("causeType", cause.getClass().getSimpleName()),
+        of("message", ErrorMessageMapper.userFriendlyError(cause)));
+    return Map.of();
   }
 }

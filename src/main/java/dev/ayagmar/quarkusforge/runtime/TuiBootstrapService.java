@@ -24,8 +24,6 @@ import dev.tamboui.tui.TuiConfig;
 import dev.tamboui.tui.TuiRunner;
 import dev.tamboui.tui.bindings.Bindings;
 import java.time.Duration;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -126,11 +124,8 @@ public final class TuiBootstrapService {
                             .handle(
                                 (presets, throwable) -> {
                                   if (throwable != null) {
-                                    diagnostics.error(
-                                        "preset.load.failure",
-                                        of("mode", "tui"),
-                                        of("message", throwable.getClass().getSimpleName()));
-                                    return Map.<String, List<String>>of();
+                                    return CatalogLoadDiagnostics.handlePresetLoadFailure(
+                                        diagnostics, throwable);
                                   }
                                   diagnostics.info(
                                       "preset.load.success",
