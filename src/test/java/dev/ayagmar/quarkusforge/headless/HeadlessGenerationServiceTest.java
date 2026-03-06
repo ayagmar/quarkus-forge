@@ -185,7 +185,7 @@ class HeadlessGenerationServiceTest {
     java.nio.file.Files.writeString(
         config.favoritesFile(),
         """
-        {"extensions":["io.quarkus:quarkus-rest"]}
+        {"schemaVersion":1,"favoriteExtensionIds":["io.quarkus:quarkus-rest"]}
         """);
 
     StubCatalogOperations client = new StubCatalogOperations();
@@ -196,6 +196,31 @@ class HeadlessGenerationServiceTest {
     int exitCode = service.run(command, true, false);
 
     assertThat(exitCode).isEqualTo(ExitCodes.OK);
+  }
+
+  @Test
+  void generationResolvesTildeOutputDirectoryAgainstUserHome() {
+    systemProperties.set("user.home", tempDir.resolve("home").toString());
+    StubCatalogOperations client = new StubCatalogOperations();
+    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+
+    GenerateCommand command = commandWithOutput();
+    command.setCliPrefill(
+        new CliPrefill(
+            "com.example",
+            "demo-app",
+            "1.0.0-SNAPSHOT",
+            null,
+            "~/Projects/Quarkus",
+            "io.quarkus.platform:3.31",
+            "maven",
+            "21"));
+
+    int exitCode = service.run(command, false, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.OK);
+    assertThat(client.lastOutputPath)
+        .isEqualTo(tempDir.resolve("home/Projects/Quarkus/demo-app").normalize());
   }
 
   @Test
@@ -467,6 +492,7 @@ class HeadlessGenerationServiceTest {
     RuntimeException startGenerationFailure;
     int startGenerationCalls;
     String lastPresetPlatformStream;
+    Path lastOutputPath;
 
     @Override
     public CatalogData loadCatalogData(Duration timeout)
@@ -499,6 +525,7 @@ class HeadlessGenerationServiceTest {
         throw startGenerationFailure;
       }
       startGenerationCalls++;
+      lastOutputPath = outputPath;
       return generationFuture;
     }
 

@@ -80,6 +80,44 @@ class HeadlessCatalogClientTest {
   }
 
   @Test
+  void loadCatalogDataFallsBackToCachedSnapshotWhenOverallLoadTimesOut() throws Exception {
+    stubCatalogEndpoints();
+    RuntimeConfig runtimeConfig = runtimeConfig();
+
+    try (HeadlessCatalogClient warmingClient = new HeadlessCatalogClient(runtimeConfig)) {
+      CatalogData liveData = warmingClient.loadCatalogData(Duration.ofSeconds(1));
+      assertThat(liveData.source()).isEqualTo(CatalogSource.LIVE);
+    }
+
+    wireMockServer.resetRequests();
+    wireMockServer.stubFor(
+        get(urlPathEqualTo("/api/extensions"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withFixedDelay(500)
+                    .withBody(
+                        """
+                        [
+                          {"id":"io.quarkus:quarkus-rest","name":"REST","shortName":"rest"}
+                        ]
+                        """)));
+    CliCommandTestSupport.stubLiveMetadataWithAllBuildTools(wireMockServer);
+
+    try (HeadlessCatalogClient client = new HeadlessCatalogClient(runtimeConfig)) {
+      CatalogData catalogData = client.loadCatalogData(Duration.ofMillis(100));
+
+      assertThat(catalogData.source()).isEqualTo(CatalogSource.CACHE);
+      assertThat(catalogData.detailMessage()).contains("timed out after 100ms");
+      assertThat(catalogData.detailMessage()).contains("cached snapshot");
+      assertThat(catalogData.extensions())
+          .extracting(ExtensionDto::id)
+          .containsExactly("io.quarkus:quarkus-rest");
+    }
+  }
+
+  @Test
   void loadBuiltInPresetsReturnsStreamSpecificPresets() throws Exception {
     stubCatalogEndpoints();
 

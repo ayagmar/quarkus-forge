@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge.headless;
 
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
+import dev.ayagmar.quarkusforge.util.OutputPathResolver;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -66,6 +67,8 @@ public final class HeadlessOutputPrinter {
   }
 
   public static Path resolveProjectDirectory(ProjectRequest request) {
-    return Path.of(request.outputDirectory()).resolve(request.artifactId()).normalize();
+    return OutputPathResolver.resolveOutputRoot(request.outputDirectory())
+        .resolve(request.artifactId())
+        .normalize();
   }
 }
