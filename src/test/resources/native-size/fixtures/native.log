@@ -1,0 +1,6 @@
+Top 10 origins of code area:
+  3.10MB com.example:demo-app                                  1.10MB details ignored
+  1.25MB org.acme:dependency                                   0.50MB details ignored
+  0.75MB io.quarkus:quarkus-rest                               0.25MB details ignored
+Top 10 object types in image heap:
+  ignored

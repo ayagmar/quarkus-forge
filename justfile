@@ -30,10 +30,6 @@ test:
 test-unit:
     {{mvn}} test
 
-# Alias for the full verify lifecycle; this build does not expose an IT-only Maven shortcut
-test-it:
-    {{mvn}} verify
-
 # Run a full clean verify and print merged coverage report paths
 coverage:
     {{mvn}} clean verify
