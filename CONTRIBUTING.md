@@ -41,9 +41,11 @@ java -jar target/quarkus-forge-headless.jar generate \
 ```text
 src/main/java/dev/ayagmar/quarkusforge/
 ├── api/          HTTP transport, JSON parsing, catalog caching
+├── application/  Startup metadata selection and request assembly
 ├── archive/      ZIP download, extraction, Zip-Bomb and Zip-Slip protection
+├── diagnostics/  Structured logging and diagnostic payloads
 ├── domain/       ProjectRequest, validation, Forgefile, compatibility rules
-├── headless/     Headless-only classes (ProjectRequestFactory, HeadlessCatalogClient, etc.)
+├── runtime/      Runtime wiring, bootstrap, and session summaries
 └── ui/           TUI state machine, renderers, event routing
 ```
 
@@ -74,7 +76,6 @@ Or use Maven directly (`./mvnw` or `mvn`):
 ```bash
 ./mvnw test                          # unit tests only
 ./mvnw clean verify                  # unit + integration tests + coverage reports
-./mvnw verify -DskipTests -DskipITs=false  # integration tests only (skip unit, keep ITs)
 ```
 
 ### Format code
@@ -95,7 +96,6 @@ Or use Maven directly (`./mvnw` or `mvn`):
 ```bash
 ./mvnw clean verify
 open target/site/jacoco/index.html       # unit test coverage
-open target/site/jacoco-it/index.html    # integration test coverage
 ```
 
 ## Code Style

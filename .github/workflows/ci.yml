@@ -4,16 +4,30 @@ on:
   pull_request:
     paths:
       - 'src/**'
+      - 'tests/**'
+      - 'docs/**'
+      - 'site/**'
       - 'scripts/**'
       - 'pom.xml'
+      - 'README.md'
+      - 'CONTRIBUTING.md'
+      - 'justfile'
+      - '.gitignore'
       - '.github/workflows/**'
   push:
     branches:
       - master
     paths:
       - 'src/**'
+      - 'tests/**'
+      - 'docs/**'
+      - 'site/**'
       - 'scripts/**'
       - 'pom.xml'
+      - 'README.md'
+      - 'CONTRIBUTING.md'
+      - 'justfile'
+      - '.gitignore'
       - '.github/workflows/**'
   workflow_dispatch:
 
@@ -166,7 +180,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          python3 scripts/check_native_size.py \
+          java scripts/CheckNativeSize.java \
             --label headless-native \
             --binary target/quarkus-forge-headless \
             --report target/quarkus-forge-headless-build-report.html \
@@ -183,7 +197,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          python3 scripts/check_native_size.py \
+          java scripts/CheckNativeSize.java \
             --label native \
             --binary target/quarkus-forge \
             --report target/quarkus-forge-build-report.html \
