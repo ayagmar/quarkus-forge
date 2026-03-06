@@ -9,280 +9,168 @@ import java.util.List;
  * list, GitHub visibility sub-menu, and exit plan construction.
  */
 final class PostGenerationMenuState {
-  private boolean visible;
-  private int actionSelection;
-  private boolean githubVisibilityMenuVisible;
-  private int githubVisibilitySelection;
-  private Path lastGeneratedProjectPath;
-  private String lastGeneratedNextCommand = "";
-  private PostGenerationExitPlan exitPlan;
   private List<UiTextConstants.PostGenerationAction> actions = List.of();
-  private List<String> actionLabels = List.of();
+  private UiState.PostGenerationView state =
+      new UiState.PostGenerationView(false, false, 0, 0, List.of(), null, "", null);
 
   void setActions(List<UiTextConstants.PostGenerationAction> actions) {
     this.actions = actions;
-    this.actionLabels = UiTextConstants.postGenerationActionLabels(actions);
+    state =
+        new UiState.PostGenerationView(
+            state.visible(),
+            state.githubVisibilityVisible(),
+            state.actionSelection(),
+            state.githubVisibilitySelection(),
+            actions,
+            state.lastGeneratedProjectPath(),
+            state.lastGeneratedNextCommand(),
+            state.exitPlan());
+  }
+
+  void apply(UiState.PostGenerationView nextState) {
+    state =
+        new UiState.PostGenerationView(
+            nextState.visible(),
+            nextState.githubVisibilityVisible(),
+            nextState.actionSelection(),
+            nextState.githubVisibilitySelection(),
+            actions,
+            nextState.lastGeneratedProjectPath(),
+            nextState.lastGeneratedNextCommand(),
+            nextState.exitPlan());
+  }
+
+  UiState.PostGenerationView snapshot() {
+    return state;
   }
 
   List<String> actionLabels() {
-    return actionLabels;
+    return state.actionLabels();
   }
 
   boolean isVisible() {
-    return visible;
+    return state.visible();
   }
 
   boolean isGithubVisibilityMenuVisible() {
-    return githubVisibilityMenuVisible;
+    return state.githubVisibilityVisible();
   }
 
   int actionSelection() {
-    return actionSelection;
+    return state.actionSelection();
   }
 
   int githubVisibilitySelection() {
-    return githubVisibilitySelection;
+    return state.githubVisibilitySelection();
   }
 
   Path lastGeneratedProjectPath() {
-    return lastGeneratedProjectPath;
+    return state.lastGeneratedProjectPath();
   }
 
   PostGenerationExitPlan exitPlan() {
-    return exitPlan;
+    return state.exitPlan();
   }
 
   String successHint() {
-    if (lastGeneratedProjectPath == null || lastGeneratedNextCommand.isEmpty()) {
-      return "";
-    }
-    String path = lastGeneratedProjectPath.toString();
-    String quotedPath = path.contains(" ") ? "\"" + path + "\"" : path;
-    return "cd " + quotedPath + " && " + lastGeneratedNextCommand;
+    return state.successHint();
   }
 
   void reset() {
-    visible = false;
-    actionSelection = 0;
-    githubVisibilityMenuVisible = false;
-    githubVisibilitySelection = 0;
-    exitPlan = null;
-    lastGeneratedProjectPath = null;
-    lastGeneratedNextCommand = "";
+    apply(new UiState.PostGenerationView(false, false, 0, 0, actions, null, "", null));
   }
 
   void showAfterSuccess(Path generatedPath, String nextCommand) {
-    lastGeneratedProjectPath = generatedPath;
-    lastGeneratedNextCommand = nextCommand == null ? "" : nextCommand;
-    exitPlan = null;
-    visible = true;
-    actionSelection = 0;
-    githubVisibilityMenuVisible = false;
-    githubVisibilitySelection = 0;
+    apply(
+        new UiState.PostGenerationView(
+            true, false, 0, 0, actions, generatedPath, nextCommand, null));
   }
 
   void hideAfterFailureOrCancel() {
-    visible = false;
-    githubVisibilityMenuVisible = false;
-    exitPlan = null;
+    apply(
+        new UiState.PostGenerationView(
+            false,
+            false,
+            state.actionSelection(),
+            0,
+            actions,
+            state.lastGeneratedProjectPath(),
+            state.lastGeneratedNextCommand(),
+            null));
   }
 
   /**
    * Handles a key event while the post-generation menu is visible.
    *
-   * @return a {@link MenuKeyResult} describing the outcome, or {@code null} if the menu is not
-   *     visible.
+   * @return a normalized reducer command, or {@code null} if the menu is not visible.
    */
-  MenuKeyResult handleKey(KeyEvent keyEvent) {
-    if (!visible) {
+  UiIntent.PostGenerationCommand handleKey(KeyEvent keyEvent) {
+    if (!state.visible()) {
       return null;
     }
-    if (githubVisibilityMenuVisible) {
+    if (state.githubVisibilityVisible()) {
       return handleGithubVisibilityKey(keyEvent);
     }
     if (keyEvent.isCtrlC()) {
-      selectExit(PostGenerationExitAction.QUIT);
-      return MenuKeyResult.quit();
+      return new UiIntent.PostGenerationCommand.Quit();
     }
     if (keyEvent.isCancel()) {
-      selectExit(PostGenerationExitAction.QUIT);
-      return MenuKeyResult.quit();
+      return new UiIntent.PostGenerationCommand.Quit();
     }
     if (keyEvent.isUp() || UiKeyMatchers.isVimUpKey(keyEvent)) {
-      moveActionSelection(-1);
-      return MenuKeyResult.handled();
+      return new UiIntent.PostGenerationCommand.MoveActionSelection(-1);
     }
     if (keyEvent.isDown() || UiKeyMatchers.isVimDownKey(keyEvent)) {
-      moveActionSelection(1);
-      return MenuKeyResult.handled();
+      return new UiIntent.PostGenerationCommand.MoveActionSelection(1);
     }
     if (keyEvent.isFocusPrevious()) {
-      moveActionSelection(-1);
-      return MenuKeyResult.handled();
+      return new UiIntent.PostGenerationCommand.MoveActionSelection(-1);
     }
     if (keyEvent.isFocusNext()) {
-      moveActionSelection(1);
-      return MenuKeyResult.handled();
+      return new UiIntent.PostGenerationCommand.MoveActionSelection(1);
     }
     if (UiKeyMatchers.isDigitKey(keyEvent)) {
       int selected = Character.digit(keyEvent.character(), 10) - 1;
-      if (selected >= 0 && selected < actionLabels.size()) {
-        actionSelection = selected;
-        return executeSelection();
+      if (selected >= 0 && selected < state.actions().size()) {
+        return new UiIntent.PostGenerationCommand.SelectActionIndex(selected);
       }
-      return MenuKeyResult.handled();
+      return new UiIntent.PostGenerationCommand.Noop();
     }
     if (keyEvent.isConfirm() || keyEvent.isSelect()) {
-      return executeSelection();
+      return new UiIntent.PostGenerationCommand.ConfirmSelection();
     }
-    return MenuKeyResult.handled();
+    return new UiIntent.PostGenerationCommand.Noop();
   }
 
-  private MenuKeyResult handleGithubVisibilityKey(KeyEvent keyEvent) {
+  private UiIntent.PostGenerationCommand handleGithubVisibilityKey(KeyEvent keyEvent) {
     if (keyEvent.isCtrlC()) {
-      selectExit(PostGenerationExitAction.QUIT);
-      return MenuKeyResult.quit();
+      return new UiIntent.PostGenerationCommand.Quit();
     }
     if (keyEvent.isCancel()) {
-      githubVisibilityMenuVisible = false;
-      return MenuKeyResult.handled();
+      return new UiIntent.PostGenerationCommand.CancelGithubVisibility();
     }
     if (keyEvent.isUp() || UiKeyMatchers.isVimUpKey(keyEvent)) {
-      moveGithubVisibilitySelection(-1);
-      return MenuKeyResult.handled();
+      return new UiIntent.PostGenerationCommand.MoveGithubVisibilitySelection(-1);
     }
     if (keyEvent.isDown() || UiKeyMatchers.isVimDownKey(keyEvent)) {
-      moveGithubVisibilitySelection(1);
-      return MenuKeyResult.handled();
+      return new UiIntent.PostGenerationCommand.MoveGithubVisibilitySelection(1);
     }
     if (keyEvent.isFocusPrevious()) {
-      moveGithubVisibilitySelection(-1);
-      return MenuKeyResult.handled();
+      return new UiIntent.PostGenerationCommand.MoveGithubVisibilitySelection(-1);
     }
     if (keyEvent.isFocusNext()) {
-      moveGithubVisibilitySelection(1);
-      return MenuKeyResult.handled();
+      return new UiIntent.PostGenerationCommand.MoveGithubVisibilitySelection(1);
     }
     if (UiKeyMatchers.isDigitKey(keyEvent)) {
       int selected = Character.digit(keyEvent.character(), 10) - 1;
       if (selected >= 0 && selected < UiTextConstants.GITHUB_VISIBILITY_LABELS.size()) {
-        githubVisibilitySelection = selected;
-        selectExit(PostGenerationExitAction.PUBLISH_GITHUB, selectedGithubVisibility());
-        return MenuKeyResult.quit();
+        return new UiIntent.PostGenerationCommand.SelectGithubVisibilityIndex(selected);
       }
-      return MenuKeyResult.handled();
+      return new UiIntent.PostGenerationCommand.Noop();
     }
     if (keyEvent.isConfirm() || keyEvent.isSelect()) {
-      selectExit(PostGenerationExitAction.PUBLISH_GITHUB, selectedGithubVisibility());
-      return MenuKeyResult.quit();
+      return new UiIntent.PostGenerationCommand.ConfirmSelection();
     }
-    return MenuKeyResult.handled();
-  }
-
-  private MenuKeyResult executeSelection() {
-    UiTextConstants.PostGenerationAction selected =
-        (actionSelection >= 0 && actionSelection < actions.size())
-            ? actions.get(actionSelection)
-            : null;
-    PostGenerationExitAction action =
-        selected != null ? selected.action() : PostGenerationExitAction.QUIT;
-    if (action == PostGenerationExitAction.EXPORT_RECIPE_LOCK) {
-      return MenuKeyResult.exportRecipe();
-    }
-    if (action == PostGenerationExitAction.PUBLISH_GITHUB) {
-      githubVisibilityMenuVisible = true;
-      githubVisibilitySelection = 0;
-      return MenuKeyResult.handled();
-    }
-    if (action == PostGenerationExitAction.GENERATE_AGAIN) {
-      reset();
-      return MenuKeyResult.generateAgain();
-    }
-    selectExit(action, selected != null ? selected.ideCommand() : null);
-    return MenuKeyResult.quit();
-  }
-
-  private void moveActionSelection(int delta) {
-    int size = actionLabels.size();
-    if (size > 0) {
-      actionSelection = Math.floorMod(actionSelection + delta, size);
-    }
-  }
-
-  private void moveGithubVisibilitySelection(int delta) {
-    int size = UiTextConstants.GITHUB_VISIBILITY_LABELS.size();
-    if (size > 0) {
-      githubVisibilitySelection = Math.floorMod(githubVisibilitySelection + delta, size);
-    }
-  }
-
-  private GitHubVisibility selectedGithubVisibility() {
-    return switch (githubVisibilitySelection) {
-      case 1 -> GitHubVisibility.PUBLIC;
-      case 2 -> GitHubVisibility.INTERNAL;
-      default -> GitHubVisibility.PRIVATE;
-    };
-  }
-
-  private void selectExit(PostGenerationExitAction action) {
-    selectExit(action, GitHubVisibility.PRIVATE, null);
-  }
-
-  private void selectExit(PostGenerationExitAction action, String ideCommand) {
-    selectExit(action, GitHubVisibility.PRIVATE, ideCommand);
-  }
-
-  private void selectExit(PostGenerationExitAction action, GitHubVisibility visibility) {
-    selectExit(action, visibility, null);
-  }
-
-  private void selectExit(
-      PostGenerationExitAction action, GitHubVisibility visibility, String ideCommand) {
-    visible = false;
-    actionSelection = 0;
-    githubVisibilityMenuVisible = false;
-    githubVisibilitySelection = 0;
-    exitPlan =
-        new PostGenerationExitPlan(
-            action, lastGeneratedProjectPath, lastGeneratedNextCommand, visibility, ideCommand);
-  }
-
-  /** Result of handling a key event in the post-generation menu. */
-  sealed interface MenuKeyResult {
-    /** Menu handled the key, no further action needed. */
-    static MenuKeyResult handled() {
-      return Handled.INSTANCE;
-    }
-
-    /** User chose to quit / exit the menu (exit plan is set). */
-    static MenuKeyResult quit() {
-      return Quit.INSTANCE;
-    }
-
-    /** User chose to export recipe/lock files. */
-    static MenuKeyResult exportRecipe() {
-      return ExportRecipe.INSTANCE;
-    }
-
-    /** User chose to generate again (menu is reset). */
-    static MenuKeyResult generateAgain() {
-      return GenerateAgain.INSTANCE;
-    }
-
-    record Handled() implements MenuKeyResult {
-      static final Handled INSTANCE = new Handled();
-    }
-
-    record Quit() implements MenuKeyResult {
-      static final Quit INSTANCE = new Quit();
-    }
-
-    record ExportRecipe() implements MenuKeyResult {
-      static final ExportRecipe INSTANCE = new ExportRecipe();
-    }
-
-    record GenerateAgain() implements MenuKeyResult {
-      static final GenerateAgain INSTANCE = new GenerateAgain();
-    }
+    return new UiIntent.PostGenerationCommand.Noop();
   }
 }

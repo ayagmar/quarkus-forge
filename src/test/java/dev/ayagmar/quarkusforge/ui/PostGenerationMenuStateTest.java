@@ -2,14 +2,12 @@ package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.ayagmar.quarkusforge.ui.PostGenerationMenuState.MenuKeyResult;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.KeyModifiers;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 class PostGenerationMenuStateTest {
@@ -28,216 +26,123 @@ class PostGenerationMenuStateTest {
   }
 
   @Test
-  void showAfterSuccessMakesVisible() {
+  void snapshotExposesSuccessHint() {
     state.showAfterSuccess(Path.of("/tmp/project"), "mvn quarkus:dev");
+
+    assertThat(state.snapshot().visible()).isTrue();
+    assertThat(state.snapshot().successHint()).isEqualTo("cd /tmp/project && mvn quarkus:dev");
+  }
+
+  @Test
+  void applyRehydratesReducerOwnedState() {
+    state.apply(
+        new UiState.PostGenerationView(
+            true,
+            true,
+            2,
+            1,
+            UiTextConstants.postGenerationActions(List.of()),
+            Path.of("/tmp/project"),
+            "mvn quarkus:dev",
+            new PostGenerationExitPlan(
+                PostGenerationExitAction.PUBLISH_GITHUB,
+                Path.of("/tmp/project"),
+                "mvn quarkus:dev",
+                GitHubVisibility.PUBLIC,
+                null)));
+
     assertThat(state.isVisible()).isTrue();
-    assertThat(state.lastGeneratedProjectPath()).isEqualTo(Path.of("/tmp/project"));
+    assertThat(state.isGithubVisibilityMenuVisible()).isTrue();
+    assertThat(state.actionSelection()).isEqualTo(2);
+    assertThat(state.githubVisibilitySelection()).isEqualTo(1);
+    assertThat(state.exitPlan()).isNotNull();
+  }
+
+  @Test
+  void actionMenuNavigationReturnsReducerCommandsWithoutMutatingState() {
+    state.showAfterSuccess(Path.of("/tmp/p"), "cmd");
+
+    UiIntent.PostGenerationCommand down = state.handleKey(KeyEvent.ofKey(KeyCode.DOWN));
+    UiIntent.PostGenerationCommand up = state.handleKey(KeyEvent.ofKey(KeyCode.UP));
+
+    assertThat(down).isEqualTo(new UiIntent.PostGenerationCommand.MoveActionSelection(1));
+    assertThat(up).isEqualTo(new UiIntent.PostGenerationCommand.MoveActionSelection(-1));
     assertThat(state.actionSelection()).isZero();
   }
 
   @Test
-  void successHintCombinesPathAndCommand() {
-    Path path = Path.of("/tmp/project");
-    state.showAfterSuccess(path, "mvn quarkus:dev");
-    assertThat(state.successHint()).isEqualTo("cd " + path + " && mvn quarkus:dev");
+  void confirmOnExportReturnsConfirmCommandUntilReducerExecutesIt() {
+    state.showAfterSuccess(Path.of("/tmp/p"), "cmd");
+    state.apply(
+        new UiState.PostGenerationView(
+            true,
+            false,
+            state.actionLabels().indexOf("Export Forgefile"),
+            0,
+            UiTextConstants.postGenerationActions(List.of()),
+            Path.of("/tmp/p"),
+            "cmd",
+            null));
+
+    UiIntent.PostGenerationCommand result = state.handleKey(KeyEvent.ofKey(KeyCode.ENTER));
+
+    assertThat(result).isInstanceOf(UiIntent.PostGenerationCommand.ConfirmSelection.class);
+    assertThat(state.isVisible()).isTrue();
   }
 
   @Test
-  void successHintEmptyWhenNoNextCommand() {
-    state.showAfterSuccess(Path.of("/tmp/project"), "");
-    assertThat(state.successHint()).isEmpty();
-  }
+  void digitSelectionReturnsDirectSelectCommand() {
+    state.showAfterSuccess(Path.of("/tmp/p"), "cmd");
 
-  @Test
-  void successHintHandlesNullNextCommand() {
-    state.showAfterSuccess(Path.of("/tmp/project"), null);
-    assertThat(state.successHint()).isEmpty();
-  }
+    UiIntent.PostGenerationCommand result = state.handleKey(KeyEvent.ofChar('1'));
 
-  @Test
-  void successHintQuotesPathWithSpaces() {
-    Path path = Path.of("/tmp/my project");
-    state.showAfterSuccess(path, "mvn quarkus:dev");
-    assertThat(state.successHint()).isEqualTo("cd \"" + path + "\" && mvn quarkus:dev");
-  }
-
-  @Test
-  void resetClearsAllState() {
-    state.showAfterSuccess(Path.of("/tmp/project"), "cmd");
-    state.reset();
-    assertThat(state.isVisible()).isFalse();
-    assertThat(state.lastGeneratedProjectPath()).isNull();
-    assertThat(state.exitPlan()).isNull();
+    assertThat(result).isEqualTo(new UiIntent.PostGenerationCommand.SelectActionIndex(0));
     assertThat(state.actionSelection()).isZero();
   }
 
   @Test
-  void hideAfterFailureClearsExitPlan() {
-    state.showAfterSuccess(Path.of("/tmp/project"), "cmd");
-    state.hideAfterFailureOrCancel();
-    assertThat(state.isVisible()).isFalse();
+  void invalidDigitReturnsNoopCommand() {
+    state.showAfterSuccess(Path.of("/tmp/p"), "cmd");
+
+    UiIntent.PostGenerationCommand result = state.handleKey(KeyEvent.ofChar('9'));
+
+    assertThat(result).isInstanceOf(UiIntent.PostGenerationCommand.Noop.class);
+  }
+
+  @Test
+  void quitKeysReturnQuitCommandWithoutPreReducerExitPlanMutation() {
+    state.showAfterSuccess(Path.of("/tmp/p"), "cmd");
+
+    UiIntent.PostGenerationCommand ctrlC = state.handleKey(KeyEvent.ofChar('c', KeyModifiers.CTRL));
+    UiIntent.PostGenerationCommand escape = state.handleKey(KeyEvent.ofKey(KeyCode.ESCAPE));
+
+    assertThat(ctrlC).isInstanceOf(UiIntent.PostGenerationCommand.Quit.class);
+    assertThat(escape).isInstanceOf(UiIntent.PostGenerationCommand.Quit.class);
     assertThat(state.exitPlan()).isNull();
+    assertThat(state.isVisible()).isTrue();
   }
 
-  @Nested
-  class ActionMenuNavigation {
-    @BeforeEach
-    void show() {
-      state.showAfterSuccess(Path.of("/tmp/p"), "cmd");
-    }
+  @Test
+  void githubVisibilityMenuReturnsVisibilityCommandsWithoutMutation() {
+    state.apply(
+        new UiState.PostGenerationView(
+            true,
+            true,
+            0,
+            0,
+            UiTextConstants.postGenerationActions(List.of()),
+            Path.of("/tmp/p"),
+            "cmd",
+            null));
 
-    @Test
-    void downKeyMovesSelectionForward() {
-      MenuKeyResult result = state.handleKey(KeyEvent.ofKey(KeyCode.DOWN));
-      assertThat(result).isInstanceOf(MenuKeyResult.Handled.class);
-      assertThat(state.actionSelection()).isEqualTo(1);
-    }
+    UiIntent.PostGenerationCommand down = state.handleKey(KeyEvent.ofKey(KeyCode.DOWN));
+    UiIntent.PostGenerationCommand escape = state.handleKey(KeyEvent.ofKey(KeyCode.ESCAPE));
+    UiIntent.PostGenerationCommand choosePublic = state.handleKey(KeyEvent.ofChar('2'));
 
-    @Test
-    void upKeyWrapsToLast() {
-      MenuKeyResult result = state.handleKey(KeyEvent.ofKey(KeyCode.UP));
-      assertThat(result).isInstanceOf(MenuKeyResult.Handled.class);
-      int lastIndex = state.actionLabels().size() - 1;
-      assertThat(state.actionSelection()).isEqualTo(lastIndex);
-    }
-
-    @Test
-    void vimJMovesDown() {
-      state.handleKey(KeyEvent.ofChar('j'));
-      assertThat(state.actionSelection()).isEqualTo(1);
-    }
-
-    @Test
-    void ctrlCQuitsAndSetsExitPlan() {
-      MenuKeyResult result = state.handleKey(KeyEvent.ofChar('c', KeyModifiers.CTRL));
-      assertThat(result).isInstanceOf(MenuKeyResult.Quit.class);
-      assertThat(state.exitPlan()).isNotNull();
-      assertThat(state.exitPlan().action()).isEqualTo(PostGenerationExitAction.QUIT);
-    }
-
-    @Test
-    void escapeQuitsAndSetsExitPlan() {
-      MenuKeyResult result = state.handleKey(KeyEvent.ofKey(KeyCode.ESCAPE));
-      assertThat(result).isInstanceOf(MenuKeyResult.Quit.class);
-    }
-  }
-
-  @Nested
-  class ActionSelection {
-    @BeforeEach
-    void show() {
-      state.showAfterSuccess(Path.of("/tmp/p"), "cmd");
-    }
-
-    @Test
-    void enterOnExportRecipeReturnsExportResult() {
-      moveSelectionToLabel("Export Forgefile");
-      MenuKeyResult result = state.handleKey(KeyEvent.ofKey(KeyCode.ENTER));
-      assertThat(result).isInstanceOf(MenuKeyResult.ExportRecipe.class);
-    }
-
-    @Test
-    void enterOnPublishGithubShowsVisibilityMenu() {
-      moveSelectionToLabel("Publish to GitHub (requires gh)");
-      MenuKeyResult result = state.handleKey(KeyEvent.ofKey(KeyCode.ENTER));
-      assertThat(result).isInstanceOf(MenuKeyResult.Handled.class);
-      assertThat(state.isGithubVisibilityMenuVisible()).isTrue();
-    }
-
-    @Test
-    void enterOnGenerateAgainResetsMenuState() {
-      moveSelectionToLabel("Generate again");
-      MenuKeyResult result = state.handleKey(KeyEvent.ofKey(KeyCode.ENTER));
-      assertThat(result).isInstanceOf(MenuKeyResult.GenerateAgain.class);
-      assertThat(state.isVisible()).isFalse();
-      assertThat(state.isGithubVisibilityMenuVisible()).isFalse();
-      assertThat(state.lastGeneratedProjectPath()).isNull();
-      assertThat(state.exitPlan()).isNull();
-      assertThat(state.actionSelection()).isZero();
-    }
-
-    @Test
-    void enterOnQuitSetsExitPlan() {
-      moveSelectionToLabel("Quit");
-      MenuKeyResult result = state.handleKey(KeyEvent.ofKey(KeyCode.ENTER));
-      assertThat(result).isInstanceOf(MenuKeyResult.Quit.class);
-      assertThat(state.exitPlan().action()).isEqualTo(PostGenerationExitAction.QUIT);
-    }
-
-    @Test
-    void digitKeySelectsDirectly() {
-      MenuKeyResult result = state.handleKey(KeyEvent.ofChar('1'));
-      assertThat(result).isInstanceOf(MenuKeyResult.Handled.class);
-      assertThat(state.isGithubVisibilityMenuVisible()).isTrue();
-    }
-
-    @Test
-    void invalidDigitKeyHandled() {
-      // Digit '9' → out of range → handled
-      MenuKeyResult result = state.handleKey(KeyEvent.ofChar('9'));
-      assertThat(result).isInstanceOf(MenuKeyResult.Handled.class);
-    }
-  }
-
-  @Nested
-  class GithubVisibilityMenu {
-    @BeforeEach
-    void showVisibilityMenu() {
-      state.showAfterSuccess(Path.of("/tmp/p"), "cmd");
-      moveSelectionToLabel("Publish to GitHub (requires gh)");
-      state.handleKey(KeyEvent.ofKey(KeyCode.ENTER)); // → opens visibility menu
-    }
-
-    @Test
-    void visibilityMenuIsVisible() {
-      assertThat(state.isGithubVisibilityMenuVisible()).isTrue();
-      assertThat(state.githubVisibilitySelection()).isZero();
-    }
-
-    @Test
-    void escapeClosesVisibilityMenu() {
-      state.handleKey(KeyEvent.ofKey(KeyCode.ESCAPE));
-      assertThat(state.isGithubVisibilityMenuVisible()).isFalse();
-      assertThat(state.isVisible()).isTrue();
-    }
-
-    @Test
-    void enterOnPrivateQuitsWithPrivateVisibility() {
-      MenuKeyResult result = state.handleKey(KeyEvent.ofKey(KeyCode.ENTER));
-      assertThat(result).isInstanceOf(MenuKeyResult.Quit.class);
-      assertThat(state.exitPlan().action()).isEqualTo(PostGenerationExitAction.PUBLISH_GITHUB);
-      assertThat(state.exitPlan().githubVisibility()).isEqualTo(GitHubVisibility.PRIVATE);
-    }
-
-    @Test
-    void navigateToPublicAndConfirm() {
-      state.handleKey(KeyEvent.ofKey(KeyCode.DOWN)); // → Public
-      MenuKeyResult result = state.handleKey(KeyEvent.ofKey(KeyCode.ENTER));
-      assertThat(result).isInstanceOf(MenuKeyResult.Quit.class);
-      assertThat(state.exitPlan().githubVisibility()).isEqualTo(GitHubVisibility.PUBLIC);
-    }
-
-    @Test
-    void ctrlCQuitsFromVisibilityMenu() {
-      MenuKeyResult result = state.handleKey(KeyEvent.ofChar('c', KeyModifiers.CTRL));
-      assertThat(result).isInstanceOf(MenuKeyResult.Quit.class);
-      assertThat(state.exitPlan().action()).isEqualTo(PostGenerationExitAction.QUIT);
-    }
-  }
-
-  private void moveSelectionToLabel(String label) {
-    int currentIndex = state.actionSelection();
-    int targetIndex = state.actionLabels().indexOf(label);
-    assertThat(targetIndex).isGreaterThanOrEqualTo(0);
-    int delta = targetIndex - currentIndex;
-    if (delta > 0) {
-      for (int i = 0; i < delta; i++) {
-        state.handleKey(KeyEvent.ofKey(KeyCode.DOWN));
-      }
-      return;
-    }
-    for (int i = 0; i < -delta; i++) {
-      state.handleKey(KeyEvent.ofKey(KeyCode.UP));
-    }
+    assertThat(down).isEqualTo(new UiIntent.PostGenerationCommand.MoveGithubVisibilitySelection(1));
+    assertThat(escape).isInstanceOf(UiIntent.PostGenerationCommand.CancelGithubVisibility.class);
+    assertThat(choosePublic)
+        .isEqualTo(new UiIntent.PostGenerationCommand.SelectGithubVisibilityIndex(1));
+    assertThat(state.githubVisibilitySelection()).isZero();
   }
 }

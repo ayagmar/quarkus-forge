@@ -76,7 +76,19 @@ class UiStateSnapshotMapperTest {
     UiState state =
         new UiStateFixtureBuilder()
             .withPostGenerationView(
-                new UiState.PostGenerationView(false, false, 0, 0, List.of("Open", "Quit"), ""))
+                new UiState.PostGenerationView(
+                    false,
+                    false,
+                    0,
+                    0,
+                    List.of(
+                        new UiTextConstants.PostGenerationAction(
+                            "Open", PostGenerationExitAction.OPEN_TERMINAL),
+                        new UiTextConstants.PostGenerationAction(
+                            "Quit", PostGenerationExitAction.QUIT)),
+                    null,
+                    "",
+                    null))
             .withStartupOverlayView(new UiState.StartupOverlayView(false, List.of("line")))
             .build();
 
@@ -98,7 +110,7 @@ class UiStateSnapshotMapperTest {
     private UiStateSnapshotMapper.ValidationState validationState =
         new UiStateSnapshotMapper.ValidationState(validation, false);
     private UiStateSnapshotMapper.SubmissionState submissionState =
-        new UiStateSnapshotMapper.SubmissionState(false, false, "Ready", "", "");
+        new UiStateSnapshotMapper.SubmissionState(false, false, "Ready", "", "", false);
     private UiStateSnapshotMapper.PanelState panelState =
         new UiStateSnapshotMapper.PanelState(
             new MetadataPanelSnapshot(
@@ -157,7 +169,7 @@ class UiStateSnapshotMapperTest {
             new UiState.OverlayState(false, false, false, false, false),
             new UiState.GenerationView(CoreTuiController.GenerationState.IDLE, 0.0, "", false),
             new UiState.CatalogLoadView(false, "snapshot", false, ""),
-            new UiState.PostGenerationView(false, false, 0, 0, List.of(), ""),
+            new UiState.PostGenerationView(false, false, 0, 0, List.of(), null, "", null),
             new UiState.StartupOverlayView(false, List.of()),
             new UiState.ExtensionView(0, 0, 0, false, false, "", "", "", ""));
 

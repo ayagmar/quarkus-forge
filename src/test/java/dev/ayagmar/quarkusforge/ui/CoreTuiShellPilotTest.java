@@ -284,6 +284,28 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void errorDetailsExpansionDoesNotLeakAcrossValidationRecoveryAndNextError() {
+    CoreTuiController controller = UiControllerTestHarness.controller();
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.ARTIFACT_ID);
+
+    controller.onEvent(KeyEvent.ofChar('X'));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    controller.onEvent(KeyEvent.ofChar('e', KeyModifiers.CTRL));
+
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("Error details:");
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.BACKSPACE));
+    assertThat(UiControllerTestHarness.renderToString(controller)).doesNotContain("Error details:");
+
+    controller.onEvent(KeyEvent.ofChar('X'));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    String rendered = UiControllerTestHarness.renderToString(controller);
+    assertThat(rendered).contains("Error:");
+    assertThat(rendered).doesNotContain("Error details:");
+  }
+
+  @Test
   void slashShortcutJumpsFocusToExtensionSearch() {
     CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.SUBMIT);

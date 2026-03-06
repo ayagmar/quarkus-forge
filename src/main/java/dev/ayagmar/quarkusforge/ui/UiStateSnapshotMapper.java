@@ -14,7 +14,8 @@ final class UiStateSnapshotMapper {
       boolean submitBlockedByTargetConflict,
       String statusMessage,
       String errorMessage,
-      String verboseErrorDetails) {}
+      String verboseErrorDetails,
+      boolean showErrorDetails) {}
 
   record ViewState(
       UiState.OverlayState overlays,
@@ -46,6 +47,7 @@ final class UiStateSnapshotMapper {
         submissionState.statusMessage(),
         submissionState.errorMessage(),
         submissionState.verboseErrorDetails(),
+        submissionState.showErrorDetails(),
         submissionState.submitRequested(),
         validationState.submitBlockedByValidation(),
         submissionState.submitBlockedByTargetConflict(),
@@ -61,8 +63,10 @@ final class UiStateSnapshotMapper {
             postGeneration.githubVisibilityVisible(),
             postGeneration.actionSelection(),
             postGeneration.githubVisibilitySelection(),
-            List.copyOf(postGeneration.actionLabels()),
-            postGeneration.successHint()),
+            List.copyOf(postGeneration.actions()),
+            postGeneration.lastGeneratedProjectPath(),
+            postGeneration.lastGeneratedNextCommand(),
+            postGeneration.exitPlan()),
         new UiState.StartupOverlayView(
             startupOverlay.visible(), List.copyOf(startupOverlay.statusLines())),
         viewState.extensions());

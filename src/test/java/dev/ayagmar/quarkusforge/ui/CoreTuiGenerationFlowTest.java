@@ -471,6 +471,26 @@ class CoreTuiGenerationFlowTest {
   }
 
   @Test
+  void blankProgressUsesSameCanonicalPhaseInStatusAndOverlay() {
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(),
+            UiScheduler.immediate(),
+            Duration.ZERO,
+            (generationRequest, outputDirectory, cancelled, progressListener) -> {
+              progressListener.accept(
+                  new GenerationProgressUpdate(GenerationProgressStep.REQUESTING_ARCHIVE, ""));
+              return new CompletableFuture<>();
+            });
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    String expectedPhase = "requesting project archive from Quarkus API...";
+    assertThat(controller.statusMessage()).isEqualTo("Generation in progress: " + expectedPhase);
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34)).contains(expectedPhase);
+  }
+
+  @Test
   void generationProgressOverlayStartsWithRequestingApiStep() {
     CoreTuiController controller =
         CoreTuiController.from(
