@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicReference;
 
 final class ExtensionCatalogPreferences {
   private static final System.Logger LOGGER =
@@ -19,7 +20,7 @@ final class ExtensionCatalogPreferences {
   private final List<String> recentExtensionIds;
   private final ExtensionFavoritesStore favoritesStore;
   private final Executor favoritesPersistenceExecutor;
-  private CompletableFuture<Void> preferencePersistenceChain;
+  private final AtomicReference<CompletableFuture<Void>> preferencePersistenceChain;
 
   ExtensionCatalogPreferences(
       ExtensionFavoritesStore favoritesStore, Executor favoritesPersistenceExecutor) {
@@ -27,7 +28,7 @@ final class ExtensionCatalogPreferences {
     this.favoritesPersistenceExecutor = Objects.requireNonNull(favoritesPersistenceExecutor);
     favoriteExtensionIds = new LinkedHashSet<>(favoritesStore.loadFavoriteExtensionIds());
     recentExtensionIds = new ArrayList<>(favoritesStore.loadRecentExtensionIds());
-    preferencePersistenceChain = CompletableFuture.completedFuture(null);
+    preferencePersistenceChain = new AtomicReference<>(CompletableFuture.completedFuture(null));
   }
 
   void retainAvailable(Set<String> availableExtensionIds) {
@@ -58,6 +59,7 @@ final class ExtensionCatalogPreferences {
   }
 
   boolean toggleFavorite(String extensionId) {
+    Objects.requireNonNull(extensionId);
     boolean isNowFavorite = favoriteExtensionIds.add(extensionId);
     if (!isNowFavorite) {
       favoriteExtensionIds.remove(extensionId);
@@ -67,6 +69,7 @@ final class ExtensionCatalogPreferences {
   }
 
   void recordRecentSelection(String extensionId) {
+    Objects.requireNonNull(extensionId);
     recentExtensionIds.remove(extensionId);
     recentExtensionIds.add(0, extensionId);
     while (recentExtensionIds.size() > CatalogRowBuilder.MAX_RECENT_SELECTIONS) {
@@ -78,21 +81,22 @@ final class ExtensionCatalogPreferences {
   private void persistUserStateAsync() {
     Set<String> favoriteSnapshot = Set.copyOf(favoriteExtensionIds);
     List<String> recentSnapshot = List.copyOf(recentExtensionIds);
-    preferencePersistenceChain =
-        preferencePersistenceChain
-            .exceptionally(
-                exception -> {
-                  logPersistenceFailure(exception);
-                  return null;
-                })
-            .thenRunAsync(
-                () -> favoritesStore.saveAll(favoriteSnapshot, recentSnapshot),
-                favoritesPersistenceExecutor)
-            .exceptionally(
-                exception -> {
-                  logPersistenceFailure(exception);
-                  return null;
-                });
+    preferencePersistenceChain.updateAndGet(
+        previousChain ->
+            previousChain
+                .exceptionally(
+                    exception -> {
+                      logPersistenceFailure(exception);
+                      return null;
+                    })
+                .thenRunAsync(
+                    () -> favoritesStore.saveAll(favoriteSnapshot, recentSnapshot),
+                    favoritesPersistenceExecutor)
+                .exceptionally(
+                    exception -> {
+                      logPersistenceFailure(exception);
+                      return null;
+                    }));
   }
 
   private void logPersistenceFailure(Throwable exception) {

@@ -1,6 +1,7 @@
 package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import java.util.Set;
@@ -71,6 +72,20 @@ class ExtensionCatalogRowsTest {
 
     assertThat(rows.toggleCategoryCollapse(null)).isFalse();
     assertThat(rows.toggleCategoryCollapse(" ")).isFalse();
+    assertThat(rows.toggleCategoryCollapse(CatalogRowBuilder.RECENT_SECTION_TITLE)).isFalse();
     assertThat(rows.expandAllCategories()).isZero();
+  }
+
+  @Test
+  void publishedCollectionsAreUnmodifiable() {
+    ExtensionCatalogRows rows = new ExtensionCatalogRows();
+    rows.update(List.of(REST, JDBC), List.of(), new ExtensionCatalogFilters(""));
+
+    assertThatThrownBy(() -> rows.filteredRows().clear())
+        .isInstanceOf(UnsupportedOperationException.class);
+    assertThatThrownBy(() -> rows.selectableRowIndexes().add(99))
+        .isInstanceOf(UnsupportedOperationException.class);
+    assertThatThrownBy(() -> rows.allRowIndexes().add(99))
+        .isInstanceOf(UnsupportedOperationException.class);
   }
 }

@@ -1,11 +1,15 @@
 package dev.ayagmar.quarkusforge.cli;
 
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Spec;
 
 final class RequestOptions {
+  private final Set<String> prefilledOptions = new HashSet<>();
 
   /**
    * Injected by Picocli after parsing; null when the object is constructed manually (e.g. in tests
@@ -114,18 +118,24 @@ final class RequestOptions {
     if (prefill == null) {
       return options;
     }
-    options.groupId = prefill.groupId();
-    options.artifactId = prefill.artifactId();
-    options.version = prefill.version();
-    options.packageName =
-        prefill.packageName() == null || prefill.packageName().isBlank()
-            ? null
-            : prefill.packageName();
-    options.outputDirectory = prefill.outputDirectory();
-    options.platformStream = prefill.platformStream();
-    options.buildTool = prefill.buildTool();
-    options.javaVersion = prefill.javaVersion();
+    options.groupId = options.applyPrefill(OPT_GROUP_ID, prefill.groupId(), options.groupId);
+    options.artifactId =
+        options.applyPrefill(OPT_ARTIFACT_ID, prefill.artifactId(), options.artifactId);
+    options.version = options.applyPrefill(OPT_VERSION, prefill.version(), options.version);
+    options.packageName = options.applyPrefill(OPT_PACKAGE_NAME, prefill.packageName(), null);
+    options.outputDirectory =
+        options.applyPrefill(OPT_OUTPUT_DIR, prefill.outputDirectory(), options.outputDirectory);
+    options.platformStream =
+        options.applyPrefill(OPT_PLATFORM_STREAM, prefill.platformStream(), options.platformStream);
+    options.buildTool =
+        options.applyPrefill(OPT_BUILD_TOOL, prefill.buildTool(), options.buildTool);
+    options.javaVersion =
+        options.applyPrefill(OPT_JAVA_VERSION, prefill.javaVersion(), options.javaVersion);
     return options;
+  }
+
+  void markPrefilled(String optionName) {
+    prefilledOptions.add(optionName);
   }
 
   /**
@@ -140,7 +150,18 @@ final class RequestOptions {
     if (spec != null && spec.commandLine() != null && spec.commandLine().getParseResult() != null) {
       return spec.commandLine().getParseResult().hasMatchedOption(optionName);
     }
+    if (prefilledOptions.contains(optionName)) {
+      return false;
+    }
     // Fallback: treat value != default as "explicitly set"
-    return !java.util.Objects.equals(currentValue, defaultValue);
+    return !Objects.equals(currentValue, defaultValue);
+  }
+
+  private String applyPrefill(String optionName, String prefilledValue, String fallbackValue) {
+    if (prefilledValue == null || prefilledValue.isBlank()) {
+      return fallbackValue;
+    }
+    prefilledOptions.add(optionName);
+    return prefilledValue;
   }
 }

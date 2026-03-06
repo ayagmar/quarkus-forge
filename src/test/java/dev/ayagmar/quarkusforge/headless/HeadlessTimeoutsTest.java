@@ -37,6 +37,13 @@ class HeadlessTimeoutsTest {
   }
 
   @Test
+  void generationTimeoutFromSystemProperty() {
+    systemProperties.set(HEADLESS_GENERATION_TIMEOUT_PROPERTY, "60000");
+
+    assertThat(HeadlessTimeouts.generationTimeout()).isEqualTo(Duration.ofMillis(60000));
+  }
+
+  @Test
   void invalidPropertyFallsBackToDefault() {
     systemProperties.set(HEADLESS_CATALOG_TIMEOUT_PROPERTY, "not-a-number");
 

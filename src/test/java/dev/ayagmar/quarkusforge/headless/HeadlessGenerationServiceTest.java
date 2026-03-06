@@ -3,6 +3,7 @@ package dev.ayagmar.quarkusforge.headless;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.ayagmar.quarkusforge.SystemPropertyExtension;
+import dev.ayagmar.quarkusforge.api.ApiClientException;
 import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
@@ -137,8 +138,7 @@ class HeadlessGenerationServiceTest {
   void generationExecutionFailureReturnsCorrectExitCode() {
     StubCatalogOperations client = new StubCatalogOperations();
     client.generationFuture =
-        CompletableFuture.failedFuture(
-            new dev.ayagmar.quarkusforge.api.ApiClientException("connection refused", null));
+        CompletableFuture.failedFuture(new ApiClientException("connection refused", null));
     HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
 
     GenerateCommand command = commandWithOutput();

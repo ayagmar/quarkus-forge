@@ -15,6 +15,8 @@ import java.nio.file.Path;
 import java.util.concurrent.Callable;
 
 public final class CliCommandTestSupport {
+  private static final Object STREAM_LOCK = new Object();
+
   private CliCommandTestSupport() {}
 
   public static RuntimeConfig runtimeConfig(Path tempDir, URI baseUri) {
@@ -38,23 +40,25 @@ public final class CliCommandTestSupport {
   }
 
   private static CommandResult captureCommandOutput(Callable<Integer> action) {
-    PrintStream originalOut = System.out;
-    PrintStream originalErr = System.err;
-    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
-    ByteArrayOutputStream stderr = new ByteArrayOutputStream();
-    try {
-      System.setOut(new PrintStream(stdout, true, StandardCharsets.UTF_8));
-      System.setErr(new PrintStream(stderr, true, StandardCharsets.UTF_8));
-      int exitCode = action.call();
-      return new CommandResult(
-          exitCode,
-          stdout.toString(StandardCharsets.UTF_8),
-          stderr.toString(StandardCharsets.UTF_8));
-    } catch (Exception exception) {
-      throw new RuntimeException(exception);
-    } finally {
-      System.setOut(originalOut);
-      System.setErr(originalErr);
+    synchronized (STREAM_LOCK) {
+      PrintStream originalOut = System.out;
+      PrintStream originalErr = System.err;
+      ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+      ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+      try {
+        System.setOut(new PrintStream(stdout, true, StandardCharsets.UTF_8));
+        System.setErr(new PrintStream(stderr, true, StandardCharsets.UTF_8));
+        int exitCode = action.call();
+        return new CommandResult(
+            exitCode,
+            stdout.toString(StandardCharsets.UTF_8),
+            stderr.toString(StandardCharsets.UTF_8));
+      } catch (Exception exception) {
+        throw new RuntimeException(exception);
+      } finally {
+        System.setOut(originalOut);
+        System.setErr(originalErr);
+      }
     }
   }
 

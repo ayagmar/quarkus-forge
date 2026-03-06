@@ -54,38 +54,39 @@ class TuiBootstrapServiceTest {
 
   @Test
   void configureTerminalBackendPreferenceSetsDefaultOnlyWhenUnset() throws Exception {
-    invokeConfigureTerminalBackendPreference();
+    invokeConfigureTerminalBackendPreference(null, null);
     assertThat(System.getProperty("tamboui.backend")).isEqualTo("panama");
 
     System.setProperty("tamboui.backend", "custom");
 
-    invokeConfigureTerminalBackendPreference();
+    invokeConfigureTerminalBackendPreference("custom", null);
 
     assertThat(System.getProperty("tamboui.backend")).isEqualTo("custom");
   }
 
   @Test
   void backendPreferenceIsExplicitlyConfiguredOnlyForNonBlankProperty() throws Exception {
-    assertThat(invokeIsBackendPreferenceExplicitlyConfigured()).isFalse();
-
-    System.setProperty("tamboui.backend", "   ");
-    assertThat(invokeIsBackendPreferenceExplicitlyConfigured()).isFalse();
-
-    System.setProperty("tamboui.backend", "panama");
-    assertThat(invokeIsBackendPreferenceExplicitlyConfigured()).isTrue();
+    assertThat(invokeIsBackendPreferenceExplicitlyConfigured(null, null)).isFalse();
+    assertThat(invokeIsBackendPreferenceExplicitlyConfigured("   ", null)).isFalse();
+    assertThat(invokeIsBackendPreferenceExplicitlyConfigured("panama", null)).isTrue();
+    assertThat(invokeIsBackendPreferenceExplicitlyConfigured(null, "ansi")).isTrue();
   }
 
-  private static void invokeConfigureTerminalBackendPreference() throws Exception {
+  private static void invokeConfigureTerminalBackendPreference(
+      String propertyValue, String envValue) throws Exception {
     Method method =
-        TuiBootstrapService.class.getDeclaredMethod("configureTerminalBackendPreference");
+        TuiBootstrapService.class.getDeclaredMethod(
+            "configureTerminalBackendPreference", String.class, String.class);
     method.setAccessible(true);
-    method.invoke(null);
+    method.invoke(null, propertyValue, envValue);
   }
 
-  private static boolean invokeIsBackendPreferenceExplicitlyConfigured() throws Exception {
+  private static boolean invokeIsBackendPreferenceExplicitlyConfigured(
+      String propertyValue, String envValue) throws Exception {
     Method method =
-        TuiBootstrapService.class.getDeclaredMethod("isBackendPreferenceExplicitlyConfigured");
+        TuiBootstrapService.class.getDeclaredMethod(
+            "isBackendPreferenceExplicitlyConfigured", String.class, String.class);
     method.setAccessible(true);
-    return (boolean) method.invoke(null);
+    return (boolean) method.invoke(null, propertyValue, envValue);
   }
 }

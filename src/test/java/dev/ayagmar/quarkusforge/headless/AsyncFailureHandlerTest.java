@@ -3,6 +3,8 @@ package dev.ayagmar.quarkusforge.headless;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import dev.ayagmar.quarkusforge.api.ApiClientException;
+import dev.ayagmar.quarkusforge.archive.ArchiveException;
 import dev.ayagmar.quarkusforge.cli.ExitCodes;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import java.io.ByteArrayOutputStream;
@@ -10,6 +12,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.AfterEach;
@@ -72,8 +75,7 @@ class AsyncFailureHandlerTest {
   @Test
   void executionExceptionUnwrapsCauseAndMapsArchiveExitCode() {
     ExecutionException executionException =
-        new ExecutionException(
-            new dev.ayagmar.quarkusforge.archive.ArchiveException("root failure"));
+        new ExecutionException(new ArchiveException("root failure"));
 
     int exitCode =
         AsyncFailureHandler.handleFailure(
@@ -84,11 +86,23 @@ class AsyncFailureHandlerTest {
   }
 
   @Test
+  void completionExceptionUnwrapsCauseAndMapsNetworkExitCode() {
+    CompletionException completionException =
+        new CompletionException(new ApiClientException("connection refused", null));
+
+    int exitCode =
+        AsyncFailureHandler.handleFailure(
+            completionException, timeout, "test.op", "Operation failed", diagnostics);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.NETWORK);
+    assertThat(stderr.toString(StandardCharsets.UTF_8)).contains("connection refused");
+  }
+
+  @Test
   void mapFailureToExitCodeUnwrapsCompletionException() {
     assertThat(
             AsyncFailureHandler.mapFailureToExitCode(
-                new java.util.concurrent.CompletionException(
-                    new dev.ayagmar.quarkusforge.api.ApiClientException("wrapped", null))))
+                new CompletionException(new ApiClientException("wrapped", null))))
         .isEqualTo(ExitCodes.NETWORK);
   }
 

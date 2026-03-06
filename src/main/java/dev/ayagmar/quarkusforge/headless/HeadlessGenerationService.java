@@ -247,8 +247,18 @@ public final class HeadlessGenerationService implements AutoCloseable {
     List<String> extensionInputs = new ArrayList<>(command.extensions());
     Forgefile forgefile = null;
     Path forgefilePath = null;
+    boolean hasFromFile = command.fromFile() != null && !command.fromFile().isBlank();
+    Path saveAsPath = saveAsPathOrNull(command.saveAsFile());
 
-    if (command.fromFile() != null && !command.fromFile().isBlank()) {
+    if (command.lock() && !hasFromFile && saveAsPath == null) {
+      throw new IllegalArgumentException("--lock requires --from or --save-as");
+    }
+    if (command.lockCheck() && !hasFromFile) {
+      throw new IllegalArgumentException(
+          "--lock-check requires --from pointing to a Forgefile with a locked section");
+    }
+
+    if (hasFromFile) {
       forgefilePath = resolveForgefileReadPath(command.fromFile());
       forgefile = ForgefileStore.load(forgefilePath);
       prefill = forgefile.toCliPrefill();
@@ -258,9 +268,6 @@ public final class HeadlessGenerationService implements AutoCloseable {
       extensionInputs.addAll(command.extensions());
     }
 
-    if (command.lock() && forgefile == null && command.saveAsFile() == null) {
-      throw new IllegalArgumentException("--lock requires --from or --save-as");
-    }
     if (command.lockCheck() && (forgefile == null || forgefile.locked() == null)) {
       throw new IllegalArgumentException(
           "--lock-check requires --from pointing to a Forgefile with a locked section");
@@ -274,7 +281,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
         forgefilePath,
         command.lock(),
         command.lockCheck(),
-        saveAsPathOrNull(command.saveAsFile()));
+        saveAsPath);
   }
 
   private static boolean requiresBuiltInPresets(List<String> presetInputs) {

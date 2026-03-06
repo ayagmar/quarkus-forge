@@ -76,7 +76,7 @@ class CommandUtilsTest {
   }
 
   @Test
-  void nonExecutableFileNotFound() throws IOException {
+  void fileWithDifferentExtensionIsNotFound() throws IOException {
     Path bin = tempDir.resolve("bin");
     Files.createDirectories(bin);
     Path file = bin.resolve("notexec.txt");

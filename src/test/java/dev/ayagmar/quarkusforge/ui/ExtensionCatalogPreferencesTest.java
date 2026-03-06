@@ -69,6 +69,26 @@ class ExtensionCatalogPreferencesTest {
     assertThat(store.savedRecents).containsExactly("rest");
   }
 
+  @Test
+  void toggleFavoriteRejectsNullExtensionId() {
+    ExtensionCatalogPreferences preferences =
+        new ExtensionCatalogPreferences(
+            new RecordingFavoritesStore(Set.of(), List.of()), Runnable::run);
+
+    org.junit.jupiter.api.Assertions.assertThrows(
+        NullPointerException.class, () -> preferences.toggleFavorite(null));
+  }
+
+  @Test
+  void recordRecentSelectionRejectsNullExtensionId() {
+    ExtensionCatalogPreferences preferences =
+        new ExtensionCatalogPreferences(
+            new RecordingFavoritesStore(Set.of(), List.of()), Runnable::run);
+
+    org.junit.jupiter.api.Assertions.assertThrows(
+        NullPointerException.class, () -> preferences.recordRecentSelection(null));
+  }
+
   private static final class RecordingFavoritesStore implements ExtensionFavoritesStore {
     private final Set<String> loadedFavorites;
     private final List<String> loadedRecents;
