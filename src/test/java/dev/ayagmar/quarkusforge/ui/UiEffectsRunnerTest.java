@@ -21,29 +21,31 @@ class UiEffectsRunnerTest {
             Map.of(),
             CatalogLoadState.loaded("live", false),
             "Loaded extension catalog from live API");
-    CommandPaletteAction commandPaletteAction = CommandPaletteAction.TOGGLE_SELECTED_FILTER;
+    UiIntent.ExtensionCommand extensionCommand = UiIntent.ExtensionCommand.TOGGLE_SELECTED_FILTER;
     KeyEvent selectorKey = KeyEvent.ofKey(KeyCode.LEFT);
     KeyEvent textInputKey = KeyEvent.ofChar('a');
     RecordingUiEffectsPort port = new RecordingUiEffectsPort();
-
-    new UiEffectsRunner()
-        .run(
-            List.of(
-                new UiEffect.StartCatalogLoad(loader),
-                new UiEffect.RequestCatalogReload(),
-                new UiEffect.PrepareForGeneration(),
-                new UiEffect.CancelPendingAsync(),
-                new UiEffect.ExportRecipeAndLock(),
-                new UiEffect.ExecuteSharedAction(commandPaletteAction),
-                new UiEffect.ApplyCatalogLoadSuccess(success),
-                new UiEffect.StartGeneration(),
-                new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.LOADING),
-                new UiEffect.RequestGenerationCancellation(),
-                new UiEffect.RequestAsyncRepaint(),
-                new UiEffect.MoveTextInputCursorToEnd(FocusTarget.EXTENSION_SEARCH),
-                new UiEffect.ApplyMetadataSelectorKey(FocusTarget.BUILD_TOOL, selectorKey),
-                new UiEffect.ApplyTextInputKey(FocusTarget.ARTIFACT_ID, textInputKey)),
-            port);
+    List<UiIntent> followUpIntents =
+        new UiEffectsRunner()
+            .run(
+                List.of(
+                    new UiEffect.StartCatalogLoad(loader),
+                    new UiEffect.RequestCatalogReload(),
+                    new UiEffect.PrepareForGeneration(),
+                    new UiEffect.CancelPendingAsync(),
+                    new UiEffect.ExportRecipeAndLock(),
+                    new UiEffect.ExecuteExtensionCommand(extensionCommand),
+                    new UiEffect.ApplyExtensionNavigationKey(KeyEvent.ofChar('j')),
+                    new UiEffect.ApplyCatalogLoadSuccess(success),
+                    new UiEffect.StartGeneration(),
+                    new UiEffect.TransitionGenerationState(
+                        CoreTuiController.GenerationState.LOADING),
+                    new UiEffect.RequestGenerationCancellation(),
+                    new UiEffect.RequestAsyncRepaint(),
+                    new UiEffect.MoveTextInputCursorToEnd(FocusTarget.EXTENSION_SEARCH),
+                    new UiEffect.ApplyMetadataSelectorKey(FocusTarget.BUILD_TOOL, selectorKey),
+                    new UiEffect.ApplyTextInputKey(FocusTarget.ARTIFACT_ID, textInputKey)),
+                port);
 
     assertThat(port.calls)
         .containsExactly(
@@ -52,7 +54,8 @@ class UiEffectsRunnerTest {
             "prepareForGeneration",
             "cancelPendingAsync",
             "exportRecipeAndLock",
-            "executeSharedAction",
+            "executeExtensionCommand",
+            "applyExtensionNavigationKey",
             "applyCatalogLoadSuccess",
             "startGeneration",
             "transitionGenerationState",
@@ -61,8 +64,11 @@ class UiEffectsRunnerTest {
             "moveTextInputCursorToEnd",
             "applyMetadataSelectorKey",
             "applyTextInputKey");
+    assertThat(followUpIntents)
+        .containsExactly(new UiIntent.ExtensionStatusIntent("Selected-only view enabled"));
     assertThat(port.loader).isSameAs(loader);
-    assertThat(port.sharedAction).isEqualTo(commandPaletteAction);
+    assertThat(port.extensionCommand).isEqualTo(extensionCommand);
+    assertThat(port.extensionNavigationKeyEvent).isEqualTo(KeyEvent.ofChar('j'));
     assertThat(port.success).isEqualTo(success);
     assertThat(port.targetState).isEqualTo(CoreTuiController.GenerationState.LOADING);
     assertThat(port.cursorFocusTarget).isEqualTo(FocusTarget.EXTENSION_SEARCH);
@@ -75,7 +81,8 @@ class UiEffectsRunnerTest {
   private static final class RecordingUiEffectsPort implements UiEffectsPort {
     private final List<String> calls = new ArrayList<>();
     private ExtensionCatalogLoader loader;
-    private CommandPaletteAction sharedAction;
+    private UiIntent.ExtensionCommand extensionCommand;
+    private KeyEvent extensionNavigationKeyEvent;
     private CatalogLoadSuccess success;
     private CoreTuiController.GenerationState targetState;
     private FocusTarget cursorFocusTarget;
@@ -111,9 +118,16 @@ class UiEffectsRunnerTest {
     }
 
     @Override
-    public void executeSharedAction(CommandPaletteAction action) {
-      calls.add("executeSharedAction");
-      sharedAction = action;
+    public String executeExtensionCommand(UiIntent.ExtensionCommand command) {
+      calls.add("executeExtensionCommand");
+      extensionCommand = command;
+      return "Selected-only view enabled";
+    }
+
+    @Override
+    public void applyExtensionNavigationKey(KeyEvent keyEvent) {
+      calls.add("applyExtensionNavigationKey");
+      extensionNavigationKeyEvent = keyEvent;
     }
 
     @Override

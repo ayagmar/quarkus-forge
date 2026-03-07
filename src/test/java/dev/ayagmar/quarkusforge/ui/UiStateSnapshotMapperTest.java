@@ -98,36 +98,68 @@ class UiStateSnapshotMapperTest {
         .isInstanceOf(UnsupportedOperationException.class);
   }
 
+  @Test
+  void mapperKeepsReducerOwnedRuntimeSlicesAndOnlyOverlaysRenderPanels() {
+    FooterSnapshot footerSnapshot =
+        new FooterSnapshot(
+            true,
+            FocusTarget.SUBMIT,
+            false,
+            false,
+            false,
+            "Rendering",
+            "",
+            "",
+            false,
+            "",
+            "",
+            "",
+            "",
+            "");
+    UiState state =
+        new UiStateFixtureBuilder()
+            .withStartupOverlayView(new UiState.StartupOverlayView(true, List.of("runtime line")))
+            .withPanelState(
+                new UiStateSnapshotMapper.PanelState(
+                    new ExtensionsPanelSnapshot(
+                        true, true, false, false, false, "", "live", false, false, false, 0, "", "",
+                        0, 0, 0, List.of(), List.of(), "", ""),
+                    footerSnapshot))
+            .build();
+
+    assertThat(state.startupOverlay().visible()).isTrue();
+    assertThat(state.startupOverlay().statusLines()).containsExactly("runtime line");
+    assertThat(state.generation().state()).isEqualTo(CoreTuiController.GenerationState.IDLE);
+    assertThat(state.extensions().searchQuery()).isEmpty();
+    assertThat(state.footer()).isEqualTo(footerSnapshot);
+    assertThat(state.statusMessage()).isEqualTo("Ready");
+  }
+
   private static final class UiStateFixtureBuilder {
     private final UiStateSnapshotMapper mapper = new UiStateSnapshotMapper();
     private final ForgeUiState initialState = UiTestFixtureFactory.defaultForgeUiState();
+    private final MetadataPanelSnapshot metadataPanelSnapshot =
+        new MetadataPanelSnapshot(
+            "",
+            false,
+            false,
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            new MetadataPanelSnapshot.SelectorInfo(0, 0),
+            new MetadataPanelSnapshot.SelectorInfo(0, 0),
+            new MetadataPanelSnapshot.SelectorInfo(0, 0));
 
     private ProjectRequest request = initialState.request();
     private ValidationReport validation = initialState.validation();
-    private FocusTarget focusTarget = FocusTarget.GROUP_ID;
-    private int commandPaletteSelection = 0;
 
-    private UiStateSnapshotMapper.ValidationState validationState =
-        new UiStateSnapshotMapper.ValidationState(validation, false);
-    private UiStateSnapshotMapper.SubmissionState submissionState =
-        new UiStateSnapshotMapper.SubmissionState(false, false, "Ready", "", "", false);
     private UiStateSnapshotMapper.PanelState panelState =
         new UiStateSnapshotMapper.PanelState(
-            new MetadataPanelSnapshot(
-                "",
-                false,
-                false,
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                new MetadataPanelSnapshot.SelectorInfo(0, 0),
-                new MetadataPanelSnapshot.SelectorInfo(0, 0),
-                new MetadataPanelSnapshot.SelectorInfo(0, 0)),
             new ExtensionsPanelSnapshot(
                 false,
                 false,
@@ -164,8 +196,22 @@ class UiStateSnapshotMapperTest {
                 "",
                 "",
                 ""));
-    private UiStateSnapshotMapper.ViewState viewState =
-        new UiStateSnapshotMapper.ViewState(
+    private UiState reducerState =
+        new UiState(
+            request,
+            validation,
+            FocusTarget.GROUP_ID,
+            "Ready",
+            "",
+            "",
+            false,
+            false,
+            false,
+            false,
+            0,
+            metadataPanelSnapshot,
+            panelState.extensionsPanel(),
+            panelState.footer(),
             new UiState.OverlayState(false, false, false, false, false),
             new UiState.GenerationView(CoreTuiController.GenerationState.IDLE, 0.0, "", false),
             new UiState.CatalogLoadView(CatalogLoadState.initial()),
@@ -174,38 +220,22 @@ class UiStateSnapshotMapperTest {
             new UiState.ExtensionView(0, 0, 0, false, false, "", "", "", ""));
 
     UiStateFixtureBuilder withPostGenerationView(UiState.PostGenerationView postGenerationView) {
-      viewState =
-          new UiStateSnapshotMapper.ViewState(
-              viewState.overlays(),
-              viewState.generation(),
-              viewState.catalogLoad(),
-              postGenerationView,
-              viewState.startupOverlay(),
-              viewState.extensions());
+      reducerState = reducerState.withPostGeneration(postGenerationView);
       return this;
     }
 
     UiStateFixtureBuilder withStartupOverlayView(UiState.StartupOverlayView startupOverlayView) {
-      viewState =
-          new UiStateSnapshotMapper.ViewState(
-              viewState.overlays(),
-              viewState.generation(),
-              viewState.catalogLoad(),
-              viewState.postGeneration(),
-              startupOverlayView,
-              viewState.extensions());
+      reducerState = reducerState.withStartupOverlay(startupOverlayView);
+      return this;
+    }
+
+    UiStateFixtureBuilder withPanelState(UiStateSnapshotMapper.PanelState nextPanelState) {
+      panelState = nextPanelState;
       return this;
     }
 
     UiState build() {
-      return mapper.map(
-          request,
-          focusTarget,
-          commandPaletteSelection,
-          validationState,
-          submissionState,
-          viewState,
-          panelState);
+      return mapper.map(reducerState, reducerState.statusMessage(), panelState);
     }
   }
 }

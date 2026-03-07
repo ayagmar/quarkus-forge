@@ -1,102 +1,21 @@
 package dev.ayagmar.quarkusforge.ui;
 
 import dev.tamboui.tui.event.KeyEvent;
-import java.nio.file.Path;
 import java.util.List;
 
 /**
- * Encapsulates the post-generation action menu state and key handling. Manages the action selection
- * list, GitHub visibility sub-menu, and exit plan construction.
+ * Maps post-generation key input onto reducer commands using the reducer-owned post-generation
+ * view.
  */
 final class PostGenerationMenuState {
-  private List<UiTextConstants.PostGenerationAction> actions = List.of();
-  private UiState.PostGenerationView state =
-      new UiState.PostGenerationView(false, false, 0, 0, List.of(), null, "", null);
+  private final List<UiTextConstants.PostGenerationAction> actions;
 
-  void setActions(List<UiTextConstants.PostGenerationAction> actions) {
-    this.actions = actions;
-    state =
-        new UiState.PostGenerationView(
-            state.visible(),
-            state.githubVisibilityVisible(),
-            state.actionSelection(),
-            state.githubVisibilitySelection(),
-            actions,
-            state.lastGeneratedProjectPath(),
-            state.lastGeneratedNextCommand(),
-            state.exitPlan());
+  PostGenerationMenuState(List<UiTextConstants.PostGenerationAction> actions) {
+    this.actions = List.copyOf(actions);
   }
 
-  void apply(UiState.PostGenerationView nextState) {
-    state =
-        new UiState.PostGenerationView(
-            nextState.visible(),
-            nextState.githubVisibilityVisible(),
-            nextState.actionSelection(),
-            nextState.githubVisibilitySelection(),
-            actions,
-            nextState.lastGeneratedProjectPath(),
-            nextState.lastGeneratedNextCommand(),
-            nextState.exitPlan());
-  }
-
-  UiState.PostGenerationView snapshot() {
-    return state;
-  }
-
-  List<String> actionLabels() {
-    return state.actionLabels();
-  }
-
-  boolean isVisible() {
-    return state.visible();
-  }
-
-  boolean isGithubVisibilityMenuVisible() {
-    return state.githubVisibilityVisible();
-  }
-
-  int actionSelection() {
-    return state.actionSelection();
-  }
-
-  int githubVisibilitySelection() {
-    return state.githubVisibilitySelection();
-  }
-
-  Path lastGeneratedProjectPath() {
-    return state.lastGeneratedProjectPath();
-  }
-
-  PostGenerationExitPlan exitPlan() {
-    return state.exitPlan();
-  }
-
-  String successHint() {
-    return state.successHint();
-  }
-
-  void reset() {
-    apply(new UiState.PostGenerationView(false, false, 0, 0, actions, null, "", null));
-  }
-
-  void showAfterSuccess(Path generatedPath, String nextCommand) {
-    apply(
-        new UiState.PostGenerationView(
-            true, false, 0, 0, actions, generatedPath, nextCommand, null));
-  }
-
-  void hideAfterFailureOrCancel() {
-    apply(
-        new UiState.PostGenerationView(
-            false,
-            false,
-            state.actionSelection(),
-            0,
-            actions,
-            state.lastGeneratedProjectPath(),
-            state.lastGeneratedNextCommand(),
-            null));
+  UiState.PostGenerationView initialView() {
+    return new UiState.PostGenerationView(false, false, 0, 0, actions, null, "", null);
   }
 
   /**
@@ -104,11 +23,11 @@ final class PostGenerationMenuState {
    *
    * @return a normalized reducer command, or {@code null} if the menu is not visible.
    */
-  UiIntent.PostGenerationCommand handleKey(KeyEvent keyEvent) {
-    if (!state.visible()) {
+  UiIntent.PostGenerationCommand handleKey(UiState.PostGenerationView view, KeyEvent keyEvent) {
+    if (!view.visible()) {
       return null;
     }
-    if (state.githubVisibilityVisible()) {
+    if (view.githubVisibilityVisible()) {
       return handleGithubVisibilityKey(keyEvent);
     }
     if (keyEvent.isCtrlC()) {
@@ -131,7 +50,7 @@ final class PostGenerationMenuState {
     }
     if (UiKeyMatchers.isDigitKey(keyEvent)) {
       int selected = Character.digit(keyEvent.character(), 10) - 1;
-      if (selected >= 0 && selected < state.actions().size()) {
+      if (selected >= 0 && selected < view.actions().size()) {
         return new UiIntent.PostGenerationCommand.SelectActionIndex(selected);
       }
       return new UiIntent.PostGenerationCommand.Noop();

@@ -108,7 +108,7 @@ open target/site/jacoco/index.html       # unit test coverage
 - Run `./mvnw spotless:apply` (or `just format`) before every commit
 - No wildcard imports
 - Prefer immutable records and sealed types for state
-- Extract state machines into dedicated classes (see `PostGenerationMenuState`, `MetadataSelectorManager`)
+- Extract focused UI collaborators when ownership is clear (see `PostGenerationMenuState`, `MetadataSelectorManager`)
 
 ## Testing Conventions
 

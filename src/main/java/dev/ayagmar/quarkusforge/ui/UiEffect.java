@@ -12,7 +12,9 @@ sealed interface UiEffect {
 
   record ExportRecipeAndLock() implements UiEffect {}
 
-  record ExecuteSharedAction(CommandPaletteAction action) implements UiEffect {}
+  record ExecuteExtensionCommand(UiIntent.ExtensionCommand command) implements UiEffect {}
+
+  record ApplyExtensionNavigationKey(dev.tamboui.tui.event.KeyEvent keyEvent) implements UiEffect {}
 
   record ApplyCatalogLoadSuccess(CatalogLoadSuccess success) implements UiEffect {}
 

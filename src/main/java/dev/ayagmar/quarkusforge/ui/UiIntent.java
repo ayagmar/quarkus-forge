@@ -50,7 +50,18 @@ sealed interface UiIntent {
 
   record SharedActionIntent(CommandPaletteAction action) implements UiIntent {}
 
-  record ExtensionPanelFocusIntent(FocusTarget focusTarget) implements UiIntent {}
+  record ExtensionCancelIntent() implements UiIntent {}
+
+  record ExtensionCommandIntent(ExtensionCommand command) implements UiIntent {}
+
+  record ExtensionStatusIntent(String statusMessage) implements UiIntent {
+    public ExtensionStatusIntent {
+      statusMessage = statusMessage == null ? "" : statusMessage;
+    }
+  }
+
+  record ExtensionNavigationIntent(dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget)
+      implements UiIntent {}
 
   record FocusNavigationIntent(dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget)
       implements UiIntent {}
@@ -62,6 +73,28 @@ sealed interface UiIntent {
       implements UiIntent {}
 
   record ToggleErrorDetailsIntent(boolean activeErrorPresent) implements UiIntent {}
+
+  enum ExtensionCommand {
+    CLEAR_SEARCH,
+    DISABLE_FAVORITES_FILTER,
+    DISABLE_SELECTED_FILTER,
+    CLEAR_PRESET_FILTER,
+    CLEAR_CATEGORY_FILTER,
+    TOGGLE_FAVORITE_AT_SELECTION,
+    CLEAR_SELECTED_EXTENSIONS,
+    TOGGLE_CATEGORY_AT_SELECTION,
+    OPEN_ALL_CATEGORIES,
+    JUMP_TO_NEXT_CATEGORY,
+    JUMP_TO_PREVIOUS_CATEGORY,
+    HIERARCHY_LEFT,
+    HIERARCHY_RIGHT,
+    TOGGLE_SELECTION_AT_CURSOR,
+    TOGGLE_FAVORITES_FILTER,
+    TOGGLE_SELECTED_FILTER,
+    CYCLE_PRESET_FILTER,
+    JUMP_TO_FAVORITE,
+    CYCLE_CATEGORY_FILTER
+  }
 
   sealed interface CommandPaletteCommand {
     record ToggleVisibility() implements CommandPaletteCommand {}

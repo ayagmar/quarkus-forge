@@ -101,13 +101,14 @@ CoreTuiController (Orchestration Shell)
     │       ├── Focus navigation
     │       └── Input handling
     │
-    ├── UiStateSnapshotMapper    Builds immutable UiState read model from controller internals
+    ├── UiStateSnapshotMapper    Layers render-only panel/footer snapshots onto synchronized UiState
     │
     ├── CoreUiReducer            Pure transition logic for migrated slices
     │       ├── post-generation intent handling
     │       ├── command palette + help overlay visibility handling
     │       ├── submit + blocked-submit authority
     │       ├── generation callback intent handling
+    │       ├── extension cancel + list interaction intent handling
     │       ├── focus/input intent handling
     │       ├── catalog load / reload lifecycle handling
     │       ├── startup overlay visibility handling
@@ -115,6 +116,7 @@ CoreTuiController (Orchestration Shell)
     │
     ├── UiEffectsRunner          Executes side effects emitted by reducer
     │       ├── catalog load / reload start
+    │       ├── extension catalog interaction commands
     │       ├── catalog success application
     │       ├── generation start/cancel
     │       ├── generation-state transitions for submit lifecycle
@@ -128,7 +130,6 @@ CoreTuiController (Orchestration Shell)
     │       └── FooterLinesComposer      Status bar composition
     │
     ├── State Managers
-    │       ├── PostGenerationMenuState  Post-gen menu state machine
     │       ├── MetadataSelectorManager  Platform/build/java selectors
     │       ├── ExtensionCatalogProjection  Search/filter state + row projection
     │       ├── ExtensionCatalogNavigation  Selection + list navigation
@@ -137,6 +138,7 @@ CoreTuiController (Orchestration Shell)
     │       └── GenerationStateTracker   Generation progress tracking
     │
     └── Extracted Helpers
+            ├── PostGenerationMenuState    Post-gen key decoding + action menu configuration
             ├── ExtensionInteractionHandler  Bridge to catalog interactions
             ├── CatalogRowBuilder            Pure function: row building
             ├── UiTextConstants              UI text content
@@ -144,6 +146,8 @@ CoreTuiController (Orchestration Shell)
             ├── GenerationFlowCoordinator    Async generation lifecycle
             └── UiTextInputKeys              Text-input edit-key normalization
 ....
+
+Reducer-visible UI semantics now follow a strict ownership split: `CoreTuiController` synchronizes the current request, validation, generation progress, startup overlay lines, and extension-filter read model onto `reducerState` before each reduce/render pass; `UiStateSnapshotMapper` no longer rebuilds those slices and only adds render-only panel/footer snapshots plus the effective status line. Mutable widget internals such as `TextInputState` and `ListState` stay in adapter/runtime context rather than `UiState`.
 
 === State Machine: Generation Flow
 
@@ -215,7 +219,7 @@ The UI refactor to explicit `UiState`/`UiIntent`/`UiReducer`/`UiEffect` must pre
 .. token-based stale completion protection
 .. cancellation semantics (`CancellationException` and cancel flag)
 .. dropped-callback reconciliation via `reconcileCompletionIfDone`
-* Post-generation flow semantics from `PostGenerationMenuState` remain unchanged:
+* Post-generation flow semantics remain unchanged:
 .. action selection and visibility sub-menu behavior
 .. stable exit-plan generation
 .. `Generate again` returns to active TUI session without quitting
@@ -379,10 +383,13 @@ graph TD
 | `JsonFieldReader` deduplicates JSON helpers across 5+ classes. `renderCompactField` consolidates two near-identical rendering methods. `BoundaryFailure` centralizes boundary failure classification. `applyFavoritesAndPresetFilters` eliminates duplicate filter pipeline.
 
 | *Derived State Elimination*
-| `successHint` is computed from `PostGenerationMenuState` rather than stored as a separate mutable field.
+| `successHint` is computed from reducer-owned `UiState.PostGenerationView` rather than stored as a separate controller field.
+
+| *Single Source of Truth*
+| Reducer-visible TUI semantics are synchronized onto `reducerState` before reduce/render; `UiStateSnapshotMapper` only overlays render-only panel/footer snapshots instead of rebuilding reducer-adjacent view slices.
 
 | *Encapsulation*
-| `PostGenerationMenuState`, `CatalogLoadCoordinator`, and `MetadataSelectorManager` each own their state and expose it through focused APIs.
+| `CatalogLoadCoordinator` and `MetadataSelectorManager` own their state; `PostGenerationMenuState` only translates keys against reducer-owned post-generation data.
 
 | *Resource Safety*
 | `QuarkusApiClient` implements `AutoCloseable`; all instantiation sites use try-with-resources or `whenComplete` callbacks to prevent thread pool leaks.
@@ -395,7 +402,7 @@ graph TD
 
 * Extensive unit tests with deterministic async harnesses for TUI state machine testing
 * Integration tests using WireMock for API contract verification
-* Dedicated unit tests for extracted state managers: `PostGenerationMenuState`, `MetadataSelectorManager`, `CatalogRowBuilder`, `StartupOverlayTracker`
+* Dedicated unit tests for extracted collaborators: `PostGenerationMenuState`, `MetadataSelectorManager`, `CatalogRowBuilder`, `StartupOverlayTracker`
 * Async TUI tests use `UiScheduler.immediate()` and `Duration.ZERO` debounce for deterministic behavior
 * Property-based tests for ZIP extraction edge cases
 
