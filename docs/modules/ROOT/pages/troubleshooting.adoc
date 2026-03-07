@@ -103,6 +103,7 @@ Symptom: native binary crashes or prints `UnsatisfiedLinkError` or SVM error.
 Actions:
 
 . Ensure you used the `native` Maven profile when building: `mvn clean package -Pnative`.
+. If the binary reports `Support for Arena.ofShared is not active`, rebuild from a version that enables GraalVM shared arenas in the native image (`-H:+SharedArenaSupport`).
 . Verify the binary was built on the same OS/arch as the target. Native images are not cross-platform.
 . Run with verbose diagnostics:
 +
