@@ -156,6 +156,11 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
           }
 
           @Override
+          public void executeCommandPaletteAction(CommandPaletteAction action) {
+            executeCommandPaletteActionEffect(action);
+          }
+
+          @Override
           public void applyCatalogLoadSuccess(CatalogLoadSuccess success) {
             applyCatalogLoadSuccessEffect(success);
           }
@@ -1019,13 +1024,15 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         dispatchIntent(
             new UiIntent.CommandPaletteIntent(
                 new UiIntent.CommandPaletteCommand.SelectIndex(selected)));
-        executeCommandPaletteSelection();
+        routeIntent(
+            new UiIntent.CommandPaletteIntent(
+                new UiIntent.CommandPaletteCommand.ConfirmSelection()));
       }
       return UiAction.handled(false);
     }
     if (keyEvent.isConfirm() || keyEvent.isSelect()) {
-      executeCommandPaletteSelection();
-      return UiAction.handled(false);
+      return routeIntent(
+          new UiIntent.CommandPaletteIntent(new UiIntent.CommandPaletteCommand.ConfirmSelection()));
     }
     return UiAction.handled(false);
   }
@@ -1104,20 +1111,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     }
   }
 
-  private void executeCommandPaletteSelection() {
-    if (UiTextConstants.COMMAND_PALETTE_ENTRIES.isEmpty()) {
-      dispatchIntent(
-          new UiIntent.CommandPaletteIntent(new UiIntent.CommandPaletteCommand.ConfirmSelection()));
-      return;
-    }
-    CommandPaletteAction action =
-        UiTextConstants.COMMAND_PALETTE_ENTRIES.get(commandPaletteSelection).action();
-    dispatchIntent(
-        new UiIntent.CommandPaletteIntent(new UiIntent.CommandPaletteCommand.ConfirmSelection()));
-    executeCommandPaletteAction(action);
-  }
-
-  private void executeCommandPaletteAction(CommandPaletteAction action) {
+  private void executeCommandPaletteActionEffect(CommandPaletteAction action) {
     switch (action) {
       case FOCUS_EXTENSION_SEARCH -> focusExtensionSearch();
       case FOCUS_EXTENSION_LIST -> focusExtensionList();

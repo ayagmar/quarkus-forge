@@ -19,6 +19,8 @@ final class UiEffectsRunner {
       case UiEffect.PrepareForGeneration _ -> effectsPort.prepareForGeneration();
       case UiEffect.CancelPendingAsync _ -> effectsPort.cancelPendingAsync();
       case UiEffect.ExportRecipeAndLock _ -> effectsPort.exportRecipeAndLock();
+      case UiEffect.ExecuteCommandPaletteAction actionEffect ->
+          effectsPort.executeCommandPaletteAction(actionEffect.action());
       case UiEffect.ApplyCatalogLoadSuccess successEffect ->
           effectsPort.applyCatalogLoadSuccess(successEffect.success());
       case UiEffect.StartGeneration _ -> effectsPort.startGeneration();

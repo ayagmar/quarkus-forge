@@ -421,7 +421,7 @@ class CoreUiReducerTest {
   }
 
   @Test
-  void commandPaletteSelectionCommandsStayReducerOwned() {
+  void commandPaletteConfirmClosesOverlayAndEmitsSelectedActionEffect() {
     UiState paletteState =
         stateWithOverlayState(
             baseState(), new UiState.OverlayState(false, true, false, false, false), 0, "Ready");
@@ -441,6 +441,9 @@ class CoreUiReducerTest {
             new UiIntent.CommandPaletteIntent(
                 new UiIntent.CommandPaletteCommand.ConfirmSelection()));
 
+    assertThat(confirmResult.effects())
+        .containsExactly(
+            new UiEffect.ExecuteCommandPaletteAction(CommandPaletteAction.TOGGLE_ERROR_DETAILS));
     assertThat(confirmResult.nextState().overlays().commandPaletteVisible()).isFalse();
     assertThat(confirmResult.nextState().commandPaletteSelection())
         .isEqualTo(UiTextConstants.COMMAND_PALETTE_ENTRIES.size() - 1);
