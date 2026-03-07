@@ -43,7 +43,7 @@ class OutputPathResolverTest {
     systemProperties.set("user.home", homePath);
 
     String output = "~\\Projects\\Quarkus";
-    Path expected = Path.of(homePath.toString() + output.substring(1)).toAbsolutePath().normalize();
+    Path expected = homePath.resolve("Projects").resolve("Quarkus").normalize();
     assertThat(OutputPathResolver.resolveOutputRoot(output)).isEqualTo(expected);
   }
 

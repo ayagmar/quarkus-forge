@@ -24,7 +24,6 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.parallel.ResourceLock;
 import org.junit.jupiter.api.parallel.Resources;
 
-@ResourceLock(Resources.SYSTEM_PROPERTIES)
 class CoreTuiShellPilotTest {
   @RegisterExtension final SystemPropertyExtension systemProperties = new SystemPropertyExtension();
 
@@ -192,6 +191,7 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  @ResourceLock(Resources.SYSTEM_PROPERTIES)
   void metadataPanelRendersOutputDirectoryAsAbsolutePath() {
     Path homePath = Path.of("target", "qf-home").toAbsolutePath().normalize();
     String expectedOutputPath = homePath.resolve("Projects").resolve("Quarkus").toString();

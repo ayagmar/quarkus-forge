@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import org.junit.jupiter.api.Test;
 
 class CatalogLoadCoordinatorTest {
@@ -95,6 +96,20 @@ class CatalogLoadCoordinatorTest {
     TestCallbacks callbacks = new TestCallbacks();
     CompletableFuture<ExtensionCatalogLoadResult> cancelled =
         CompletableFuture.failedFuture(new CancellationException("cancelled"));
+
+    coordinator.startLoad(() -> cancelled, callbacks);
+
+    assertThat(callbacks.failures).isEmpty();
+    assertThat(callbacks.successes).isEmpty();
+  }
+
+  @Test
+  void wrappedCancellationDoesNotEmitFailureCallback() {
+    CatalogLoadCoordinator coordinator = new CatalogLoadCoordinator();
+    TestCallbacks callbacks = new TestCallbacks();
+    CompletableFuture<ExtensionCatalogLoadResult> cancelled =
+        CompletableFuture.failedFuture(
+            new CompletionException(new CancellationException("cancelled")));
 
     coordinator.startLoad(() -> cancelled, callbacks);
 

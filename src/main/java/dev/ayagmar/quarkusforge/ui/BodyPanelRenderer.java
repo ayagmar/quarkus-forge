@@ -54,6 +54,7 @@ final class BodyPanelRenderer {
       PanelBorderStyleResolver panelBorderStyleResolver) {
     Objects.requireNonNull(snapshot);
     Objects.requireNonNull(inputRenderer);
+    Objects.requireNonNull(renderContext);
     Objects.requireNonNull(panelTitleFormatter);
     Objects.requireNonNull(panelBorderStyleResolver);
 
