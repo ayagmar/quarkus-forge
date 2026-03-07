@@ -13,7 +13,9 @@ interface UiEffectsPort {
 
   void exportRecipeAndLock();
 
-  void executeSharedAction(CommandPaletteAction action);
+  String executeExtensionCommand(UiIntent.ExtensionCommand command);
+
+  void applyExtensionNavigationKey(KeyEvent keyEvent);
 
   void applyCatalogLoadSuccess(CatalogLoadSuccess success);
 

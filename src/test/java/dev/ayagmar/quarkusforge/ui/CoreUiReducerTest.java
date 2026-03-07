@@ -450,7 +450,97 @@ class CoreUiReducerTest {
     assertThat(result.nextState().focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
     assertThat(result.nextState().statusMessage()).isEqualTo("Focus moved to extensionList");
     assertThat(result.effects())
-        .containsExactly(new UiEffect.ExecuteSharedAction(CommandPaletteAction.JUMP_TO_FAVORITE));
+        .containsExactly(
+            new UiEffect.ExecuteExtensionCommand(UiIntent.ExtensionCommand.JUMP_TO_FAVORITE));
+  }
+
+  @Test
+  void extensionCancelIntentUsesEscUnwindPriorityBeforeQuit() {
+    UiState state =
+        stateWithExtensionView(
+            stateWithFocus(baseState(), FocusTarget.EXTENSION_SEARCH),
+            new UiState.ExtensionView(1, 2, 1, true, true, "web", "Core", "rest", ""));
+
+    ReduceResult result = reducer.reduce(state, new UiIntent.ExtensionCancelIntent());
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects())
+        .containsExactly(
+            new UiEffect.ExecuteExtensionCommand(UiIntent.ExtensionCommand.CLEAR_SEARCH));
+  }
+
+  @Test
+  void extensionCancelIntentFallsBackToListFocusWhenOnlySearchFocusRemains() {
+    UiState state =
+        stateWithExtensionView(
+            stateWithFocus(baseState(), FocusTarget.EXTENSION_SEARCH),
+            new UiState.ExtensionView(2, 2, 0, false, false, "", "", "", ""));
+
+    ReduceResult result = reducer.reduce(state, new UiIntent.ExtensionCancelIntent());
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects()).isEmpty();
+    assertThat(result.nextState().focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
+    assertThat(result.nextState().statusMessage()).isEqualTo("Focus moved to extensionList");
+  }
+
+  @Test
+  void sharedCategoryActionsMoveFocusToListBeforeRunningExtensionEffect() {
+    ReduceResult result =
+        reducer.reduce(
+            baseState(),
+            new UiIntent.SharedActionIntent(CommandPaletteAction.CYCLE_CATEGORY_FILTER));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.nextState().focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
+    assertThat(result.nextState().statusMessage()).isEqualTo("Focus moved to extensionList");
+    assertThat(result.effects())
+        .containsExactly(
+            new UiEffect.ExecuteExtensionCommand(UiIntent.ExtensionCommand.CYCLE_CATEGORY_FILTER));
+  }
+
+  @Test
+  void extensionStatusIntentPreservesExistingVisibleErrorWhileUpdatingStatus() {
+    UiState state =
+        baseState()
+            .withSubmissionState(
+                "Submit blocked", "groupId: invalid", "verbose", true, true, false, true);
+
+    ReduceResult result =
+        reducer.reduce(state, new UiIntent.ExtensionStatusIntent("Closed category: Core"));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects()).isEmpty();
+    assertThat(result.nextState().statusMessage()).isEqualTo("Closed category: Core");
+    assertThat(result.nextState().errorMessage()).isEqualTo("groupId: invalid");
+    assertThat(result.nextState().showErrorDetails()).isTrue();
+  }
+
+  @Test
+  void extensionNavigationIntentRoutesListMovementThroughEffect() {
+    ReduceResult result =
+        reducer.reduce(
+            stateWithFocus(baseState(), FocusTarget.EXTENSION_LIST),
+            new UiIntent.ExtensionNavigationIntent(
+                KeyEvent.ofChar('j'), FocusTarget.EXTENSION_LIST));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects())
+        .containsExactly(new UiEffect.ApplyExtensionNavigationKey(KeyEvent.ofChar('j')));
+    assertThat(result.nextState())
+        .isEqualTo(stateWithFocus(baseState(), FocusTarget.EXTENSION_LIST));
+  }
+
+  @Test
+  void extensionNavigationIntentIgnoresNonNavigationKeys() {
+    ReduceResult result =
+        reducer.reduce(
+            stateWithFocus(baseState(), FocusTarget.EXTENSION_LIST),
+            new UiIntent.ExtensionNavigationIntent(
+                KeyEvent.ofChar('x'), FocusTarget.EXTENSION_LIST));
+
+    assertThat(result.action()).isEqualTo(UiAction.ignored());
+    assertThat(result.effects()).isEmpty();
   }
 
   @Test
@@ -616,7 +706,7 @@ class CoreUiReducerTest {
   }
 
   @Test
-  void extensionPanelFocusIntentClearsValidationBlockThroughReducerState() {
+  void sharedFocusExtensionSearchClearsValidationBlockThroughReducerState() {
     UiState blockedState =
         invalidConfiguredState()
             .withSubmissionState(
@@ -624,10 +714,12 @@ class CoreUiReducerTest {
 
     ReduceResult result =
         reducer.reduce(
-            blockedState, new UiIntent.ExtensionPanelFocusIntent(FocusTarget.EXTENSION_SEARCH));
+            blockedState,
+            new UiIntent.SharedActionIntent(CommandPaletteAction.FOCUS_EXTENSION_SEARCH));
 
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
-    assertThat(result.effects()).isEmpty();
+    assertThat(result.effects())
+        .containsExactly(new UiEffect.MoveTextInputCursorToEnd(FocusTarget.EXTENSION_SEARCH));
     assertThat(result.nextState().focusTarget()).isEqualTo(FocusTarget.EXTENSION_SEARCH);
     assertThat(result.nextState().statusMessage()).isEqualTo("Focus moved to extensionSearch");
     assertThat(result.nextState().errorMessage()).isEmpty();
@@ -637,7 +729,7 @@ class CoreUiReducerTest {
   }
 
   @Test
-  void extensionPanelFocusIntentPreservesTargetConflictStateWhileClearingVisibleError() {
+  void sharedFocusExtensionListPreservesTargetConflictStateWhileClearingVisibleError() {
     UiState blockedState =
         baseState()
             .withSubmissionState(
@@ -651,7 +743,8 @@ class CoreUiReducerTest {
 
     ReduceResult result =
         reducer.reduce(
-            blockedState, new UiIntent.ExtensionPanelFocusIntent(FocusTarget.EXTENSION_LIST));
+            blockedState,
+            new UiIntent.SharedActionIntent(CommandPaletteAction.FOCUS_EXTENSION_LIST));
 
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
     assertThat(result.effects()).isEmpty();
@@ -703,6 +796,30 @@ class CoreUiReducerTest {
 
   private static UiState validState(UiState referenceState) {
     return stateWithValidation(referenceState, baseState().validation());
+  }
+
+  private static UiState stateWithFocus(UiState state, FocusTarget focusTarget) {
+    return new UiState(
+        state.request(),
+        state.validation(),
+        focusTarget,
+        state.statusMessage(),
+        state.errorMessage(),
+        state.verboseErrorDetails(),
+        state.showErrorDetails(),
+        state.submitRequested(),
+        state.submitBlockedByValidation(),
+        state.submitBlockedByTargetConflict(),
+        state.commandPaletteSelection(),
+        state.metadataPanel(),
+        state.extensionsPanel(),
+        state.footer(),
+        state.overlays(),
+        state.generation(),
+        state.catalogLoad(),
+        state.postGeneration(),
+        state.startupOverlay(),
+        state.extensions());
   }
 
   private static UiState stateWithSelectedCount(UiState state, int selectedExtensionCount) {
@@ -761,6 +878,30 @@ class CoreUiReducerTest {
         state.postGeneration(),
         state.startupOverlay(),
         state.extensions());
+  }
+
+  private static UiState stateWithExtensionView(UiState state, UiState.ExtensionView extensions) {
+    return new UiState(
+        state.request(),
+        state.validation(),
+        state.focusTarget(),
+        state.statusMessage(),
+        state.errorMessage(),
+        state.verboseErrorDetails(),
+        state.showErrorDetails(),
+        state.submitRequested(),
+        state.submitBlockedByValidation(),
+        state.submitBlockedByTargetConflict(),
+        state.commandPaletteSelection(),
+        state.metadataPanel(),
+        state.extensionsPanel(),
+        state.footer(),
+        state.overlays(),
+        state.generation(),
+        state.catalogLoad(),
+        state.postGeneration(),
+        state.startupOverlay(),
+        extensions);
   }
 
   private static UiState postGenerationVisibleState() {

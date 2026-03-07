@@ -454,6 +454,34 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void commandPaletteCategoryActionsReuseReducerOwnedListFlow() {
+    CoreTuiController controller = UiControllerTestHarness.controller();
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20)))));
+
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.GROUP_ID);
+    controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
+    controller.onEvent(KeyEvent.ofChar('8'));
+
+    assertThat(controller.commandPaletteVisible()).isFalse();
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
+    assertThat(controller.statusMessage()).contains("Closed category: Core");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("▶ Core ");
+
+    controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
+    controller.onEvent(KeyEvent.ofChar('9'));
+
+    assertThat(controller.commandPaletteVisible()).isFalse();
+    assertThat(controller.statusMessage()).contains("Opened 1 category");
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("CDI");
+  }
+
+  @Test
   void slashIsInsertedInOutputDirectoryWithoutStealingFocus() {
     CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.OUTPUT_DIR);

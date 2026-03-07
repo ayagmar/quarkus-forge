@@ -36,6 +36,34 @@ record UiState(
     return withFeedback(nextStatusMessage, nextErrorMessage, verboseErrorDetails, showErrorDetails);
   }
 
+  UiState withStatusMessage(String nextStatusMessage) {
+    return withFeedback(nextStatusMessage, errorMessage, verboseErrorDetails, showErrorDetails);
+  }
+
+  UiState withRequestAndValidation(ProjectRequest nextRequest, ValidationReport nextValidation) {
+    return new UiState(
+        nextRequest,
+        nextValidation,
+        focusTarget,
+        statusMessage,
+        errorMessage,
+        verboseErrorDetails,
+        showErrorDetails,
+        submitRequested,
+        submitBlockedByValidation,
+        submitBlockedByTargetConflict,
+        commandPaletteSelection,
+        metadataPanel,
+        extensionsPanel,
+        footer,
+        overlays,
+        generation,
+        catalogLoad,
+        postGeneration,
+        startupOverlay,
+        extensions);
+  }
+
   UiState withFeedback(
       String nextStatusMessage,
       String nextErrorMessage,
@@ -80,6 +108,81 @@ record UiState(
         metadataPanel,
         extensionsPanel,
         footer,
+        overlays,
+        generation,
+        catalogLoad,
+        postGeneration,
+        startupOverlay,
+        extensions);
+  }
+
+  UiState withFocusAndStatus(FocusTarget nextFocusTarget, String nextStatusMessage) {
+    return new UiState(
+        request,
+        validation,
+        nextFocusTarget,
+        nextStatusMessage,
+        errorMessage,
+        verboseErrorDetails,
+        showErrorDetails,
+        submitRequested,
+        submitBlockedByValidation,
+        submitBlockedByTargetConflict,
+        commandPaletteSelection,
+        metadataPanel,
+        extensionsPanel,
+        footer,
+        overlays,
+        generation,
+        catalogLoad,
+        postGeneration,
+        startupOverlay,
+        extensions);
+  }
+
+  UiState withMetadataPanel(MetadataPanelSnapshot nextMetadataPanel) {
+    return new UiState(
+        request,
+        validation,
+        focusTarget,
+        statusMessage,
+        errorMessage,
+        verboseErrorDetails,
+        showErrorDetails,
+        submitRequested,
+        submitBlockedByValidation,
+        submitBlockedByTargetConflict,
+        commandPaletteSelection,
+        nextMetadataPanel,
+        extensionsPanel,
+        footer,
+        overlays,
+        generation,
+        catalogLoad,
+        postGeneration,
+        startupOverlay,
+        extensions);
+  }
+
+  UiState withRenderSnapshot(
+      String nextStatusMessage,
+      ExtensionsPanelSnapshot nextExtensionsPanel,
+      FooterSnapshot nextFooter) {
+    return new UiState(
+        request,
+        validation,
+        focusTarget,
+        nextStatusMessage,
+        errorMessage,
+        verboseErrorDetails,
+        showErrorDetails,
+        submitRequested,
+        submitBlockedByValidation,
+        submitBlockedByTargetConflict,
+        commandPaletteSelection,
+        metadataPanel,
+        nextExtensionsPanel,
+        nextFooter,
         overlays,
         generation,
         catalogLoad,
@@ -236,6 +339,10 @@ record UiState(
         extensions);
   }
 
+  UiState withStartupOverlayStatusLines(List<String> nextStatusLines) {
+    return withStartupOverlay(new StartupOverlayView(startupOverlay.visible(), nextStatusLines));
+  }
+
   UiState withStartupOverlay(StartupOverlayView nextStartupOverlay) {
     return new UiState(
         request,
@@ -298,6 +405,64 @@ record UiState(
         extensions);
   }
 
+  UiState withGeneration(GenerationView nextGeneration) {
+    return new UiState(
+        request,
+        validation,
+        focusTarget,
+        statusMessage,
+        errorMessage,
+        verboseErrorDetails,
+        showErrorDetails,
+        submitRequested,
+        submitBlockedByValidation,
+        submitBlockedByTargetConflict,
+        commandPaletteSelection,
+        metadataPanel,
+        extensionsPanel,
+        footer,
+        new OverlayState(
+            isGenerationVisible(nextGeneration),
+            overlays.commandPaletteVisible(),
+            overlays.helpOverlayVisible(),
+            overlays.postGenerationVisible(),
+            overlays.startupOverlayVisible()),
+        nextGeneration,
+        catalogLoad,
+        postGeneration,
+        startupOverlay,
+        extensions);
+  }
+
+  UiState withExtensions(ExtensionView nextExtensions) {
+    return new UiState(
+        request,
+        validation,
+        focusTarget,
+        statusMessage,
+        errorMessage,
+        verboseErrorDetails,
+        showErrorDetails,
+        submitRequested,
+        submitBlockedByValidation,
+        submitBlockedByTargetConflict,
+        commandPaletteSelection,
+        metadataPanel,
+        extensionsPanel,
+        footer,
+        overlays,
+        generation,
+        catalogLoad,
+        postGeneration,
+        startupOverlay,
+        nextExtensions);
+  }
+
+  private static boolean isGenerationVisible(GenerationView generationView) {
+    return generationView.state() == CoreTuiController.GenerationState.VALIDATING
+        || generationView.state() == CoreTuiController.GenerationState.LOADING;
+  }
+
   record OverlayState(
       boolean generationVisible,
       boolean commandPaletteVisible,
@@ -345,6 +510,86 @@ record UiState(
     PostGenerationView {
       actions = List.copyOf(actions);
       lastGeneratedNextCommand = lastGeneratedNextCommand == null ? "" : lastGeneratedNextCommand;
+    }
+
+    PostGenerationView withActionSelection(int nextActionSelection) {
+      return new PostGenerationView(
+          visible,
+          githubVisibilityVisible,
+          nextActionSelection,
+          githubVisibilitySelection,
+          actions,
+          lastGeneratedProjectPath,
+          lastGeneratedNextCommand,
+          exitPlan);
+    }
+
+    PostGenerationView withGithubVisibilitySelection(int nextGithubVisibilitySelection) {
+      return new PostGenerationView(
+          visible,
+          githubVisibilityVisible,
+          actionSelection,
+          nextGithubVisibilitySelection,
+          actions,
+          lastGeneratedProjectPath,
+          lastGeneratedNextCommand,
+          exitPlan);
+    }
+
+    PostGenerationView showGithubVisibilityMenu() {
+      return new PostGenerationView(
+          true,
+          true,
+          actionSelection,
+          0,
+          actions,
+          lastGeneratedProjectPath,
+          lastGeneratedNextCommand,
+          null);
+    }
+
+    PostGenerationView hideGithubVisibilityMenu() {
+      return new PostGenerationView(
+          visible,
+          false,
+          actionSelection,
+          0,
+          actions,
+          lastGeneratedProjectPath,
+          lastGeneratedNextCommand,
+          exitPlan);
+    }
+
+    PostGenerationView afterSuccess(Path generatedPath, String nextCommand) {
+      return new PostGenerationView(true, false, 0, 0, actions, generatedPath, nextCommand, null);
+    }
+
+    PostGenerationView hidden() {
+      return new PostGenerationView(
+          false,
+          false,
+          actionSelection,
+          0,
+          actions,
+          lastGeneratedProjectPath,
+          lastGeneratedNextCommand,
+          null);
+    }
+
+    PostGenerationView reset() {
+      return new PostGenerationView(false, false, 0, 0, actions, null, "", null);
+    }
+
+    PostGenerationView closeWithExitPlan(PostGenerationExitPlan nextExitPlan) {
+      return new PostGenerationView(
+          false,
+          false,
+          0,
+          0,
+          actions,
+          lastGeneratedProjectPath,
+          lastGeneratedNextCommand,
+          nextExitPlan);
     }
 
     List<String> actionLabels() {

@@ -111,10 +111,10 @@ final class CoreUiReducer implements UiReducer {
                       false,
                       false)
                   .withPostGeneration(
-                      successPostGenerationState(
-                          state.postGeneration(),
-                          successIntent.generatedPath(),
-                          successIntent.nextCommand())),
+                      state
+                          .postGeneration()
+                          .afterSuccess(
+                              successIntent.generatedPath(), successIntent.nextCommand())),
               List.of(new UiEffect.RequestAsyncRepaint()),
               UiAction.handled(false));
       case UiIntent.GenerationCancelledIntent _ ->
@@ -128,7 +128,7 @@ final class CoreUiReducer implements UiReducer {
                       false,
                       false,
                       false)
-                  .withPostGeneration(hiddenPostGenerationState(state.postGeneration())),
+                  .withPostGeneration(state.postGeneration().hidden()),
               List.of(new UiEffect.RequestAsyncRepaint()),
               UiAction.handled(false));
       case UiIntent.GenerationFailedIntent failedIntent ->
@@ -142,7 +142,7 @@ final class CoreUiReducer implements UiReducer {
                       false,
                       false,
                       false)
-                  .withPostGeneration(hiddenPostGenerationState(state.postGeneration())),
+                  .withPostGeneration(state.postGeneration().hidden()),
               List.of(new UiEffect.RequestAsyncRepaint()),
               UiAction.handled(false));
       case UiIntent.GenerationCancellationRequestedIntent _ ->
@@ -163,8 +163,17 @@ final class CoreUiReducer implements UiReducer {
           reduceHelpOverlay(state, helpOverlayIntent.command());
       case UiIntent.SharedActionIntent sharedActionIntent ->
           reduceSharedAction(state, sharedActionIntent.action());
-      case UiIntent.ExtensionPanelFocusIntent focusIntent ->
-          reduceExtensionPanelFocus(state, focusIntent.focusTarget());
+      case UiIntent.ExtensionCancelIntent _ -> reduceExtensionCancel(state);
+      case UiIntent.ExtensionCommandIntent extensionIntent ->
+          reduceExtensionCommand(state, extensionIntent.command());
+      case UiIntent.ExtensionStatusIntent extensionStatusIntent ->
+          new ReduceResult(
+              state.withStatusMessage(extensionStatusIntent.statusMessage()),
+              List.of(),
+              UiAction.handled(false));
+      case UiIntent.ExtensionNavigationIntent navigationIntent ->
+          reduceExtensionNavigation(
+              state, navigationIntent.keyEvent(), navigationIntent.focusTarget());
       case UiIntent.FocusNavigationIntent navigationIntent ->
           reduceFocusNavigation(state, navigationIntent.keyEvent(), navigationIntent.focusTarget());
       case UiIntent.MetadataInputIntent metadataIntent ->
@@ -179,8 +188,7 @@ final class CoreUiReducer implements UiReducer {
 
   private static ReduceResult reduceSubmitRequest(
       UiState state, UiIntent.SubmitRequestContext context) {
-    UiState preparedState =
-        state.withPostGeneration(resetPostGenerationState(state.postGeneration()));
+    UiState preparedState = state.withPostGeneration(state.postGeneration().reset());
     String firstValidationError = UiIntent.firstValidationError(state.validation());
     if (!firstValidationError.isBlank()) {
       FocusTarget firstInvalidTarget = ValidationFocusTargets.firstInvalid(state.validation());
@@ -430,24 +438,86 @@ final class CoreUiReducer implements UiReducer {
                   FocusTarget.EXTENSION_LIST, "Focus moved to extensionList"),
               List.of(),
               UiAction.handled(false));
-      case TOGGLE_FAVORITES_FILTER,
-          TOGGLE_SELECTED_FILTER,
-          CYCLE_PRESET_FILTER,
-          CYCLE_CATEGORY_FILTER,
-          TOGGLE_CATEGORY,
-          OPEN_ALL_CATEGORIES ->
-          new ReduceResult(
-              state, List.of(new UiEffect.ExecuteSharedAction(action)), UiAction.handled(false));
+      case TOGGLE_FAVORITES_FILTER ->
+          reduceExtensionCommand(state, UiIntent.ExtensionCommand.TOGGLE_FAVORITES_FILTER);
+      case TOGGLE_SELECTED_FILTER ->
+          reduceExtensionCommand(state, UiIntent.ExtensionCommand.TOGGLE_SELECTED_FILTER);
+      case CYCLE_PRESET_FILTER ->
+          reduceExtensionCommand(state, UiIntent.ExtensionCommand.CYCLE_PRESET_FILTER);
+      case CYCLE_CATEGORY_FILTER ->
+          reduceExtensionCommandWithOptionalListFocus(
+              state, UiIntent.ExtensionCommand.CYCLE_CATEGORY_FILTER);
+      case TOGGLE_CATEGORY ->
+          reduceExtensionCommandWithOptionalListFocus(
+              state, UiIntent.ExtensionCommand.TOGGLE_CATEGORY_AT_SELECTION);
+      case OPEN_ALL_CATEGORIES ->
+          reduceExtensionCommandWithOptionalListFocus(
+              state, UiIntent.ExtensionCommand.OPEN_ALL_CATEGORIES);
       case JUMP_TO_FAVORITE ->
-          new ReduceResult(
-              focusExtensionListForSharedAction(state),
-              List.of(new UiEffect.ExecuteSharedAction(action)),
-              UiAction.handled(false));
+          reduceExtensionCommandWithOptionalListFocus(
+              state, UiIntent.ExtensionCommand.JUMP_TO_FAVORITE);
       case RELOAD_CATALOG ->
           new ReduceResult(
               state, List.of(new UiEffect.RequestCatalogReload()), UiAction.handled(false));
       case TOGGLE_ERROR_DETAILS -> reduceToggleErrorDetails(state, hasActiveError(state));
     };
+  }
+
+  private static ReduceResult reduceExtensionCancel(UiState state) {
+    if (state.overlays().generationVisible()) {
+      return new ReduceResult(state, List.of(), UiAction.ignored());
+    }
+    boolean extensionFocused =
+        state.focusTarget() == FocusTarget.EXTENSION_SEARCH
+            || state.focusTarget() == FocusTarget.EXTENSION_LIST;
+    if (!extensionFocused) {
+      return new ReduceResult(state, List.of(), UiAction.ignored());
+    }
+    if (!state.extensions().searchQuery().isBlank()) {
+      return reduceExtensionCommand(state, UiIntent.ExtensionCommand.CLEAR_SEARCH);
+    }
+    if (state.extensions().favoritesOnlyEnabled()) {
+      return reduceExtensionCommand(state, UiIntent.ExtensionCommand.DISABLE_FAVORITES_FILTER);
+    }
+    if (state.extensions().selectedOnlyEnabled()) {
+      return reduceExtensionCommand(state, UiIntent.ExtensionCommand.DISABLE_SELECTED_FILTER);
+    }
+    if (!state.extensions().activePresetFilterName().isBlank()) {
+      return reduceExtensionCommand(state, UiIntent.ExtensionCommand.CLEAR_PRESET_FILTER);
+    }
+    if (!state.extensions().activeCategoryFilterTitle().isBlank()) {
+      return reduceExtensionCommand(state, UiIntent.ExtensionCommand.CLEAR_CATEGORY_FILTER);
+    }
+    if (state.focusTarget() == FocusTarget.EXTENSION_SEARCH) {
+      return reduceExtensionPanelFocus(state, FocusTarget.EXTENSION_LIST);
+    }
+    return new ReduceResult(state, List.of(), UiAction.ignored());
+  }
+
+  private static ReduceResult reduceExtensionCommand(
+      UiState state, UiIntent.ExtensionCommand command) {
+    return new ReduceResult(
+        state, List.of(new UiEffect.ExecuteExtensionCommand(command)), UiAction.handled(false));
+  }
+
+  private static ReduceResult reduceExtensionCommandWithOptionalListFocus(
+      UiState state, UiIntent.ExtensionCommand command) {
+    UiState focusedState = focusExtensionListForSharedAction(state);
+    return new ReduceResult(
+        focusedState,
+        List.of(new UiEffect.ExecuteExtensionCommand(command)),
+        UiAction.handled(false));
+  }
+
+  private static ReduceResult reduceExtensionNavigation(
+      UiState state, KeyEvent keyEvent, FocusTarget focusTarget) {
+    if (focusTarget != FocusTarget.EXTENSION_LIST || !isExtensionNavigationKey(keyEvent)) {
+      return new ReduceResult(state, List.of(), UiAction.ignored());
+    }
+    return new ReduceResult(
+        state,
+        List.of(new UiEffect.ApplyExtensionNavigationKey(keyEvent)),
+        UiAction.handled(false));
   }
 
   private static ReduceResult reduceHelpOverlay(
@@ -560,6 +630,17 @@ final class CoreUiReducer implements UiReducer {
         FocusTarget.EXTENSION_LIST, "Focus moved to extensionList");
   }
 
+  private static boolean isExtensionNavigationKey(KeyEvent keyEvent) {
+    return keyEvent.isUp()
+        || UiKeyMatchers.isVimUpKey(keyEvent)
+        || keyEvent.isDown()
+        || UiKeyMatchers.isVimDownKey(keyEvent)
+        || keyEvent.isHome()
+        || UiKeyMatchers.isVimHomeKey(keyEvent)
+        || keyEvent.isEnd()
+        || UiKeyMatchers.isVimEndKey(keyEvent);
+  }
+
   private static ReduceResult reduceMetadataInput(
       UiState state, KeyEvent keyEvent, FocusTarget focusTarget) {
     if (!MetadataSelectorManager.isSelectorFocus(focusTarget)) {
@@ -625,32 +706,14 @@ final class CoreUiReducer implements UiReducer {
               state, withExactActionSelection(postGeneration, selectCommand.index()));
       case UiIntent.PostGenerationCommand.SelectGithubVisibilityIndex selectCommand ->
           confirmGithubVisibilitySelection(
-              state,
-              new UiState.PostGenerationView(
-                  postGeneration.visible(),
-                  postGeneration.githubVisibilityVisible(),
-                  postGeneration.actionSelection(),
-                  selectCommand.index(),
-                  postGeneration.actions(),
-                  postGeneration.lastGeneratedProjectPath(),
-                  postGeneration.lastGeneratedNextCommand(),
-                  postGeneration.exitPlan()));
+              state, postGeneration.withGithubVisibilitySelection(selectCommand.index()));
       case UiIntent.PostGenerationCommand.ConfirmSelection _ ->
           postGeneration.githubVisibilityVisible()
               ? confirmGithubVisibilitySelection(state, postGeneration)
               : executePostGenerationSelection(state, postGeneration);
       case UiIntent.PostGenerationCommand.CancelGithubVisibility _ ->
           new ReduceResult(
-              state.withPostGeneration(
-                  new UiState.PostGenerationView(
-                      postGeneration.visible(),
-                      false,
-                      postGeneration.actionSelection(),
-                      0,
-                      postGeneration.actions(),
-                      postGeneration.lastGeneratedProjectPath(),
-                      postGeneration.lastGeneratedNextCommand(),
-                      postGeneration.exitPlan())),
+              state.withPostGeneration(postGeneration.hideGithubVisibilityMenu()),
               List.of(),
               UiAction.handled(false));
       case UiIntent.PostGenerationCommand.Quit _ ->
@@ -701,15 +764,7 @@ final class CoreUiReducer implements UiReducer {
       UiState.PostGenerationView state, int delta, int size) {
     int nextSelection =
         size > 0 ? Math.floorMod(state.actionSelection() + delta, size) : state.actionSelection();
-    return new UiState.PostGenerationView(
-        state.visible(),
-        state.githubVisibilityVisible(),
-        nextSelection,
-        state.githubVisibilitySelection(),
-        state.actions(),
-        state.lastGeneratedProjectPath(),
-        state.lastGeneratedNextCommand(),
-        state.exitPlan());
+    return state.withActionSelection(nextSelection);
   }
 
   private static UiState.PostGenerationView withGithubVisibilitySelection(
@@ -718,28 +773,12 @@ final class CoreUiReducer implements UiReducer {
         size > 0
             ? Math.floorMod(state.githubVisibilitySelection() + delta, size)
             : state.githubVisibilitySelection();
-    return new UiState.PostGenerationView(
-        state.visible(),
-        state.githubVisibilityVisible(),
-        state.actionSelection(),
-        nextSelection,
-        state.actions(),
-        state.lastGeneratedProjectPath(),
-        state.lastGeneratedNextCommand(),
-        state.exitPlan());
+    return state.withGithubVisibilitySelection(nextSelection);
   }
 
   private static UiState.PostGenerationView withExactActionSelection(
       UiState.PostGenerationView state, int index) {
-    return new UiState.PostGenerationView(
-        state.visible(),
-        state.githubVisibilityVisible(),
-        index,
-        state.githubVisibilitySelection(),
-        state.actions(),
-        state.lastGeneratedProjectPath(),
-        state.lastGeneratedNextCommand(),
-        state.exitPlan());
+    return state.withActionSelection(index);
   }
 
   private static ReduceResult executePostGenerationSelection(
@@ -759,16 +798,7 @@ final class CoreUiReducer implements UiReducer {
     }
     if (action == PostGenerationExitAction.PUBLISH_GITHUB) {
       return new ReduceResult(
-          state.withPostGeneration(
-              new UiState.PostGenerationView(
-                  true,
-                  true,
-                  postGeneration.actionSelection(),
-                  0,
-                  postGeneration.actions(),
-                  postGeneration.lastGeneratedProjectPath(),
-                  postGeneration.lastGeneratedNextCommand(),
-                  null)),
+          state.withPostGeneration(postGeneration.showGithubVisibilityMenu()),
           List.of(),
           UiAction.handled(false));
     }
@@ -777,7 +807,7 @@ final class CoreUiReducer implements UiReducer {
           state
               .withSubmissionState(
                   "Ready for next generation", "", "", state.submitRequested(), false, false, false)
-              .withPostGeneration(resetPostGenerationState(postGeneration)),
+              .withPostGeneration(postGeneration.reset()),
           List.of(new UiEffect.PrepareForGeneration()),
           UiAction.handled(false));
     }
@@ -808,44 +838,8 @@ final class CoreUiReducer implements UiReducer {
   private static ReduceResult closePostGenerationWithExitPlan(
       UiState state, UiState.PostGenerationView postGeneration, PostGenerationExitPlan exitPlan) {
     return new ReduceResult(
-        state.withPostGeneration(
-            new UiState.PostGenerationView(
-                false,
-                false,
-                0,
-                0,
-                postGeneration.actions(),
-                postGeneration.lastGeneratedProjectPath(),
-                postGeneration.lastGeneratedNextCommand(),
-                exitPlan)),
+        state.withPostGeneration(postGeneration.closeWithExitPlan(exitPlan)),
         List.of(new UiEffect.CancelPendingAsync()),
         UiAction.handled(true));
-  }
-
-  private static UiState.PostGenerationView successPostGenerationState(
-      UiState.PostGenerationView currentState,
-      java.nio.file.Path generatedPath,
-      String nextCommand) {
-    return new UiState.PostGenerationView(
-        true, false, 0, 0, currentState.actions(), generatedPath, nextCommand, null);
-  }
-
-  private static UiState.PostGenerationView hiddenPostGenerationState(
-      UiState.PostGenerationView currentState) {
-    return new UiState.PostGenerationView(
-        false,
-        false,
-        currentState.actionSelection(),
-        0,
-        currentState.actions(),
-        currentState.lastGeneratedProjectPath(),
-        currentState.lastGeneratedNextCommand(),
-        null);
-  }
-
-  private static UiState.PostGenerationView resetPostGenerationState(
-      UiState.PostGenerationView currentState) {
-    return new UiState.PostGenerationView(
-        false, false, 0, 0, currentState.actions(), null, "", null);
   }
 }

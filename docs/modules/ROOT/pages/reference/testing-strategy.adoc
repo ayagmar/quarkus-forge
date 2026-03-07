@@ -40,8 +40,8 @@ Before and during the UI state-machine migration, these semantic contracts must 
 | Class | Tests | Coverage
 
 | `PostGenerationMenuState`
-| 26
-| State transitions, key handling, sealed `MenuKeyResult` dispatch
+| focused unit suite
+| Reducer-backed key translation and post-generation menu command routing
 
 | `MetadataSelectorManager`
 | 18
