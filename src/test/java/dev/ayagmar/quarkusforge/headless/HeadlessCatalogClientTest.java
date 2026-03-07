@@ -1,6 +1,7 @@
 package dev.ayagmar.quarkusforge.headless;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
@@ -9,6 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
+import dev.ayagmar.quarkusforge.api.BuildToolCodec;
 import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogDataService;
 import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
@@ -119,6 +121,7 @@ class HeadlessCatalogClientTest {
       assertThat(catalogData.extensions())
           .extracting(ExtensionDto::id)
           .containsExactly("io.quarkus:quarkus-rest");
+      wireMockServer.verify(getRequestedFor(urlPathEqualTo("/api/extensions")));
     }
   }
 
@@ -154,10 +157,6 @@ class HeadlessCatalogClientTest {
   @Test
   void startGenerationDownloadsExtractsAndReportsProgress() throws Exception {
     stubCatalogEndpoints();
-    wireMockServer.stubFor(
-        get(urlPathEqualTo("/api/download"))
-            .willReturn(aResponse().withStatus(200).withBody(generatedZipPayload("demo-app"))));
-    List<String> progressLines = new ArrayList<>();
     GenerationRequest request =
         new GenerationRequest(
             "com.example",
@@ -167,12 +166,32 @@ class HeadlessCatalogClientTest {
             "maven",
             "25",
             List.of("io.quarkus:quarkus-rest"));
+    wireMockServer.stubFor(
+        get(urlPathEqualTo("/api/download"))
+            .withQueryParam("g", equalTo(request.groupId()))
+            .withQueryParam("a", equalTo(request.artifactId()))
+            .withQueryParam("v", equalTo(request.version()))
+            .withQueryParam("S", equalTo(request.platformStream()))
+            .withQueryParam("b", equalTo(BuildToolCodec.toApiValue(request.buildTool())))
+            .withQueryParam("j", equalTo(request.javaVersion()))
+            .withQueryParam("e", equalTo(request.extensions().getFirst()))
+            .willReturn(aResponse().withStatus(200).withBody(generatedZipPayload("demo-app"))));
+    List<String> progressLines = new ArrayList<>();
     Path outputPath = tempDir.resolve("generated-project");
 
     try (HeadlessCatalogClient client = client(runtimeConfig())) {
       Path generatedRoot = client.startGeneration(request, outputPath, progressLines::add).join();
 
-      wireMockServer.verify(1, getRequestedFor(urlPathEqualTo("/api/download")));
+      wireMockServer.verify(
+          1,
+          getRequestedFor(urlPathEqualTo("/api/download"))
+              .withQueryParam("g", equalTo(request.groupId()))
+              .withQueryParam("a", equalTo(request.artifactId()))
+              .withQueryParam("v", equalTo(request.version()))
+              .withQueryParam("S", equalTo(request.platformStream()))
+              .withQueryParam("b", equalTo(BuildToolCodec.toApiValue(request.buildTool())))
+              .withQueryParam("j", equalTo(request.javaVersion()))
+              .withQueryParam("e", equalTo(request.extensions().getFirst())));
       assertThat(generatedRoot).isEqualTo(outputPath);
       assertThat(Files.readString(generatedRoot.resolve("pom.xml"))).isEqualTo("<project/>");
       assertThat(progressLines)

@@ -36,7 +36,7 @@ test-it:
 
 # Generate bash completion scripts for both entry points
 completion-bash:
-    {{mvn}} -DskipTests package -Pheadless
+    {{mvn}} clean -DskipTests package -Pheadless
     {{mvn}} -DskipTests package
     mkdir -p target/completions
     {{java_bin}} -cp {{jar}} picocli.AutoComplete -f -o target/completions/quarkus-forge.bash -n quarkus-forge dev.ayagmar.quarkusforge.cli.QuarkusForgeCli
@@ -44,7 +44,7 @@ completion-bash:
 
 # Generate sha256 checksum files for release artifacts
 release-checksums:
-    {{mvn}} -DskipTests package -Pheadless
+    {{mvn}} clean -DskipTests package -Pheadless
     {{mvn}} -DskipTests package
     if command -v sha256sum >/dev/null 2>&1; then sha256sum {{jar}} > {{jar}}.sha256; else shasum -a 256 {{jar}} > {{jar}}.sha256; fi
     if command -v sha256sum >/dev/null 2>&1; then sha256sum {{hjar}} > {{hjar}}.sha256; else shasum -a 256 {{hjar}} > {{hjar}}.sha256; fi

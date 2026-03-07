@@ -4,8 +4,11 @@ import dev.ayagmar.quarkusforge.api.EncodingProbeMain;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
 
 public final class EncodingProbeSupport {
+  private static final long PROBE_TIMEOUT_SECONDS = 10;
+
   private EncodingProbeSupport() {}
 
   public static String probe(String mode, Path path) throws IOException, InterruptedException {
@@ -20,8 +23,16 @@ public final class EncodingProbeSupport {
                 path.toString())
             .redirectErrorStream(true)
             .start();
+    boolean finished = process.waitFor(PROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    if (!finished) {
+      process.destroyForcibly();
+      process.waitFor();
+      String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+      throw new IOException(
+          "Encoding probe timed out after " + PROBE_TIMEOUT_SECONDS + "s: " + stdout);
+    }
     String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-    int exitCode = process.waitFor();
+    int exitCode = process.exitValue();
     if (exitCode != 0) {
       throw new IOException("Encoding probe failed (" + exitCode + "): " + stdout);
     }

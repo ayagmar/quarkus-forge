@@ -842,7 +842,7 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
-  void categoryFilterStacksWithSearchQuery() {
+  void categoryFilterClearsWhenSearchQueryMakesItUnavailable() {
     CoreTuiController controller = UiControllerTestHarness.controller();
     controller.loadExtensionCatalogAsync(
         () ->

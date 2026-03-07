@@ -194,14 +194,13 @@ final class CoreUiReducer implements UiReducer {
               List.of(),
               UiAction.handled(false));
       case UiIntent.ExtensionNavigationIntent navigationIntent ->
-          reduceExtensionNavigation(
-              state, navigationIntent.keyEvent(), navigationIntent.focusTarget());
+          reduceExtensionNavigation(state, navigationIntent.keyEvent());
       case UiIntent.FocusNavigationIntent navigationIntent ->
-          reduceFocusNavigation(state, navigationIntent.keyEvent(), navigationIntent.focusTarget());
+          reduceFocusNavigation(state, navigationIntent.keyEvent());
       case UiIntent.MetadataInputIntent metadataIntent ->
-          reduceMetadataInput(state, metadataIntent.keyEvent(), metadataIntent.focusTarget());
+          reduceMetadataInput(state, metadataIntent.keyEvent());
       case UiIntent.TextInputIntent textInputIntent ->
-          reduceTextInput(state, textInputIntent.keyEvent(), textInputIntent.focusTarget());
+          reduceTextInput(state, textInputIntent.keyEvent());
       case UiIntent.ToggleErrorDetailsIntent toggleIntent ->
           reduceToggleErrorDetails(state, toggleIntent.activeErrorPresent());
       default -> new ReduceResult(state, List.of(), UiAction.ignored());
@@ -531,8 +530,8 @@ final class CoreUiReducer implements UiReducer {
         UiAction.handled(false));
   }
 
-  private static ReduceResult reduceExtensionNavigation(
-      UiState state, KeyEvent keyEvent, FocusTarget focusTarget) {
+  private static ReduceResult reduceExtensionNavigation(UiState state, KeyEvent keyEvent) {
+    FocusTarget focusTarget = state.focusTarget();
     if (focusTarget != FocusTarget.EXTENSION_LIST || !isExtensionNavigationKey(keyEvent)) {
       return new ReduceResult(state, List.of(), UiAction.ignored());
     }
@@ -578,8 +577,8 @@ final class CoreUiReducer implements UiReducer {
     };
   }
 
-  private static ReduceResult reduceFocusNavigation(
-      UiState state, KeyEvent keyEvent, FocusTarget focusTarget) {
+  private static ReduceResult reduceFocusNavigation(UiState state, KeyEvent keyEvent) {
+    FocusTarget focusTarget = state.focusTarget();
     if (keyEvent.isFocusPrevious()) {
       return moveFocus(state, focusTarget, -1);
     }
@@ -663,8 +662,8 @@ final class CoreUiReducer implements UiReducer {
         || UiKeyMatchers.isVimEndKey(keyEvent);
   }
 
-  private static ReduceResult reduceMetadataInput(
-      UiState state, KeyEvent keyEvent, FocusTarget focusTarget) {
+  private static ReduceResult reduceMetadataInput(UiState state, KeyEvent keyEvent) {
+    FocusTarget focusTarget = state.focusTarget();
     if (!MetadataSelectorManager.isSelectorFocus(focusTarget)) {
       return new ReduceResult(state, List.of(), UiAction.ignored());
     }
@@ -689,8 +688,8 @@ final class CoreUiReducer implements UiReducer {
     return new ReduceResult(state, List.of(), UiAction.ignored());
   }
 
-  private static ReduceResult reduceTextInput(
-      UiState state, KeyEvent keyEvent, FocusTarget focusTarget) {
+  private static ReduceResult reduceTextInput(UiState state, KeyEvent keyEvent) {
+    FocusTarget focusTarget = state.focusTarget();
     if (!UiFocusPredicates.isTextInputFocus(focusTarget)
         || !UiTextInputKeys.isSupportedEditKey(keyEvent)) {
       return new ReduceResult(state, List.of(), UiAction.ignored());
@@ -704,6 +703,12 @@ final class CoreUiReducer implements UiReducer {
   private static ReduceResult reducePostGeneration(
       UiState state, UiIntent.PostGenerationCommand command) {
     UiState.PostGenerationView postGeneration = state.postGeneration();
+    if (command instanceof UiIntent.PostGenerationCommand.Noop) {
+      return new ReduceResult(state, List.of(), UiAction.handled(false));
+    }
+    if (!postGeneration.visible()) {
+      return new ReduceResult(state, List.of(), UiAction.handled(false));
+    }
     return switch (command) {
       case UiIntent.PostGenerationCommand.Noop _ ->
           new ReduceResult(state, List.of(), UiAction.handled(false));
