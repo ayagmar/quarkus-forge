@@ -161,6 +161,8 @@ final class CoreUiReducer implements UiReducer {
           reduceCommandPalette(state, commandPaletteIntent.command());
       case UiIntent.HelpOverlayIntent helpOverlayIntent ->
           reduceHelpOverlay(state, helpOverlayIntent.command());
+      case UiIntent.SharedActionIntent sharedActionIntent ->
+          reduceSharedAction(state, sharedActionIntent.action());
       case UiIntent.ExtensionPanelFocusIntent focusIntent ->
           reduceExtensionPanelFocus(state, focusIntent.focusTarget());
       case UiIntent.FocusNavigationIntent navigationIntent ->
@@ -406,13 +408,45 @@ final class CoreUiReducer implements UiReducer {
           yield new ReduceResult(state, List.of(), UiAction.ignored());
         }
         CommandPaletteAction selectedAction = selectedCommandPaletteAction(state);
-        yield new ReduceResult(
-            closeCommandPalette(state, state.statusMessage()),
-            selectedAction == null
-                ? List.of()
-                : List.of(new UiEffect.ExecuteCommandPaletteAction(selectedAction)),
-            UiAction.handled(false));
+        UiState closedState = closeCommandPalette(state, state.statusMessage());
+        yield selectedAction == null
+            ? new ReduceResult(closedState, List.of(), UiAction.handled(false))
+            : reduceSharedAction(closedState, selectedAction);
       }
+    };
+  }
+
+  private static ReduceResult reduceSharedAction(UiState state, CommandPaletteAction action) {
+    return switch (action) {
+      case FOCUS_EXTENSION_SEARCH ->
+          new ReduceResult(
+              state.withFocusAndValidationFeedback(
+                  FocusTarget.EXTENSION_SEARCH, "Focus moved to extensionSearch"),
+              List.of(new UiEffect.MoveTextInputCursorToEnd(FocusTarget.EXTENSION_SEARCH)),
+              UiAction.handled(false));
+      case FOCUS_EXTENSION_LIST ->
+          new ReduceResult(
+              state.withFocusAndValidationFeedback(
+                  FocusTarget.EXTENSION_LIST, "Focus moved to extensionList"),
+              List.of(),
+              UiAction.handled(false));
+      case TOGGLE_FAVORITES_FILTER,
+          TOGGLE_SELECTED_FILTER,
+          CYCLE_PRESET_FILTER,
+          CYCLE_CATEGORY_FILTER,
+          TOGGLE_CATEGORY,
+          OPEN_ALL_CATEGORIES ->
+          new ReduceResult(
+              state, List.of(new UiEffect.ExecuteSharedAction(action)), UiAction.handled(false));
+      case JUMP_TO_FAVORITE ->
+          new ReduceResult(
+              focusExtensionListForSharedAction(state),
+              List.of(new UiEffect.ExecuteSharedAction(action)),
+              UiAction.handled(false));
+      case RELOAD_CATALOG ->
+          new ReduceResult(
+              state, List.of(new UiEffect.RequestCatalogReload()), UiAction.handled(false));
+      case TOGGLE_ERROR_DETAILS -> reduceToggleErrorDetails(state, hasActiveError(state));
     };
   }
 
@@ -516,6 +550,14 @@ final class CoreUiReducer implements UiReducer {
         false,
         state.commandPaletteSelection(),
         nextStatusMessage);
+  }
+
+  private static UiState focusExtensionListForSharedAction(UiState state) {
+    if (state.focusTarget() == FocusTarget.EXTENSION_LIST) {
+      return state;
+    }
+    return state.withFocusAndValidationFeedback(
+        FocusTarget.EXTENSION_LIST, "Focus moved to extensionList");
   }
 
   private static ReduceResult reduceMetadataInput(
@@ -638,6 +680,10 @@ final class CoreUiReducer implements UiReducer {
             nextShowErrorDetails ? "Expanded error details" : "Collapsed error details"),
         List.of(),
         UiAction.handled(false));
+  }
+
+  private static boolean hasActiveError(UiState state) {
+    return !state.errorMessage().isBlank() || !state.catalogLoad().state().errorMessage().isBlank();
   }
 
   private static boolean hasSelectorOptions(UiState state, FocusTarget focusTarget) {

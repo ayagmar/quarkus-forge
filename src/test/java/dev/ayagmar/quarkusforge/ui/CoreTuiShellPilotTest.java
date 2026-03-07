@@ -419,6 +419,41 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void shortcutAndPaletteSharedQuickActionsStayInSync() {
+    CoreTuiController controller = UiControllerTestHarness.controller();
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20)))));
+
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+    controller.onEvent(KeyEvent.ofChar('f'));
+    assertThat(controller.favoriteExtensionCount()).isEqualTo(1);
+
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.GROUP_ID);
+    controller.onEvent(KeyEvent.ofChar('k', KeyModifiers.CTRL));
+    assertThat(controller.favoritesOnlyFilterEnabled()).isTrue();
+    assertThat(controller.filteredExtensionCount()).isEqualTo(1);
+    assertThat(controller.firstFilteredExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
+
+    controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
+    controller.onEvent(KeyEvent.ofChar('3'));
+    assertThat(controller.commandPaletteVisible()).isFalse();
+    assertThat(controller.favoritesOnlyFilterEnabled()).isFalse();
+    assertThat(controller.filteredExtensionCount()).isEqualTo(2);
+
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.GROUP_ID);
+    controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
+    controller.onEvent(KeyEvent.ofChar('6'));
+    assertThat(controller.commandPaletteVisible()).isFalse();
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
+    assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
+  }
+
+  @Test
   void slashIsInsertedInOutputDirectoryWithoutStealingFocus() {
     CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.OUTPUT_DIR);

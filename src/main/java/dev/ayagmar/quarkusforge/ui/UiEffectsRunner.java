@@ -19,8 +19,8 @@ final class UiEffectsRunner {
       case UiEffect.PrepareForGeneration _ -> effectsPort.prepareForGeneration();
       case UiEffect.CancelPendingAsync _ -> effectsPort.cancelPendingAsync();
       case UiEffect.ExportRecipeAndLock _ -> effectsPort.exportRecipeAndLock();
-      case UiEffect.ExecuteCommandPaletteAction actionEffect ->
-          effectsPort.executeCommandPaletteAction(actionEffect.action());
+      case UiEffect.ExecuteSharedAction actionEffect ->
+          effectsPort.executeSharedAction(actionEffect.action());
       case UiEffect.ApplyCatalogLoadSuccess successEffect ->
           effectsPort.applyCatalogLoadSuccess(successEffect.success());
       case UiEffect.StartGeneration _ -> effectsPort.startGeneration();
@@ -28,6 +28,8 @@ final class UiEffectsRunner {
           effectsPort.transitionGenerationState(transitionEffect.targetState());
       case UiEffect.RequestGenerationCancellation _ -> effectsPort.requestGenerationCancellation();
       case UiEffect.RequestAsyncRepaint _ -> effectsPort.requestAsyncRepaint();
+      case UiEffect.MoveTextInputCursorToEnd moveCursorEffect ->
+          effectsPort.moveTextInputCursorToEnd(moveCursorEffect.focusTarget());
       case UiEffect.ApplyMetadataSelectorKey selectorEffect ->
           effectsPort.applyMetadataSelectorKey(
               selectorEffect.focusTarget(), selectorEffect.keyEvent());

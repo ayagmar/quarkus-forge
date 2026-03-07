@@ -12,7 +12,7 @@ sealed interface UiEffect {
 
   record ExportRecipeAndLock() implements UiEffect {}
 
-  record ExecuteCommandPaletteAction(CommandPaletteAction action) implements UiEffect {}
+  record ExecuteSharedAction(CommandPaletteAction action) implements UiEffect {}
 
   record ApplyCatalogLoadSuccess(CatalogLoadSuccess success) implements UiEffect {}
 
@@ -24,6 +24,8 @@ sealed interface UiEffect {
   record RequestGenerationCancellation() implements UiEffect {}
 
   record RequestAsyncRepaint() implements UiEffect {}
+
+  record MoveTextInputCursorToEnd(FocusTarget focusTarget) implements UiEffect {}
 
   record ApplyMetadataSelectorKey(FocusTarget focusTarget, dev.tamboui.tui.event.KeyEvent keyEvent)
       implements UiEffect {}
