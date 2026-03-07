@@ -1,8 +1,11 @@
 package dev.ayagmar.quarkusforge.util;
 
 import java.nio.file.Path;
+import java.util.regex.Pattern;
 
 public final class OutputPathResolver {
+  private static final Pattern PATH_SEPARATOR_PATTERN = Pattern.compile("[/\\\\]+");
+
   private OutputPathResolver() {}
 
   public static Path resolveOutputRoot(String outputDirectory) {
@@ -24,12 +27,22 @@ public final class OutputPathResolver {
       return userHome();
     }
     if (outputDirectory.startsWith("~/") || outputDirectory.startsWith("~\\")) {
-      return userHome() + outputDirectory.substring(1);
+      return resolveHomeRelative(outputDirectory.substring(2)).toString();
     }
     return outputDirectory;
   }
 
   private static String userHome() {
     return System.getProperty("user.home", "");
+  }
+
+  private static Path resolveHomeRelative(String relativePath) {
+    Path resolved = Path.of(userHome());
+    for (String segment : PATH_SEPARATOR_PATTERN.split(relativePath)) {
+      if (!segment.isEmpty()) {
+        resolved = resolved.resolve(segment);
+      }
+    }
+    return resolved;
   }
 }

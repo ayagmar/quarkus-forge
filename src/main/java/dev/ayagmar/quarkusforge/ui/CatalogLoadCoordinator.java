@@ -89,7 +89,8 @@ final class CatalogLoadCoordinator {
     if (token != loadToken) {
       return;
     }
-    if (throwable instanceof CancellationException) {
+    Throwable cause = ThrowableUnwrapper.unwrapCompletionCause(throwable);
+    if (cause instanceof CancellationException) {
       return;
     }
     if (throwable != null) {

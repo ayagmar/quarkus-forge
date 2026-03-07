@@ -724,11 +724,16 @@ final class CoreUiReducer implements UiReducer {
               List.of(),
               UiAction.handled(false));
       case UiIntent.PostGenerationCommand.SelectActionIndex selectCommand ->
-          executePostGenerationSelection(
-              state, withExactActionSelection(postGeneration, selectCommand.index()));
+          selectCommand.index() >= 0 && selectCommand.index() < postGeneration.actions().size()
+              ? executePostGenerationSelection(
+                  state, withExactActionSelection(postGeneration, selectCommand.index()))
+              : new ReduceResult(state, List.of(), UiAction.handled(false));
       case UiIntent.PostGenerationCommand.SelectGithubVisibilityIndex selectCommand ->
-          confirmGithubVisibilitySelection(
-              state, postGeneration.withGithubVisibilitySelection(selectCommand.index()));
+          selectCommand.index() >= 0
+                  && selectCommand.index() < UiTextConstants.GITHUB_VISIBILITY_LABELS.size()
+              ? confirmGithubVisibilitySelection(
+                  state, postGeneration.withGithubVisibilitySelection(selectCommand.index()))
+              : new ReduceResult(state, List.of(), UiAction.handled(false));
       case UiIntent.PostGenerationCommand.ConfirmSelection _ ->
           postGeneration.githubVisibilityVisible()
               ? confirmGithubVisibilitySelection(state, postGeneration)

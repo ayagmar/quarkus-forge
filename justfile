@@ -40,7 +40,7 @@ completion-bash:
     {{mvn}} -DskipTests package
     mkdir -p target/completions
     {{java_bin}} -cp {{jar}} picocli.AutoComplete -f -o target/completions/quarkus-forge.bash -n quarkus-forge dev.ayagmar.quarkusforge.cli.QuarkusForgeCli
-    java -cp {{hjar}} picocli.AutoComplete -f -o target/completions/quarkus-forge-headless.bash -n quarkus-forge-headless dev.ayagmar.quarkusforge.cli.HeadlessCli
+    {{java_bin}} -cp {{hjar}} picocli.AutoComplete -f -o target/completions/quarkus-forge-headless.bash -n quarkus-forge-headless dev.ayagmar.quarkusforge.cli.HeadlessCli
 
 # Generate sha256 checksum files for release artifacts
 release-checksums:

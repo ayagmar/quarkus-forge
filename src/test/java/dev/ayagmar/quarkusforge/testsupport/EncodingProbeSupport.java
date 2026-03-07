@@ -18,12 +18,12 @@ public final class EncodingProbeSupport {
                 EncodingProbeMain.class.getName(),
                 mode,
                 path.toString())
+            .redirectErrorStream(true)
             .start();
-    int exitCode = process.waitFor();
     String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-    String stderr = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
+    int exitCode = process.waitFor();
     if (exitCode != 0) {
-      throw new IOException("Encoding probe failed (" + exitCode + "): " + stderr);
+      throw new IOException("Encoding probe failed (" + exitCode + "): " + stdout);
     }
     return stdout;
   }

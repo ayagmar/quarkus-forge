@@ -3,6 +3,7 @@ package dev.ayagmar.quarkusforge.ui;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 final class ValidationFocusTargets {
   private ValidationFocusTargets() {}
@@ -26,7 +27,7 @@ final class ValidationFocusTargets {
     if (fieldName == null || fieldName.isBlank()) {
       return null;
     }
-    return switch (fieldName.trim().toLowerCase()) {
+    return switch (fieldName.trim().toLowerCase(Locale.ROOT)) {
       case "groupid" -> FocusTarget.GROUP_ID;
       case "artifactid" -> FocusTarget.ARTIFACT_ID;
       case "version" -> FocusTarget.VERSION;

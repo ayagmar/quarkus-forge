@@ -384,6 +384,37 @@ class CoreUiReducerTest {
   }
 
   @Test
+  void postGenerationInvalidActionSelectionIsIgnored() {
+    ReduceResult result =
+        reducer.reduce(
+            postGenerationVisibleState(),
+            new UiIntent.PostGenerationIntent(
+                new UiIntent.PostGenerationCommand.SelectActionIndex(99)));
+
+    assertThat(result.nextState()).isEqualTo(postGenerationVisibleState());
+    assertThat(result.effects()).isEmpty();
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+  }
+
+  @Test
+  void postGenerationInvalidGithubVisibilitySelectionIsIgnored() {
+    UiState githubVisibilityState =
+        postGenerationVisibleState()
+            .withPostGeneration(
+                postGenerationVisibleState().postGeneration().showGithubVisibilityMenu());
+
+    ReduceResult result =
+        reducer.reduce(
+            githubVisibilityState,
+            new UiIntent.PostGenerationIntent(
+                new UiIntent.PostGenerationCommand.SelectGithubVisibilityIndex(99)));
+
+    assertThat(result.nextState()).isEqualTo(githubVisibilityState);
+    assertThat(result.effects()).isEmpty();
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+  }
+
+  @Test
   void toggleErrorDetailsCollapsesWhenNoActiveErrorExists() {
     ReduceResult result = reducer.reduce(baseState(), new UiIntent.ToggleErrorDetailsIntent(false));
 
@@ -804,7 +835,8 @@ class CoreUiReducerTest {
             java.time.Duration.ZERO,
             (generationRequest, outputDirectory, cancelled, progressListener) -> null);
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.GROUP_ID);
-    for (int i = 0; i < 30; i++) {
+    int groupIdLength = controller.request().groupId().length();
+    for (int i = 0; i < groupIdLength; i++) {
       controller.onEvent(KeyEvent.ofKey(KeyCode.BACKSPACE));
     }
     return controller.uiState();

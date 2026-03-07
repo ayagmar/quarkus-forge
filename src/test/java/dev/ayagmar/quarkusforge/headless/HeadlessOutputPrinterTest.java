@@ -6,7 +6,6 @@ import dev.ayagmar.quarkusforge.SystemPropertyExtension;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ValidationError;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
-import dev.ayagmar.quarkusforge.util.OutputPathResolver;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -134,9 +133,9 @@ class HeadlessOutputPrinterTest {
         new ProjectRequest("org.acme", "app", "1.0.0", "", outputDir, "", "maven", "25");
 
     Path resolved = HeadlessOutputPrinter.resolveProjectDirectory(request);
+    Path expected = Path.of(outputDir).toAbsolutePath().normalize().resolve("app").normalize();
 
-    assertThat(resolved)
-        .isEqualTo(OutputPathResolver.resolveOutputRoot(outputDir).resolve("app").normalize());
+    assertThat(resolved).isEqualTo(expected);
   }
 
   @Test

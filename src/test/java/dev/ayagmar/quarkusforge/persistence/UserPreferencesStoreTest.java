@@ -137,5 +137,7 @@ class UserPreferencesStoreTest {
 
     assertThat(EncodingProbeSupport.probe("preferences-output-dir", preferencesFile))
         .isEqualTo("./caf\\u00E9");
+    assertThat(store.loadLastRequest()).isNotNull();
+    assertThat(store.loadLastRequest().outputDirectory()).isEqualTo("./caf\u00e9");
   }
 }

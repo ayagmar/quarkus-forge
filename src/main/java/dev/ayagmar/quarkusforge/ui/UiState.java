@@ -510,6 +510,10 @@ record UiState(
     PostGenerationView {
       actions = List.copyOf(actions);
       lastGeneratedNextCommand = lastGeneratedNextCommand == null ? "" : lastGeneratedNextCommand;
+      actionSelection = clampActionSelection(actionSelection, actions.size());
+      githubVisibilitySelection =
+          clampSelection(
+              githubVisibilitySelection, UiTextConstants.GITHUB_VISIBILITY_LABELS.size());
     }
 
     PostGenerationView withActionSelection(int nextActionSelection) {
@@ -611,6 +615,17 @@ record UiState(
         case 2 -> GitHubVisibility.INTERNAL;
         default -> GitHubVisibility.PRIVATE;
       };
+    }
+
+    private static int clampActionSelection(int selection, int size) {
+      return clampSelection(selection, size);
+    }
+
+    private static int clampSelection(int selection, int size) {
+      if (size <= 0) {
+        return 0;
+      }
+      return Math.max(0, Math.min(selection, size - 1));
     }
   }
 

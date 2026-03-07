@@ -172,6 +172,7 @@ class HeadlessCatalogClientTest {
     try (HeadlessCatalogClient client = client(runtimeConfig())) {
       Path generatedRoot = client.startGeneration(request, outputPath, progressLines::add).join();
 
+      wireMockServer.verify(1, getRequestedFor(urlPathEqualTo("/api/download")));
       assertThat(generatedRoot).isEqualTo(outputPath);
       assertThat(Files.readString(generatedRoot.resolve("pom.xml"))).isEqualTo("<project/>");
       assertThat(progressLines)
