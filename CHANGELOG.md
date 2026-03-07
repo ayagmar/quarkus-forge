@@ -3,7 +3,16 @@
 All notable changes to Quarkus Forge are documented here.
 This project uses [Conventional Commits](https://www.conventionalcommits.org/). GitHub Releases contain auto-generated notes from [JReleaser](https://jreleaser.org/).
 
-## [Unreleased](https://github.com/ayagmar/quarkus-forge/compare/v0.6.0...HEAD)
+## [Unreleased](https://github.com/ayagmar/quarkus-forge/compare/v0.6.1...HEAD)
+
+## [0.6.1](https://github.com/ayagmar/quarkus-forge/compare/v0.6.0...v0.6.1) (2026-03-07)
+
+### Changed
+
+- refactor(native): align metadata with package boundaries (2f0b825)
+- fix(native): enable shared arena support (6176e9e)
+- chore(release): prepare next iteration 0.6.1-SNAPSHOT (f074a92)
+
 
 ## [0.6.0](https://github.com/ayagmar/quarkus-forge/compare/v0.5.0...v0.6.0) (2026-03-07)
 
