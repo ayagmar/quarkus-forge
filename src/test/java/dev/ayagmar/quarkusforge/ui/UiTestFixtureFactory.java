@@ -30,4 +30,8 @@ final class UiTestFixtureFactory {
             .merge(metadataCompatibility.validate(request));
     return new ForgeUiState(request, validation, metadataCompatibility);
   }
+
+  static UiState.ExtensionView defaultExtensionView() {
+    return new UiState.ExtensionView(7, 7, 0, false, false, "", "", "", "");
+  }
 }

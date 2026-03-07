@@ -517,6 +517,22 @@ class CoreUiReducerTest {
   }
 
   @Test
+  void extensionStateUpdatedIntentMakesExtensionViewReducerOwned() {
+    UiState.ExtensionView nextExtensions =
+        new UiState.ExtensionView(1, 2, 1, true, false, "web", "Core", "rest", "io.quarkus:rest");
+    UiState state =
+        stateWithExtensionView(
+            baseState(), new UiState.ExtensionView(7, 7, 0, false, false, "", "", "", ""));
+
+    ReduceResult result =
+        reducer.reduce(state, new UiIntent.ExtensionStateUpdatedIntent(nextExtensions));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects()).isEmpty();
+    assertThat(result.nextState().extensions()).isEqualTo(nextExtensions);
+  }
+
+  @Test
   void extensionNavigationIntentRoutesListMovementThroughEffect() {
     ReduceResult result =
         reducer.reduce(

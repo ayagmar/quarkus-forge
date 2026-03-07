@@ -1247,13 +1247,18 @@ class CoreTuiShellPilotTest {
 
     controller.onEvent(KeyEvent.ofChar('l'));
     assertThat(controller.request().platformStream()).isEqualTo("io.quarkus.platform:3.20");
+    assertThat(controller.uiState().request().platformStream())
+        .isEqualTo("io.quarkus.platform:3.20");
     assertThat(controller.validation().isValid()).isFalse();
+    assertThat(controller.uiState().validation().isValid()).isFalse();
     assertThat(controller.validation().errors().getFirst().field()).isEqualTo("compatibility");
 
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.JAVA_VERSION);
     controller.onEvent(KeyEvent.ofChar('h'));
     assertThat(controller.request().javaVersion()).isEqualTo("21");
+    assertThat(controller.uiState().request().javaVersion()).isEqualTo("21");
     assertThat(controller.validation().isValid()).isTrue();
+    assertThat(controller.uiState().validation().isValid()).isTrue();
 
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.BUILD_TOOL);
     String originalBuildTool = controller.request().buildTool();
@@ -1262,6 +1267,8 @@ class CoreTuiShellPilotTest {
 
     controller.onEvent(KeyEvent.ofChar('l'));
     assertThat(controller.request().buildTool()).isEqualTo("gradle");
+    assertThat(controller.uiState().request().buildTool()).isEqualTo("gradle");
+    assertThat(controller.statusMessage()).isEqualTo("Build tool selected: gradle");
   }
 
   @Test

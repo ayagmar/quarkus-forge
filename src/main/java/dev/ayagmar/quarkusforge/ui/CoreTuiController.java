@@ -3,7 +3,6 @@ package dev.ayagmar.quarkusforge.ui;
 import dev.ayagmar.quarkusforge.api.BuildToolCodec;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
-import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
@@ -16,6 +15,7 @@ import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.ayagmar.quarkusforge.forge.Forgefile;
 import dev.ayagmar.quarkusforge.forge.ForgefileLock;
 import dev.ayagmar.quarkusforge.forge.ForgefileStore;
+import dev.ayagmar.quarkusforge.persistence.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.postgen.IdeDetector;
 import dev.ayagmar.quarkusforge.util.OutputPathResolver;
 import dev.tamboui.terminal.Frame;
@@ -85,8 +85,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   private final ProjectGenerationRunner projectGenerationRunner;
   private final MetadataSelectorManager metadataSelectors = new MetadataSelectorManager();
 
-  private ProjectRequest request;
-  private ValidationReport validation;
   private UiState reducerState;
   private String generationStatusNotice;
   private final GenerationStateTracker generationStateTracker;
@@ -117,8 +115,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     Objects.requireNonNull(projectGenerationRunner);
     Objects.requireNonNull(favoritesStore);
     Objects.requireNonNull(favoritesPersistenceExecutor);
-    request = initialState.request();
-    validation = initialState.validation();
     generationStatusNotice = "";
     metadataCompatibility = initialState.metadataCompatibility();
     this.scheduler = scheduler;
@@ -156,23 +152,23 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
           }
 
           @Override
-          public void exportRecipeAndLock() {
-            exportRecipeAndLockEffect();
+          public String exportRecipeAndLock() {
+            return exportRecipeAndLockEffect();
           }
 
           @Override
-          public String executeExtensionCommand(UiIntent.ExtensionCommand command) {
+          public List<UiIntent> executeExtensionCommand(UiIntent.ExtensionCommand command) {
             return executeExtensionCommandEffect(command);
           }
 
           @Override
-          public void applyExtensionNavigationKey(KeyEvent keyEvent) {
-            applyExtensionNavigationKeyEffect(keyEvent);
+          public List<UiIntent> applyExtensionNavigationKey(KeyEvent keyEvent) {
+            return applyExtensionNavigationKeyEffect(keyEvent);
           }
 
           @Override
-          public void applyCatalogLoadSuccess(CatalogLoadSuccess success) {
-            applyCatalogLoadSuccessEffect(success);
+          public List<UiIntent> applyCatalogLoadSuccess(CatalogLoadSuccess success) {
+            return applyCatalogLoadSuccessEffect(success);
           }
 
           @Override
@@ -201,13 +197,13 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
           }
 
           @Override
-          public void applyMetadataSelectorKey(FocusTarget target, KeyEvent keyEvent) {
-            applyMetadataSelectorKeyEffect(target, keyEvent);
+          public List<UiIntent> applyMetadataSelectorKey(FocusTarget target, KeyEvent keyEvent) {
+            return applyMetadataSelectorKeyEffect(target, keyEvent);
           }
 
           @Override
-          public void applyTextInputKey(FocusTarget target, KeyEvent keyEvent) {
-            applyTextInputKeyEffect(target, keyEvent);
+          public List<UiIntent> applyTextInputKey(FocusTarget target, KeyEvent keyEvent) {
+            return applyTextInputKeyEffect(target, keyEvent);
           }
         };
     uiStateSnapshotMapper = new UiStateSnapshotMapper();
@@ -240,12 +236,12 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     for (FocusTarget target : FocusTarget.values()) {
       inputStates.put(target, new TextInputState(""));
     }
-    inputStates.get(FocusTarget.GROUP_ID).setText(request.groupId());
-    inputStates.get(FocusTarget.ARTIFACT_ID).setText(request.artifactId());
-    inputStates.get(FocusTarget.VERSION).setText(request.version());
-    inputStates.get(FocusTarget.PACKAGE_NAME).setText(request.packageName());
-    inputStates.get(FocusTarget.OUTPUT_DIR).setText(request.outputDirectory());
-    syncMetadataSelectors();
+    ProjectRequest initialRequest = initialState.request();
+    inputStates.get(FocusTarget.GROUP_ID).setText(initialRequest.groupId());
+    inputStates.get(FocusTarget.ARTIFACT_ID).setText(initialRequest.artifactId());
+    inputStates.get(FocusTarget.VERSION).setText(initialRequest.version());
+    inputStates.get(FocusTarget.PACKAGE_NAME).setText(initialRequest.packageName());
+    inputStates.get(FocusTarget.OUTPUT_DIR).setText(initialRequest.outputDirectory());
     for (FocusTarget target : UiFocusTargets.ordered()) {
       if (isTextInputFocus(target)) {
         inputStates.get(target).moveCursorToEnd();
@@ -264,8 +260,10 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         new ExtensionInteractionHandler(
             extensionCatalogPreferences, extensionCatalogNavigation, extensionCatalogProjection);
 
-    revalidate();
-    reducerState = initialReducerState();
+    ProjectRequest synchronizedRequest = syncMetadataSelectors(initialRequest);
+    ValidationReport synchronizedValidation = validateRequest(synchronizedRequest);
+    reducerState =
+        initialReducerState(synchronizedRequest, synchronizedValidation, extensionViewSnapshot());
   }
 
   public static CoreTuiController from(ForgeUiState initialState) {
@@ -352,8 +350,8 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
       return handleTickEvent();
     }
     if (event instanceof ResizeEvent resizeEvent) {
-      storeReducerState(
-          reducerState.withStatusMessage(
+      dispatchIntent(
+          new UiIntent.StatusMessageIntent(
               "Terminal resized to " + resizeEvent.width() + "x" + resizeEvent.height()));
       return UiAction.handled(false);
     }
@@ -431,7 +429,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
                   UiIntent.SubmitRequestContext.from(
                       projectGenerationRunner != NOOP_PROJECT_GENERATION_RUNNER,
                       extensionCatalogNavigation.selectedExtensionCount(),
-                      currentTargetConflictErrorMessage())));
+                      currentTargetConflictErrorMessage(currentRequest()))));
       moveFocusedInputCursorToEndAfterSubmitFeedback();
       return action != null ? action : UiAction.handled(false);
     }
@@ -544,7 +542,8 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   public void onGenerationSuccess(Path generatedPath) {
     generationStatusNotice = "";
     dispatchIntent(
-        new UiIntent.GenerationSuccessIntent(generatedPath, nextStepCommand(request.buildTool())));
+        new UiIntent.GenerationSuccessIntent(
+            generatedPath, nextStepCommand(currentRequest().buildTool())));
   }
 
   @Override
@@ -593,7 +592,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   private UiState reducerStateSnapshot() {
     return reducerState
-        .withRequestAndValidation(request, validation)
         .withMetadataPanel(metadataPanelSnapshot())
         .withGeneration(
             new UiState.GenerationView(
@@ -601,18 +599,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
                 generationStateTracker.progressRatio(),
                 generationStateTracker.progressPhase(),
                 generationFlowCoordinator.isCancellationRequested()))
-        .withStartupOverlayStatusLines(startupOverlayStatusLines())
-        .withExtensions(
-            new UiState.ExtensionView(
-                extensionCatalogProjection.filteredExtensions().size(),
-                extensionCatalogProjection.totalCatalogExtensionCount(),
-                extensionCatalogNavigation.selectedExtensionCount(),
-                extensionCatalogProjection.favoritesOnlyFilterEnabled(),
-                extensionCatalogProjection.selectedOnlyFilterEnabled(),
-                extensionCatalogProjection.activePresetFilterName(),
-                extensionCatalogProjection.activeCategoryFilterTitle(),
-                inputStates.get(FocusTarget.EXTENSION_SEARCH).text(),
-                focusedExtensionId()));
+        .withStartupOverlayStatusLines(startupOverlayStatusLines());
   }
 
   FocusTarget focusTarget() {
@@ -620,11 +607,11 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   ValidationReport validation() {
-    return validation;
+    return currentValidation();
   }
 
   public ProjectRequest request() {
-    return request;
+    return currentRequest();
   }
 
   List<String> selectedExtensionIds() {
@@ -680,7 +667,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   int filteredExtensionCount() {
-    return extensionCatalogProjection.filteredExtensions().size();
+    return reducerState.extensions().filteredCount();
   }
 
   String firstFilteredExtensionId() {
@@ -702,7 +689,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   boolean favoritesOnlyFilterEnabled() {
-    return extensionCatalogProjection.favoritesOnlyFilterEnabled();
+    return reducerState.extensions().favoritesOnlyEnabled();
   }
 
   int favoriteExtensionCount() {
@@ -710,14 +697,23 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   String focusedListExtensionId() {
-    return focusedExtensionId();
+    return reducerState.extensions().focusedExtensionId();
   }
 
   private CatalogLoadState catalogLoadState() {
     return reducerState.catalogLoad().state();
   }
 
-  private UiState initialReducerState() {
+  private ProjectRequest currentRequest() {
+    return reducerState.request();
+  }
+
+  private ValidationReport currentValidation() {
+    return reducerState.validation();
+  }
+
+  private UiState initialReducerState(
+      ProjectRequest request, ValidationReport validation, UiState.ExtensionView extensions) {
     return new UiState(
         request,
         validation,
@@ -738,10 +734,12 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         new UiState.CatalogLoadView(CatalogLoadState.initial()),
         postGenerationMenu.initialView(),
         new UiState.StartupOverlayView(false, List.of()),
-        new UiState.ExtensionView(0, 0, 0, false, false, "", "", "", ""));
+        extensions);
   }
 
   private MetadataPanelSnapshot metadataPanelSnapshot() {
+    ProjectRequest request = currentRequest();
+    ValidationReport validation = currentValidation();
     return new MetadataPanelSnapshot(
         metadataPanelTitle(),
         isMetadataFocused(),
@@ -753,19 +751,20 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         OutputPathResolver.absoluteDisplayPath(request.outputDirectory()),
         MetadataSelectorManager.optionDisplayLabel(
             FocusTarget.PLATFORM_STREAM,
-            selectorValue(FocusTarget.PLATFORM_STREAM),
+            selectorValue(request, FocusTarget.PLATFORM_STREAM),
             metadataCompatibility.metadataSnapshot()),
-        selectorValue(FocusTarget.BUILD_TOOL),
-        selectorValue(FocusTarget.JAVA_VERSION),
+        selectorValue(request, FocusTarget.BUILD_TOOL),
+        selectorValue(request, FocusTarget.JAVA_VERSION),
         metadataSelectors.selectorInfo(
-            FocusTarget.PLATFORM_STREAM, selectorValue(FocusTarget.PLATFORM_STREAM)),
+            FocusTarget.PLATFORM_STREAM, selectorValue(request, FocusTarget.PLATFORM_STREAM)),
         metadataSelectors.selectorInfo(
-            FocusTarget.BUILD_TOOL, selectorValue(FocusTarget.BUILD_TOOL)),
+            FocusTarget.BUILD_TOOL, selectorValue(request, FocusTarget.BUILD_TOOL)),
         metadataSelectors.selectorInfo(
-            FocusTarget.JAVA_VERSION, selectorValue(FocusTarget.JAVA_VERSION)));
+            FocusTarget.JAVA_VERSION, selectorValue(request, FocusTarget.JAVA_VERSION)));
   }
 
   private ExtensionsPanelSnapshot extensionsPanelSnapshot() {
+    ValidationReport validation = currentValidation();
     return new ExtensionsPanelSnapshot(
         isExtensionPanelFocused(),
         focusTarget() == FocusTarget.EXTENSION_LIST,
@@ -790,6 +789,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   private MetadataFieldRenderContext metadataRenderContext() {
+    ValidationReport validation = currentValidation();
     EnumMap<FocusTarget, List<String>> selectorDisplayOptions = new EnumMap<>(FocusTarget.class);
     selectorDisplayOptions.put(
         FocusTarget.PLATFORM_STREAM,
@@ -829,6 +829,32 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     String focusedId =
         extensionCatalogProjection.itemIdAtRow(extensionCatalogNavigation.selectedRow());
     return focusedId == null ? "" : focusedId;
+  }
+
+  private UiState.ExtensionView extensionViewSnapshot() {
+    return new UiState.ExtensionView(
+        extensionCatalogProjection.filteredExtensions().size(),
+        extensionCatalogProjection.totalCatalogExtensionCount(),
+        extensionCatalogNavigation.selectedExtensionCount(),
+        extensionCatalogProjection.favoritesOnlyFilterEnabled(),
+        extensionCatalogProjection.selectedOnlyFilterEnabled(),
+        extensionCatalogProjection.activePresetFilterName(),
+        extensionCatalogProjection.activeCategoryFilterTitle(),
+        inputStates.get(FocusTarget.EXTENSION_SEARCH).text(),
+        focusedExtensionId());
+  }
+
+  private UiIntent.ExtensionStateUpdatedIntent extensionStateUpdatedIntent() {
+    return new UiIntent.ExtensionStateUpdatedIntent(extensionViewSnapshot());
+  }
+
+  private List<UiIntent> extensionUpdateIntents(String statusMessage) {
+    List<UiIntent> intents = new ArrayList<>();
+    intents.add(extensionStateUpdatedIntent());
+    if (statusMessage != null) {
+      intents.add(new UiIntent.ExtensionStatusIntent(statusMessage));
+    }
+    return List.copyOf(intents);
   }
 
   private String focusedExtensionDescription() {
@@ -895,7 +921,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
       return "";
     }
     try {
-      return resolveGeneratedProjectDirectory().toString();
+      return resolveGeneratedProjectDirectory(currentRequest()).toString();
     } catch (RuntimeException pathError) {
       return "";
     }
@@ -920,7 +946,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
       return "";
     }
     String fieldName = UiFocusTargets.nameOf(focusTarget());
-    return validation.errors().stream()
+    return currentValidation().errors().stream()
         .filter(error -> error.field().equalsIgnoreCase(fieldName))
         .findFirst()
         .map(error -> error.message())
@@ -1016,14 +1042,13 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     return action.handled() ? action : null;
   }
 
-  private void exportRecipeAndLockFiles() {
+  private String exportRecipeAndLockFiles() {
     Path generatedProjectPath = reducerState.postGeneration().lastGeneratedProjectPath();
     if (generatedProjectPath == null) {
-      storeReducerState(
-          reducerState.withStatusMessage("Cannot export Forgefile: no generated project path"));
-      return;
+      return "Cannot export Forgefile: no generated project path";
     }
     try {
+      ProjectRequest request = currentRequest();
       List<String> selectedExtensions = extensionCatalogNavigation.selectedExtensionIds();
       ForgefileLock lock =
           ForgefileLock.of(
@@ -1047,62 +1072,71 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
               lock);
       Path forgefilePath = generatedProjectPath.resolve(UiTextConstants.FORGE_FILE_NAME);
       ForgefileStore.save(forgefilePath, forgefile);
-      storeReducerState(reducerState.withStatusMessage("Exported Forgefile to " + forgefilePath));
+      return "Exported Forgefile to " + forgefilePath;
     } catch (RuntimeException runtimeException) {
-      storeReducerState(
-          reducerState.withStatusMessage(
-              "Failed to export Forgefile: " + runtimeException.getMessage()));
+      return "Failed to export Forgefile: " + runtimeException.getMessage();
     }
   }
 
-  private String executeExtensionCommandEffect(UiIntent.ExtensionCommand command) {
+  private List<UiIntent> executeExtensionCommandEffect(UiIntent.ExtensionCommand command) {
     return switch (command) {
       case CLEAR_SEARCH -> clearExtensionSearchFilter();
       case DISABLE_FAVORITES_FILTER ->
-          extensionCatalogProjection.favoritesOnlyFilterEnabled()
-              ? extensionInteraction.toggleFavoritesOnlyFilter(this::updateExtensionFilterStatus)
-              : "Favorites filter disabled";
+          extensionUpdateIntents(
+              reducerState.extensions().favoritesOnlyEnabled()
+                  ? extensionInteraction.toggleFavoritesOnlyFilter(ignored -> {})
+                  : "Favorites filter disabled");
       case DISABLE_SELECTED_FILTER ->
-          extensionCatalogProjection.selectedOnlyFilterEnabled()
-              ? extensionInteraction.toggleSelectedOnlyFilter(this::updateExtensionFilterStatus)
-              : "Selected-only view disabled";
+          extensionUpdateIntents(
+              reducerState.extensions().selectedOnlyEnabled()
+                  ? extensionInteraction.toggleSelectedOnlyFilter(ignored -> {})
+                  : "Selected-only view disabled");
       case CLEAR_PRESET_FILTER ->
-          extensionInteraction.clearPresetFilter(this::updateExtensionFilterStatus);
+          extensionUpdateIntents(extensionInteraction.clearPresetFilter(ignored -> {}));
       case CLEAR_CATEGORY_FILTER -> {
-        String statusMessage =
-            extensionInteraction.clearCategoryFilter(this::updateExtensionFilterStatus);
-        yield statusMessage == null ? "Category filter cleared" : statusMessage;
+        String statusMessage = extensionInteraction.clearCategoryFilter(ignored -> {});
+        yield extensionUpdateIntents(
+            statusMessage == null ? "Category filter cleared" : statusMessage);
       }
       case TOGGLE_FAVORITE_AT_SELECTION ->
-          extensionInteraction.toggleFavoriteAtSelection(this::updateExtensionFilterStatus);
-      case CLEAR_SELECTED_EXTENSIONS -> extensionInteraction.clearSelectedExtensions();
-      case TOGGLE_CATEGORY_AT_SELECTION -> extensionInteraction.toggleCategoryCollapseAtSelection();
-      case OPEN_ALL_CATEGORIES -> extensionInteraction.expandAllCategories();
-      case JUMP_TO_NEXT_CATEGORY -> extensionInteraction.jumpToAdjacentSection(true);
-      case JUMP_TO_PREVIOUS_CATEGORY -> extensionInteraction.jumpToAdjacentSection(false);
+          extensionUpdateIntents(extensionInteraction.toggleFavoriteAtSelection(ignored -> {}));
+      case CLEAR_SELECTED_EXTENSIONS ->
+          extensionUpdateIntents(extensionInteraction.clearSelectedExtensions());
+      case TOGGLE_CATEGORY_AT_SELECTION ->
+          extensionUpdateIntents(extensionInteraction.toggleCategoryCollapseAtSelection());
+      case OPEN_ALL_CATEGORIES ->
+          extensionUpdateIntents(extensionInteraction.expandAllCategories());
+      case JUMP_TO_NEXT_CATEGORY ->
+          extensionUpdateIntents(extensionInteraction.jumpToAdjacentSection(true));
+      case JUMP_TO_PREVIOUS_CATEGORY ->
+          extensionUpdateIntents(extensionInteraction.jumpToAdjacentSection(false));
       case HIERARCHY_LEFT -> {
         String statusMessage = extensionInteraction.handleHierarchyLeft();
-        yield statusMessage == null ? reducerState.statusMessage() : statusMessage;
+        yield extensionUpdateIntents(
+            statusMessage == null ? reducerState.statusMessage() : statusMessage);
       }
       case HIERARCHY_RIGHT -> {
         String statusMessage = extensionInteraction.handleHierarchyRight();
-        yield statusMessage == null ? reducerState.statusMessage() : statusMessage;
+        yield extensionUpdateIntents(
+            statusMessage == null ? reducerState.statusMessage() : statusMessage);
       }
-      case TOGGLE_SELECTION_AT_CURSOR -> toggleExtensionSelectionAtCursor();
+      case TOGGLE_SELECTION_AT_CURSOR -> extensionUpdateIntents(toggleExtensionSelectionAtCursor());
       case TOGGLE_FAVORITES_FILTER ->
-          extensionInteraction.toggleFavoritesOnlyFilter(this::updateExtensionFilterStatus);
+          extensionUpdateIntents(extensionInteraction.toggleFavoritesOnlyFilter(ignored -> {}));
       case TOGGLE_SELECTED_FILTER ->
-          extensionInteraction.toggleSelectedOnlyFilter(this::updateExtensionFilterStatus);
+          extensionUpdateIntents(extensionInteraction.toggleSelectedOnlyFilter(ignored -> {}));
       case CYCLE_PRESET_FILTER ->
-          extensionInteraction.cyclePresetFilter(this::updateExtensionFilterStatus);
-      case JUMP_TO_FAVORITE -> extensionInteraction.jumpToFavorite();
+          extensionUpdateIntents(extensionInteraction.cyclePresetFilter(ignored -> {}));
+      case JUMP_TO_FAVORITE -> extensionUpdateIntents(extensionInteraction.jumpToFavorite());
       case CYCLE_CATEGORY_FILTER ->
-          extensionInteraction.cycleCategoryFilter(this::updateExtensionFilterStatus);
+          extensionUpdateIntents(extensionInteraction.cycleCategoryFilter(ignored -> {}));
     };
   }
 
-  private void applyExtensionNavigationKeyEffect(KeyEvent keyEvent) {
-    extensionCatalogNavigation.handleNavigationKey(extensionCatalogProjection.rows(), keyEvent);
+  private List<UiIntent> applyExtensionNavigationKeyEffect(KeyEvent keyEvent) {
+    boolean handled =
+        extensionCatalogNavigation.handleNavigationKey(extensionCatalogProjection.rows(), keyEvent);
+    return handled ? List.of(extensionStateUpdatedIntent()) : List.of();
   }
 
   @Override
@@ -1156,7 +1190,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   private String metadataPanelTitle() {
-    return validation.isValid() ? "Project Metadata" : "Project Metadata [invalid]";
+    return currentValidation().isValid() ? "Project Metadata" : "Project Metadata [invalid]";
   }
 
   private boolean hasValidationErrorFor(FocusTarget target) {
@@ -1165,7 +1199,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
       return false;
     }
     String fieldName = UiFocusTargets.nameOf(target);
-    return validation.errors().stream()
+    return currentValidation().errors().stream()
         .anyMatch(error -> error.field().equalsIgnoreCase(fieldName));
   }
 
@@ -1191,34 +1225,24 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   private void scheduleFilteredExtensionsRefresh() {
     String query = inputStates.get(FocusTarget.EXTENSION_SEARCH).text();
-    storeReducerState(reducerState.withStatusMessage("Searching extensions..."));
     extensionCatalogProjection.scheduleRefresh(
         query,
         extensionCatalogNavigation,
         extensionCatalogPreferences,
-        this::updateExtensionFilterStatus);
+        this::publishFilteredExtensionUpdate);
   }
 
-  private void syncMetadataSelectors() {
+  private ProjectRequest syncMetadataSelectors(ProjectRequest request) {
     MetadataDto metadataSnapshot = metadataCompatibility.metadataSnapshot();
     MetadataSelectorManager.ResolvedSelections resolved =
         metadataSelectors.sync(
             metadataSnapshot, request.platformStream(), request.buildTool(), request.javaVersion());
 
-    request =
-        CliPrefillMapper.map(
-            new CliPrefill(
-                inputStates.get(FocusTarget.GROUP_ID).text(),
-                inputStates.get(FocusTarget.ARTIFACT_ID).text(),
-                inputStates.get(FocusTarget.VERSION).text(),
-                inputStates.get(FocusTarget.PACKAGE_NAME).text(),
-                inputStates.get(FocusTarget.OUTPUT_DIR).text(),
-                resolved.platformStream(),
-                resolved.buildTool(),
-                resolved.javaVersion()));
+    return buildRequestFromInputs(
+        resolved.platformStream(), resolved.buildTool(), resolved.javaVersion());
   }
 
-  private boolean handleMetadataSelectorKey(FocusTarget target, KeyEvent keyEvent) {
+  private List<UiIntent> handleMetadataSelectorKey(FocusTarget target, KeyEvent keyEvent) {
     if (keyEvent.isLeft()
         || UiKeyMatchers.isVimLeftKey(keyEvent)
         || keyEvent.isUp()
@@ -1237,28 +1261,28 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     if (keyEvent.isEnd()) {
       return applySelectorEdge(target, false);
     }
-    return false;
+    return List.of();
   }
 
-  private boolean applySelectorCycle(FocusTarget target, int delta) {
-    String newValue = metadataSelectors.cycle(target, selectorValue(target), delta);
+  private List<UiIntent> applySelectorCycle(FocusTarget target, int delta) {
+    String newValue =
+        metadataSelectors.cycle(target, selectorValue(currentRequest(), target), delta);
     if (newValue == null) {
-      return false;
+      return List.of();
     }
-    applySelector(target, newValue);
-    return true;
+    return applySelector(target, newValue);
   }
 
-  private boolean applySelectorEdge(FocusTarget target, boolean first) {
+  private List<UiIntent> applySelectorEdge(FocusTarget target, boolean first) {
     String newValue = metadataSelectors.selectEdge(target, first);
     if (newValue == null) {
-      return false;
+      return List.of();
     }
-    applySelector(target, newValue);
-    return true;
+    return applySelector(target, newValue);
   }
 
-  private void applySelector(FocusTarget target, String selectedValue) {
+  private List<UiIntent> applySelector(FocusTarget target, String selectedValue) {
+    ProjectRequest request = currentRequest();
     String platformStream = request.platformStream();
     String buildTool = request.buildTool();
     String javaVersion = request.javaVersion();
@@ -1271,22 +1295,16 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
       javaVersion = selectedValue;
     }
 
-    request =
-        CliPrefillMapper.map(
-            new CliPrefill(
-                inputStates.get(FocusTarget.GROUP_ID).text(),
-                inputStates.get(FocusTarget.ARTIFACT_ID).text(),
-                inputStates.get(FocusTarget.VERSION).text(),
-                inputStates.get(FocusTarget.PACKAGE_NAME).text(),
-                inputStates.get(FocusTarget.OUTPUT_DIR).text(),
-                platformStream,
-                buildTool,
-                javaVersion));
-    syncMetadataSelectors();
-    storeReducerState(reducerState.withStatusMessage(selectorStatusMessage(target)));
+    ProjectRequest nextRequest =
+        syncMetadataSelectors(buildRequestFromInputs(platformStream, buildTool, javaVersion));
+    ValidationReport nextValidation = validateRequest(nextRequest);
+    return List.of(
+        new UiIntent.FormStateUpdatedIntent(nextRequest, nextValidation),
+        new UiIntent.StatusMessageIntent(selectorStatusMessage(target, nextRequest)),
+        submitRecoveryIntent(nextRequest));
   }
 
-  private String selectorStatusMessage(FocusTarget target) {
+  private String selectorStatusMessage(FocusTarget target, ProjectRequest request) {
     return switch (target) {
       case PLATFORM_STREAM ->
           "Platform stream selected: "
@@ -1297,7 +1315,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     };
   }
 
-  private String selectorValue(FocusTarget target) {
+  private String selectorValue(ProjectRequest request, FocusTarget target) {
     return switch (target) {
       case PLATFORM_STREAM -> request.platformStream();
       case BUILD_TOOL -> request.buildTool();
@@ -1319,23 +1337,23 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     return List.copyOf(displayOptions);
   }
 
-  private void rebuildRequestFromInputs() {
-    CliPrefill prefill =
+  private ProjectRequest buildRequestFromInputs(
+      String platformStream, String buildTool, String javaVersion) {
+    return CliPrefillMapper.map(
         new CliPrefill(
             inputStates.get(FocusTarget.GROUP_ID).text(),
             inputStates.get(FocusTarget.ARTIFACT_ID).text(),
             inputStates.get(FocusTarget.VERSION).text(),
             inputStates.get(FocusTarget.PACKAGE_NAME).text(),
             inputStates.get(FocusTarget.OUTPUT_DIR).text(),
-            request.platformStream(),
-            request.buildTool(),
-            request.javaVersion());
-    request = CliPrefillMapper.map(prefill);
+            platformStream,
+            buildTool,
+            javaVersion));
   }
 
-  private void revalidate() {
+  private ValidationReport validateRequest(ProjectRequest request) {
     ValidationReport report = requestValidator.validate(request);
-    validation = report.merge(metadataCompatibility.validate(request));
+    return report.merge(metadataCompatibility.validate(request));
   }
 
   private void cancelPendingAsyncOperations() {
@@ -1353,6 +1371,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   private GenerationRequest toGenerationRequest() {
+    ProjectRequest request = currentRequest();
     return new GenerationRequest(
         request.groupId(),
         request.artifactId(),
@@ -1363,7 +1382,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         extensionCatalogNavigation.selectedExtensionIds());
   }
 
-  private Path resolveGeneratedProjectDirectory() {
+  private Path resolveGeneratedProjectDirectory(ProjectRequest request) {
     Path outputRoot = OutputPathResolver.resolveOutputRoot(request.outputDirectory());
     return outputRoot.resolve(request.artifactId()).normalize();
   }
@@ -1381,11 +1400,9 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     catalogLoadCoordinator.requestReload(catalogLoadIntentPort);
   }
 
-  private void applyCatalogLoadSuccessEffect(CatalogLoadSuccess success) {
+  private List<UiIntent> applyCatalogLoadSuccessEffect(CatalogLoadSuccess success) {
     if (success.metadata() != null) {
       metadataCompatibility = MetadataCompatibilityContext.success(success.metadata());
-      syncMetadataSelectors();
-      revalidate();
     }
     replaceExtensionCatalog(success.items(), inputStates.get(FocusTarget.EXTENSION_SEARCH).text());
     extensionCatalogProjection.setPresetExtensionsByName(
@@ -1393,14 +1410,23 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         extensionCatalogNavigation,
         extensionCatalogPreferences,
         ignored -> {});
+    List<UiIntent> followUpIntents = new ArrayList<>();
+    followUpIntents.add(extensionStateUpdatedIntent());
+    if (success.metadata() == null) {
+      return List.copyOf(followUpIntents);
+    }
+    ProjectRequest nextRequest = syncMetadataSelectors(currentRequest());
+    followUpIntents.add(
+        new UiIntent.FormStateUpdatedIntent(nextRequest, validateRequest(nextRequest)));
+    return List.copyOf(followUpIntents);
   }
 
   private void cancelPendingAsyncEffect() {
     cancelPendingAsyncOperations();
   }
 
-  private void exportRecipeAndLockEffect() {
-    exportRecipeAndLockFiles();
+  private String exportRecipeAndLockEffect() {
+    return exportRecipeAndLockFiles();
   }
 
   private void resetGenerationStateAfterTerminalOutcome() {
@@ -1409,7 +1435,10 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   private void startGenerationEffect() {
     generationFlowCoordinator.startFlow(
-        projectGenerationRunner, toGenerationRequest(), resolveGeneratedProjectDirectory(), this);
+        projectGenerationRunner,
+        toGenerationRequest(),
+        resolveGeneratedProjectDirectory(currentRequest()),
+        this);
   }
 
   private void transitionGenerationStateEffect(GenerationState targetState) {
@@ -1431,24 +1460,27 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     }
   }
 
-  private void applyMetadataSelectorKeyEffect(FocusTarget target, KeyEvent keyEvent) {
-    if (handleMetadataSelectorKey(target, keyEvent)) {
-      revalidate();
-      dispatchSubmitEditRecovery();
-    }
+  private List<UiIntent> applyMetadataSelectorKeyEffect(FocusTarget target, KeyEvent keyEvent) {
+    return handleMetadataSelectorKey(target, keyEvent);
   }
 
-  private void applyTextInputKeyEffect(FocusTarget target, KeyEvent keyEvent) {
+  private List<UiIntent> applyTextInputKeyEffect(FocusTarget target, KeyEvent keyEvent) {
     if (!handleTextInputKey(inputStates.get(target), keyEvent)) {
-      return;
+      return List.of();
     }
     if (target == FocusTarget.EXTENSION_SEARCH) {
       scheduleFilteredExtensionsRefresh();
-      return;
+      return extensionUpdateIntents("Searching extensions...");
     }
-    rebuildRequestFromInputs();
-    revalidate();
-    dispatchSubmitEditRecovery();
+    ProjectRequest currentRequest = currentRequest();
+    ProjectRequest nextRequest =
+        buildRequestFromInputs(
+            currentRequest.platformStream(),
+            currentRequest.buildTool(),
+            currentRequest.javaVersion());
+    return List.of(
+        new UiIntent.FormStateUpdatedIntent(nextRequest, validateRequest(nextRequest)),
+        submitRecoveryIntent(nextRequest));
   }
 
   @Override
@@ -1506,11 +1538,11 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     return shouldRender ? new UiAction(true, false) : UiAction.ignored();
   }
 
-  private void updateExtensionFilterStatus(int filteredCount) {
-    if (isGenerationInProgress()) {
-      return;
+  private void publishFilteredExtensionUpdate(int filteredCount) {
+    dispatchIntent(extensionStateUpdatedIntent());
+    if (!isGenerationInProgress()) {
+      dispatchIntent(new UiIntent.ExtensionStatusIntent("Extensions filtered: " + filteredCount));
     }
-    storeReducerState(reducerState.withStatusMessage("Extensions filtered: " + filteredCount));
   }
 
   private void requestAsyncRepaint() {
@@ -1583,9 +1615,9 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     return null;
   }
 
-  private String currentTargetConflictErrorMessage() {
+  private String currentTargetConflictErrorMessage(ProjectRequest request) {
     try {
-      Path generatedProjectDirectory = resolveGeneratedProjectDirectory();
+      Path generatedProjectDirectory = resolveGeneratedProjectDirectory(request);
       if (!Files.exists(generatedProjectDirectory)) {
         return "";
       }
@@ -1596,10 +1628,9 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     }
   }
 
-  private void dispatchSubmitEditRecovery() {
-    dispatchIntent(
-        new UiIntent.SubmitEditRecoveryIntent(
-            new UiIntent.SubmitRecoveryContext(currentTargetConflictErrorMessage())));
+  private UiIntent.SubmitEditRecoveryIntent submitRecoveryIntent(ProjectRequest request) {
+    return new UiIntent.SubmitEditRecoveryIntent(
+        new UiIntent.SubmitRecoveryContext(currentTargetConflictErrorMessage(request)));
   }
 
   private void moveFocusedInputCursorToEndAfterSubmitFeedback() {
@@ -1618,16 +1649,13 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     return routeIntent(new UiIntent.ExtensionCommandIntent(command));
   }
 
-  private String clearExtensionSearchFilter() {
+  private List<UiIntent> clearExtensionSearchFilter() {
     TextInputState searchState = inputStates.get(FocusTarget.EXTENSION_SEARCH);
     searchState.setText("");
     searchState.moveCursorToStart();
     extensionCatalogProjection.refreshNow(
-        "",
-        extensionCatalogNavigation,
-        extensionCatalogPreferences,
-        this::updateExtensionFilterStatus);
-    return "Extension search cleared";
+        "", extensionCatalogNavigation, extensionCatalogPreferences, ignored -> {});
+    return extensionUpdateIntents("Extension search cleared");
   }
 
   static String catalogLoadedStatusMessage(CatalogSource source, boolean stale) {
@@ -1641,9 +1669,9 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   private void moveFocusToAdjacentInvalidField(boolean forward) {
-    List<FocusTarget> invalidTargets = ValidationFocusTargets.orderedInvalid(validation);
+    List<FocusTarget> invalidTargets = ValidationFocusTargets.orderedInvalid(currentValidation());
     if (invalidTargets.isEmpty()) {
-      storeReducerState(reducerState.withStatusMessage("No invalid fields"));
+      dispatchIntent(new UiIntent.StatusMessageIntent("No invalid fields"));
       return;
     }
     int currentIndex = invalidTargets.indexOf(focusTarget());
@@ -1657,8 +1685,8 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     if (isTextInputFocus(nextFocusTarget)) {
       inputStates.get(nextFocusTarget).moveCursorToEnd();
     }
-    storeReducerState(
-        reducerState.withFocusAndStatus(
+    dispatchIntent(
+        new UiIntent.FocusStatusIntent(
             nextFocusTarget,
             "Focus moved to invalid field: " + UiFocusTargets.nameOf(nextFocusTarget)));
   }
@@ -1667,9 +1695,10 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     if (isGenerationInProgress() || postGenerationMenuVisible()) {
       return "";
     }
+    ProjectRequest request = currentRequest();
     String targetPathDisplay;
     try {
-      targetPathDisplay = resolveGeneratedProjectDirectory().toString();
+      targetPathDisplay = resolveGeneratedProjectDirectory(request).toString();
     } catch (RuntimeException pathError) {
       targetPathDisplay = request.outputDirectory() + "/" + request.artifactId();
     }

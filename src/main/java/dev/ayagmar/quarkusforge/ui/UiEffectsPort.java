@@ -1,6 +1,7 @@
 package dev.ayagmar.quarkusforge.ui;
 
 import dev.tamboui.tui.event.KeyEvent;
+import java.util.List;
 
 interface UiEffectsPort {
   void startCatalogLoad(ExtensionCatalogLoader loader);
@@ -11,13 +12,13 @@ interface UiEffectsPort {
 
   void cancelPendingAsync();
 
-  void exportRecipeAndLock();
+  String exportRecipeAndLock();
 
-  String executeExtensionCommand(UiIntent.ExtensionCommand command);
+  List<UiIntent> executeExtensionCommand(UiIntent.ExtensionCommand command);
 
-  void applyExtensionNavigationKey(KeyEvent keyEvent);
+  List<UiIntent> applyExtensionNavigationKey(KeyEvent keyEvent);
 
-  void applyCatalogLoadSuccess(CatalogLoadSuccess success);
+  List<UiIntent> applyCatalogLoadSuccess(CatalogLoadSuccess success);
 
   void startGeneration();
 
@@ -29,7 +30,7 @@ interface UiEffectsPort {
 
   void moveTextInputCursorToEnd(FocusTarget focusTarget);
 
-  void applyMetadataSelectorKey(FocusTarget focusTarget, KeyEvent keyEvent);
+  List<UiIntent> applyMetadataSelectorKey(FocusTarget focusTarget, KeyEvent keyEvent);
 
-  void applyTextInputKey(FocusTarget focusTarget, KeyEvent keyEvent);
+  List<UiIntent> applyTextInputKey(FocusTarget focusTarget, KeyEvent keyEvent);
 }
