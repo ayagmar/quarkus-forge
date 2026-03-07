@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge.ui;
 
+import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
 
 /** Normalized user/system events consumed by the reducer. */
@@ -59,6 +60,23 @@ sealed interface UiIntent {
       statusMessage = statusMessage == null ? "" : statusMessage;
     }
   }
+
+  record StatusMessageIntent(String statusMessage) implements UiIntent {
+    public StatusMessageIntent {
+      statusMessage = statusMessage == null ? "" : statusMessage;
+    }
+  }
+
+  record FocusStatusIntent(FocusTarget focusTarget, String statusMessage) implements UiIntent {
+    public FocusStatusIntent {
+      statusMessage = statusMessage == null ? "" : statusMessage;
+    }
+  }
+
+  record FormStateUpdatedIntent(ProjectRequest request, ValidationReport validation)
+      implements UiIntent {}
+
+  record ExtensionStateUpdatedIntent(UiState.ExtensionView extensions) implements UiIntent {}
 
   record ExtensionNavigationIntent(dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget)
       implements UiIntent {}

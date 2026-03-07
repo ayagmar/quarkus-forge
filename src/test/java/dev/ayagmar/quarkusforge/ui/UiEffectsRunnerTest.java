@@ -2,6 +2,8 @@ package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.ayagmar.quarkusforge.domain.ProjectRequest;
+import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import java.util.ArrayList;
@@ -25,6 +27,8 @@ class UiEffectsRunnerTest {
     KeyEvent selectorKey = KeyEvent.ofKey(KeyCode.LEFT);
     KeyEvent textInputKey = KeyEvent.ofChar('a');
     RecordingUiEffectsPort port = new RecordingUiEffectsPort();
+    ProjectRequest request = UiTestFixtureFactory.defaultForgeUiState().request();
+    ValidationReport validation = UiTestFixtureFactory.defaultForgeUiState().validation();
     List<UiIntent> followUpIntents =
         new UiEffectsRunner()
             .run(
@@ -65,7 +69,16 @@ class UiEffectsRunnerTest {
             "applyMetadataSelectorKey",
             "applyTextInputKey");
     assertThat(followUpIntents)
-        .containsExactly(new UiIntent.ExtensionStatusIntent("Selected-only view enabled"));
+        .containsExactly(
+            new UiIntent.StatusMessageIntent("Exported Forgefile to /tmp/Forgefile"),
+            new UiIntent.ExtensionStateUpdatedIntent(UiTestFixtureFactory.defaultExtensionView()),
+            new UiIntent.ExtensionStatusIntent("Selected-only view enabled"),
+            new UiIntent.ExtensionStateUpdatedIntent(UiTestFixtureFactory.defaultExtensionView()),
+            new UiIntent.FormStateUpdatedIntent(request, validation),
+            new UiIntent.FormStateUpdatedIntent(request, validation),
+            new UiIntent.StatusMessageIntent("Build tool selected: gradle"),
+            new UiIntent.FormStateUpdatedIntent(request, validation),
+            new UiIntent.SubmitEditRecoveryIntent(new UiIntent.SubmitRecoveryContext("")));
     assertThat(port.loader).isSameAs(loader);
     assertThat(port.extensionCommand).isEqualTo(extensionCommand);
     assertThat(port.extensionNavigationKeyEvent).isEqualTo(KeyEvent.ofChar('j'));
@@ -113,27 +126,36 @@ class UiEffectsRunnerTest {
     }
 
     @Override
-    public void exportRecipeAndLock() {
+    public String exportRecipeAndLock() {
       calls.add("exportRecipeAndLock");
+      return "Exported Forgefile to /tmp/Forgefile";
     }
 
     @Override
-    public String executeExtensionCommand(UiIntent.ExtensionCommand command) {
+    public List<UiIntent> executeExtensionCommand(UiIntent.ExtensionCommand command) {
       calls.add("executeExtensionCommand");
       extensionCommand = command;
-      return "Selected-only view enabled";
+      return List.of(
+          new UiIntent.ExtensionStateUpdatedIntent(UiTestFixtureFactory.defaultExtensionView()),
+          new UiIntent.ExtensionStatusIntent("Selected-only view enabled"));
     }
 
     @Override
-    public void applyExtensionNavigationKey(KeyEvent keyEvent) {
+    public List<UiIntent> applyExtensionNavigationKey(KeyEvent keyEvent) {
       calls.add("applyExtensionNavigationKey");
       extensionNavigationKeyEvent = keyEvent;
+      return List.of(
+          new UiIntent.ExtensionStateUpdatedIntent(UiTestFixtureFactory.defaultExtensionView()));
     }
 
     @Override
-    public void applyCatalogLoadSuccess(CatalogLoadSuccess success) {
+    public List<UiIntent> applyCatalogLoadSuccess(CatalogLoadSuccess success) {
       calls.add("applyCatalogLoadSuccess");
       this.success = success;
+      return List.of(
+          new UiIntent.FormStateUpdatedIntent(
+              UiTestFixtureFactory.defaultForgeUiState().request(),
+              UiTestFixtureFactory.defaultForgeUiState().validation()));
     }
 
     @Override
@@ -164,17 +186,27 @@ class UiEffectsRunnerTest {
     }
 
     @Override
-    public void applyMetadataSelectorKey(FocusTarget focusTarget, KeyEvent keyEvent) {
+    public List<UiIntent> applyMetadataSelectorKey(FocusTarget focusTarget, KeyEvent keyEvent) {
       calls.add("applyMetadataSelectorKey");
       metadataFocusTarget = focusTarget;
       metadataKeyEvent = keyEvent;
+      return List.of(
+          new UiIntent.FormStateUpdatedIntent(
+              UiTestFixtureFactory.defaultForgeUiState().request(),
+              UiTestFixtureFactory.defaultForgeUiState().validation()),
+          new UiIntent.StatusMessageIntent("Build tool selected: gradle"));
     }
 
     @Override
-    public void applyTextInputKey(FocusTarget focusTarget, KeyEvent keyEvent) {
+    public List<UiIntent> applyTextInputKey(FocusTarget focusTarget, KeyEvent keyEvent) {
       calls.add("applyTextInputKey");
       textInputFocusTarget = focusTarget;
       textInputKeyEvent = keyEvent;
+      return List.of(
+          new UiIntent.FormStateUpdatedIntent(
+              UiTestFixtureFactory.defaultForgeUiState().request(),
+              UiTestFixtureFactory.defaultForgeUiState().validation()),
+          new UiIntent.SubmitEditRecoveryIntent(new UiIntent.SubmitRecoveryContext("")));
     }
   }
 }

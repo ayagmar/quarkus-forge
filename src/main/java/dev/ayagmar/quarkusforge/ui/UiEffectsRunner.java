@@ -21,16 +21,14 @@ final class UiEffectsRunner {
       case UiEffect.RequestCatalogReload _ -> runAndReturnNone(effectsPort::requestCatalogReload);
       case UiEffect.PrepareForGeneration _ -> runAndReturnNone(effectsPort::prepareForGeneration);
       case UiEffect.CancelPendingAsync _ -> runAndReturnNone(effectsPort::cancelPendingAsync);
-      case UiEffect.ExportRecipeAndLock _ -> runAndReturnNone(effectsPort::exportRecipeAndLock);
+      case UiEffect.ExportRecipeAndLock _ ->
+          List.of(new UiIntent.StatusMessageIntent(effectsPort.exportRecipeAndLock()));
       case UiEffect.ExecuteExtensionCommand extensionEffect ->
-          List.of(
-              new UiIntent.ExtensionStatusIntent(
-                  effectsPort.executeExtensionCommand(extensionEffect.command())));
+          effectsPort.executeExtensionCommand(extensionEffect.command());
       case UiEffect.ApplyExtensionNavigationKey navigationEffect ->
-          runAndReturnNone(
-              () -> effectsPort.applyExtensionNavigationKey(navigationEffect.keyEvent()));
+          effectsPort.applyExtensionNavigationKey(navigationEffect.keyEvent());
       case UiEffect.ApplyCatalogLoadSuccess successEffect ->
-          runAndReturnNone(() -> effectsPort.applyCatalogLoadSuccess(successEffect.success()));
+          effectsPort.applyCatalogLoadSuccess(successEffect.success());
       case UiEffect.StartGeneration _ -> runAndReturnNone(effectsPort::startGeneration);
       case UiEffect.TransitionGenerationState transitionEffect ->
           runAndReturnNone(
@@ -42,15 +40,10 @@ final class UiEffectsRunner {
           runAndReturnNone(
               () -> effectsPort.moveTextInputCursorToEnd(moveCursorEffect.focusTarget()));
       case UiEffect.ApplyMetadataSelectorKey selectorEffect ->
-          runAndReturnNone(
-              () ->
-                  effectsPort.applyMetadataSelectorKey(
-                      selectorEffect.focusTarget(), selectorEffect.keyEvent()));
+          effectsPort.applyMetadataSelectorKey(
+              selectorEffect.focusTarget(), selectorEffect.keyEvent());
       case UiEffect.ApplyTextInputKey textInputEffect ->
-          runAndReturnNone(
-              () ->
-                  effectsPort.applyTextInputKey(
-                      textInputEffect.focusTarget(), textInputEffect.keyEvent()));
+          effectsPort.applyTextInputKey(textInputEffect.focusTarget(), textInputEffect.keyEvent());
     };
   }
 

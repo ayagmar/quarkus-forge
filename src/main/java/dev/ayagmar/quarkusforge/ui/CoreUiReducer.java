@@ -171,6 +171,28 @@ final class CoreUiReducer implements UiReducer {
               state.withStatusMessage(extensionStatusIntent.statusMessage()),
               List.of(),
               UiAction.handled(false));
+      case UiIntent.StatusMessageIntent statusMessageIntent ->
+          new ReduceResult(
+              state.withStatusMessage(statusMessageIntent.statusMessage()),
+              List.of(),
+              UiAction.handled(false));
+      case UiIntent.FocusStatusIntent focusStatusIntent ->
+          new ReduceResult(
+              state.withFocusAndStatus(
+                  focusStatusIntent.focusTarget(), focusStatusIntent.statusMessage()),
+              List.of(),
+              UiAction.handled(false));
+      case UiIntent.FormStateUpdatedIntent formStateUpdatedIntent ->
+          new ReduceResult(
+              state.withRequestAndValidation(
+                  formStateUpdatedIntent.request(), formStateUpdatedIntent.validation()),
+              List.of(),
+              UiAction.handled(false));
+      case UiIntent.ExtensionStateUpdatedIntent extensionStateUpdatedIntent ->
+          new ReduceResult(
+              state.withExtensions(extensionStateUpdatedIntent.extensions()),
+              List.of(),
+              UiAction.handled(false));
       case UiIntent.ExtensionNavigationIntent navigationIntent ->
           reduceExtensionNavigation(
               state, navigationIntent.keyEvent(), navigationIntent.focusTarget());
