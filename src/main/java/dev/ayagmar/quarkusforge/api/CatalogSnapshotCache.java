@@ -1,6 +1,7 @@
 package dev.ayagmar.quarkusforge.api;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -149,7 +150,8 @@ public final class CatalogSnapshotCache {
 
     @Override
     public CatalogSnapshotPayload read(Path file) throws IOException {
-      Map<String, Object> root = JsonSupport.parseObject(Files.readString(file));
+      Map<String, Object> root =
+          JsonSupport.parseObject(Files.readString(file, StandardCharsets.UTF_8));
 
       Integer schemaVersion = JsonFieldReader.readInt(root, "schemaVersion");
       Long fetchedAtEpochMillis = JsonFieldReader.readLong(root, "fetchedAtEpochMillis");

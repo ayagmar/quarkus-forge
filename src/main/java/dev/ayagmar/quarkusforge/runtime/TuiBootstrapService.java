@@ -202,7 +202,6 @@ public final class TuiBootstrapService {
     controller.loadExtensionCatalogAsync(
         () -> {
           diagnostics.info("catalog.load.start", of("mode", "tui"));
-          String presetStreamKey = controller.request().platformStream();
           CompletableFuture<CatalogData> catalogLoadFuture =
               firstCatalogLoad.getAndSet(false)
                   ? catalogLoader.loadForStartup()
@@ -212,7 +211,9 @@ public final class TuiBootstrapService {
               .thenCompose(
                   loadResult ->
                       presetLoader
-                          .load(presetStreamKey)
+                          .load(
+                              resolvePresetStreamKey(
+                                  controller.request().platformStream(), loadResult.metadata()))
                           .handle(
                               (presets, throwable) -> {
                                 if (throwable != null) {
@@ -255,5 +256,16 @@ public final class TuiBootstrapService {
       return;
     }
     System.setProperty(BACKEND_PROPERTY_NAME, previousBackendPreference);
+  }
+
+  private static String resolvePresetStreamKey(
+      String currentStreamKey, dev.ayagmar.quarkusforge.api.MetadataDto metadata) {
+    if (currentStreamKey != null && !currentStreamKey.isBlank()) {
+      return currentStreamKey;
+    }
+    if (metadata == null) {
+      return "";
+    }
+    return metadata.recommendedPlatformStreamKey();
   }
 }

@@ -3,6 +3,7 @@ package dev.ayagmar.quarkusforge.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import dev.ayagmar.quarkusforge.testsupport.EncodingProbeSupport;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -56,6 +57,25 @@ class CatalogSnapshotCacheTest {
 
     CachedCatalogSnapshot snapshot = cache.read().orElseThrow();
     assertThat(snapshot.extensions().getFirst().description()).isEqualTo("REST endpoint support");
+  }
+
+  @Test
+  void readUsesUtf8WhenJvmDefaultCharsetIsAscii() throws Exception {
+    Path cacheFile = tempDir.resolve("catalog-snapshot.json");
+    CatalogSnapshotCache cache =
+        new CatalogSnapshotCache(
+            cacheFile,
+            CatalogSnapshotCache.defaultPayloadCodec(),
+            Clock.fixed(Instant.parse("2026-02-22T00:00:00Z"), ZoneOffset.UTC),
+            Duration.ofHours(6),
+            2L * 1024L * 1024L);
+    List<ExtensionDto> extensions =
+        List.of(new ExtensionDto("io.quarkus:quarkus-rest", "Caf\u00e9", "rest"));
+
+    assertThat(cache.write(sampleMetadata(), extensions).written()).isTrue();
+
+    assertThat(EncodingProbeSupport.probe("catalog-extension-name", cacheFile))
+        .isEqualTo("Caf\\u00E9");
   }
 
   @Test

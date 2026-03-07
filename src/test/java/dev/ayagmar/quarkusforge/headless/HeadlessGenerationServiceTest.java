@@ -49,7 +49,9 @@ class HeadlessGenerationServiceTest {
   private static final CatalogData CATALOG_DATA =
       new CatalogData(
           METADATA,
-          List.of(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest")),
+          List.of(
+              new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest"),
+              new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "arc")),
           CatalogSource.LIVE,
           false,
           "");
@@ -185,6 +187,27 @@ class HeadlessGenerationServiceTest {
         favoritesFile,
         """
         {"schemaVersion":1,"favoriteExtensionIds":["io.quarkus:quarkus-rest"]}
+        """);
+
+    StubCatalogOperations client = new StubCatalogOperations();
+    HeadlessGenerationService service =
+        serviceWith(client, ExtensionFavoritesStore.fileBacked(favoritesFile));
+
+    GenerateCommand command = commandWithOutput();
+    command.presets().add("favorites");
+    int exitCode = service.run(command, true, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.OK);
+  }
+
+  @Test
+  void favoritesPresetIgnoresRemovedFavoriteIds() throws Exception {
+    Path favoritesFile = tempDir.resolve("favorites.json");
+    java.nio.file.Files.createDirectories(favoritesFile.getParent());
+    java.nio.file.Files.writeString(
+        favoritesFile,
+        """
+        {"schemaVersion":1,"favoriteExtensionIds":["io.quarkus:quarkus-rest","io.quarkus:removed"]}
         """);
 
     StubCatalogOperations client = new StubCatalogOperations();
@@ -346,6 +369,82 @@ class HeadlessGenerationServiceTest {
 
     GenerateCommand command = commandWithOutput();
     command.setFromFile(forgefilePath.toString());
+    int exitCode = service.run(command, true, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.OK);
+  }
+
+  @Test
+  void lockCheckIgnoresExtensionOrderingWhenSelectionsAreEquivalent() throws Exception {
+    Path forgefilePath = tempDir.resolve("equivalent-lock-order.json");
+    java.nio.file.Files.writeString(
+        forgefilePath,
+        """
+        {
+          "groupId": "com.team",
+          "artifactId": "ordered-app",
+          "buildTool": "maven",
+          "javaVersion": "21",
+          "presets": [],
+          "extensions": ["io.quarkus:quarkus-arc", "io.quarkus:quarkus-rest"],
+          "locked": {
+            "platformStream": "io.quarkus.platform:3.31",
+            "buildTool": "maven",
+            "javaVersion": "21",
+            "presets": [],
+            "extensions": ["io.quarkus:quarkus-rest", "io.quarkus:quarkus-arc"]
+          }
+        }
+        """);
+
+    StubCatalogOperations client = new StubCatalogOperations();
+    HeadlessGenerationService service = serviceWith(client);
+
+    GenerateCommand command = commandWithOutput();
+    command.setFromFile(forgefilePath.toString());
+    command.setLockCheck(true);
+    int exitCode = service.run(command, true, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.OK);
+  }
+
+  @Test
+  void lockCheckIgnoresPresetOrderingWhenSelectionsAreEquivalent() throws Exception {
+    Path favoritesFile = tempDir.resolve("favorites.json");
+    java.nio.file.Files.createDirectories(favoritesFile.getParent());
+    java.nio.file.Files.writeString(
+        favoritesFile,
+        """
+        {"schemaVersion":1,"favoriteExtensionIds":["io.quarkus:quarkus-rest"]}
+        """);
+    Path forgefilePath = tempDir.resolve("equivalent-preset-lock-order.json");
+    java.nio.file.Files.writeString(
+        forgefilePath,
+        """
+        {
+          "groupId": "com.team",
+          "artifactId": "preset-app",
+          "buildTool": "maven",
+          "javaVersion": "21",
+          "presets": ["favorites", "web"],
+          "extensions": [],
+          "locked": {
+            "platformStream": "io.quarkus.platform:3.31",
+            "buildTool": "maven",
+            "javaVersion": "21",
+            "presets": ["web", "favorites"],
+            "extensions": ["io.quarkus:quarkus-rest"]
+          }
+        }
+        """);
+
+    StubCatalogOperations client = new StubCatalogOperations();
+    HeadlessGenerationService service =
+        serviceWith(client, ExtensionFavoritesStore.fileBacked(favoritesFile));
+
+    GenerateCommand command = commandWithOutput();
+    command.setFromFile(forgefilePath.toString());
+    command.setLockCheck(true);
     int exitCode = service.run(command, true, false);
 
     assertThat(exitCode).isEqualTo(ExitCodes.OK);

@@ -30,9 +30,9 @@ test:
 test-unit:
     {{mvn}} test
 
-# Run integration tests only (Failsafe; skips Surefire unit-test execution)
+# Run integration tests only (Failsafe; compiles tests without running Surefire)
 test-it:
-    {{mvn}} verify -DskipTests
+    {{mvn}} test-compile failsafe:integration-test failsafe:verify
 
 # Generate bash completion scripts for both entry points
 completion-bash:

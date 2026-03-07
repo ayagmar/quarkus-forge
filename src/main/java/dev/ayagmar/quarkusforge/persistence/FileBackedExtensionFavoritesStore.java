@@ -5,6 +5,7 @@ import dev.ayagmar.quarkusforge.api.AtomicFileStore;
 import dev.ayagmar.quarkusforge.api.JsonFieldReader;
 import dev.ayagmar.quarkusforge.api.JsonSupport;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -64,7 +65,8 @@ final class FileBackedExtensionFavoritesStore implements ExtensionFavoritesStore
       return null;
     }
     try {
-      Map<String, Object> root = JsonSupport.parseObject(Files.readString(file));
+      Map<String, Object> root =
+          JsonSupport.parseObject(Files.readString(file, StandardCharsets.UTF_8));
       Integer schemaVersion = JsonFieldReader.readInt(root, "schemaVersion");
       if (schemaVersion == null || schemaVersion != SCHEMA_VERSION) {
         return null;

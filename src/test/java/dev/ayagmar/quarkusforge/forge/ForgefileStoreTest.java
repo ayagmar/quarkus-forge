@@ -3,6 +3,7 @@ package dev.ayagmar.quarkusforge.forge;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import dev.ayagmar.quarkusforge.testsupport.EncodingProbeSupport;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -201,7 +202,7 @@ class ForgefileStoreTest {
   }
 
   @Test
-  void loadIgnoresNonMapLockedSection() throws Exception {
+  void loadRejectsNonMapLockedSection() throws Exception {
     Path file = tempDir.resolve("locked-string.json");
     Files.writeString(
         file,
@@ -212,10 +213,31 @@ class ForgefileStoreTest {
         }
         """);
 
-    Forgefile loaded = ForgefileStore.load(file);
+    assertThatThrownBy(() -> ForgefileStore.load(file))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Failed to parse Forgefile '")
+        .hasMessageContaining("locked-string.json")
+        .hasMessageContaining("Field 'locked' must be an object");
+  }
 
-    assertThat(loaded.locked()).isNull();
-    assertThat(loaded.artifactId()).isEqualTo("test");
+  @Test
+  void loadReadsUtf8PayloadsWhenJvmDefaultCharsetIsAscii() throws Exception {
+    Path file = tempDir.resolve("utf8-forgefile.json");
+    ForgefileStore.save(
+        file,
+        new Forgefile(
+            "com.acme",
+            "demo",
+            "1.0.0",
+            "com.acme.demo",
+            "./caf\u00e9",
+            "io.quarkus.platform:3.31",
+            "maven",
+            "25",
+            null,
+            null));
+
+    assertThat(EncodingProbeSupport.probe("forgefile-output-dir", file)).isEqualTo("./caf\\u00E9");
   }
 
   @Test

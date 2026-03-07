@@ -99,6 +99,42 @@ class TuiBootstrapServiceRunTest {
   }
 
   @Test
+  void runSessionUsesLiveRecommendedStreamForPresetsWhenStartupMetadataWasUnavailable()
+      throws Exception {
+    TuiBootstrapService service = new TuiBootstrapService();
+    ForgeUiState initialState =
+        InputResolutionService.resolveInitialState(
+            new CliPrefill("com.example", "forge-app", "1.0.0", "", ".", "", "maven", "25"),
+            MetadataCompatibilityContext.failure("startup metadata unavailable"));
+    CatalogData catalogData =
+        new CatalogData(
+            METADATA,
+            List.of(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "web")),
+            CatalogSource.LIVE,
+            false,
+            "live catalog ready");
+    AtomicReference<String> presetRequest = new AtomicReference<>();
+
+    service.runSession(
+        initialState,
+        0,
+        DiagnosticLogger.create(false),
+        completedCatalogLoader(catalogData),
+        streamKey -> {
+          presetRequest.set(streamKey);
+          return CompletableFuture.completedFuture(Map.of());
+        },
+        (generationRequest, outputDirectory, cancelled, progressListener) ->
+            CompletableFuture.failedFuture(new IllegalStateException("unused")),
+        ExtensionFavoritesStore.inMemory(),
+        UiScheduler.immediate(),
+        List.of(),
+        (controller, diagnostics) -> {});
+
+    assertThat(presetRequest).hasValue("io.quarkus.platform:3.31");
+  }
+
+  @Test
   void runSessionLogsFailureAndRethrowsSessionLoopException() {
     TuiBootstrapService service = new TuiBootstrapService();
     ForgeUiState initialState = defaultState();
