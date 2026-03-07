@@ -1,4 +1,4 @@
-package dev.ayagmar.quarkusforge.api;
+package dev.ayagmar.quarkusforge.persistence;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;

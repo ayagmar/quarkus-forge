@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
-import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
+import dev.ayagmar.quarkusforge.persistence.ExtensionFavoritesStore;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.KeyModifiers;
@@ -80,6 +80,36 @@ class CoreTuiExtensionSearchPilotTest {
       controller.onEvent(KeyEvent.ofKey(KeyCode.BACKSPACE));
     }
     assertThat(controller.selectedExtensionIds()).contains(selectedId);
+  }
+
+  @Test
+  void debouncedSearchKeepsReducerVisibleQueryAndStatusInSync() {
+    UiControllerTestHarness.QueueingScheduler scheduler =
+        new UiControllerTestHarness.QueueingScheduler();
+    CoreTuiController controller =
+        UiControllerTestHarness.controller(scheduler, Duration.ofMillis(5));
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest"),
+                        new ExtensionDto(
+                            "io.quarkus:quarkus-jdbc-postgresql",
+                            "JDBC PostgreSQL",
+                            "jdbc-postgresql")))));
+    scheduler.runAll();
+
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_SEARCH);
+    controller.onEvent(KeyEvent.ofChar('j'));
+
+    assertThat(controller.uiState().extensions().searchQuery()).isEqualTo("j");
+    assertThat(controller.statusMessage()).isEqualTo("Searching extensions...");
+
+    scheduler.runAll();
+
+    assertThat(controller.filteredExtensionCount()).isEqualTo(1);
+    assertThat(controller.statusMessage()).isEqualTo("Extensions filtered: 1");
   }
 
   @Test

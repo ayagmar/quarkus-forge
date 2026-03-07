@@ -12,8 +12,8 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import dev.ayagmar.quarkusforge.SystemPropertyExtension;
-import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
+import dev.ayagmar.quarkusforge.persistence.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;

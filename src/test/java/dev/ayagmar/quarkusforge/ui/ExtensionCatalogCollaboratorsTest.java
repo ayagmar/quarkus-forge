@@ -2,7 +2,7 @@ package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
+import dev.ayagmar.quarkusforge.persistence.ExtensionFavoritesStore;
 import java.time.Duration;
 import java.util.LinkedHashSet;
 import java.util.List;

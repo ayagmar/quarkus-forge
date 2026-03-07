@@ -16,7 +16,7 @@ import dev.ayagmar.quarkusforge.cli.GenerateCommand;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.forge.Forgefile;
 import dev.ayagmar.quarkusforge.forge.ForgefileStore;
-import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
+import dev.ayagmar.quarkusforge.persistence.ExtensionFavoritesStore;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -57,7 +57,7 @@ class HeadlessGenerationServiceTest {
   @Test
   void dryRunSkipsGenerationExecution() {
     StubCatalogOperations client = new StubCatalogOperations();
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     int exitCode = service.run(command, true, false);
@@ -70,7 +70,7 @@ class HeadlessGenerationServiceTest {
   void generationTimeoutCancelsRunningFuture() {
     StubCatalogOperations client = new StubCatalogOperations();
     client.generationFuture = new CompletableFuture<>();
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     systemProperties.set(HEADLESS_GENERATION_TIMEOUT_PROPERTY, 1L);
@@ -86,7 +86,7 @@ class HeadlessGenerationServiceTest {
   void catalogTimeoutReturnsNetworkExitCodeBeforeValidation() {
     StubCatalogOperations client = new StubCatalogOperations();
     client.catalogLoadTimeout = new TimeoutException("timeout");
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     int exitCode = service.run(command, false, false);
@@ -99,7 +99,7 @@ class HeadlessGenerationServiceTest {
   void catalogCancellationReturnsCancelledExitCode() {
     StubCatalogOperations client = new StubCatalogOperations();
     client.catalogLoadCancellation = new java.util.concurrent.CancellationException("cancelled");
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     int exitCode = service.run(command, false, false);
@@ -110,7 +110,7 @@ class HeadlessGenerationServiceTest {
   @Test
   void validationFailureReturnsValidationExitCode() {
     StubCatalogOperations client = new StubCatalogOperations();
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     command.setCliPrefill(
@@ -131,7 +131,7 @@ class HeadlessGenerationServiceTest {
   @Test
   void unknownExtensionReturnsValidationExitCode() {
     StubCatalogOperations client = new StubCatalogOperations();
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     command.extensions().add("io.quarkus:nonexistent");
@@ -145,7 +145,7 @@ class HeadlessGenerationServiceTest {
     StubCatalogOperations client = new StubCatalogOperations();
     client.generationFuture =
         CompletableFuture.failedFuture(new ApiClientException("connection refused", null));
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     int exitCode = service.run(command, false, false);
@@ -156,7 +156,7 @@ class HeadlessGenerationServiceTest {
   @Test
   void verboseModeEmitsDiagnostics() {
     StubCatalogOperations client = new StubCatalogOperations();
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     // verbose mode should not change exit code
@@ -168,7 +168,7 @@ class HeadlessGenerationServiceTest {
   @Test
   void blankExtensionInputReturnsValidationExitCode() {
     StubCatalogOperations client = new StubCatalogOperations();
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     command.extensions().add("   ");
@@ -179,17 +179,17 @@ class HeadlessGenerationServiceTest {
 
   @Test
   void favoritesPresetResolvesFromStore() throws Exception {
-    RuntimeConfig config = stubRuntimeConfig();
-    // Write a favorites file
-    java.nio.file.Files.createDirectories(config.favoritesFile().getParent());
+    Path favoritesFile = tempDir.resolve("favorites.json");
+    java.nio.file.Files.createDirectories(favoritesFile.getParent());
     java.nio.file.Files.writeString(
-        config.favoritesFile(),
+        favoritesFile,
         """
         {"schemaVersion":1,"favoriteExtensionIds":["io.quarkus:quarkus-rest"]}
         """);
 
     StubCatalogOperations client = new StubCatalogOperations();
-    HeadlessGenerationService service = new HeadlessGenerationService(client, config);
+    HeadlessGenerationService service =
+        serviceWith(client, ExtensionFavoritesStore.fileBacked(favoritesFile));
 
     GenerateCommand command = commandWithOutput();
     command.presets().add("favorites");
@@ -202,7 +202,7 @@ class HeadlessGenerationServiceTest {
   void generationResolvesTildeOutputDirectoryAgainstUserHome() {
     systemProperties.set("user.home", tempDir.resolve("home").toString());
     StubCatalogOperations client = new StubCatalogOperations();
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     command.setCliPrefill(
@@ -226,7 +226,7 @@ class HeadlessGenerationServiceTest {
   @Test
   void builtInPresetResolvesExtensions() {
     StubCatalogOperations client = new StubCatalogOperations();
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     command.presets().add("web");
@@ -239,7 +239,7 @@ class HeadlessGenerationServiceTest {
   @Test
   void presetNamesAreTrimmedAndMatchedCaseInsensitively() {
     StubCatalogOperations client = new StubCatalogOperations();
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     command.presets().add("  Web  ");
@@ -251,7 +251,7 @@ class HeadlessGenerationServiceTest {
   @Test
   void unknownPresetReturnsValidationExitCode() {
     StubCatalogOperations client = new StubCatalogOperations();
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     command.presets().add("nonexistent");
@@ -263,7 +263,7 @@ class HeadlessGenerationServiceTest {
   @Test
   void blankPresetInputIsSkipped() {
     StubCatalogOperations client = new StubCatalogOperations();
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     command.presets().add("   ");
@@ -276,7 +276,7 @@ class HeadlessGenerationServiceTest {
   void presetLoadFailureReturnsNetworkExitCode() {
     StubCatalogOperations client = new StubCatalogOperations();
     client.presetLoadTimeout = new TimeoutException("presets timeout");
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     command.presets().add("web"); // non-favorites preset triggers loadBuiltInPresets
@@ -290,7 +290,7 @@ class HeadlessGenerationServiceTest {
   void synchronousGenerationStartFailureReturnsInternalExitCode() {
     StubCatalogOperations client = new StubCatalogOperations();
     client.startGenerationFailure = new IllegalStateException("boom");
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     int exitCode = service.run(commandWithOutput(), false, false);
 
@@ -300,7 +300,7 @@ class HeadlessGenerationServiceTest {
   @Test
   void lockWithoutFromOrSaveAsReturnsValidation() {
     StubCatalogOperations client = new StubCatalogOperations();
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     command.setLock(true);
@@ -313,7 +313,7 @@ class HeadlessGenerationServiceTest {
   @Test
   void lockCheckWithoutFromReturnsValidation() {
     StubCatalogOperations client = new StubCatalogOperations();
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     command.setLockCheck(true);
@@ -342,7 +342,7 @@ class HeadlessGenerationServiceTest {
         """);
 
     StubCatalogOperations client = new StubCatalogOperations();
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     command.setFromFile(forgefilePath.toString());
@@ -356,7 +356,7 @@ class HeadlessGenerationServiceTest {
     java.nio.file.Path saveAsPath = tempDir.resolve("saved.forgefile.json");
 
     StubCatalogOperations client = new StubCatalogOperations();
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     command.setSaveAsFile(saveAsPath.toString());
@@ -389,7 +389,7 @@ class HeadlessGenerationServiceTest {
         """);
 
     StubCatalogOperations client = new StubCatalogOperations();
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = new GenerateCommand();
     command.setFromFile(sourcePath.toString());
@@ -423,7 +423,7 @@ class HeadlessGenerationServiceTest {
         """);
 
     StubCatalogOperations client = new StubCatalogOperations();
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = new GenerateCommand();
     command.setFromFile(sourcePath.toString());
@@ -450,7 +450,7 @@ class HeadlessGenerationServiceTest {
     directoryTarget.toFile().mkdirs();
 
     StubCatalogOperations client = new StubCatalogOperations();
-    HeadlessGenerationService service = new HeadlessGenerationService(client, stubRuntimeConfig());
+    HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     command.setSaveAsFile(directoryTarget.toString());
@@ -475,15 +475,17 @@ class HeadlessGenerationServiceTest {
     return cmd;
   }
 
-  private RuntimeConfig stubRuntimeConfig() {
-    return new RuntimeConfig(
-        java.net.URI.create("https://code.quarkus.io"),
-        tempDir.resolve("cache.json"),
-        tempDir.resolve("favorites.json"),
-        tempDir.resolve("preferences.json"));
+  private static HeadlessGenerationService serviceWith(StubCatalogOperations client) {
+    return serviceWith(client, ExtensionFavoritesStore.inMemory());
   }
 
-  private static final class StubCatalogOperations implements HeadlessCatalogOperations {
+  private static HeadlessGenerationService serviceWith(
+      StubCatalogOperations client, ExtensionFavoritesStore favoritesStore) {
+    return new HeadlessGenerationService(client, client, favoritesStore);
+  }
+
+  private static final class StubCatalogOperations
+      implements HeadlessCatalogLoader, HeadlessProjectGenerator {
     TimeoutException catalogLoadTimeout;
     java.util.concurrent.CancellationException catalogLoadCancellation;
     TimeoutException presetLoadTimeout;

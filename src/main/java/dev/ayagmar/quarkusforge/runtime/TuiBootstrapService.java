@@ -4,15 +4,13 @@ import static dev.ayagmar.quarkusforge.diagnostics.DiagnosticField.of;
 
 import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogDataService;
-import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
 import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
-import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
 import dev.ayagmar.quarkusforge.archive.OverwritePolicy;
 import dev.ayagmar.quarkusforge.archive.ProjectArchiveService;
-import dev.ayagmar.quarkusforge.archive.SafeZipExtractor;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
+import dev.ayagmar.quarkusforge.persistence.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.postgen.IdeDetector;
 import dev.ayagmar.quarkusforge.ui.CoreTuiController;
 import dev.ayagmar.quarkusforge.ui.ExtensionCatalogLoadResult;
@@ -91,8 +89,7 @@ public final class TuiBootstrapService {
     diagnostics.info("tui.session.start", of("smokeMode", true), of("mode", "headless-smoke"));
     try (QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri())) {
       CatalogDataService catalogDataService =
-          new CatalogDataService(
-              apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
+          RuntimeWiring.catalogDataService(apiClient, runtimeConfig);
       diagnostics.info("catalog.load.start", of("mode", "headless-smoke"));
       catalogDataService
           .load()
@@ -120,10 +117,9 @@ public final class TuiBootstrapService {
       try (var tui = TuiRunner.create(tuiConfig);
           QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri())) {
         CatalogDataService catalogDataService =
-            new CatalogDataService(
-                apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
+            RuntimeWiring.catalogDataService(apiClient, runtimeConfig);
         ProjectArchiveService projectArchiveService =
-            new ProjectArchiveService(apiClient, new SafeZipExtractor());
+            RuntimeWiring.projectArchiveService(apiClient);
         return runSession(
             initialState,
             searchDebounceMs,
@@ -156,7 +152,7 @@ public final class TuiBootstrapService {
                                   GenerationProgressUpdate.extractingArchive(
                                       "extracting project archive...");
                             })),
-            ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile()),
+            RuntimeWiring.favoritesStore(runtimeConfig),
             UiScheduler.fromScheduledExecutor(tui.scheduler(), tui::runOnRenderThread),
             IdeDetector.detect(),
             (controller, sessionDiagnostics) ->
