@@ -1732,20 +1732,12 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   private void focusExtensionSearch() {
-    focusTarget = FocusTarget.EXTENSION_SEARCH;
+    dispatchIntent(new UiIntent.ExtensionPanelFocusIntent(FocusTarget.EXTENSION_SEARCH));
     inputStates.get(FocusTarget.EXTENSION_SEARCH).moveCursorToEnd();
-    statusMessage = "Focus moved to " + UiFocusTargets.nameOf(focusTarget);
-    errorMessage = "";
-    showErrorDetails = false;
-    submitBlockedByValidation = false;
   }
 
   private void focusExtensionList() {
-    focusTarget = FocusTarget.EXTENSION_LIST;
-    statusMessage = "Focus moved to " + UiFocusTargets.nameOf(focusTarget);
-    errorMessage = "";
-    showErrorDetails = false;
-    submitBlockedByValidation = false;
+    dispatchIntent(new UiIntent.ExtensionPanelFocusIntent(FocusTarget.EXTENSION_LIST));
   }
 
   private void clearExtensionSearchFilter() {
