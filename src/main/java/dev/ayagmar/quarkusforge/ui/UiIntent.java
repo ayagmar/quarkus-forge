@@ -90,7 +90,7 @@ sealed interface UiIntent {
   record TextInputIntent(dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget)
       implements UiIntent {}
 
-  record ToggleErrorDetailsIntent(boolean activeErrorPresent) implements UiIntent {}
+  record ToggleErrorDetailsIntent() implements UiIntent {}
 
   enum ExtensionCommand {
     CLEAR_SEARCH,
