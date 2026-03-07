@@ -3,7 +3,56 @@
 All notable changes to Quarkus Forge are documented here.
 This project uses [Conventional Commits](https://www.conventionalcommits.org/). GitHub Releases contain auto-generated notes from [JReleaser](https://jreleaser.org/).
 
-## [Unreleased](https://github.com/ayagmar/quarkus-forge/compare/v0.5.0...HEAD)
+## [Unreleased](https://github.com/ayagmar/quarkus-forge/compare/v0.6.0...HEAD)
+
+## [0.6.0](https://github.com/ayagmar/quarkus-forge/compare/v0.5.0...v0.6.0) (2026-03-07)
+
+### Changed
+
+- style(ui): apply spotless formatting (d7b61da)
+- refactor(ui): remove toggle error details payload (2acd9e9)
+- refactor: clean up method parameters and improve test assertions (a03e5a2)
+- fix(core): harden reducer and path edge cases (d44b626)
+- refactor: update file reading to use UTF-8 encoding and enhance test coverage (d76a55a)
+- test(headless): harden output path assertions on windows (52046e0)
+- refactor(forge): remove deprecated compatibility shims (20c8800)
+- docs(architecture): align docs with runtime split (5e970ae)
+- refactor(core): centralize runtime and persistence wiring (8b1cfee)
+- refactor(ui): finish reducer-owned extension state (d24a5c6)
+- refactor(ui:  effect handling and extend functionality (742a426)
+- refactor(ui): unify shared shortcut and palette actions (fe021b8)
+- refactor(ui): route command palette actions through effects (9705b4f)
+- refactor(ui): enhance command palette and help overlay handling in reducer and controller (39b85ca)
+- refactor(ui): implement extension panel focus intent and associated reducer logic (33a1c19)
+- refactor(ui): update submit request handling and status messaging (64aa292)
+- refactor(ui): narrow submit and effect authority (22aa17c)
+- docs(ui): align architecture with state machine refactor (f59338c)
+- refactor(ui): split catalog state and render adapters (ec25a7b)
+- refactor(ui): harden reducer-owned controller flows (5501dce)
+- fix(headless): fallback to cache and resolve home paths (caa6722)
+- fix(api): harden catalog cache fallback handling (9328390)
+- fix(core): address verified review findings (ecdf0a8)
+- test(core): harden startup and transport coverage (2ab4fd7)
+- refactor(core): centralize input and ui state flows (39b9869)
+- fix(core): tighten forgefile compatibility and startup defaults (d23ea91)
+- fix(ci): address review feedback and native gating (ea23dce)
+- refactor(architecture): split cli headless forge and postgen boundaries (ea92d8d)
+- chore(native): port size budget check to Java 25 (cb3526e)
+- fix(core): tighten review cleanup (5930238)
+- fix(runtime): unwrap preset load failure diagnostics (79016fe)
+- refactor(runtime): separate bootstrap and startup packages (31bc864)
+- refactor(ui): split extension catalog collaborators (7c44e52)
+- refactor(ui): route post-generation reset through reducer (6b526f7)
+- chore(tests): ignore generated python bytecode (cacea31)
+- test(native): cover native size script regressions (6cc2a3c)
+- test(headless): harden client and cli boundaries (d7b5955)
+- test(api): add transport coverage and stabilize timeouts (12e455a)
+- refactor(tests): simplify GenerationRequest creation in ProjectArchiveServiceTest (966d3e3)
+- fix(native): remove timeout race and stabilize timeout tests (99b2eb9)
+- refactor(native): type api transport and enforce size budgets (6f59fd4)
+- docs: sync runtime docs and remove stale headless spec (c09cf87)
+- chore(release): prepare next iteration 0.5.1-SNAPSHOT (f34b081)
+
 
 ## [0.5.0](https://github.com/ayagmar/quarkus-forge/compare/v0.4.0...v0.5.0) (2026-03-04)
 
