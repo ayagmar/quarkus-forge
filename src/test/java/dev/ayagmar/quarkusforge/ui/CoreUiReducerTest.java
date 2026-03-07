@@ -431,7 +431,7 @@ class CoreUiReducerTest {
 
   @Test
   void toggleErrorDetailsCollapsesWhenNoActiveErrorExists() {
-    ReduceResult result = reducer.reduce(baseState(), new UiIntent.ToggleErrorDetailsIntent(false));
+    ReduceResult result = reducer.reduce(baseState(), new UiIntent.ToggleErrorDetailsIntent());
 
     assertThat(result.nextState().showErrorDetails()).isFalse();
     assertThat(result.nextState().statusMessage()).isEqualTo("No error details available");

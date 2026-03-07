@@ -201,8 +201,7 @@ final class CoreUiReducer implements UiReducer {
           reduceMetadataInput(state, metadataIntent.keyEvent());
       case UiIntent.TextInputIntent textInputIntent ->
           reduceTextInput(state, textInputIntent.keyEvent());
-      case UiIntent.ToggleErrorDetailsIntent toggleIntent ->
-          reduceToggleErrorDetails(state, toggleIntent.activeErrorPresent());
+      case UiIntent.ToggleErrorDetailsIntent _ -> reduceToggleErrorDetails(state, hasActiveError(state));
       default -> new ReduceResult(state, List.of(), UiAction.ignored());
     };
   }
