@@ -421,33 +421,36 @@ class CoreUiReducerTest {
   }
 
   @Test
-  void commandPaletteConfirmClosesOverlayAndEmitsSelectedActionEffect() {
+  void commandPaletteConfirmClosesOverlayAndRoutesFocusActionThroughSharedReducerPath() {
     UiState paletteState =
         stateWithOverlayState(
             baseState(), new UiState.OverlayState(false, true, false, false, false), 0, "Ready");
 
-    ReduceResult moveResult =
-        reducer.reduce(
-            paletteState,
-            new UiIntent.CommandPaletteIntent(
-                new UiIntent.CommandPaletteCommand.MoveSelection(-1)));
-
-    assertThat(moveResult.nextState().commandPaletteSelection())
-        .isEqualTo(UiTextConstants.COMMAND_PALETTE_ENTRIES.size() - 1);
-
     ReduceResult confirmResult =
         reducer.reduce(
-            moveResult.nextState(),
+            paletteState,
             new UiIntent.CommandPaletteIntent(
                 new UiIntent.CommandPaletteCommand.ConfirmSelection()));
 
     assertThat(confirmResult.effects())
-        .containsExactly(
-            new UiEffect.ExecuteCommandPaletteAction(CommandPaletteAction.TOGGLE_ERROR_DETAILS));
+        .containsExactly(new UiEffect.MoveTextInputCursorToEnd(FocusTarget.EXTENSION_SEARCH));
     assertThat(confirmResult.nextState().overlays().commandPaletteVisible()).isFalse();
-    assertThat(confirmResult.nextState().commandPaletteSelection())
-        .isEqualTo(UiTextConstants.COMMAND_PALETTE_ENTRIES.size() - 1);
-    assertThat(confirmResult.nextState().statusMessage()).isEqualTo("Ready");
+    assertThat(confirmResult.nextState().focusTarget()).isEqualTo(FocusTarget.EXTENSION_SEARCH);
+    assertThat(confirmResult.nextState().statusMessage())
+        .isEqualTo("Focus moved to extensionSearch");
+  }
+
+  @Test
+  void sharedJumpToFavoriteActionFocusesListAndEmitsEffect() {
+    ReduceResult result =
+        reducer.reduce(
+            baseState(), new UiIntent.SharedActionIntent(CommandPaletteAction.JUMP_TO_FAVORITE));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.nextState().focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
+    assertThat(result.nextState().statusMessage()).isEqualTo("Focus moved to extensionList");
+    assertThat(result.effects())
+        .containsExactly(new UiEffect.ExecuteSharedAction(CommandPaletteAction.JUMP_TO_FAVORITE));
   }
 
   @Test

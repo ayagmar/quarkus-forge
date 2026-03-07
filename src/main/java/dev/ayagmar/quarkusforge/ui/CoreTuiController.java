@@ -156,8 +156,8 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
           }
 
           @Override
-          public void executeCommandPaletteAction(CommandPaletteAction action) {
-            executeCommandPaletteActionEffect(action);
+          public void executeSharedAction(CommandPaletteAction action) {
+            executeSharedActionEffect(action);
           }
 
           @Override
@@ -183,6 +183,11 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
           @Override
           public void requestAsyncRepaint() {
             requestAsyncRepaintEffect();
+          }
+
+          @Override
+          public void moveTextInputCursorToEnd(FocusTarget target) {
+            moveTextInputCursorToEndEffect(target);
           }
 
           @Override
@@ -425,39 +430,8 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
       moveFocusToAdjacentInvalidField(false);
       return UiAction.handled(false);
     }
-    if (shouldFocusExtensionSearch(keyEvent, focusTarget)) {
-      focusExtensionSearch();
-      return UiAction.handled(false);
-    }
-    if (AppKeyActions.isFocusExtensionListKey(keyEvent)) {
-      focusExtensionList();
-      return UiAction.handled(false);
-    }
-    if (AppKeyActions.isCatalogReloadKey(keyEvent)) {
-      requestCatalogReload();
-      return UiAction.handled(false);
-    }
-    if (AppKeyActions.isFavoritesFilterToggleKey(keyEvent)) {
-      toggleFavoritesOnlyFilter();
-      return UiAction.handled(false);
-    }
-    if (AppKeyActions.isSelectedOnlyFilterToggleKey(keyEvent)) {
-      toggleSelectedOnlyFilter();
-      return UiAction.handled(false);
-    }
-    if (AppKeyActions.isPresetFilterCycleKey(keyEvent)) {
-      cyclePresetFilter();
-      return UiAction.handled(false);
-    }
-    if (AppKeyActions.isJumpToFavoriteKey(keyEvent)) {
-      jumpToFavorite();
-      return UiAction.handled(false);
-    }
-    if (AppKeyActions.isErrorDetailsToggleKey(keyEvent)) {
-      toggleErrorDetails();
-      return UiAction.handled(false);
-    }
-    return null;
+    CommandPaletteAction sharedAction = sharedGlobalShortcutAction(keyEvent, focusTarget);
+    return sharedAction == null ? null : routeSharedAction(sharedAction);
   }
 
   @Override
@@ -484,14 +458,12 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   @Override
   public UiAction handleExtensionFocusFlow(KeyEvent keyEvent) {
     if (focusTarget == FocusTarget.EXTENSION_SEARCH && keyEvent.code() == KeyCode.DOWN) {
-      focusExtensionList();
-      return UiAction.handled(false);
+      return routeSharedAction(CommandPaletteAction.FOCUS_EXTENSION_LIST);
     }
     if (focusTarget == FocusTarget.EXTENSION_LIST
         && isUpNavigation(keyEvent)
         && extensionCatalogNavigation.isSelectionAtTop(extensionCatalogProjection.rows())) {
-      focusExtensionSearch();
-      return UiAction.handled(false);
+      return routeSharedAction(CommandPaletteAction.FOCUS_EXTENSION_SEARCH);
     }
     if (focusTarget == FocusTarget.EXTENSION_LIST
         && (keyEvent.isLeft() || UiKeyMatchers.isVimLeftKey(keyEvent))) {
@@ -523,6 +495,11 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
       return UiAction.handled(false);
     }
     if (focusTarget == FocusTarget.EXTENSION_LIST
+        && AppKeyActions.isClearSelectedExtensionsKey(keyEvent)) {
+      clearSelectedExtensions();
+      return UiAction.handled(false);
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST
         && AppKeyActions.isCategoryFilterCycleKey(keyEvent)) {
       cycleCategoryFilter();
       return UiAction.handled(false);
@@ -530,11 +507,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     if (focusTarget == FocusTarget.EXTENSION_LIST
         && AppKeyActions.isPresetFilterCycleKey(keyEvent)) {
       cyclePresetFilter();
-      return UiAction.handled(false);
-    }
-    if (focusTarget == FocusTarget.EXTENSION_LIST
-        && AppKeyActions.isClearSelectedExtensionsKey(keyEvent)) {
-      clearSelectedExtensions();
       return UiAction.handled(false);
     }
     if (focusTarget == FocusTarget.EXTENSION_LIST
@@ -1111,10 +1083,8 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     }
   }
 
-  private void executeCommandPaletteActionEffect(CommandPaletteAction action) {
+  private void executeSharedActionEffect(CommandPaletteAction action) {
     switch (action) {
-      case FOCUS_EXTENSION_SEARCH -> focusExtensionSearch();
-      case FOCUS_EXTENSION_LIST -> focusExtensionList();
       case TOGGLE_FAVORITES_FILTER -> toggleFavoritesOnlyFilter();
       case TOGGLE_SELECTED_FILTER -> toggleSelectedOnlyFilter();
       case CYCLE_PRESET_FILTER -> cyclePresetFilter();
@@ -1137,8 +1107,8 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         }
         expandAllCategories();
       }
-      case RELOAD_CATALOG -> requestCatalogReload();
-      case TOGGLE_ERROR_DETAILS -> toggleErrorDetails();
+      case FOCUS_EXTENSION_SEARCH, FOCUS_EXTENSION_LIST, RELOAD_CATALOG, TOGGLE_ERROR_DETAILS ->
+          throw new IllegalStateException("Reducer-owned shared action reached effects: " + action);
     }
   }
 
@@ -1459,6 +1429,13 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     requestAsyncRepaint();
   }
 
+  private void moveTextInputCursorToEndEffect(FocusTarget target) {
+    TextInputState inputState = inputStates.get(target);
+    if (inputState != null) {
+      inputState.moveCursorToEnd();
+    }
+  }
+
   private void applyMetadataSelectorKeyEffect(FocusTarget target, KeyEvent keyEvent) {
     if (handleMetadataSelectorKey(target, keyEvent)) {
       revalidate();
@@ -1574,9 +1551,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   private void jumpToFavorite() {
-    if (focusTarget != FocusTarget.EXTENSION_LIST) {
-      focusExtensionList();
-    }
     statusMessage = extensionInteraction.jumpToFavorite();
   }
 
@@ -1616,14 +1590,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     statusMessage = extensionInteraction.clearPresetFilter(this::updateExtensionFilterStatus);
   }
 
-  private void toggleErrorDetails() {
-    dispatchIntent(new UiIntent.ToggleErrorDetailsIntent(!activeErrorDetails().isBlank()));
-  }
-
-  private void requestCatalogReload() {
-    dispatchIntent(new UiIntent.CatalogReloadRequestedIntent());
-  }
-
   private String effectiveStatusMessage() {
     if (generationStateTracker.currentState() != GenerationState.LOADING) {
       return statusMessage;
@@ -1661,6 +1627,35 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     return AppKeyActions.isFocusExtensionSearchCtrlKey(keyEvent);
   }
 
+  private static CommandPaletteAction sharedGlobalShortcutAction(
+      KeyEvent keyEvent, FocusTarget currentFocus) {
+    if (shouldFocusExtensionSearch(keyEvent, currentFocus)) {
+      return CommandPaletteAction.FOCUS_EXTENSION_SEARCH;
+    }
+    if (AppKeyActions.isFocusExtensionListKey(keyEvent)) {
+      return CommandPaletteAction.FOCUS_EXTENSION_LIST;
+    }
+    if (AppKeyActions.isCatalogReloadKey(keyEvent)) {
+      return CommandPaletteAction.RELOAD_CATALOG;
+    }
+    if (AppKeyActions.isFavoritesFilterToggleKey(keyEvent)) {
+      return CommandPaletteAction.TOGGLE_FAVORITES_FILTER;
+    }
+    if (AppKeyActions.isSelectedOnlyFilterToggleKey(keyEvent)) {
+      return CommandPaletteAction.TOGGLE_SELECTED_FILTER;
+    }
+    if (AppKeyActions.isPresetFilterCycleKey(keyEvent)) {
+      return CommandPaletteAction.CYCLE_PRESET_FILTER;
+    }
+    if (AppKeyActions.isJumpToFavoriteKey(keyEvent)) {
+      return CommandPaletteAction.JUMP_TO_FAVORITE;
+    }
+    if (AppKeyActions.isErrorDetailsToggleKey(keyEvent)) {
+      return CommandPaletteAction.TOGGLE_ERROR_DETAILS;
+    }
+    return null;
+  }
+
   private String currentTargetConflictErrorMessage() {
     try {
       Path generatedProjectDirectory = resolveGeneratedProjectDirectory();
@@ -1687,9 +1682,8 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     }
   }
 
-  private void focusExtensionSearch() {
-    dispatchIntent(new UiIntent.ExtensionPanelFocusIntent(FocusTarget.EXTENSION_SEARCH));
-    inputStates.get(FocusTarget.EXTENSION_SEARCH).moveCursorToEnd();
+  private UiAction routeSharedAction(CommandPaletteAction action) {
+    return routeIntent(new UiIntent.SharedActionIntent(action));
   }
 
   private void focusExtensionList() {

@@ -34,12 +34,13 @@ class UiEffectsRunnerTest {
                 new UiEffect.PrepareForGeneration(),
                 new UiEffect.CancelPendingAsync(),
                 new UiEffect.ExportRecipeAndLock(),
-                new UiEffect.ExecuteCommandPaletteAction(commandPaletteAction),
+                new UiEffect.ExecuteSharedAction(commandPaletteAction),
                 new UiEffect.ApplyCatalogLoadSuccess(success),
                 new UiEffect.StartGeneration(),
                 new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.LOADING),
                 new UiEffect.RequestGenerationCancellation(),
                 new UiEffect.RequestAsyncRepaint(),
+                new UiEffect.MoveTextInputCursorToEnd(FocusTarget.EXTENSION_SEARCH),
                 new UiEffect.ApplyMetadataSelectorKey(FocusTarget.BUILD_TOOL, selectorKey),
                 new UiEffect.ApplyTextInputKey(FocusTarget.ARTIFACT_ID, textInputKey)),
             port);
@@ -51,18 +52,20 @@ class UiEffectsRunnerTest {
             "prepareForGeneration",
             "cancelPendingAsync",
             "exportRecipeAndLock",
-            "executeCommandPaletteAction",
+            "executeSharedAction",
             "applyCatalogLoadSuccess",
             "startGeneration",
             "transitionGenerationState",
             "requestGenerationCancellation",
             "requestAsyncRepaint",
+            "moveTextInputCursorToEnd",
             "applyMetadataSelectorKey",
             "applyTextInputKey");
     assertThat(port.loader).isSameAs(loader);
-    assertThat(port.commandPaletteAction).isEqualTo(commandPaletteAction);
+    assertThat(port.sharedAction).isEqualTo(commandPaletteAction);
     assertThat(port.success).isEqualTo(success);
     assertThat(port.targetState).isEqualTo(CoreTuiController.GenerationState.LOADING);
+    assertThat(port.cursorFocusTarget).isEqualTo(FocusTarget.EXTENSION_SEARCH);
     assertThat(port.metadataFocusTarget).isEqualTo(FocusTarget.BUILD_TOOL);
     assertThat(port.metadataKeyEvent).isEqualTo(selectorKey);
     assertThat(port.textInputFocusTarget).isEqualTo(FocusTarget.ARTIFACT_ID);
@@ -72,9 +75,10 @@ class UiEffectsRunnerTest {
   private static final class RecordingUiEffectsPort implements UiEffectsPort {
     private final List<String> calls = new ArrayList<>();
     private ExtensionCatalogLoader loader;
-    private CommandPaletteAction commandPaletteAction;
+    private CommandPaletteAction sharedAction;
     private CatalogLoadSuccess success;
     private CoreTuiController.GenerationState targetState;
+    private FocusTarget cursorFocusTarget;
     private FocusTarget metadataFocusTarget;
     private KeyEvent metadataKeyEvent;
     private FocusTarget textInputFocusTarget;
@@ -107,9 +111,9 @@ class UiEffectsRunnerTest {
     }
 
     @Override
-    public void executeCommandPaletteAction(CommandPaletteAction action) {
-      calls.add("executeCommandPaletteAction");
-      commandPaletteAction = action;
+    public void executeSharedAction(CommandPaletteAction action) {
+      calls.add("executeSharedAction");
+      sharedAction = action;
     }
 
     @Override
@@ -137,6 +141,12 @@ class UiEffectsRunnerTest {
     @Override
     public void requestAsyncRepaint() {
       calls.add("requestAsyncRepaint");
+    }
+
+    @Override
+    public void moveTextInputCursorToEnd(FocusTarget focusTarget) {
+      calls.add("moveTextInputCursorToEnd");
+      cursorFocusTarget = focusTarget;
     }
 
     @Override

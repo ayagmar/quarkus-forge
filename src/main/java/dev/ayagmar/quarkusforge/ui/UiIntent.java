@@ -48,6 +48,8 @@ sealed interface UiIntent {
 
   record HelpOverlayIntent(HelpOverlayCommand command) implements UiIntent {}
 
+  record SharedActionIntent(CommandPaletteAction action) implements UiIntent {}
+
   record ExtensionPanelFocusIntent(FocusTarget focusTarget) implements UiIntent {}
 
   record FocusNavigationIntent(dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget)

@@ -13,7 +13,7 @@ interface UiEffectsPort {
 
   void exportRecipeAndLock();
 
-  void executeCommandPaletteAction(CommandPaletteAction action);
+  void executeSharedAction(CommandPaletteAction action);
 
   void applyCatalogLoadSuccess(CatalogLoadSuccess success);
 
@@ -24,6 +24,8 @@ interface UiEffectsPort {
   void requestGenerationCancellation();
 
   void requestAsyncRepaint();
+
+  void moveTextInputCursorToEnd(FocusTarget focusTarget);
 
   void applyMetadataSelectorKey(FocusTarget focusTarget, KeyEvent keyEvent);
 
