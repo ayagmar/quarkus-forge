@@ -13,6 +13,8 @@ interface UiEffectsPort {
 
   void exportRecipeAndLock();
 
+  void executeCommandPaletteAction(CommandPaletteAction action);
+
   void applyCatalogLoadSuccess(CatalogLoadSuccess success);
 
   void startGeneration();

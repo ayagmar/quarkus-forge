@@ -405,8 +405,13 @@ final class CoreUiReducer implements UiReducer {
         if (!state.overlays().commandPaletteVisible()) {
           yield new ReduceResult(state, List.of(), UiAction.ignored());
         }
+        CommandPaletteAction selectedAction = selectedCommandPaletteAction(state);
         yield new ReduceResult(
-            closeCommandPalette(state, state.statusMessage()), List.of(), UiAction.handled(false));
+            closeCommandPalette(state, state.statusMessage()),
+            selectedAction == null
+                ? List.of()
+                : List.of(new UiEffect.ExecuteCommandPaletteAction(selectedAction)),
+            UiAction.handled(false));
       }
     };
   }
@@ -492,6 +497,17 @@ final class CoreUiReducer implements UiReducer {
         state.overlays().helpOverlayVisible(),
         state.commandPaletteSelection(),
         nextStatusMessage);
+  }
+
+  private static CommandPaletteAction selectedCommandPaletteAction(UiState state) {
+    if (UiTextConstants.COMMAND_PALETTE_ENTRIES.isEmpty()) {
+      return null;
+    }
+    int selection = state.commandPaletteSelection();
+    if (selection < 0 || selection >= UiTextConstants.COMMAND_PALETTE_ENTRIES.size()) {
+      return null;
+    }
+    return UiTextConstants.COMMAND_PALETTE_ENTRIES.get(selection).action();
   }
 
   private static UiState closeHelpOverlay(UiState state, String nextStatusMessage) {

@@ -12,6 +12,8 @@ sealed interface UiEffect {
 
   record ExportRecipeAndLock() implements UiEffect {}
 
+  record ExecuteCommandPaletteAction(CommandPaletteAction action) implements UiEffect {}
+
   record ApplyCatalogLoadSuccess(CatalogLoadSuccess success) implements UiEffect {}
 
   record StartGeneration() implements UiEffect {}

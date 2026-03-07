@@ -21,6 +21,7 @@ class UiEffectsRunnerTest {
             Map.of(),
             CatalogLoadState.loaded("live", false),
             "Loaded extension catalog from live API");
+    CommandPaletteAction commandPaletteAction = CommandPaletteAction.TOGGLE_SELECTED_FILTER;
     KeyEvent selectorKey = KeyEvent.ofKey(KeyCode.LEFT);
     KeyEvent textInputKey = KeyEvent.ofChar('a');
     RecordingUiEffectsPort port = new RecordingUiEffectsPort();
@@ -33,6 +34,7 @@ class UiEffectsRunnerTest {
                 new UiEffect.PrepareForGeneration(),
                 new UiEffect.CancelPendingAsync(),
                 new UiEffect.ExportRecipeAndLock(),
+                new UiEffect.ExecuteCommandPaletteAction(commandPaletteAction),
                 new UiEffect.ApplyCatalogLoadSuccess(success),
                 new UiEffect.StartGeneration(),
                 new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.LOADING),
@@ -49,6 +51,7 @@ class UiEffectsRunnerTest {
             "prepareForGeneration",
             "cancelPendingAsync",
             "exportRecipeAndLock",
+            "executeCommandPaletteAction",
             "applyCatalogLoadSuccess",
             "startGeneration",
             "transitionGenerationState",
@@ -57,6 +60,7 @@ class UiEffectsRunnerTest {
             "applyMetadataSelectorKey",
             "applyTextInputKey");
     assertThat(port.loader).isSameAs(loader);
+    assertThat(port.commandPaletteAction).isEqualTo(commandPaletteAction);
     assertThat(port.success).isEqualTo(success);
     assertThat(port.targetState).isEqualTo(CoreTuiController.GenerationState.LOADING);
     assertThat(port.metadataFocusTarget).isEqualTo(FocusTarget.BUILD_TOOL);
@@ -68,6 +72,7 @@ class UiEffectsRunnerTest {
   private static final class RecordingUiEffectsPort implements UiEffectsPort {
     private final List<String> calls = new ArrayList<>();
     private ExtensionCatalogLoader loader;
+    private CommandPaletteAction commandPaletteAction;
     private CatalogLoadSuccess success;
     private CoreTuiController.GenerationState targetState;
     private FocusTarget metadataFocusTarget;
@@ -99,6 +104,12 @@ class UiEffectsRunnerTest {
     @Override
     public void exportRecipeAndLock() {
       calls.add("exportRecipeAndLock");
+    }
+
+    @Override
+    public void executeCommandPaletteAction(CommandPaletteAction action) {
+      calls.add("executeCommandPaletteAction");
+      commandPaletteAction = action;
     }
 
     @Override

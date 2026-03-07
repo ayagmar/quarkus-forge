@@ -406,6 +406,19 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void commandPaletteDigitShortcutRunsSelectedAction() {
+    CoreTuiController controller = UiControllerTestHarness.controller();
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
+
+    controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
+    controller.onEvent(KeyEvent.ofChar('2'));
+
+    assertThat(controller.commandPaletteVisible()).isFalse();
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
+    assertThat(controller.statusMessage()).contains("Focus moved to extensionList");
+  }
+
+  @Test
   void slashIsInsertedInOutputDirectoryWithoutStealingFocus() {
     CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.OUTPUT_DIR);
