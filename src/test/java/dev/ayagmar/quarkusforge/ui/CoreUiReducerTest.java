@@ -16,9 +16,8 @@ class CoreUiReducerTest {
   void validSubmitProducesPrepareAndStartEffects() {
     ReduceResult result =
         reducer.reduce(
-            baseState(),
-            new UiIntent.SubmitRequestedIntent(
-                new UiIntent.SubmitEvaluation(true, 2, null, 0, "", "")));
+            configuredState(2),
+            new UiIntent.SubmitRequestedIntent(new UiIntent.SubmitRequestContext(true, 2, "")));
 
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
     assertThat(result.effects())
@@ -37,10 +36,8 @@ class CoreUiReducerTest {
   void invalidSubmitMovesFocusAndBlocksViaReducerState() {
     ReduceResult result =
         reducer.reduce(
-            baseState(),
-            new UiIntent.SubmitRequestedIntent(
-                new UiIntent.SubmitEvaluation(
-                    true, 0, FocusTarget.GROUP_ID, 2, "groupId: must not be blank", "")));
+            invalidConfiguredState(),
+            new UiIntent.SubmitRequestedIntent(new UiIntent.SubmitRequestContext(true, 0, "")));
 
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
     assertThat(result.effects())
@@ -50,7 +47,7 @@ class CoreUiReducerTest {
             new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.ERROR));
     assertThat(result.nextState().focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
     assertThat(result.nextState().statusMessage())
-        .isEqualTo("Submit blocked: fix groupId (2 issues)");
+        .isEqualTo("Submit blocked: fix groupId (1 issue)");
     assertThat(result.nextState().errorMessage()).isEqualTo("groupId: must not be blank");
     assertThat(result.nextState().submitBlockedByValidation()).isTrue();
     assertThat(result.nextState().submitBlockedByTargetConflict()).isFalse();
@@ -60,10 +57,10 @@ class CoreUiReducerTest {
   void targetConflictSubmitBlocksWithoutStartingGeneration() {
     ReduceResult result =
         reducer.reduce(
-            baseState(),
+            configuredState(0),
             new UiIntent.SubmitRequestedIntent(
-                new UiIntent.SubmitEvaluation(
-                    true, 0, null, 0, "", "Output directory already exists: /tmp/demo")));
+                new UiIntent.SubmitRequestContext(
+                    true, 0, "Output directory already exists: /tmp/demo")));
 
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
     assertThat(result.effects())
@@ -84,8 +81,7 @@ class CoreUiReducerTest {
     ReduceResult result =
         reducer.reduce(
             baseState(),
-            new UiIntent.SubmitRequestedIntent(
-                new UiIntent.SubmitEvaluation(false, 3, null, 0, "", "")));
+            new UiIntent.SubmitRequestedIntent(new UiIntent.SubmitRequestContext(false, 3, "")));
 
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
     assertThat(result.effects())
@@ -108,9 +104,8 @@ class CoreUiReducerTest {
 
     ReduceResult result =
         reducer.reduce(
-            blockedState,
-            new UiIntent.SubmitEditRecoveryIntent(
-                new UiIntent.SubmitEditRecovery(true, true, "", false, "")));
+            validState(blockedState),
+            new UiIntent.SubmitEditRecoveryIntent(new UiIntent.SubmitRecoveryContext("")));
 
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
     assertThat(result.nextState().statusMessage()).isEqualTo("Validation restored");
@@ -129,12 +124,29 @@ class CoreUiReducerTest {
     ReduceResult result =
         reducer.reduce(
             blockedState,
-            new UiIntent.SubmitEditRecoveryIntent(
-                new UiIntent.SubmitEditRecovery(false, true, "", true, "")));
+            new UiIntent.SubmitEditRecoveryIntent(new UiIntent.SubmitRecoveryContext("")));
 
     assertThat(result.nextState().statusMessage()).isEqualTo("Target folder conflict resolved");
     assertThat(result.nextState().errorMessage()).isEmpty();
     assertThat(result.nextState().submitBlockedByTargetConflict()).isFalse();
+    assertThat(result.nextState().showErrorDetails()).isFalse();
+  }
+
+  @Test
+  void submitRecoveryKeepsValidationBlockWhenEditedStateIsStillInvalid() {
+    UiState blockedState =
+        invalidConfiguredState()
+            .withSubmissionState(
+                "Submit blocked", "groupId: must not be blank", "", true, true, false, true);
+
+    ReduceResult result =
+        reducer.reduce(
+            blockedState,
+            new UiIntent.SubmitEditRecoveryIntent(new UiIntent.SubmitRecoveryContext("")));
+
+    assertThat(result.nextState().statusMessage()).isEqualTo("Submit blocked");
+    assertThat(result.nextState().errorMessage()).isEqualTo("groupId: must not be blank");
+    assertThat(result.nextState().submitBlockedByValidation()).isTrue();
     assertThat(result.nextState().showErrorDetails()).isFalse();
   }
 
@@ -180,18 +192,29 @@ class CoreUiReducerTest {
   }
 
   @Test
-  void generationProgressUsesCanonicalStatusMessage() {
-    ReduceResult result =
-        reducer.reduce(
-            baseState(),
-            new UiIntent.GenerationProgressIntent(
-                "Generation in progress: requesting project archive from Quarkus API..."));
+  void generationProgressClearsErrorsWithoutRecomputingStatusText() {
+    UiState state =
+        baseState()
+            .withSubmissionState(
+                "Submit requested with 2 extension(s)",
+                "Output directory already exists",
+                "verbose",
+                true,
+                true,
+                true,
+                true);
+
+    ReduceResult result = reducer.reduce(state, new UiIntent.GenerationProgressIntent());
 
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
     assertThat(result.effects()).isEmpty();
     assertThat(result.nextState().statusMessage())
-        .isEqualTo("Generation in progress: requesting project archive from Quarkus API...");
+        .isEqualTo("Submit requested with 2 extension(s)");
     assertThat(result.nextState().errorMessage()).isEmpty();
+    assertThat(result.nextState().verboseErrorDetails()).isEmpty();
+    assertThat(result.nextState().showErrorDetails()).isFalse();
+    assertThat(result.nextState().submitBlockedByValidation()).isFalse();
+    assertThat(result.nextState().submitBlockedByTargetConflict()).isFalse();
   }
 
   @Test
@@ -482,6 +505,91 @@ class CoreUiReducerTest {
 
   private static UiState baseState() {
     return UiControllerTestHarness.controller().uiState();
+  }
+
+  private static UiState configuredState(int selectedExtensionCount) {
+    return stateWithSelectedCount(
+        UiControllerTestHarness.controller(
+                UiScheduler.immediate(),
+                java.time.Duration.ZERO,
+                (generationRequest, outputDirectory, cancelled, progressListener) -> null)
+            .uiState(),
+        selectedExtensionCount);
+  }
+
+  private static UiState invalidConfiguredState() {
+    CoreTuiController controller =
+        UiControllerTestHarness.controller(
+            UiScheduler.immediate(),
+            java.time.Duration.ZERO,
+            (generationRequest, outputDirectory, cancelled, progressListener) -> null);
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.GROUP_ID);
+    for (int i = 0; i < 30; i++) {
+      controller.onEvent(KeyEvent.ofKey(KeyCode.BACKSPACE));
+    }
+    return controller.uiState();
+  }
+
+  private static UiState validState(UiState referenceState) {
+    return stateWithValidation(referenceState, baseState().validation());
+  }
+
+  private static UiState stateWithSelectedCount(UiState state, int selectedExtensionCount) {
+    return new UiState(
+        state.request(),
+        state.validation(),
+        state.focusTarget(),
+        state.statusMessage(),
+        state.errorMessage(),
+        state.verboseErrorDetails(),
+        state.showErrorDetails(),
+        state.submitRequested(),
+        state.submitBlockedByValidation(),
+        state.submitBlockedByTargetConflict(),
+        state.commandPaletteSelection(),
+        state.metadataPanel(),
+        state.extensionsPanel(),
+        state.footer(),
+        state.overlays(),
+        state.generation(),
+        state.catalogLoad(),
+        state.postGeneration(),
+        state.startupOverlay(),
+        new UiState.ExtensionView(
+            state.extensions().filteredCount(),
+            state.extensions().totalCount(),
+            selectedExtensionCount,
+            state.extensions().favoritesOnlyEnabled(),
+            state.extensions().selectedOnlyEnabled(),
+            state.extensions().activePresetFilterName(),
+            state.extensions().activeCategoryFilterTitle(),
+            state.extensions().searchQuery(),
+            state.extensions().focusedExtensionId()));
+  }
+
+  private static UiState stateWithValidation(
+      UiState state, dev.ayagmar.quarkusforge.domain.ValidationReport validation) {
+    return new UiState(
+        state.request(),
+        validation,
+        state.focusTarget(),
+        state.statusMessage(),
+        state.errorMessage(),
+        state.verboseErrorDetails(),
+        state.showErrorDetails(),
+        state.submitRequested(),
+        state.submitBlockedByValidation(),
+        state.submitBlockedByTargetConflict(),
+        state.commandPaletteSelection(),
+        state.metadataPanel(),
+        state.extensionsPanel(),
+        state.footer(),
+        state.overlays(),
+        state.generation(),
+        state.catalogLoad(),
+        state.postGeneration(),
+        state.startupOverlay(),
+        state.extensions());
   }
 
   private static UiState postGenerationVisibleState() {

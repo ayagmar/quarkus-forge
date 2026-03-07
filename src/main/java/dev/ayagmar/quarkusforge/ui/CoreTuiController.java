@@ -67,6 +67,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   private String statusMessage;
   private String errorMessage;
   private String verboseErrorDetails;
+  private String generationStatusNotice;
   private boolean submitRequested;
   private boolean submitBlockedByValidation;
   private boolean submitBlockedByTargetConflict;
@@ -110,6 +111,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     statusMessage = "Ready";
     errorMessage = "";
     verboseErrorDetails = "";
+    generationStatusNotice = "";
     submitRequested = false;
     submitBlockedByValidation = false;
     submitBlockedByTargetConflict = false;
@@ -401,10 +403,10 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   @Override
   public UiAction handleWhileGenerationInProgress(KeyEvent keyEvent) {
     if (keyEvent.isConfirm()) {
-      statusMessage = "Generation already in progress. Press Esc to cancel.";
+      generationStatusNotice = "Generation already in progress. Press Esc to cancel.";
       return UiAction.handled(false);
     }
-    statusMessage = "Generation in progress. Press Esc to cancel.";
+    generationStatusNotice = "Generation in progress. Press Esc to cancel.";
     return UiAction.handled(false);
   }
 
@@ -464,10 +466,9 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
       UiAction action =
           routeIntent(
               new UiIntent.SubmitRequestedIntent(
-                  UiIntent.SubmitEvaluation.from(
+                  UiIntent.SubmitRequestContext.from(
                       projectGenerationRunner != NOOP_PROJECT_GENERATION_RUNNER,
                       extensionCatalogNavigation.selectedExtensionCount(),
-                      validation,
                       currentTargetConflictErrorMessage())));
       moveFocusedInputCursorToEndAfterSubmitFeedback();
       return action != null ? action : UiAction.handled(false);
@@ -576,30 +577,32 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   @Override
   public void onSubmitIgnored(String stateLabel) {
-    statusMessage = "Submit ignored in state: " + stateLabel;
+    generationStatusNotice = "Submit ignored in state: " + stateLabel;
   }
 
   @Override
   public void onProgress(GenerationProgressUpdate progressUpdate) {
     generationStateTracker.updateProgress(progressUpdate);
-    dispatchIntent(
-        new UiIntent.GenerationProgressIntent(
-            "Generation in progress: " + generationStateTracker.progressPhase()));
+    generationStatusNotice = "";
+    dispatchIntent(new UiIntent.GenerationProgressIntent());
   }
 
   @Override
   public void onGenerationSuccess(Path generatedPath) {
+    generationStatusNotice = "";
     dispatchIntent(
         new UiIntent.GenerationSuccessIntent(generatedPath, nextStepCommand(request.buildTool())));
   }
 
   @Override
   public void onGenerationCancelled() {
+    generationStatusNotice = "";
     dispatchIntent(new UiIntent.GenerationCancelledIntent());
   }
 
   @Override
   public void onGenerationFailed(Throwable cause) {
+    generationStatusNotice = "";
     dispatchIntent(
         new UiIntent.GenerationFailedIntent(
             ErrorMessageMapper.userFriendlyError(cause), ErrorMessageMapper.verboseDetails(cause)));
@@ -607,6 +610,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   @Override
   public void onCancellationRequested() {
+    generationStatusNotice = "";
     dispatchIntent(new UiIntent.GenerationCancellationRequestedIntent());
   }
 
@@ -628,9 +632,15 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   UiState uiState() {
+    return uiState(true);
+  }
+
+  private UiState uiState(boolean useEffectiveStatusMessage) {
     MetadataPanelSnapshot metadataPanelSnapshot = metadataPanelSnapshot();
     ExtensionsPanelSnapshot extensionsPanelSnapshot = extensionsPanelSnapshot();
     FooterSnapshot footerSnapshot = footerSnapshot();
+    String snapshotStatusMessage =
+        useEffectiveStatusMessage ? effectiveStatusMessage() : statusMessage;
     return uiStateSnapshotMapper.map(
         request,
         focusTarget,
@@ -639,7 +649,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         new UiStateSnapshotMapper.SubmissionState(
             submitRequested,
             submitBlockedByTargetConflict,
-            statusMessage,
+            snapshotStatusMessage,
             errorMessage,
             verboseErrorDetails,
             showErrorDetails),
@@ -689,7 +699,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   String statusMessage() {
-    return statusMessage;
+    return effectiveStatusMessage();
   }
 
   String errorMessage() {
@@ -922,7 +932,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         commandPaletteVisible,
         helpOverlayVisible,
         postGenerationMenu.isVisible(),
-        statusMessage,
+        effectiveStatusMessage(),
         activeErrorDetails(),
         verboseErrorDetails(),
         showErrorDetails,
@@ -1039,7 +1049,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   private ReduceResult dispatchIntent(UiIntent intent) {
-    ReduceResult reduceResult = uiReducer.reduce(uiState(), intent);
+    ReduceResult reduceResult = uiReducer.reduce(uiState(false), intent);
     applyReducerState(reduceResult.nextState());
     uiEffectsRunner.run(reduceResult.effects(), uiEffectsPort);
     return reduceResult;
@@ -1438,6 +1448,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   private void prepareForGenerationEffect() {
+    generationStatusNotice = "";
     resetGenerationStateAfterTerminalOutcome();
   }
 
@@ -1560,7 +1571,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     if (generationStateTracker.currentState() == GenerationState.LOADING) {
       if (!generationFlowCoordinator.isCancellationRequested()) {
         generationStateTracker.tick(generationFlowCoordinator.elapsedMillisSinceStart());
-        statusMessage = "Generation in progress: " + generationStateTracker.progressPhase();
+        generationStatusNotice = "";
       }
       shouldRender = true;
     }
@@ -1657,6 +1668,22 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     dispatchIntent(new UiIntent.CatalogReloadRequestedIntent());
   }
 
+  private String effectiveStatusMessage() {
+    if (generationStateTracker.currentState() != GenerationState.LOADING) {
+      return statusMessage;
+    }
+    if (!generationStatusNotice.isBlank()) {
+      return generationStatusNotice;
+    }
+    if (generationFlowCoordinator.isCancellationRequested()) {
+      return statusMessage;
+    }
+    if (generationStateTracker.progressPhase().isBlank()) {
+      return "Generation in progress. Press Esc to cancel.";
+    }
+    return "Generation in progress: " + generationStateTracker.progressPhase();
+  }
+
   private static boolean shouldToggleHelpOverlay(KeyEvent keyEvent, FocusTarget currentFocus) {
     if (!AppKeyActions.isHelpOverlayToggleKey(keyEvent)) {
       return false;
@@ -1694,11 +1721,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   private void dispatchSubmitEditRecovery() {
     dispatchIntent(
         new UiIntent.SubmitEditRecoveryIntent(
-            UiIntent.SubmitEditRecovery.from(
-                validation,
-                submitBlockedByValidation,
-                submitBlockedByTargetConflict,
-                currentTargetConflictErrorMessage())));
+            new UiIntent.SubmitRecoveryContext(currentTargetConflictErrorMessage())));
   }
 
   private void moveFocusedInputCursorToEndAfterSubmitFeedback() {

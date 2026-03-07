@@ -242,6 +242,28 @@ class CoreTuiGenerationFlowTest {
   }
 
   @Test
+  void duplicateSubmitNoticeFallsBackToCanonicalProgressCopyOnTick() {
+    CoreTuiController controller =
+        CoreTuiController.from(
+            UiTestFixtureFactory.defaultForgeUiState(),
+            UiScheduler.immediate(),
+            Duration.ZERO,
+            (generationRequest, outputDirectory, cancelled, progressListener) ->
+                new CompletableFuture<>());
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    assertThat(controller.statusMessage()).contains("already in progress");
+
+    controller.onEvent(TickEvent.of(1, Duration.ofMillis(40)));
+
+    assertThat(controller.statusMessage())
+        .isEqualTo("Generation in progress: waiting for Quarkus API response (0s)..");
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .contains("waiting for Quarkus API response (0s)..");
+  }
+
+  @Test
   void generationLockConsumesKeysWithoutTriggeringQuit() {
     UiControllerTestHarness.ControlledGenerationRunner generationRunner =
         new UiControllerTestHarness.ControlledGenerationRunner();

@@ -26,13 +26,13 @@ sealed interface UiIntent {
 
   record StartupOverlayVisibilityIntent(boolean visible) implements UiIntent {}
 
-  record SubmitRequestedIntent(SubmitEvaluation evaluation) implements UiIntent {}
+  record SubmitRequestedIntent(SubmitRequestContext context) implements UiIntent {}
 
-  record SubmitEditRecoveryIntent(SubmitEditRecovery recovery) implements UiIntent {}
+  record SubmitEditRecoveryIntent(SubmitRecoveryContext context) implements UiIntent {}
 
   record CancelGenerationIntent() implements UiIntent {}
 
-  record GenerationProgressIntent(String statusMessage) implements UiIntent {}
+  record GenerationProgressIntent() implements UiIntent {}
 
   record GenerationSuccessIntent(java.nio.file.Path generatedPath, String nextCommand)
       implements UiIntent {}
@@ -73,29 +73,19 @@ sealed interface UiIntent {
     record Quit() implements PostGenerationCommand {}
   }
 
-  record SubmitEvaluation(
-      boolean generationConfigured,
-      int selectedExtensionCount,
-      FocusTarget firstInvalidTarget,
-      int validationIssueCount,
-      String firstValidationError,
-      String targetConflictErrorMessage) {
-    static SubmitEvaluation from(
-        boolean generationConfigured,
-        int selectedExtensionCount,
-        ValidationReport validation,
-        String targetConflictErrorMessage) {
-      return new SubmitEvaluation(
-          generationConfigured,
-          selectedExtensionCount,
-          ValidationFocusTargets.firstInvalid(validation),
-          validation.errors().size(),
-          UiIntent.firstValidationError(validation),
-          targetConflictErrorMessage);
+  record SubmitRequestContext(
+      boolean generationConfigured, int selectedExtensionCount, String targetConflictErrorMessage) {
+    public SubmitRequestContext {
+      targetConflictErrorMessage =
+          targetConflictErrorMessage == null ? "" : targetConflictErrorMessage;
     }
 
-    boolean hasValidationError() {
-      return !firstValidationError.isBlank();
+    static SubmitRequestContext from(
+        boolean generationConfigured,
+        int selectedExtensionCount,
+        String targetConflictErrorMessage) {
+      return new SubmitRequestContext(
+          generationConfigured, selectedExtensionCount, targetConflictErrorMessage);
     }
 
     boolean hasTargetConflict() {
@@ -103,35 +93,14 @@ sealed interface UiIntent {
     }
   }
 
-  record SubmitEditRecovery(
-      boolean submitBlockedByValidation,
-      boolean validationValid,
-      String firstValidationError,
-      boolean submitBlockedByTargetConflict,
-      String targetConflictErrorMessage) {
-    static SubmitEditRecovery from(
-        ValidationReport validation,
-        boolean submitBlockedByValidation,
-        boolean submitBlockedByTargetConflict,
-        String targetConflictErrorMessage) {
-      return new SubmitEditRecovery(
-          submitBlockedByValidation,
-          validation.isValid(),
-          UiIntent.firstValidationError(validation),
-          submitBlockedByTargetConflict,
-          targetConflictErrorMessage);
-    }
-
-    boolean targetConflictResolved() {
-      return submitBlockedByTargetConflict && targetConflictErrorMessage.isBlank();
-    }
-
-    boolean validationRecovered() {
-      return submitBlockedByValidation && validationValid;
+  record SubmitRecoveryContext(String targetConflictErrorMessage) {
+    public SubmitRecoveryContext {
+      targetConflictErrorMessage =
+          targetConflictErrorMessage == null ? "" : targetConflictErrorMessage;
     }
   }
 
-  private static String firstValidationError(ValidationReport report) {
+  static String firstValidationError(ValidationReport report) {
     return report.errors().isEmpty()
         ? ""
         : report.errors().getFirst().field() + ": " + report.errors().getFirst().message();
