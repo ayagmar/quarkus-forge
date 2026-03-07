@@ -73,7 +73,7 @@ final class BodyPanelRenderer {
       return;
     }
 
-    if (area.width() < UiLayoutConstants.NARROW_WIDTH_THRESHOLD || inner.height() < 2) {
+    if (inner.width() < UiLayoutConstants.NARROW_WIDTH_THRESHOLD || inner.height() < 2) {
       renderMetadataPanelNarrow(frame, inner, snapshot, inputRenderer, renderContext);
       return;
     }

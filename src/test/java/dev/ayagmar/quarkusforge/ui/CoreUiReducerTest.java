@@ -307,13 +307,14 @@ class CoreUiReducerTest {
 
   @Test
   void postGenerationExportKeepsMenuOpenAndProducesExportEffect() {
+    int exportSelection = postGenerationActionIndex(PostGenerationExitAction.EXPORT_RECIPE_LOCK);
     UiState exportState =
         postGenerationVisibleState()
             .withPostGeneration(
                 new UiState.PostGenerationView(
                     true,
                     false,
-                    5,
+                    exportSelection,
                     0,
                     postGenerationVisibleState().postGeneration().actions(),
                     Path.of("/tmp/demo"),
@@ -333,13 +334,14 @@ class CoreUiReducerTest {
 
   @Test
   void postGenerationGenerateAgainResetsStateAndKeepsTuiOpen() {
+    int generateAgainSelection = postGenerationActionIndex(PostGenerationExitAction.GENERATE_AGAIN);
     UiState generateAgainState =
         postGenerationVisibleState()
             .withPostGeneration(
                 new UiState.PostGenerationView(
                     true,
                     false,
-                    3,
+                    generateAgainSelection,
                     0,
                     postGenerationVisibleState().postGeneration().actions(),
                     Path.of("/tmp/demo"),
@@ -410,6 +412,19 @@ class CoreUiReducerTest {
                 new UiIntent.PostGenerationCommand.SelectGithubVisibilityIndex(99)));
 
     assertThat(result.nextState()).isEqualTo(githubVisibilityState);
+    assertThat(result.effects()).isEmpty();
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+  }
+
+  @Test
+  void hiddenPostGenerationCommandsAreIgnored() {
+    ReduceResult result =
+        reducer.reduce(
+            baseState(),
+            new UiIntent.PostGenerationIntent(
+                new UiIntent.PostGenerationCommand.ConfirmSelection()));
+
+    assertThat(result.nextState()).isEqualTo(baseState());
     assertThat(result.effects()).isEmpty();
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
   }
@@ -704,7 +719,7 @@ class CoreUiReducerTest {
   void metadataIntentWithOptionsProducesSelectorEffect() {
     ReduceResult result =
         reducer.reduce(
-            baseState(),
+            stateWithFocus(baseState(), FocusTarget.BUILD_TOOL),
             new UiIntent.MetadataInputIntent(KeyEvent.ofKey(KeyCode.LEFT), FocusTarget.BUILD_TOOL));
 
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
@@ -716,12 +731,40 @@ class CoreUiReducerTest {
   void textInputIntentWithSupportedKeyProducesApplyKeyEffect() {
     ReduceResult result =
         reducer.reduce(
-            baseState(),
+            stateWithFocus(baseState(), FocusTarget.ARTIFACT_ID),
             new UiIntent.TextInputIntent(KeyEvent.ofChar('a'), FocusTarget.ARTIFACT_ID));
 
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
     assertThat(result.effects()).hasSize(1);
     assertThat(result.effects().getFirst()).isInstanceOf(UiEffect.ApplyTextInputKey.class);
+  }
+
+  @Test
+  void metadataIntentUsesReducerFocusInsteadOfIntentFocus() {
+    KeyEvent keyEvent = KeyEvent.ofKey(KeyCode.LEFT);
+
+    ReduceResult result =
+        reducer.reduce(
+            stateWithFocus(baseState(), FocusTarget.BUILD_TOOL),
+            new UiIntent.MetadataInputIntent(keyEvent, FocusTarget.JAVA_VERSION));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects())
+        .containsExactly(new UiEffect.ApplyMetadataSelectorKey(FocusTarget.BUILD_TOOL, keyEvent));
+  }
+
+  @Test
+  void textInputIntentUsesReducerFocusInsteadOfIntentFocus() {
+    KeyEvent keyEvent = KeyEvent.ofChar('a');
+
+    ReduceResult result =
+        reducer.reduce(
+            stateWithFocus(baseState(), FocusTarget.ARTIFACT_ID),
+            new UiIntent.TextInputIntent(keyEvent, FocusTarget.VERSION));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects())
+        .containsExactly(new UiEffect.ApplyTextInputKey(FocusTarget.ARTIFACT_ID, keyEvent));
   }
 
   @Test
@@ -964,6 +1007,13 @@ class CoreUiReducerTest {
             Path.of("/tmp/demo"),
             "mvn quarkus:dev",
             null));
+  }
+
+  private static int postGenerationActionIndex(PostGenerationExitAction action) {
+    return postGenerationVisibleState().postGeneration().actions().stream()
+        .map(UiTextConstants.PostGenerationAction::action)
+        .toList()
+        .indexOf(action);
   }
 
   private static UiState stateWithOverlayState(
