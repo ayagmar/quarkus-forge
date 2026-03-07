@@ -1,7 +1,7 @@
 /**
- * Post-generation shell and IDE integration after TUI exit.
+ * Post-generation actions plus shell and IDE integration helpers.
  *
- * <p>This package isolates process execution and command discovery from CLI parsing, application
- * orchestration, and headless generation logic.
+ * <p>This package isolates process execution, IDE discovery, and post-generation exit handling from
+ * CLI parsing, runtime bootstrap, and headless generation orchestration.
  */
 package dev.ayagmar.quarkusforge.postgen;

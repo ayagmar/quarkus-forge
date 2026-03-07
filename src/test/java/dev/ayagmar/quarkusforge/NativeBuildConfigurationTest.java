@@ -25,6 +25,29 @@ class NativeBuildConfigurationTest {
     assertThat(textContents(buildArgs)).contains("-H:+SharedArenaSupport");
   }
 
+  @Test
+  void compilerDisablesEmptyPicocliProxyConfigGeneration() throws Exception {
+    Document document = parsePom(Path.of("pom.xml"));
+
+    NodeList compilerArgs = document.getElementsByTagName("arg");
+
+    assertThat(textContents(compilerArgs)).contains("-Adisable.proxy.config");
+  }
+
+  @Test
+  void headlessProfilesDisableTuiOnlyNativeResourcePatterns() throws Exception {
+    Document document = parsePom(Path.of("pom.xml"));
+
+    assertThat(profileProperty(document, "headless", "native.ui.resource.pattern"))
+        .isEqualTo("(?!)");
+    assertThat(profileProperty(document, "headless", "native.tui.bindings.resource.pattern"))
+        .isEqualTo("(?!)");
+    assertThat(profileProperty(document, "headless-native", "native.ui.resource.pattern"))
+        .isEqualTo("(?!)");
+    assertThat(profileProperty(document, "headless-native", "native.tui.bindings.resource.pattern"))
+        .isEqualTo("(?!)");
+  }
+
   private static Document parsePom(Path pomPath) throws Exception {
     DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
     factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
@@ -46,6 +69,16 @@ class NativeBuildConfigurationTest {
       }
     }
     throw new IOException("profile not found: " + profileId);
+  }
+
+  private static String profileProperty(Document document, String profileId, String propertyName)
+      throws IOException {
+    Element profile = profileById(document, profileId);
+    NodeList properties = profile.getElementsByTagName(propertyName);
+    if (properties.getLength() == 0) {
+      throw new IOException("property not found: " + profileId + "#" + propertyName);
+    }
+    return properties.item(0).getTextContent().trim();
   }
 
   private static java.util.List<String> textContents(NodeList nodeList) {

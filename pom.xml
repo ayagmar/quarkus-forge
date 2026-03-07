@@ -11,6 +11,10 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>25</maven.compiler.release>
+    <native.ui.resource.pattern>ui/.*\\.tcss$</native.ui.resource.pattern>
+    <native.tui.bindings.resource.pattern>
+      dev/tamboui/tui/bindings/.*\\.properties$
+    </native.tui.bindings.resource.pattern>
 
     <tamboui.version>0.2.0-SNAPSHOT</tamboui.version>
     <picocli.version>4.7.7</picocli.version>
@@ -106,6 +110,7 @@
         <filtering>true</filtering>
         <includes>
           <include>version.properties</include>
+          <include>META-INF/native-image/dev.ayagmar/quarkusforge/resource-config.json</include>
         </includes>
       </resource>
       <resource>
@@ -113,6 +118,7 @@
         <filtering>false</filtering>
         <excludes>
           <exclude>version.properties</exclude>
+          <exclude>META-INF/native-image/dev.ayagmar/quarkusforge/resource-config.json</exclude>
         </excludes>
       </resource>
     </resources>
@@ -153,6 +159,7 @@
           </annotationProcessorPaths>
           <compilerArgs>
             <arg>-Aproject=${project.groupId}/${project.artifactId}</arg>
+            <arg>-Adisable.proxy.config</arg>
           </compilerArgs>
         </configuration>
       </plugin>
@@ -364,6 +371,8 @@
         <forge.main.class>${forge.headless.main.class}</forge.main.class>
         <forge.jar.name>quarkus-forge-headless</forge.jar.name>
         <maven.test.skip>true</maven.test.skip>
+        <native.ui.resource.pattern>(?!)</native.ui.resource.pattern>
+        <native.tui.bindings.resource.pattern>(?!)</native.tui.bindings.resource.pattern>
       </properties>
       <dependencies>
         <dependency>
@@ -409,6 +418,8 @@
         <forge.main.class>${forge.headless.main.class}</forge.main.class>
         <forge.jar.name>quarkus-forge-headless</forge.jar.name>
         <maven.test.skip>true</maven.test.skip>
+        <native.ui.resource.pattern>(?!)</native.ui.resource.pattern>
+        <native.tui.bindings.resource.pattern>(?!)</native.tui.bindings.resource.pattern>
       </properties>
       <dependencies>
         <dependency>

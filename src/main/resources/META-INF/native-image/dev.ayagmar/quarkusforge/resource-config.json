@@ -5,10 +5,10 @@
         "pattern": "metadata/.*\\.json$"
       },
       {
-        "pattern": "ui/.*\\.tcss$"
+        "pattern": "${native.ui.resource.pattern}"
       },
       {
-        "pattern": "dev/tamboui/tui/bindings/.*\\.properties$"
+        "pattern": "${native.tui.bindings.resource.pattern}"
       },
       {
         "pattern": "version\\.properties$"
