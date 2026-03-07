@@ -44,6 +44,10 @@ sealed interface UiIntent {
 
   record GenerationCancellationRequestedIntent() implements UiIntent {}
 
+  record CommandPaletteIntent(CommandPaletteCommand command) implements UiIntent {}
+
+  record HelpOverlayIntent(HelpOverlayCommand command) implements UiIntent {}
+
   record ExtensionPanelFocusIntent(FocusTarget focusTarget) implements UiIntent {}
 
   record FocusNavigationIntent(dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget)
@@ -56,6 +60,28 @@ sealed interface UiIntent {
       implements UiIntent {}
 
   record ToggleErrorDetailsIntent(boolean activeErrorPresent) implements UiIntent {}
+
+  sealed interface CommandPaletteCommand {
+    record ToggleVisibility() implements CommandPaletteCommand {}
+
+    record Dismiss() implements CommandPaletteCommand {}
+
+    record MoveSelection(int delta) implements CommandPaletteCommand {}
+
+    record JumpHome() implements CommandPaletteCommand {}
+
+    record JumpEnd() implements CommandPaletteCommand {}
+
+    record SelectIndex(int index) implements CommandPaletteCommand {}
+
+    record ConfirmSelection() implements CommandPaletteCommand {}
+  }
+
+  sealed interface HelpOverlayCommand {
+    record ToggleVisibility() implements HelpOverlayCommand {}
+
+    record Dismiss() implements HelpOverlayCommand {}
+  }
 
   sealed interface PostGenerationCommand {
     record Noop() implements PostGenerationCommand {}

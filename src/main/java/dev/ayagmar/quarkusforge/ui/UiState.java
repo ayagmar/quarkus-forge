@@ -265,6 +265,39 @@ record UiState(
         extensions);
   }
 
+  UiState withOverlayState(
+      boolean nextCommandPaletteVisible,
+      boolean nextHelpOverlayVisible,
+      int nextCommandPaletteSelection,
+      String nextStatusMessage) {
+    return new UiState(
+        request,
+        validation,
+        focusTarget,
+        nextStatusMessage,
+        errorMessage,
+        verboseErrorDetails,
+        showErrorDetails,
+        submitRequested,
+        submitBlockedByValidation,
+        submitBlockedByTargetConflict,
+        nextCommandPaletteSelection,
+        metadataPanel,
+        extensionsPanel,
+        footer,
+        new OverlayState(
+            overlays.generationVisible(),
+            nextCommandPaletteVisible,
+            nextHelpOverlayVisible,
+            overlays.postGenerationVisible(),
+            overlays.startupOverlayVisible()),
+        generation,
+        catalogLoad,
+        postGeneration,
+        startupOverlay,
+        extensions);
+  }
+
   record OverlayState(
       boolean generationVisible,
       boolean commandPaletteVisible,

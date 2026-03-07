@@ -105,6 +105,7 @@ CoreTuiController (Orchestration Shell)
     │
     ├── CoreUiReducer            Pure transition logic for migrated slices
     │       ├── post-generation intent handling
+    │       ├── command palette + help overlay visibility handling
     │       ├── submit + blocked-submit authority
     │       ├── generation callback intent handling
     │       ├── focus/input intent handling
