@@ -2,9 +2,11 @@ package dev.ayagmar.quarkusforge.headless;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.ayagmar.quarkusforge.SystemPropertyExtension;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ValidationError;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
+import dev.ayagmar.quarkusforge.util.OutputPathResolver;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -13,6 +15,7 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.parallel.ResourceLock;
 import org.junit.jupiter.api.parallel.Resources;
 
@@ -20,6 +23,8 @@ import org.junit.jupiter.api.parallel.Resources;
 @ResourceLock(Resources.SYSTEM_ERR)
 @ResourceLock(Resources.SYSTEM_PROPERTIES)
 class HeadlessOutputPrinterTest {
+  @RegisterExtension final SystemPropertyExtension systemProperties = new SystemPropertyExtension();
+
   private PrintStream originalOut;
   private PrintStream originalErr;
   private ByteArrayOutputStream stdout;
@@ -130,7 +135,8 @@ class HeadlessOutputPrinterTest {
 
     Path resolved = HeadlessOutputPrinter.resolveProjectDirectory(request);
 
-    assertThat(resolved).isEqualTo(Path.of("/tmp/out/app"));
+    assertThat(resolved)
+        .isEqualTo(OutputPathResolver.resolveOutputRoot(outputDir).resolve("app").normalize());
   }
 
   @Test
@@ -203,21 +209,13 @@ class HeadlessOutputPrinterTest {
 
   @Test
   void resolveProjectDirectoryExpandsTildeAgainstUserHome() {
-    String originalUserHome = System.getProperty("user.home");
-    System.setProperty("user.home", Path.of("/tmp/test-home").toString());
-    try {
-      ProjectRequest request =
-          new ProjectRequest("org.acme", "my-app", "1.0.0", "", "~/Projects", "", "maven", "25");
+    Path homePath = Path.of("target", "qf-headless-home").toAbsolutePath().normalize();
+    systemProperties.set("user.home", homePath);
+    ProjectRequest request =
+        new ProjectRequest("org.acme", "my-app", "1.0.0", "", "~/Projects", "", "maven", "25");
 
-      Path resolved = HeadlessOutputPrinter.resolveProjectDirectory(request);
+    Path resolved = HeadlessOutputPrinter.resolveProjectDirectory(request);
 
-      assertThat(resolved).isEqualTo(Path.of("/tmp/test-home/Projects/my-app"));
-    } finally {
-      if (originalUserHome == null) {
-        System.clearProperty("user.home");
-      } else {
-        System.setProperty("user.home", originalUserHome);
-      }
-    }
+    assertThat(resolved).isEqualTo(homePath.resolve("Projects").resolve("my-app").normalize());
   }
 }
