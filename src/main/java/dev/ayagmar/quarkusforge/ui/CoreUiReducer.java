@@ -84,24 +84,18 @@ final class CoreUiReducer implements UiReducer {
               List.of(),
               UiAction.handled(false));
       case UiIntent.SubmitRequestedIntent submitIntent ->
-          reduceSubmitRequest(state, submitIntent.evaluation());
+          reduceSubmitRequest(state, submitIntent.context());
       case UiIntent.SubmitEditRecoveryIntent recoveryIntent ->
-          reduceSubmitRecovery(state, recoveryIntent.recovery());
+          reduceSubmitRecovery(state, recoveryIntent.context());
       case UiIntent.CancelGenerationIntent _ ->
           new ReduceResult(
               state,
               List.of(new UiEffect.RequestGenerationCancellation()),
               UiAction.handled(false));
-      case UiIntent.GenerationProgressIntent progressIntent -> {
+      case UiIntent.GenerationProgressIntent _ -> {
         yield new ReduceResult(
             state.withSubmissionState(
-                progressIntent.statusMessage(),
-                "",
-                "",
-                state.submitRequested(),
-                false,
-                false,
-                false),
+                state.statusMessage(), "", "", state.submitRequested(), false, false, false),
             List.of(),
             UiAction.handled(false));
       }
@@ -176,24 +170,24 @@ final class CoreUiReducer implements UiReducer {
   }
 
   private static ReduceResult reduceSubmitRequest(
-      UiState state, UiIntent.SubmitEvaluation evaluation) {
+      UiState state, UiIntent.SubmitRequestContext context) {
     UiState preparedState =
         state.withPostGeneration(resetPostGenerationState(state.postGeneration()));
-    if (evaluation.hasValidationError()) {
+    String firstValidationError = UiIntent.firstValidationError(state.validation());
+    if (!firstValidationError.isBlank()) {
+      FocusTarget firstInvalidTarget = ValidationFocusTargets.firstInvalid(state.validation());
       FocusTarget nextFocusTarget =
-          evaluation.firstInvalidTarget() == null
-              ? state.focusTarget()
-              : evaluation.firstInvalidTarget();
-      int issueCount = evaluation.validationIssueCount();
+          firstInvalidTarget == null ? state.focusTarget() : firstInvalidTarget;
+      int issueCount = state.validation().errors().size();
       String statusMessage =
-          evaluation.firstInvalidTarget() == null
+          firstInvalidTarget == null
               ? "Submit blocked: invalid input ("
                   + issueCount
                   + " issue"
                   + (issueCount == 1 ? "" : "s")
                   + ")"
               : "Submit blocked: fix "
-                  + UiFocusTargets.nameOf(evaluation.firstInvalidTarget())
+                  + UiFocusTargets.nameOf(firstInvalidTarget)
                   + " ("
                   + issueCount
                   + " issue"
@@ -201,19 +195,19 @@ final class CoreUiReducer implements UiReducer {
                   + ")";
       return new ReduceResult(
           preparedState.withSubmitFeedback(
-              nextFocusTarget, statusMessage, evaluation.firstValidationError(), true, false),
+              nextFocusTarget, statusMessage, firstValidationError, true, false),
           List.of(
               new UiEffect.PrepareForGeneration(),
               new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.VALIDATING),
               new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.ERROR)),
           UiAction.handled(false));
     }
-    if (evaluation.hasTargetConflict()) {
+    if (context.hasTargetConflict()) {
       return new ReduceResult(
           preparedState.withSubmitFeedback(
               FocusTarget.OUTPUT_DIR,
               "Submit blocked: target folder exists (change output/artifact)",
-              evaluation.targetConflictErrorMessage(),
+              context.targetConflictErrorMessage(),
               false,
               true),
           List.of(
@@ -222,11 +216,11 @@ final class CoreUiReducer implements UiReducer {
               new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.ERROR)),
           UiAction.handled(false));
     }
-    if (!evaluation.generationConfigured()) {
+    if (!context.generationConfigured()) {
       return new ReduceResult(
           preparedState.withSubmissionState(
               "Submit requested with "
-                  + evaluation.selectedExtensionCount()
+                  + context.selectedExtensionCount()
                   + " extension(s), but generation service is not configured.",
               "",
               "",
@@ -242,7 +236,7 @@ final class CoreUiReducer implements UiReducer {
     }
     return new ReduceResult(
         preparedState.withSubmissionState(
-            "Submit requested with " + evaluation.selectedExtensionCount() + " extension(s)",
+            "Submit requested with " + context.selectedExtensionCount() + " extension(s)",
             "",
             "",
             true,
@@ -257,8 +251,8 @@ final class CoreUiReducer implements UiReducer {
   }
 
   private static ReduceResult reduceSubmitRecovery(
-      UiState state, UiIntent.SubmitEditRecovery recovery) {
-    if (recovery.targetConflictResolved()) {
+      UiState state, UiIntent.SubmitRecoveryContext context) {
+    if (state.submitBlockedByTargetConflict() && context.targetConflictErrorMessage().isBlank()) {
       return new ReduceResult(
           state.withSubmissionState(
               "Target folder conflict resolved",
@@ -271,11 +265,11 @@ final class CoreUiReducer implements UiReducer {
           List.of(),
           UiAction.handled(false));
     }
-    if (recovery.submitBlockedByTargetConflict()) {
+    if (state.submitBlockedByTargetConflict()) {
       return new ReduceResult(
           state.withSubmissionState(
               state.statusMessage(),
-              recovery.targetConflictErrorMessage(),
+              context.targetConflictErrorMessage(),
               state.verboseErrorDetails(),
               state.submitRequested(),
               state.submitBlockedByValidation(),
@@ -284,7 +278,7 @@ final class CoreUiReducer implements UiReducer {
           List.of(),
           UiAction.handled(false));
     }
-    if (recovery.validationRecovered()) {
+    if (state.submitBlockedByValidation() && state.validation().isValid()) {
       return new ReduceResult(
           state.withSubmissionState(
               "Validation restored",
@@ -297,11 +291,11 @@ final class CoreUiReducer implements UiReducer {
           List.of(),
           UiAction.handled(false));
     }
-    if (recovery.submitBlockedByValidation()) {
+    if (state.submitBlockedByValidation()) {
       return new ReduceResult(
           state.withSubmissionState(
               state.statusMessage(),
-              recovery.firstValidationError(),
+              UiIntent.firstValidationError(state.validation()),
               state.verboseErrorDetails(),
               state.submitRequested(),
               true,
