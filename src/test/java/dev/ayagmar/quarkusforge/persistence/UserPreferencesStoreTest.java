@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
+import dev.ayagmar.quarkusforge.testsupport.EncodingProbeSupport;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
@@ -116,5 +117,25 @@ class UserPreferencesStoreTest {
     assertThat(result).isNotNull();
     assertThat(result.groupId()).isEmpty();
     assertThat(result.artifactId()).isEmpty();
+  }
+
+  @Test
+  void fileBackedStoreReadsUtf8PayloadsWhenJvmDefaultCharsetIsAscii() throws Exception {
+    Path preferencesFile = tempDir.resolve("utf8-preferences.json");
+    UserPreferencesStore store = UserPreferencesStore.fileBacked(preferencesFile);
+
+    store.saveLastRequest(
+        new ProjectRequest(
+            "org.demo",
+            "demo-app",
+            "1.2.3",
+            "org.demo.app",
+            "./caf\u00e9",
+            "io.quarkus.platform:3.31",
+            "gradle",
+            "25"));
+
+    assertThat(EncodingProbeSupport.probe("preferences-output-dir", preferencesFile))
+        .isEqualTo("./caf\\u00E9");
   }
 }

@@ -19,7 +19,7 @@ public final class ForgefileStore {
   public static Forgefile load(Path file) {
     String content;
     try {
-      content = Files.readString(file);
+      content = Files.readString(file, StandardCharsets.UTF_8);
     } catch (NoSuchFileException noSuchFileException) {
       throw new IllegalArgumentException(
           "Forgefile not found: '" + file + "'", noSuchFileException);
@@ -92,7 +92,7 @@ public final class ForgefileStore {
       return null;
     }
     if (!(lockedObj instanceof Map<?, ?> lockedMap)) {
-      return null;
+      throw new IllegalArgumentException("Field 'locked' must be an object");
     }
     Map<String, Object> locked = (Map<String, Object>) lockedMap;
     return new ForgefileLock(

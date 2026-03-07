@@ -221,7 +221,9 @@ public final class HeadlessGenerationService implements AutoCloseable {
         continue;
       }
       if (PRESET_FAVORITES.equals(preset)) {
-        resolved.addAll(favoritesStore.loadFavoriteExtensionIds());
+        favoritesStore.loadFavoriteExtensionIds().stream()
+            .filter(knownExtensionIds::contains)
+            .forEach(resolved::add);
         continue;
       }
       List<String> presetExtensions = presetExtensionsByName.get(preset);
@@ -327,7 +329,8 @@ public final class HeadlessGenerationService implements AutoCloseable {
     checkDrift(errors, "buildTool", lock.buildTool(), request.buildTool());
     checkDrift(errors, "javaVersion", lock.javaVersion(), request.javaVersion());
     List<String> lockedExtensions = lock.extensions() == null ? List.of() : lock.extensions();
-    if (!lockedExtensions.equals(extensionIds)) {
+    if (!normalizedExtensionIdsForComparison(lockedExtensions)
+        .equals(normalizedExtensionIdsForComparison(extensionIds))) {
       errors.add(
           new ValidationError(
               "locked",
@@ -335,7 +338,8 @@ public final class HeadlessGenerationService implements AutoCloseable {
     }
     List<String> normalizedPresets = normalizePresets(inputs.presetInputs());
     List<String> lockedPresets = lock.presets() == null ? List.of() : lock.presets();
-    if (!lockedPresets.equals(normalizedPresets)) {
+    if (!normalizedPresetIdsForComparison(lockedPresets)
+        .equals(normalizedPresetIdsForComparison(normalizedPresets))) {
       errors.add(
           new ValidationError(
               "locked",
@@ -365,6 +369,22 @@ public final class HeadlessGenerationService implements AutoCloseable {
         .filter(s -> !s.isEmpty())
         .distinct()
         .toList();
+  }
+
+  private static List<String> normalizedPresetIdsForComparison(List<String> presetInputs) {
+    return normalizePresets(presetInputs).stream().sorted().toList();
+  }
+
+  private static List<String> normalizedExtensionIdsForComparison(List<String> extensionIds) {
+    return extensionIds == null
+        ? List.of()
+        : extensionIds.stream()
+            .filter(Objects::nonNull)
+            .map(String::trim)
+            .filter(value -> !value.isEmpty())
+            .distinct()
+            .sorted()
+            .toList();
   }
 
   private static String normalizePresetName(String presetName) {

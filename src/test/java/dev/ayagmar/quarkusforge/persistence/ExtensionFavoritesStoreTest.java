@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.ayagmar.quarkusforge.testsupport.EncodingProbeSupport;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -114,5 +115,16 @@ class ExtensionFavoritesStoreTest {
     ExtensionFavoritesStore store = ExtensionFavoritesStore.fileBacked(favoritesFile);
     assertThat(store.loadFavoriteExtensionIds()).isEmpty();
     assertThat(store.loadRecentExtensionIds()).isEmpty();
+  }
+
+  @Test
+  void fileBackedStoreReadsUtf8PayloadsWhenJvmDefaultCharsetIsAscii() throws Exception {
+    Path favoritesFile = tempDir.resolve("utf8-favorites.json");
+    ExtensionFavoritesStore store = ExtensionFavoritesStore.fileBacked(favoritesFile);
+
+    store.saveAll(Set.of(), List.of("cafe-\u00e9xt"));
+
+    assertThat(EncodingProbeSupport.probe("favorites-recent", favoritesFile))
+        .isEqualTo("cafe-\\u00E9xt");
   }
 }
