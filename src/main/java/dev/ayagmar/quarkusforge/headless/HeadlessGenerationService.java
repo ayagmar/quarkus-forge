@@ -3,11 +3,13 @@ package dev.ayagmar.quarkusforge.headless;
 import static dev.ayagmar.quarkusforge.diagnostics.DiagnosticField.of;
 
 import dev.ayagmar.quarkusforge.api.CatalogData;
+import dev.ayagmar.quarkusforge.api.CatalogDataService;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
-import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
+import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
 import dev.ayagmar.quarkusforge.application.InputResolutionService;
+import dev.ayagmar.quarkusforge.archive.ProjectArchiveService;
 import dev.ayagmar.quarkusforge.cli.ExitCodes;
 import dev.ayagmar.quarkusforge.cli.GenerateCommand;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
@@ -19,7 +21,7 @@ import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.ayagmar.quarkusforge.forge.Forgefile;
 import dev.ayagmar.quarkusforge.forge.ForgefileLock;
 import dev.ayagmar.quarkusforge.forge.ForgefileStore;
-import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
+import dev.ayagmar.quarkusforge.persistence.ExtensionFavoritesStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -38,18 +40,32 @@ import java.util.stream.Collectors;
 public final class HeadlessGenerationService implements AutoCloseable {
   private static final String PRESET_FAVORITES = "favorites";
 
-  private final HeadlessCatalogOperations catalogClient;
-  private final RuntimeConfig runtimeConfig;
+  private final HeadlessCatalogLoader catalogLoader;
+  private final HeadlessProjectGenerator projectGenerator;
+  private final ExtensionFavoritesStore favoritesStore;
 
-  public HeadlessGenerationService(
-      HeadlessCatalogOperations catalogClient, RuntimeConfig runtimeConfig) {
-    this.catalogClient = catalogClient;
-    this.runtimeConfig = runtimeConfig;
+  HeadlessGenerationService(
+      HeadlessCatalogLoader catalogLoader,
+      HeadlessProjectGenerator projectGenerator,
+      ExtensionFavoritesStore favoritesStore) {
+    this.catalogLoader = Objects.requireNonNull(catalogLoader);
+    this.projectGenerator = Objects.requireNonNull(projectGenerator);
+    this.favoritesStore = Objects.requireNonNull(favoritesStore);
+  }
+
+  public static HeadlessGenerationService create(
+      QuarkusApiClient apiClient,
+      CatalogDataService catalogDataService,
+      ProjectArchiveService projectArchiveService,
+      ExtensionFavoritesStore favoritesStore) {
+    HeadlessCatalogClient client =
+        new HeadlessCatalogClient(apiClient, catalogDataService, projectArchiveService);
+    return new HeadlessGenerationService(client, client, favoritesStore);
   }
 
   @Override
   public void close() {
-    catalogClient.close();
+    catalogLoader.close();
   }
 
   public int run(GenerateCommand command, boolean globalDryRun, boolean verbose) {
@@ -70,7 +86,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
     Duration catalogTimeout = HeadlessTimeouts.catalogTimeout();
     CatalogData catalogData;
     try {
-      catalogData = catalogClient.loadCatalogData(catalogTimeout);
+      catalogData = catalogLoader.loadCatalogData(catalogTimeout);
       diagnostics.info(
           "catalog.load.success",
           of("source", catalogData.sourceLabel()),
@@ -105,7 +121,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
     if (requiresBuiltInPresets(inputs.presetInputs())) {
       try {
         presetExtensionsByName =
-            catalogClient.loadBuiltInPresets(
+            catalogLoader.loadBuiltInPresets(
                 validatedState.request().platformStream(), catalogTimeout);
       } catch (Exception e) {
         return AsyncFailureHandler.handleFailure(
@@ -168,7 +184,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
         of("extensionCount", extensionIds.size()));
     try {
       generationFuture =
-          catalogClient.startGeneration(generationRequest, outputPath, System.out::println);
+          projectGenerator.startGeneration(generationRequest, outputPath, System.out::println);
       Path generatedProjectRoot =
           generationFuture.get(generationTimeout.toMillis(), TimeUnit.MILLISECONDS);
       diagnostics.info(
@@ -205,9 +221,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
         continue;
       }
       if (PRESET_FAVORITES.equals(preset)) {
-        resolved.addAll(
-            ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile())
-                .loadFavoriteExtensionIds());
+        resolved.addAll(favoritesStore.loadFavoriteExtensionIds());
         continue;
       }
       List<String> presetExtensions = presetExtensionsByName.get(preset);

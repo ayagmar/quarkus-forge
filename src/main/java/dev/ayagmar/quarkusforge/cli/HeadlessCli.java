@@ -1,8 +1,8 @@
 package dev.ayagmar.quarkusforge.cli;
 
-import dev.ayagmar.quarkusforge.headless.HeadlessCatalogClient;
 import dev.ayagmar.quarkusforge.headless.HeadlessGenerationService;
 import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
+import dev.ayagmar.quarkusforge.runtime.RuntimeWiring;
 import java.util.Objects;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
@@ -50,7 +50,7 @@ public final class HeadlessCli implements Callable<Integer>, HeadlessRunner {
   @Override
   public int runHeadlessGenerate(GenerateCommand command) {
     try (HeadlessGenerationService service =
-        new HeadlessGenerationService(new HeadlessCatalogClient(runtimeConfig), runtimeConfig)) {
+        RuntimeWiring.headlessGenerationService(runtimeConfig)) {
       return service.run(command, dryRun, verbose);
     }
   }

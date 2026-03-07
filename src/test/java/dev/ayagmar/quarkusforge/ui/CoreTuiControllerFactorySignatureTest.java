@@ -2,8 +2,8 @@ package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 
-import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
+import dev.ayagmar.quarkusforge.persistence.ExtensionFavoritesStore;
 import java.time.Duration;
 import java.util.concurrent.Executor;
 import org.junit.jupiter.api.Test;

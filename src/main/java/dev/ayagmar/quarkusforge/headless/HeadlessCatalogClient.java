@@ -2,13 +2,10 @@ package dev.ayagmar.quarkusforge.headless;
 
 import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogDataService;
-import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
 import dev.ayagmar.quarkusforge.archive.OverwritePolicy;
 import dev.ayagmar.quarkusforge.archive.ProjectArchiveService;
-import dev.ayagmar.quarkusforge.archive.SafeZipExtractor;
-import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -25,13 +22,18 @@ import java.util.function.Consumer;
  * single {@link QuarkusApiClient} across all calls within one generation session. Must be closed
  * after use to release transport resources.
  */
-public final class HeadlessCatalogClient implements HeadlessCatalogOperations {
-  private final RuntimeConfig runtimeConfig;
+final class HeadlessCatalogClient implements HeadlessCatalogLoader, HeadlessProjectGenerator {
   private final QuarkusApiClient apiClient;
+  private final CatalogDataService catalogDataService;
+  private final ProjectArchiveService projectArchiveService;
 
-  public HeadlessCatalogClient(RuntimeConfig runtimeConfig) {
-    this.runtimeConfig = Objects.requireNonNull(runtimeConfig);
-    this.apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
+  HeadlessCatalogClient(
+      QuarkusApiClient apiClient,
+      CatalogDataService catalogDataService,
+      ProjectArchiveService projectArchiveService) {
+    this.apiClient = Objects.requireNonNull(apiClient);
+    this.catalogDataService = Objects.requireNonNull(catalogDataService);
+    this.projectArchiveService = Objects.requireNonNull(projectArchiveService);
   }
 
   @Override
@@ -39,10 +41,9 @@ public final class HeadlessCatalogClient implements HeadlessCatalogOperations {
     apiClient.close();
   }
 
+  @Override
   public CatalogData loadCatalogData(Duration timeout)
       throws ExecutionException, InterruptedException, TimeoutException {
-    CatalogSnapshotCache snapshotCache = new CatalogSnapshotCache(runtimeConfig.catalogCacheFile());
-    CatalogDataService catalogDataService = new CatalogDataService(apiClient, snapshotCache);
     CompletableFuture<CatalogData> loadFuture = catalogDataService.load();
     try {
       return loadFuture.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
@@ -63,6 +64,7 @@ public final class HeadlessCatalogClient implements HeadlessCatalogOperations {
     }
   }
 
+  @Override
   public Map<String, List<String>> loadBuiltInPresets(String platformStream, Duration timeout)
       throws ExecutionException, InterruptedException, TimeoutException {
     CompletableFuture<Map<String, List<String>>> presetsFuture =
@@ -78,11 +80,10 @@ public final class HeadlessCatalogClient implements HeadlessCatalogOperations {
     }
   }
 
+  @Override
   public CompletableFuture<Path> startGeneration(
       GenerationRequest generationRequest, Path outputPath, Consumer<String> progressLineConsumer) {
-    ProjectArchiveService archiveService =
-        new ProjectArchiveService(apiClient, new SafeZipExtractor());
-    return archiveService.downloadAndExtract(
+    return projectArchiveService.downloadAndExtract(
         generationRequest,
         outputPath,
         OverwritePolicy.FAIL_IF_EXISTS,

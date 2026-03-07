@@ -10,9 +10,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import dev.ayagmar.quarkusforge.api.CatalogData;
+import dev.ayagmar.quarkusforge.api.CatalogDataService;
+import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
+import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
+import dev.ayagmar.quarkusforge.archive.ProjectArchiveService;
+import dev.ayagmar.quarkusforge.archive.SafeZipExtractor;
 import dev.ayagmar.quarkusforge.cli.CliCommandTestSupport;
 import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
 import java.io.ByteArrayOutputStream;
@@ -54,7 +59,7 @@ class HeadlessCatalogClientTest {
   void loadCatalogDataReturnsLiveCatalogData() throws Exception {
     stubCatalogEndpoints();
 
-    try (HeadlessCatalogClient client = new HeadlessCatalogClient(runtimeConfig())) {
+    try (HeadlessCatalogClient client = client(runtimeConfig())) {
       CatalogData catalogData = client.loadCatalogData(Duration.ofSeconds(1));
 
       assertThat(catalogData.source()).isEqualTo(CatalogSource.LIVE);
@@ -72,7 +77,7 @@ class HeadlessCatalogClientTest {
             .willReturn(aResponse().withFixedDelay(500).withStatus(200).withBody("[]")));
     CliCommandTestSupport.stubLiveMetadataWithAllBuildTools(wireMockServer);
 
-    try (HeadlessCatalogClient client = new HeadlessCatalogClient(runtimeConfig())) {
+    try (HeadlessCatalogClient client = client(runtimeConfig())) {
       assertThatThrownBy(() -> client.loadCatalogData(Duration.ofMillis(100)))
           .isInstanceOf(TimeoutException.class)
           .hasMessage("catalog load timed out after 100ms");
@@ -84,7 +89,7 @@ class HeadlessCatalogClientTest {
     stubCatalogEndpoints();
     RuntimeConfig runtimeConfig = runtimeConfig();
 
-    try (HeadlessCatalogClient warmingClient = new HeadlessCatalogClient(runtimeConfig)) {
+    try (HeadlessCatalogClient warmingClient = client(runtimeConfig)) {
       CatalogData liveData = warmingClient.loadCatalogData(Duration.ofSeconds(1));
       assertThat(liveData.source()).isEqualTo(CatalogSource.LIVE);
     }
@@ -105,7 +110,7 @@ class HeadlessCatalogClientTest {
                         """)));
     CliCommandTestSupport.stubLiveMetadataWithAllBuildTools(wireMockServer);
 
-    try (HeadlessCatalogClient client = new HeadlessCatalogClient(runtimeConfig)) {
+    try (HeadlessCatalogClient client = client(runtimeConfig)) {
       CatalogData catalogData = client.loadCatalogData(Duration.ofMillis(100));
 
       assertThat(catalogData.source()).isEqualTo(CatalogSource.CACHE);
@@ -121,7 +126,7 @@ class HeadlessCatalogClientTest {
   void loadBuiltInPresetsReturnsStreamSpecificPresets() throws Exception {
     stubCatalogEndpoints();
 
-    try (HeadlessCatalogClient client = new HeadlessCatalogClient(runtimeConfig())) {
+    try (HeadlessCatalogClient client = client(runtimeConfig())) {
       Map<String, List<String>> presets =
           client.loadBuiltInPresets("io.quarkus.platform:3.31", Duration.ofSeconds(1));
 
@@ -138,7 +143,7 @@ class HeadlessCatalogClientTest {
         get(urlPathEqualTo("/api/presets/stream/io.quarkus.platform%3A3.31"))
             .willReturn(aResponse().withFixedDelay(500).withStatus(200).withBody("[]")));
 
-    try (HeadlessCatalogClient client = new HeadlessCatalogClient(runtimeConfig())) {
+    try (HeadlessCatalogClient client = client(runtimeConfig())) {
       assertThatThrownBy(
               () -> client.loadBuiltInPresets("io.quarkus.platform:3.31", Duration.ofMillis(100)))
           .isInstanceOf(TimeoutException.class)
@@ -164,7 +169,7 @@ class HeadlessCatalogClientTest {
             List.of("io.quarkus:quarkus-rest"));
     Path outputPath = tempDir.resolve("generated-project");
 
-    try (HeadlessCatalogClient client = new HeadlessCatalogClient(runtimeConfig())) {
+    try (HeadlessCatalogClient client = client(runtimeConfig())) {
       Path generatedRoot = client.startGeneration(request, outputPath, progressLines::add).join();
 
       assertThat(generatedRoot).isEqualTo(outputPath);
@@ -177,6 +182,15 @@ class HeadlessCatalogClientTest {
 
   private RuntimeConfig runtimeConfig() {
     return CliCommandTestSupport.runtimeConfig(tempDir, URI.create(wireMockServer.baseUrl()));
+  }
+
+  private static HeadlessCatalogClient client(RuntimeConfig runtimeConfig) {
+    QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
+    return new HeadlessCatalogClient(
+        apiClient,
+        new CatalogDataService(
+            apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile())),
+        new ProjectArchiveService(apiClient, new SafeZipExtractor()));
   }
 
   private void stubCatalogEndpoints() {

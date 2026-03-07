@@ -3,7 +3,7 @@ package dev.ayagmar.quarkusforge.ui;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import dev.ayagmar.quarkusforge.api.ExtensionFavoritesStore;
+import dev.ayagmar.quarkusforge.persistence.ExtensionFavoritesStore;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
