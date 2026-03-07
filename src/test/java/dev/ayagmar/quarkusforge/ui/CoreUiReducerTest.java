@@ -493,6 +493,54 @@ class CoreUiReducerTest {
   }
 
   @Test
+  void extensionPanelFocusIntentClearsValidationBlockThroughReducerState() {
+    UiState blockedState =
+        invalidConfiguredState()
+            .withSubmissionState(
+                "Submit blocked", "groupId: must not be blank", "verbose", true, true, false, true);
+
+    ReduceResult result =
+        reducer.reduce(
+            blockedState, new UiIntent.ExtensionPanelFocusIntent(FocusTarget.EXTENSION_SEARCH));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects()).isEmpty();
+    assertThat(result.nextState().focusTarget()).isEqualTo(FocusTarget.EXTENSION_SEARCH);
+    assertThat(result.nextState().statusMessage()).isEqualTo("Focus moved to extensionSearch");
+    assertThat(result.nextState().errorMessage()).isEmpty();
+    assertThat(result.nextState().showErrorDetails()).isFalse();
+    assertThat(result.nextState().submitBlockedByValidation()).isFalse();
+    assertThat(result.nextState().verboseErrorDetails()).isEqualTo("verbose");
+  }
+
+  @Test
+  void extensionPanelFocusIntentPreservesTargetConflictStateWhileClearingVisibleError() {
+    UiState blockedState =
+        baseState()
+            .withSubmissionState(
+                "Submit blocked",
+                "Output directory already exists",
+                "verbose",
+                true,
+                false,
+                true,
+                true);
+
+    ReduceResult result =
+        reducer.reduce(
+            blockedState, new UiIntent.ExtensionPanelFocusIntent(FocusTarget.EXTENSION_LIST));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects()).isEmpty();
+    assertThat(result.nextState().focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
+    assertThat(result.nextState().statusMessage()).isEqualTo("Focus moved to extensionList");
+    assertThat(result.nextState().errorMessage()).isEmpty();
+    assertThat(result.nextState().showErrorDetails()).isFalse();
+    assertThat(result.nextState().submitBlockedByTargetConflict()).isTrue();
+    assertThat(result.nextState().verboseErrorDetails()).isEqualTo("verbose");
+  }
+
+  @Test
   void unrelatedIntentReturnsIgnoredWithoutEffects() {
     ReduceResult result =
         reducer.reduce(

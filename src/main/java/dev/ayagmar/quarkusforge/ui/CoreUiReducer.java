@@ -157,6 +157,8 @@ final class CoreUiReducer implements UiReducer {
                   false),
               List.of(),
               UiAction.handled(false));
+      case UiIntent.ExtensionPanelFocusIntent focusIntent ->
+          reduceExtensionPanelFocus(state, focusIntent.focusTarget());
       case UiIntent.FocusNavigationIntent navigationIntent ->
           reduceFocusNavigation(state, navigationIntent.keyEvent(), navigationIntent.focusTarget());
       case UiIntent.MetadataInputIntent metadataIntent ->
@@ -324,6 +326,17 @@ final class CoreUiReducer implements UiReducer {
       }
     }
     return new ReduceResult(state, List.of(), UiAction.ignored());
+  }
+
+  private static ReduceResult reduceExtensionPanelFocus(UiState state, FocusTarget focusTarget) {
+    if (focusTarget != FocusTarget.EXTENSION_SEARCH && focusTarget != FocusTarget.EXTENSION_LIST) {
+      return new ReduceResult(state, List.of(), UiAction.ignored());
+    }
+    return new ReduceResult(
+        state.withFocusAndValidationFeedback(
+            focusTarget, "Focus moved to " + UiFocusTargets.nameOf(focusTarget)),
+        List.of(),
+        UiAction.handled(false));
   }
 
   private static ReduceResult moveFocus(UiState state, FocusTarget focusTarget, int offset) {

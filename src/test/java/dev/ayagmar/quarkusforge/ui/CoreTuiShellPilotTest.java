@@ -417,6 +417,28 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void extensionFocusShortcutsClearBlockedSubmitFeedback() {
+    CoreTuiController controller = UiControllerTestHarness.controller();
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.ARTIFACT_ID);
+
+    controller.onEvent(KeyEvent.ofChar('X'));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+    assertThat(controller.uiState().submitBlockedByValidation()).isTrue();
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("Error:");
+
+    controller.onEvent(KeyEvent.ofChar('f', KeyModifiers.CTRL));
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_SEARCH);
+    assertThat(controller.uiState().submitBlockedByValidation()).isFalse();
+    assertThat(controller.statusMessage()).contains("Focus moved to extensionSearch");
+    assertThat(UiControllerTestHarness.renderToString(controller)).doesNotContain("Error:");
+
+    controller.onEvent(KeyEvent.ofChar('l', KeyModifiers.CTRL));
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
+    assertThat(controller.statusMessage()).contains("Focus moved to extensionList");
+    assertThat(UiControllerTestHarness.renderToString(controller)).doesNotContain("Error:");
+  }
+
+  @Test
   void submitFocusSupportsVimJkTraversal() {
     CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.SUBMIT);
