@@ -157,6 +157,10 @@ final class CoreUiReducer implements UiReducer {
                   false),
               List.of(),
               UiAction.handled(false));
+      case UiIntent.CommandPaletteIntent commandPaletteIntent ->
+          reduceCommandPalette(state, commandPaletteIntent.command());
+      case UiIntent.HelpOverlayIntent helpOverlayIntent ->
+          reduceHelpOverlay(state, helpOverlayIntent.command());
       case UiIntent.ExtensionPanelFocusIntent focusIntent ->
           reduceExtensionPanelFocus(state, focusIntent.focusTarget());
       case UiIntent.FocusNavigationIntent navigationIntent ->
@@ -309,6 +313,140 @@ final class CoreUiReducer implements UiReducer {
     return new ReduceResult(state, List.of(), UiAction.ignored());
   }
 
+  private static ReduceResult reduceCommandPalette(
+      UiState state, UiIntent.CommandPaletteCommand command) {
+    return switch (command) {
+      case UiIntent.CommandPaletteCommand.ToggleVisibility _ -> {
+        if (state.overlays().commandPaletteVisible()) {
+          yield new ReduceResult(
+              closeCommandPalette(state, "Command palette closed"),
+              List.of(),
+              UiAction.handled(false));
+        }
+        if (state.overlays().generationVisible()) {
+          yield new ReduceResult(
+              state.withStatusAndError(
+                  "Generation in progress. Press Esc to cancel.", state.errorMessage()),
+              List.of(),
+              UiAction.handled(false));
+        }
+        if (state.overlays().postGenerationVisible()) {
+          yield new ReduceResult(
+              state.withStatusAndError("Post-generation actions are open.", state.errorMessage()),
+              List.of(),
+              UiAction.handled(false));
+        }
+        yield new ReduceResult(
+            state.withOverlayState(true, false, 0, "Command palette opened"),
+            List.of(),
+            UiAction.handled(false));
+      }
+      case UiIntent.CommandPaletteCommand.Dismiss _ -> {
+        if (!state.overlays().commandPaletteVisible()) {
+          yield new ReduceResult(state, List.of(), UiAction.ignored());
+        }
+        yield new ReduceResult(
+            closeCommandPalette(state, "Command palette closed"),
+            List.of(),
+            UiAction.handled(false));
+      }
+      case UiIntent.CommandPaletteCommand.MoveSelection moveSelection -> {
+        if (!state.overlays().commandPaletteVisible()) {
+          yield new ReduceResult(state, List.of(), UiAction.ignored());
+        }
+        int size = UiTextConstants.COMMAND_PALETTE_ENTRIES.size();
+        int nextSelection =
+            size == 0
+                ? state.commandPaletteSelection()
+                : Math.floorMod(state.commandPaletteSelection() + moveSelection.delta(), size);
+        yield new ReduceResult(
+            state.withOverlayState(
+                true, state.overlays().helpOverlayVisible(), nextSelection, state.statusMessage()),
+            List.of(),
+            UiAction.handled(false));
+      }
+      case UiIntent.CommandPaletteCommand.JumpHome _ -> {
+        if (!state.overlays().commandPaletteVisible()) {
+          yield new ReduceResult(state, List.of(), UiAction.ignored());
+        }
+        yield new ReduceResult(
+            state.withOverlayState(
+                true, state.overlays().helpOverlayVisible(), 0, state.statusMessage()),
+            List.of(),
+            UiAction.handled(false));
+      }
+      case UiIntent.CommandPaletteCommand.JumpEnd _ -> {
+        if (!state.overlays().commandPaletteVisible()) {
+          yield new ReduceResult(state, List.of(), UiAction.ignored());
+        }
+        int lastSelection = Math.max(UiTextConstants.COMMAND_PALETTE_ENTRIES.size() - 1, 0);
+        yield new ReduceResult(
+            state.withOverlayState(
+                true, state.overlays().helpOverlayVisible(), lastSelection, state.statusMessage()),
+            List.of(),
+            UiAction.handled(false));
+      }
+      case UiIntent.CommandPaletteCommand.SelectIndex selectIndex -> {
+        if (!state.overlays().commandPaletteVisible()) {
+          yield new ReduceResult(state, List.of(), UiAction.ignored());
+        }
+        int nextSelection =
+            selectIndex.index() >= 0
+                    && selectIndex.index() < UiTextConstants.COMMAND_PALETTE_ENTRIES.size()
+                ? selectIndex.index()
+                : state.commandPaletteSelection();
+        yield new ReduceResult(
+            state.withOverlayState(
+                true, state.overlays().helpOverlayVisible(), nextSelection, state.statusMessage()),
+            List.of(),
+            UiAction.handled(false));
+      }
+      case UiIntent.CommandPaletteCommand.ConfirmSelection _ -> {
+        if (!state.overlays().commandPaletteVisible()) {
+          yield new ReduceResult(state, List.of(), UiAction.ignored());
+        }
+        yield new ReduceResult(
+            closeCommandPalette(state, state.statusMessage()), List.of(), UiAction.handled(false));
+      }
+    };
+  }
+
+  private static ReduceResult reduceHelpOverlay(
+      UiState state, UiIntent.HelpOverlayCommand command) {
+    return switch (command) {
+      case UiIntent.HelpOverlayCommand.ToggleVisibility _ -> {
+        if (state.overlays().helpOverlayVisible()) {
+          yield new ReduceResult(
+              closeHelpOverlay(state, "Help closed"), List.of(), UiAction.handled(false));
+        }
+        if (state.overlays().generationVisible()) {
+          yield new ReduceResult(
+              state.withStatusAndError(
+                  "Generation in progress. Press Esc to cancel.", state.errorMessage()),
+              List.of(),
+              UiAction.handled(false));
+        }
+        if (state.overlays().postGenerationVisible()) {
+          yield new ReduceResult(
+              state.withStatusAndError("Post-generation actions are open.", state.errorMessage()),
+              List.of(),
+              UiAction.handled(false));
+        }
+        yield new ReduceResult(
+            state.withOverlayState(false, true, state.commandPaletteSelection(), "Help opened"),
+            List.of(),
+            UiAction.handled(false));
+      }
+      case UiIntent.HelpOverlayCommand.Dismiss _ -> {
+        if (!state.overlays().helpOverlayVisible()) {
+          yield new ReduceResult(state, List.of(), UiAction.ignored());
+        }
+        yield new ReduceResult(
+            closeHelpOverlay(state, "Help closed"), List.of(), UiAction.handled(false));
+      }
+    };
+  }
+
   private static ReduceResult reduceFocusNavigation(
       UiState state, KeyEvent keyEvent, FocusTarget focusTarget) {
     if (keyEvent.isFocusPrevious()) {
@@ -346,6 +484,22 @@ final class CoreUiReducer implements UiReducer {
             nextFocusTarget, "Focus moved to " + UiFocusTargets.nameOf(nextFocusTarget)),
         List.of(),
         UiAction.handled(false));
+  }
+
+  private static UiState closeCommandPalette(UiState state, String nextStatusMessage) {
+    return state.withOverlayState(
+        false,
+        state.overlays().helpOverlayVisible(),
+        state.commandPaletteSelection(),
+        nextStatusMessage);
+  }
+
+  private static UiState closeHelpOverlay(UiState state, String nextStatusMessage) {
+    return state.withOverlayState(
+        state.overlays().commandPaletteVisible(),
+        false,
+        state.commandPaletteSelection(),
+        nextStatusMessage);
   }
 
   private static ReduceResult reduceMetadataInput(

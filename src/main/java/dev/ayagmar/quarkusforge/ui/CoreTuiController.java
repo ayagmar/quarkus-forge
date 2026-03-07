@@ -990,30 +990,35 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
       return UiAction.handled(true);
     }
     if (keyEvent.isCancel()) {
-      closeCommandPalette();
-      statusMessage = "Command palette closed";
-      return UiAction.handled(false);
+      return routeIntent(
+          new UiIntent.CommandPaletteIntent(new UiIntent.CommandPaletteCommand.Dismiss()));
     }
     if (keyEvent.isUp() || UiKeyMatchers.isVimUpKey(keyEvent)) {
-      moveCommandPaletteSelection(-1);
+      dispatchIntent(
+          new UiIntent.CommandPaletteIntent(new UiIntent.CommandPaletteCommand.MoveSelection(-1)));
       return UiAction.handled(false);
     }
     if (keyEvent.isDown() || UiKeyMatchers.isVimDownKey(keyEvent)) {
-      moveCommandPaletteSelection(1);
+      dispatchIntent(
+          new UiIntent.CommandPaletteIntent(new UiIntent.CommandPaletteCommand.MoveSelection(1)));
       return UiAction.handled(false);
     }
     if (keyEvent.isHome()) {
-      commandPaletteSelection = 0;
+      dispatchIntent(
+          new UiIntent.CommandPaletteIntent(new UiIntent.CommandPaletteCommand.JumpHome()));
       return UiAction.handled(false);
     }
     if (keyEvent.isEnd()) {
-      commandPaletteSelection = UiTextConstants.COMMAND_PALETTE_ENTRIES.size() - 1;
+      dispatchIntent(
+          new UiIntent.CommandPaletteIntent(new UiIntent.CommandPaletteCommand.JumpEnd()));
       return UiAction.handled(false);
     }
     if (UiKeyMatchers.isDigitKey(keyEvent)) {
       int selected = Character.digit(keyEvent.character(), 10) - 1;
       if (selected >= 0 && selected < UiTextConstants.COMMAND_PALETTE_ENTRIES.size()) {
-        commandPaletteSelection = selected;
+        dispatchIntent(
+            new UiIntent.CommandPaletteIntent(
+                new UiIntent.CommandPaletteCommand.SelectIndex(selected)));
         executeCommandPaletteSelection();
       }
       return UiAction.handled(false);
@@ -1045,6 +1050,9 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     submitBlockedByTargetConflict = reducedState.submitBlockedByTargetConflict();
     catalogLoadState = reducedState.catalogLoad().state();
     startupOverlayVisible = reducedState.startupOverlay().visible();
+    commandPaletteVisible = reducedState.overlays().commandPaletteVisible();
+    helpOverlayVisible = reducedState.overlays().helpOverlayVisible();
+    commandPaletteSelection = reducedState.commandPaletteSelection();
     postGenerationMenu.apply(reducedState.postGeneration());
   }
 
@@ -1096,22 +1104,16 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     }
   }
 
-  private void moveCommandPaletteSelection(int delta) {
-    int size = UiTextConstants.COMMAND_PALETTE_ENTRIES.size();
-    if (size == 0) {
-      return;
-    }
-    commandPaletteSelection = Math.floorMod(commandPaletteSelection + delta, size);
-  }
-
   private void executeCommandPaletteSelection() {
     if (UiTextConstants.COMMAND_PALETTE_ENTRIES.isEmpty()) {
-      closeCommandPalette();
+      dispatchIntent(
+          new UiIntent.CommandPaletteIntent(new UiIntent.CommandPaletteCommand.ConfirmSelection()));
       return;
     }
     CommandPaletteAction action =
         UiTextConstants.COMMAND_PALETTE_ENTRIES.get(commandPaletteSelection).action();
-    closeCommandPalette();
+    dispatchIntent(
+        new UiIntent.CommandPaletteIntent(new UiIntent.CommandPaletteCommand.ConfirmSelection()));
     executeCommandPaletteAction(action);
   }
 
@@ -1148,27 +1150,8 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   @Override
   public void toggleCommandPalette() {
-    if (commandPaletteVisible) {
-      closeCommandPalette();
-      statusMessage = "Command palette closed";
-      return;
-    }
-    if (isGenerationInProgress()) {
-      statusMessage = "Generation in progress. Press Esc to cancel.";
-      return;
-    }
-    if (postGenerationMenu.isVisible()) {
-      statusMessage = "Post-generation actions are open.";
-      return;
-    }
-    closeHelpOverlay();
-    commandPaletteVisible = true;
-    commandPaletteSelection = 0;
-    statusMessage = "Command palette opened";
-  }
-
-  private void closeCommandPalette() {
-    commandPaletteVisible = false;
+    dispatchIntent(
+        new UiIntent.CommandPaletteIntent(new UiIntent.CommandPaletteCommand.ToggleVisibility()));
   }
 
   @Override
@@ -1181,12 +1164,9 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
       return UiAction.handled(true);
     }
     if (keyEvent.isCancel() || AppKeyActions.isHelpOverlayToggleKey(keyEvent)) {
-      closeHelpOverlay();
-      statusMessage = "Help closed";
-      return UiAction.handled(false);
+      return routeIntent(new UiIntent.HelpOverlayIntent(new UiIntent.HelpOverlayCommand.Dismiss()));
     }
     if (isCommandPaletteToggleKey(keyEvent)) {
-      closeHelpOverlay();
       toggleCommandPalette();
       return UiAction.handled(false);
     }
@@ -1195,26 +1175,8 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   @Override
   public void toggleHelpOverlay() {
-    if (helpOverlayVisible) {
-      closeHelpOverlay();
-      statusMessage = "Help closed";
-      return;
-    }
-    if (isGenerationInProgress()) {
-      statusMessage = "Generation in progress. Press Esc to cancel.";
-      return;
-    }
-    if (postGenerationMenu.isVisible()) {
-      statusMessage = "Post-generation actions are open.";
-      return;
-    }
-    closeCommandPalette();
-    helpOverlayVisible = true;
-    statusMessage = "Help opened";
-  }
-
-  private void closeHelpOverlay() {
-    helpOverlayVisible = false;
+    dispatchIntent(
+        new UiIntent.HelpOverlayIntent(new UiIntent.HelpOverlayCommand.ToggleVisibility()));
   }
 
   private boolean isMetadataFocused() {

@@ -392,6 +392,123 @@ class CoreUiReducerTest {
   }
 
   @Test
+  void commandPaletteToggleOpensAndClosesOverlaysThroughReducerState() {
+    UiState helpVisibleState =
+        stateWithOverlayState(
+            baseState(), new UiState.OverlayState(false, false, true, false, false), 3, "Ready");
+
+    ReduceResult openResult =
+        reducer.reduce(
+            helpVisibleState,
+            new UiIntent.CommandPaletteIntent(
+                new UiIntent.CommandPaletteCommand.ToggleVisibility()));
+
+    assertThat(openResult.action()).isEqualTo(UiAction.handled(false));
+    assertThat(openResult.effects()).isEmpty();
+    assertThat(openResult.nextState().overlays().commandPaletteVisible()).isTrue();
+    assertThat(openResult.nextState().overlays().helpOverlayVisible()).isFalse();
+    assertThat(openResult.nextState().commandPaletteSelection()).isZero();
+    assertThat(openResult.nextState().statusMessage()).isEqualTo("Command palette opened");
+
+    ReduceResult closeResult =
+        reducer.reduce(
+            openResult.nextState(),
+            new UiIntent.CommandPaletteIntent(
+                new UiIntent.CommandPaletteCommand.ToggleVisibility()));
+
+    assertThat(closeResult.nextState().overlays().commandPaletteVisible()).isFalse();
+    assertThat(closeResult.nextState().statusMessage()).isEqualTo("Command palette closed");
+  }
+
+  @Test
+  void commandPaletteSelectionCommandsStayReducerOwned() {
+    UiState paletteState =
+        stateWithOverlayState(
+            baseState(), new UiState.OverlayState(false, true, false, false, false), 0, "Ready");
+
+    ReduceResult moveResult =
+        reducer.reduce(
+            paletteState,
+            new UiIntent.CommandPaletteIntent(
+                new UiIntent.CommandPaletteCommand.MoveSelection(-1)));
+
+    assertThat(moveResult.nextState().commandPaletteSelection())
+        .isEqualTo(UiTextConstants.COMMAND_PALETTE_ENTRIES.size() - 1);
+
+    ReduceResult confirmResult =
+        reducer.reduce(
+            moveResult.nextState(),
+            new UiIntent.CommandPaletteIntent(
+                new UiIntent.CommandPaletteCommand.ConfirmSelection()));
+
+    assertThat(confirmResult.nextState().overlays().commandPaletteVisible()).isFalse();
+    assertThat(confirmResult.nextState().commandPaletteSelection())
+        .isEqualTo(UiTextConstants.COMMAND_PALETTE_ENTRIES.size() - 1);
+    assertThat(confirmResult.nextState().statusMessage()).isEqualTo("Ready");
+  }
+
+  @Test
+  void commandPaletteToggleUsesReducerStateForBlockedMessages() {
+    UiState generationVisibleState =
+        stateWithOverlayState(
+            baseState(), new UiState.OverlayState(true, false, false, false, false), 0, "Ready");
+
+    ReduceResult result =
+        reducer.reduce(
+            generationVisibleState,
+            new UiIntent.CommandPaletteIntent(
+                new UiIntent.CommandPaletteCommand.ToggleVisibility()));
+
+    assertThat(result.nextState().overlays().commandPaletteVisible()).isFalse();
+    assertThat(result.nextState().statusMessage())
+        .isEqualTo("Generation in progress. Press Esc to cancel.");
+  }
+
+  @Test
+  void helpOverlayToggleOpensAndClosesOverlaysThroughReducerState() {
+    UiState paletteVisibleState =
+        stateWithOverlayState(
+            baseState(), new UiState.OverlayState(false, true, false, false, false), 4, "Ready");
+
+    ReduceResult openResult =
+        reducer.reduce(
+            paletteVisibleState,
+            new UiIntent.HelpOverlayIntent(new UiIntent.HelpOverlayCommand.ToggleVisibility()));
+
+    assertThat(openResult.action()).isEqualTo(UiAction.handled(false));
+    assertThat(openResult.nextState().overlays().helpOverlayVisible()).isTrue();
+    assertThat(openResult.nextState().overlays().commandPaletteVisible()).isFalse();
+    assertThat(openResult.nextState().commandPaletteSelection()).isEqualTo(4);
+    assertThat(openResult.nextState().statusMessage()).isEqualTo("Help opened");
+
+    ReduceResult dismissResult =
+        reducer.reduce(
+            openResult.nextState(),
+            new UiIntent.HelpOverlayIntent(new UiIntent.HelpOverlayCommand.Dismiss()));
+
+    assertThat(dismissResult.nextState().overlays().helpOverlayVisible()).isFalse();
+    assertThat(dismissResult.nextState().statusMessage()).isEqualTo("Help closed");
+  }
+
+  @Test
+  void helpOverlayToggleUsesReducerStateForBlockedMessages() {
+    UiState postGenerationVisibleState =
+        stateWithOverlayState(
+            postGenerationVisibleState(),
+            new UiState.OverlayState(false, false, false, true, false),
+            0,
+            "Ready");
+
+    ReduceResult result =
+        reducer.reduce(
+            postGenerationVisibleState,
+            new UiIntent.HelpOverlayIntent(new UiIntent.HelpOverlayCommand.ToggleVisibility()));
+
+    assertThat(result.nextState().overlays().helpOverlayVisible()).isFalse();
+    assertThat(result.nextState().statusMessage()).isEqualTo("Post-generation actions are open.");
+  }
+
+  @Test
   void metadataIntentIsIgnoredWhenSelectorHasNoOptions() {
     UiState currentState = baseState();
     UiState noOptionsState =
@@ -652,5 +769,33 @@ class CoreUiReducerTest {
             Path.of("/tmp/demo"),
             "mvn quarkus:dev",
             null));
+  }
+
+  private static UiState stateWithOverlayState(
+      UiState state,
+      UiState.OverlayState overlays,
+      int commandPaletteSelection,
+      String statusMessage) {
+    return new UiState(
+        state.request(),
+        state.validation(),
+        state.focusTarget(),
+        statusMessage,
+        state.errorMessage(),
+        state.verboseErrorDetails(),
+        state.showErrorDetails(),
+        state.submitRequested(),
+        state.submitBlockedByValidation(),
+        state.submitBlockedByTargetConflict(),
+        commandPaletteSelection,
+        state.metadataPanel(),
+        state.extensionsPanel(),
+        state.footer(),
+        overlays,
+        state.generation(),
+        state.catalogLoad(),
+        state.postGeneration(),
+        state.startupOverlay(),
+        state.extensions());
   }
 }

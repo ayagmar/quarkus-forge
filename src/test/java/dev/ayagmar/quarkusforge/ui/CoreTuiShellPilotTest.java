@@ -366,6 +366,32 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void ctrlPFromHelpOverlaySwapsToCommandPalette() {
+    CoreTuiController controller = UiControllerTestHarness.controller();
+
+    controller.onEvent(KeyEvent.ofChar('?'));
+    controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
+
+    assertThat(controller.helpOverlayVisible()).isFalse();
+    assertThat(controller.commandPaletteVisible()).isTrue();
+    assertThat(UiControllerTestHarness.renderToString(controller))
+        .contains("Command Palette [focus]");
+  }
+
+  @Test
+  void questionMarkFromCommandPaletteSwapsToHelpOverlay() {
+    CoreTuiController controller = UiControllerTestHarness.controller();
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.SUBMIT);
+
+    controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
+    controller.onEvent(KeyEvent.ofChar('?'));
+
+    assertThat(controller.commandPaletteVisible()).isFalse();
+    assertThat(controller.helpOverlayVisible()).isTrue();
+    assertThat(UiControllerTestHarness.renderToString(controller)).contains("Help [focus]");
+  }
+
+  @Test
   void commandPaletteRunsSelectedAction() {
     CoreTuiController controller = UiControllerTestHarness.controller();
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
