@@ -270,6 +270,10 @@ The codebase is organized into focused modules that follow SOLID principles and 
 - **`MetadataCompatibilityContext`** — Enforces metadata-driven compatibility constraints (build tool ↔ Java version).
 - **`CliPrefillMapper`** — Maps CLI options to validated project requests.
 
+### Persistence Layer (`persistence/`)
+- **`UserPreferencesStore`** — Persists the last successful request used to prefill the next TUI session.
+- **`ExtensionFavoritesStore`** — Owns favorites/recents storage for TUI filters and headless `favorites` preset expansion.
+
 ### UI Layer (`ui/`)
 - **`CoreTuiController`** — TUI orchestration shell and callback sink, rendering from immutable state snapshots.
 - **`CatalogLoadCoordinator`** / **`GenerationFlowCoordinator`** — Dedicated async workflow coordinators for catalog loading and generation.
@@ -282,6 +286,7 @@ The codebase is organized into focused modules that follow SOLID principles and 
 - **`BodyPanelRenderer`** / **`FooterLinesComposer`** — Layout rendering helpers.
 
 ### Runtime Layer (`runtime/`)
+- **`RuntimeWiring`** — Central composition owner for persistence-backed stores, headless generation wiring, and shared API/archive service assembly.
 - **`TuiBootstrapService`** — Runtime wiring for TUI startup, catalog bootstrap, Tamboui backend preference, and session execution.
 - **`TuiSessionSummary`** — Immutable summary of the final request and post-generation exit plan.
 
@@ -296,9 +301,9 @@ The codebase is organized into focused modules that follow SOLID principles and 
 - **`ExitCodes`** — Central exit code constants shared by both entry points.
 
 ### Headless Layer (`headless/`)
-- **`HeadlessGenerationService`** — Decoupled headless generation engine for CI/scripting, resolving Forgefiles through `InputResolutionService`.
+- **`HeadlessGenerationService`** — Decoupled headless generation engine for CI/scripting, resolving Forgefiles through `InputResolutionService` and narrow catalog/generation/favorites collaborators.
 - **`AsyncFailureHandler`** — Headless boundary adapter for consistent exit codes, diagnostics, and user-facing messages.
-- **`HeadlessCatalogClient`** — Timeout-aware catalog and preset loading plus archive generation orchestration.
+- **`HeadlessCatalogClient`** — Internal timeout-aware adapter that fronts catalog, preset, and archive services for one headless session.
 - **`HeadlessOutputPrinter`** — Text-mode summaries and validation/error output.
 
 Shared timeout/cancellation/failure classification is provided by `dev.ayagmar.quarkusforge.diagnostics.BoundaryFailure` and reused by headless and runtime code.

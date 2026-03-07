@@ -16,11 +16,13 @@ graph TD
     end
 
     subgraph Runtime["Runtime Layer (runtime/)"]
+        RW[RuntimeWiring]
         TBS[TuiBootstrapService]
     end
 
     subgraph Persistence["Persistence Layer (persistence/)"]
         UPS[UserPreferencesStore]
+        EFS[ExtensionFavoritesStore]
     end
 
     subgraph TUI["UI Layer (ui/)"]
@@ -61,14 +63,17 @@ graph TD
         ID[IdeDetector]
     end
 
+    CLI --> RW
     CLI --> TBS
-    CLI --> UPS
-    CLI --> HGS
-    HCLI --> HGS
+    HCLI --> RW
+    RW --> UPS
+    RW --> EFS
+    RW --> HGS
     HGS --> HCC
     HGS --> HOP
     HGS --> HT
     HGS --> IRS
+    HGS --> EFS
     TBS --> CTC
     CTC --> QAC
     CTC --> FFS
@@ -83,6 +88,8 @@ graph TD
     PTA --> ID
 </pre>
 ++++
+
+`RuntimeWiring` is the single composition owner for persistence-backed stores plus shared API and archive services. Headless orchestration now resolves favorites through `persistence` and depends on a catalog loader plus project generator rather than pulling `RuntimeConfig` into `HeadlessGenerationService`.
 
 == UI Layer Design
 
@@ -147,7 +154,7 @@ CoreTuiController (Orchestration Shell)
             └── UiTextInputKeys              Text-input edit-key normalization
 ....
 
-Reducer-visible UI semantics now follow a strict ownership split: `CoreTuiController` synchronizes the current request, validation, generation progress, startup overlay lines, and extension-filter read model onto `reducerState` before each reduce/render pass; `UiStateSnapshotMapper` no longer rebuilds those slices and only adds render-only panel/footer snapshots plus the effective status line. Mutable widget internals such as `TextInputState` and `ListState` stay in adapter/runtime context rather than `UiState`.
+Reducer-visible UI semantics are now converged for form and extension read-model state. `ProjectRequest`, `ValidationReport`, and extension search/filter/read-model summaries update through reducer intents/effects and live in reducer-owned `UiState`, while generation progress and startup overlay lines are still synchronized from controller-owned runtime collaborators before render. `UiStateSnapshotMapper` only adds render-only panel/footer snapshots plus the effective status line. Mutable widget internals such as `TextInputState` and `ListState` stay in adapter/runtime context rather than `UiState`.
 
 === State Machine: Generation Flow
 
@@ -237,6 +244,29 @@ The UI refactor to explicit `UiState`/`UiIntent`/`UiReducer`/`UiEffect` must pre
 * State updates follow single-writer discipline: reducer transitions execute on the render thread.
 * TUI refactor cannot change headless behavior or CLI semantics.
 
+== Maintainer Checklists
+
+Before merging architecture-sensitive changes, re-check the contracts below instead of relying on local intuition:
+
+=== Routing And Overlay Changes
+
+* Preserve `UiEventRouter` precedence: help, command palette, post-generation menu, extension cancel, quit, loading lock, global shortcuts, focus navigation, submit, extension flow, metadata selectors, text input.
+* Keep `Esc` unwind order stable for extensions: search query, favorites-only, selected-only, preset filter, category filter, search-to-list focus shift, then quit.
+* Re-run the focused routing/state suites before changing key handling or overlay visibility behavior.
+
+=== Reducer / Effects Changes
+
+* Keep reducer state pure and immutable; push imperative work through `UiEffect` handling.
+* Route follow-up semantic state changes back through `UiIntent` instead of mutating `reducerState` directly from callbacks or helper methods.
+* Keep mutable widget internals (`TextInputState`, `ListState`, terminal handles) outside `UiState`.
+* If a change touches form authority, keep `ProjectRequest` and `ValidationReport` synchronized through reducer-owned state.
+
+=== Native Release Changes
+
+* Preserve CI native-size gating in `.github/workflows/ci.yml` for both `headless-native` and full `native`.
+* Update `scripts/CheckNativeSize.java` tests when native report parsing or summary output changes, especially for malformed reports and size-budget failures.
+* Re-run the documented serial verification commands before merging native/release workflow changes.
+
 === Extension Cancel Flow (Esc Priority Chain)
 
 When the user presses `Esc` in the extension search or list, the TUI unwinds filters in priority order:
@@ -265,8 +295,13 @@ When the user presses `Esc` in the extension search or list, the TUI unwinds fil
 
 Headless/TUI boundaries are protected by ArchUnit tests to prevent dependency drift:
 
+* Headless classes must not depend on `dev.ayagmar.quarkusforge.runtime.*`.
 * Headless orchestration classes must not depend on `dev.ayagmar.quarkusforge.ui.*`.
 * Headless orchestration classes must not depend on `dev.tamboui.*`.
+* CLI classes must not depend directly on `dev.ayagmar.quarkusforge.persistence.*`.
+* UI classes must not depend on `cli`, `headless`, or `runtime`.
+* Post-generation classes must not depend on `cli`, `headless`, or `persistence`.
+* Persistence classes must not depend on `cli`, `headless`, `runtime`, `ui`, or `postgen`.
 * Core non-UI layers (`application`, `api`, `archive`, `diagnostics`, `domain`, `forge`, `headless`, `persistence`, `util`) must not depend on `ui`.
 
 See xref:reference/headless-maintenance.adoc[Headless Maintenance Guardrails].
@@ -395,7 +430,7 @@ graph TD
 | `QuarkusApiClient` implements `AutoCloseable`; all instantiation sites use try-with-resources or `whenComplete` callbacks to prevent thread pool leaks.
 
 | *Atomic Persistence*
-| `FileBackedExtensionFavoritesStore.saveAll()` writes both favorites and recents in a single file operation, preventing data loss from split read-modify-write.
+| `persistence.FileBackedExtensionFavoritesStore.saveAll()` writes both favorites and recents in a single file operation, preventing data loss from split read-modify-write.
 |===
 
 == Testing Strategy
