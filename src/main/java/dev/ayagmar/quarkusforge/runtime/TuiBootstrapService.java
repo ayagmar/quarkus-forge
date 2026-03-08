@@ -3,11 +3,8 @@ package dev.ayagmar.quarkusforge.runtime;
 import static dev.ayagmar.quarkusforge.diagnostics.DiagnosticField.of;
 
 import dev.ayagmar.quarkusforge.api.CatalogData;
-import dev.ayagmar.quarkusforge.api.CatalogDataService;
 import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
-import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
 import dev.ayagmar.quarkusforge.archive.OverwritePolicy;
-import dev.ayagmar.quarkusforge.archive.ProjectArchiveService;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
 import dev.ayagmar.quarkusforge.persistence.ExtensionFavoritesStore;
@@ -87,11 +84,10 @@ public final class TuiBootstrapService {
 
   public static void runHeadlessSmoke(RuntimeConfig runtimeConfig, DiagnosticLogger diagnostics) {
     diagnostics.info("tui.session.start", of("smokeMode", true), of("mode", "headless-smoke"));
-    try (QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri())) {
-      CatalogDataService catalogDataService =
-          RuntimeWiring.catalogDataService(apiClient, runtimeConfig);
+    try (RuntimeServices runtimeServices = RuntimeServices.open(runtimeConfig)) {
       diagnostics.info("catalog.load.start", of("mode", "headless-smoke"));
-      catalogDataService
+      runtimeServices
+          .catalogDataService()
           .load()
           .handle(CatalogLoadDiagnostics.catalogLoadDiagnostics(diagnostics, "headless-smoke"))
           .join();
@@ -108,25 +104,13 @@ public final class TuiBootstrapService {
       configureTerminalBackendPreference();
       TuiConfig tuiConfig = appTuiConfig();
       try (var tui = TuiRunner.create(tuiConfig);
-          QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri())) {
-        CatalogDataService catalogDataService =
-            RuntimeWiring.catalogDataService(apiClient, runtimeConfig);
+          RuntimeServices runtimeServices = RuntimeServices.open(runtimeConfig)) {
         runInteractiveSmokeSession(
             initialState,
             diagnostics,
-            new CatalogLoader() {
-              @Override
-              public CompletableFuture<CatalogData> load() {
-                return catalogDataService.load();
-              }
-
-              @Override
-              public CompletableFuture<CatalogData> loadForStartup() {
-                return catalogDataService.loadForStartup();
-              }
-            },
-            apiClient::fetchPresets,
-            RuntimeWiring.favoritesStore(runtimeConfig),
+            catalogLoader(runtimeServices),
+            runtimeServices.apiClient()::fetchPresets,
+            runtimeServices.favoritesStore(),
             UiScheduler.fromScheduledExecutor(tui.scheduler(), tui::runOnRenderThread),
             IdeDetector.detect(),
             (controller, sessionDiagnostics) -> {
@@ -177,44 +161,32 @@ public final class TuiBootstrapService {
       configureTerminalBackendPreference();
       TuiConfig tuiConfig = appTuiConfig();
       try (var tui = TuiRunner.create(tuiConfig);
-          QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri())) {
-        CatalogDataService catalogDataService =
-            RuntimeWiring.catalogDataService(apiClient, runtimeConfig);
-        ProjectArchiveService projectArchiveService =
-            RuntimeWiring.projectArchiveService(apiClient);
+          RuntimeServices runtimeServices = RuntimeServices.open(runtimeConfig)) {
         return runSession(
             initialState,
             searchDebounceMs,
             diagnostics,
-            new CatalogLoader() {
-              @Override
-              public CompletableFuture<CatalogData> load() {
-                return catalogDataService.load();
-              }
-
-              @Override
-              public CompletableFuture<CatalogData> loadForStartup() {
-                return catalogDataService.loadForStartup();
-              }
-            },
-            apiClient::fetchPresets,
+            catalogLoader(runtimeServices),
+            runtimeServices.apiClient()::fetchPresets,
             (generationRequest, outputDirectory, cancelled, progressListener) ->
-                projectArchiveService.downloadAndExtract(
-                    generationRequest,
-                    outputDirectory,
-                    OverwritePolicy.FAIL_IF_EXISTS,
-                    cancelled,
-                    progress ->
-                        progressListener.accept(
-                            switch (progress) {
-                              case REQUESTING_ARCHIVE ->
-                                  GenerationProgressUpdate.requestingArchive(
-                                      "requesting project archive from Quarkus API...");
-                              case EXTRACTING_ARCHIVE ->
-                                  GenerationProgressUpdate.extractingArchive(
-                                      "extracting project archive...");
-                            })),
-            RuntimeWiring.favoritesStore(runtimeConfig),
+                runtimeServices
+                    .projectArchiveService()
+                    .downloadAndExtract(
+                        generationRequest,
+                        outputDirectory,
+                        OverwritePolicy.FAIL_IF_EXISTS,
+                        cancelled,
+                        progress ->
+                            progressListener.accept(
+                                switch (progress) {
+                                  case REQUESTING_ARCHIVE ->
+                                      GenerationProgressUpdate.requestingArchive(
+                                          "requesting project archive from Quarkus API...");
+                                  case EXTRACTING_ARCHIVE ->
+                                      GenerationProgressUpdate.extractingArchive(
+                                          "extracting project archive...");
+                                })),
+            runtimeServices.favoritesStore(),
             UiScheduler.fromScheduledExecutor(tui.scheduler(), tui::runOnRenderThread),
             IdeDetector.detect(),
             (controller, sessionDiagnostics) ->
@@ -310,6 +282,20 @@ public final class TuiBootstrapService {
           of("message", ErrorMessageMapper.userFriendlyError(exception)));
       throw exception;
     }
+  }
+
+  private static CatalogLoader catalogLoader(RuntimeServices runtimeServices) {
+    return new CatalogLoader() {
+      @Override
+      public CompletableFuture<CatalogData> load() {
+        return runtimeServices.catalogDataService().load();
+      }
+
+      @Override
+      public CompletableFuture<CatalogData> loadForStartup() {
+        return runtimeServices.catalogDataService().loadForStartup();
+      }
+    };
   }
 
   void runInteractiveSmokeSession(
