@@ -6,6 +6,7 @@ record MetadataPanelSnapshot(
     String title,
     boolean focused,
     boolean invalid,
+    String focusedFieldIssue,
     String groupId,
     String artifactId,
     String version,
@@ -19,6 +20,7 @@ record MetadataPanelSnapshot(
     SelectorInfo javaVersionInfo) {
   MetadataPanelSnapshot {
     title = Objects.requireNonNull(title);
+    focusedFieldIssue = focusedFieldIssue == null ? "" : focusedFieldIssue;
     groupId = groupId == null ? "" : groupId;
     artifactId = artifactId == null ? "" : artifactId;
     version = version == null ? "" : version;

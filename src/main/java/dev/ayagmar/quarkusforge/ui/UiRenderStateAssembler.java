@@ -60,6 +60,7 @@ final class UiRenderStateAssembler {
     return uiStateSnapshotMapper.renderModel(
         reducerState,
         statusMessage,
+        submitAlertSnapshot(reducerState),
         metadataPanelSnapshot(reducerState, metadataCompatibility),
         new UiStateSnapshotMapper.PanelState(
             extensionsPanelSnapshot(reducerState), footerSnapshot(reducerState, statusMessage)),
@@ -75,6 +76,7 @@ final class UiRenderStateAssembler {
         metadataPanelTitle(validation),
         isMetadataFocused(reducerState.focusTarget()),
         !validation.isValid(),
+        focusedFieldIssue(reducerState),
         request.groupId(),
         request.artifactId(),
         request.version(),
@@ -205,7 +207,35 @@ final class UiRenderStateAssembler {
         preGeneratePlan(reducerState),
         resolvedTargetPathForFooter(reducerState),
         focusedFieldValueForFooter(reducerState),
-        focusedFieldIssueForFooter(reducerState));
+        focusedFieldIssue(reducerState));
+  }
+
+  private SubmitAlertSnapshot submitAlertSnapshot(UiState reducerState) {
+    if (!reducerState.submitBlockedByValidation()
+        && !reducerState.submitBlockedByTargetConflict()) {
+      return SubmitAlertSnapshot.HIDDEN;
+    }
+    List<String> lines = new ArrayList<>();
+    String focusedField = UiFocusTargets.displayNameOf(reducerState.focusTarget());
+    if (reducerState.submitBlockedByTargetConflict()) {
+      lines.add("Target folder already exists. Change Output or Artifact, then submit again.");
+      if (!reducerState.errorMessage().isBlank()) {
+        lines.add(reducerState.errorMessage());
+      }
+    } else {
+      int issueCount = reducerState.validation().errors().size();
+      lines.add(
+          "Fix "
+              + focusedField
+              + " to continue"
+              + (issueCount <= 1 ? "." : " (" + issueCount + " issues remaining)."));
+      String issue = focusedFieldIssue(reducerState);
+      if (!issue.isBlank()) {
+        lines.add(issue);
+      }
+    }
+    lines.add("Focus moved to " + focusedField + ". Update the field and press Enter to retry.");
+    return new SubmitAlertSnapshot(true, "Submit blocked", lines);
   }
 
   private String resolvedTargetPathForFooter(UiState reducerState) {
@@ -234,11 +264,16 @@ final class UiRenderStateAssembler {
     };
   }
 
-  private String focusedFieldIssueForFooter(UiState reducerState) {
+  private String focusedFieldIssue(UiState reducerState) {
     if (reducerState.overlays().helpOverlayVisible()
         || reducerState.overlays().commandPaletteVisible()
         || reducerState.postGeneration().visible()) {
       return "";
+    }
+    if (reducerState.submitBlockedByTargetConflict()
+        && reducerState.focusTarget() == FocusTarget.OUTPUT_DIR
+        && !reducerState.errorMessage().isBlank()) {
+      return reducerState.errorMessage();
     }
     if (!hasValidationErrorFor(reducerState.validation(), reducerState.focusTarget())) {
       return "";

@@ -118,7 +118,11 @@ class CoreTuiShellPilotTest {
 
     assertThat(controller.validation().isValid()).isFalse();
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
-    assertThat(controller.statusMessage()).contains("fix groupId");
+    assertThat(controller.statusMessage()).contains("fix Group ID");
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .contains("Submit blocked")
+        .contains("Fix Group ID to continue")
+        .contains("Issue: must not be blank");
   }
 
   @Test

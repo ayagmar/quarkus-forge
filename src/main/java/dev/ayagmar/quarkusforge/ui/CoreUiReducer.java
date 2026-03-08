@@ -222,7 +222,7 @@ final class CoreUiReducer implements UiReducer {
                   + (issueCount == 1 ? "" : "s")
                   + ")"
               : "Submit blocked: fix "
-                  + UiFocusTargets.nameOf(firstInvalidTarget)
+                  + UiFocusTargets.displayNameOf(firstInvalidTarget)
                   + " ("
                   + issueCount
                   + " issue"

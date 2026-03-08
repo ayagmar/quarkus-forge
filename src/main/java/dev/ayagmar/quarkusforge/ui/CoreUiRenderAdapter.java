@@ -6,6 +6,9 @@ import dev.tamboui.layout.Rect;
 import dev.tamboui.style.Overflow;
 import dev.tamboui.style.Style;
 import dev.tamboui.terminal.Frame;
+import dev.tamboui.widgets.block.Block;
+import dev.tamboui.widgets.block.BorderType;
+import dev.tamboui.widgets.block.Borders;
 import dev.tamboui.widgets.input.TextInputState;
 import dev.tamboui.widgets.list.ListState;
 import dev.tamboui.widgets.paragraph.Paragraph;
@@ -86,6 +89,7 @@ final class CoreUiRenderAdapter implements UiRenderer.Adapter {
   public void renderBody(
       Frame frame,
       Rect area,
+      SubmitAlertSnapshot submitAlert,
       MetadataPanelSnapshot metadataPanelSnapshot,
       ExtensionsPanelSnapshot extensionsPanelSnapshot) {
     RenderContext context = requireContext();
@@ -93,14 +97,28 @@ final class CoreUiRenderAdapter implements UiRenderer.Adapter {
         area.width() < UiLayoutConstants.NARROW_WIDTH_THRESHOLD
             ? METADATA_PANEL_HEIGHT_NARROW
             : METADATA_PANEL_HEIGHT_COMPACT;
-    List<Rect> bodyLayout =
-        Layout.vertical()
-            .constraints(Constraint.length(metadataHeight), Constraint.fill())
-            .split(area);
+    if (!metadataPanelSnapshot.focusedFieldIssue().isBlank()) {
+      metadataHeight++;
+    }
+    boolean showSubmitAlert = submitAlert.visible();
+    int alertHeight =
+        showSubmitAlert ? estimateAlertHeight(submitAlert, Math.max(1, area.width() - 2)) : 0;
+    List<Constraint> constraints = new ArrayList<>();
+    if (showSubmitAlert) {
+      constraints.add(Constraint.length(alertHeight));
+    }
+    constraints.add(Constraint.length(metadataHeight));
+    constraints.add(Constraint.fill());
+    List<Rect> bodyLayout = Layout.vertical().constraints(constraints).split(area);
+
+    int sectionIndex = 0;
+    if (showSubmitAlert) {
+      renderSubmitAlert(frame, bodyLayout.get(sectionIndex++), submitAlert);
+    }
 
     bodyPanelRenderer.renderMetadataPanel(
         frame,
-        bodyLayout.get(0),
+        bodyLayout.get(sectionIndex++),
         metadataPanelSnapshot,
         compactFieldRenderer,
         context.metadataFields(),
@@ -108,7 +126,7 @@ final class CoreUiRenderAdapter implements UiRenderer.Adapter {
         this::panelBorderStyle);
     bodyPanelRenderer.renderExtensionsPanel(
         frame,
-        bodyLayout.get(1),
+        bodyLayout.get(sectionIndex),
         extensionsPanelSnapshot,
         context.extensionSearchState(),
         context.extensionListState(),
@@ -116,6 +134,36 @@ final class CoreUiRenderAdapter implements UiRenderer.Adapter {
         this::panelBorderStyle,
         context.selectedLookup(),
         context.favoriteLookup());
+  }
+
+  private int estimateAlertHeight(SubmitAlertSnapshot submitAlert, int availableWidth) {
+    int contentWidth = Math.max(1, availableWidth - 4);
+    int lines = 0;
+    for (String line : submitAlert.lines()) {
+      int lineWidth = Math.max(1, line.length());
+      lines += Math.max(1, (lineWidth + contentWidth - 1) / contentWidth);
+    }
+    return Math.max(3, lines + 2);
+  }
+
+  private void renderSubmitAlert(Frame frame, Rect area, SubmitAlertSnapshot submitAlert) {
+    if (!submitAlert.visible() || area.isEmpty()) {
+      return;
+    }
+    Paragraph paragraph =
+        Paragraph.builder()
+            .text(String.join("\n", submitAlert.lines()))
+            .style(Style.EMPTY.fg(theme.color("text")).bg(theme.color("base")))
+            .overflow(Overflow.WRAP_WORD)
+            .block(
+                Block.builder()
+                    .title(submitAlert.title())
+                    .borders(Borders.ALL)
+                    .borderType(BorderType.ROUNDED)
+                    .borderStyle(Style.EMPTY.fg(theme.color("error")).bold())
+                    .build())
+            .build();
+    frame.renderWidget(paragraph, area);
   }
 
   @Override

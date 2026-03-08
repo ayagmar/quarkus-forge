@@ -71,6 +71,11 @@ class CoreTuiGenerationFlowTest {
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.OUTPUT_DIR);
     assertThat(controller.statusMessage()).contains("target folder exists");
     assertThat(controller.errorMessage()).contains("Output directory already exists:");
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .contains("Submit blocked")
+        .contains("Target folder already exists")
+        .contains("Issue: Output directory already exists:")
+        .contains("Focus moved to Output directory");
   }
 
   @Test
