@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge.ui;
 
+import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import java.util.List;
 
@@ -190,8 +191,8 @@ final class CoreUiReducer implements UiReducer {
               state.withExtensions(extensionStateUpdatedIntent.extensions()),
               List.of(),
               UiAction.handled(false));
-      case UiIntent.ExtensionNavigationIntent navigationIntent ->
-          reduceExtensionNavigation(state, navigationIntent.keyEvent());
+      case UiIntent.ExtensionInteractionIntent interactionIntent ->
+          reduceExtensionInteraction(state, interactionIntent.keyEvent());
       case UiIntent.FocusNavigationIntent navigationIntent ->
           reduceFocusNavigation(state, navigationIntent.keyEvent());
       case UiIntent.MetadataInputIntent metadataIntent ->
@@ -527,6 +528,71 @@ final class CoreUiReducer implements UiReducer {
         UiAction.handled(false));
   }
 
+  private static ReduceResult reduceExtensionInteraction(UiState state, KeyEvent keyEvent) {
+    FocusTarget focusTarget = state.focusTarget();
+    if (focusTarget == FocusTarget.EXTENSION_SEARCH && keyEvent.code() == KeyCode.DOWN) {
+      return reduceSharedAction(state, CommandPaletteAction.FOCUS_EXTENSION_LIST);
+    }
+    if (focusTarget != FocusTarget.EXTENSION_SEARCH && focusTarget != FocusTarget.EXTENSION_LIST) {
+      return new ReduceResult(state, List.of(), UiAction.ignored());
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST
+        && isUpNavigation(keyEvent)
+        && state.extensions().listSelectionAtTop()) {
+      return reduceSharedAction(state, CommandPaletteAction.FOCUS_EXTENSION_SEARCH);
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST
+        && (keyEvent.isLeft() || UiKeyMatchers.isVimLeftKey(keyEvent))) {
+      return reduceExtensionCommand(state, UiIntent.ExtensionCommand.HIERARCHY_LEFT);
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST
+        && (keyEvent.isRight() || UiKeyMatchers.isVimRightKey(keyEvent))) {
+      return reduceExtensionCommand(state, UiIntent.ExtensionCommand.HIERARCHY_RIGHT);
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST && keyEvent.isPageDown()) {
+      return reduceExtensionCommand(state, UiIntent.ExtensionCommand.JUMP_TO_NEXT_CATEGORY);
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST && keyEvent.isPageUp()) {
+      return reduceExtensionCommand(state, UiIntent.ExtensionCommand.JUMP_TO_PREVIOUS_CATEGORY);
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST
+        && keyEvent.isSelect()
+        && state.extensions().categoryHeaderSelected()) {
+      return reduceSharedAction(state, CommandPaletteAction.TOGGLE_CATEGORY);
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST && AppKeyActions.isFavoriteToggleKey(keyEvent)) {
+      return reduceExtensionCommand(state, UiIntent.ExtensionCommand.TOGGLE_FAVORITE_AT_SELECTION);
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST
+        && AppKeyActions.isClearSelectedExtensionsKey(keyEvent)) {
+      return reduceExtensionCommand(state, UiIntent.ExtensionCommand.CLEAR_SELECTED_EXTENSIONS);
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST
+        && AppKeyActions.isCategoryFilterCycleKey(keyEvent)) {
+      return reduceSharedAction(state, CommandPaletteAction.CYCLE_CATEGORY_FILTER);
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST
+        && AppKeyActions.isPresetFilterCycleKey(keyEvent)) {
+      return reduceSharedAction(state, CommandPaletteAction.CYCLE_PRESET_FILTER);
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST
+        && AppKeyActions.isCategoryCollapseToggleKey(keyEvent)) {
+      return reduceSharedAction(state, CommandPaletteAction.TOGGLE_CATEGORY);
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST
+        && AppKeyActions.isExpandAllCategoriesKey(keyEvent)) {
+      return reduceSharedAction(state, CommandPaletteAction.OPEN_ALL_CATEGORIES);
+    }
+    ReduceResult navigationResult = reduceExtensionNavigation(state, keyEvent);
+    if (navigationResult.action().handled()) {
+      return navigationResult;
+    }
+    if (focusTarget == FocusTarget.EXTENSION_LIST && keyEvent.isSelect()) {
+      return reduceExtensionCommand(state, UiIntent.ExtensionCommand.TOGGLE_SELECTION_AT_CURSOR);
+    }
+    return navigationResult;
+  }
+
   private static ReduceResult reduceExtensionNavigation(UiState state, KeyEvent keyEvent) {
     FocusTarget focusTarget = state.focusTarget();
     if (focusTarget != FocusTarget.EXTENSION_LIST || !isExtensionNavigationKey(keyEvent)) {
@@ -657,6 +723,10 @@ final class CoreUiReducer implements UiReducer {
         || UiKeyMatchers.isVimHomeKey(keyEvent)
         || keyEvent.isEnd()
         || UiKeyMatchers.isVimEndKey(keyEvent);
+  }
+
+  private static boolean isUpNavigation(KeyEvent keyEvent) {
+    return keyEvent.isUp() || UiKeyMatchers.isVimUpKey(keyEvent);
   }
 
   private static ReduceResult reduceMetadataInput(

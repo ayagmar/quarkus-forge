@@ -504,5 +504,7 @@ record UiState(
       String activePresetFilterName,
       String activeCategoryFilterTitle,
       String searchQuery,
-      String focusedExtensionId) {}
+      String focusedExtensionId,
+      boolean listSelectionAtTop,
+      boolean categoryHeaderSelected) {}
 }

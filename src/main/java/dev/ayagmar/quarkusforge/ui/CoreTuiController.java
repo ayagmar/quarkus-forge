@@ -485,67 +485,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   @Override
   public UiAction handleExtensionFocusFlow(KeyEvent keyEvent) {
-    if (focusTarget() == FocusTarget.EXTENSION_SEARCH && keyEvent.code() == KeyCode.DOWN) {
-      return routeSharedAction(CommandPaletteAction.FOCUS_EXTENSION_LIST);
-    }
-    if (focusTarget() == FocusTarget.EXTENSION_LIST
-        && isUpNavigation(keyEvent)
-        && extensionCatalogNavigation.isSelectionAtTop(extensionCatalogProjection.rows())) {
-      return routeSharedAction(CommandPaletteAction.FOCUS_EXTENSION_SEARCH);
-    }
-    if (focusTarget() == FocusTarget.EXTENSION_LIST
-        && (keyEvent.isLeft() || UiKeyMatchers.isVimLeftKey(keyEvent))) {
-      return routeExtensionCommand(UiIntent.ExtensionCommand.HIERARCHY_LEFT);
-    }
-    if (focusTarget() == FocusTarget.EXTENSION_LIST
-        && (keyEvent.isRight() || UiKeyMatchers.isVimRightKey(keyEvent))) {
-      return routeExtensionCommand(UiIntent.ExtensionCommand.HIERARCHY_RIGHT);
-    }
-    if (focusTarget() == FocusTarget.EXTENSION_LIST && keyEvent.isPageDown()) {
-      return routeExtensionCommand(UiIntent.ExtensionCommand.JUMP_TO_NEXT_CATEGORY);
-    }
-    if (focusTarget() == FocusTarget.EXTENSION_LIST && keyEvent.isPageUp()) {
-      return routeExtensionCommand(UiIntent.ExtensionCommand.JUMP_TO_PREVIOUS_CATEGORY);
-    }
-    if (focusTarget() == FocusTarget.EXTENSION_LIST
-        && keyEvent.isSelect()
-        && extensionCatalogProjection.isCategorySectionHeaderSelected(
-            extensionCatalogNavigation.selectedRow())) {
-      return routeSharedAction(CommandPaletteAction.TOGGLE_CATEGORY);
-    }
-    if (focusTarget() == FocusTarget.EXTENSION_LIST
-        && AppKeyActions.isFavoriteToggleKey(keyEvent)) {
-      return routeExtensionCommand(UiIntent.ExtensionCommand.TOGGLE_FAVORITE_AT_SELECTION);
-    }
-    if (focusTarget() == FocusTarget.EXTENSION_LIST
-        && AppKeyActions.isClearSelectedExtensionsKey(keyEvent)) {
-      return routeExtensionCommand(UiIntent.ExtensionCommand.CLEAR_SELECTED_EXTENSIONS);
-    }
-    if (focusTarget() == FocusTarget.EXTENSION_LIST
-        && AppKeyActions.isCategoryFilterCycleKey(keyEvent)) {
-      return routeSharedAction(CommandPaletteAction.CYCLE_CATEGORY_FILTER);
-    }
-    if (focusTarget() == FocusTarget.EXTENSION_LIST
-        && AppKeyActions.isPresetFilterCycleKey(keyEvent)) {
-      return routeSharedAction(CommandPaletteAction.CYCLE_PRESET_FILTER);
-    }
-    if (focusTarget() == FocusTarget.EXTENSION_LIST
-        && AppKeyActions.isCategoryCollapseToggleKey(keyEvent)) {
-      return routeSharedAction(CommandPaletteAction.TOGGLE_CATEGORY);
-    }
-    if (focusTarget() == FocusTarget.EXTENSION_LIST
-        && AppKeyActions.isExpandAllCategoriesKey(keyEvent)) {
-      return routeSharedAction(CommandPaletteAction.OPEN_ALL_CATEGORIES);
-    }
-    UiAction navigationAction =
-        routeIntent(new UiIntent.ExtensionNavigationIntent(keyEvent, focusTarget()));
-    if (navigationAction != null) {
-      return navigationAction;
-    }
-    if (focusTarget() == FocusTarget.EXTENSION_LIST && keyEvent.isSelect()) {
-      return routeExtensionCommand(UiIntent.ExtensionCommand.TOGGLE_SELECTION_AT_CURSOR);
-    }
-    return null;
+    return routeIntent(new UiIntent.ExtensionInteractionIntent(keyEvent));
   }
 
   @Override
@@ -778,6 +718,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   private UiState.ExtensionView extensionViewSnapshot() {
+    Integer selectedRow = extensionCatalogNavigation.selectedRow();
     return new UiState.ExtensionView(
         extensionCatalogProjection.filteredExtensions().size(),
         extensionCatalogProjection.totalCatalogExtensionCount(),
@@ -787,7 +728,9 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         extensionCatalogProjection.activePresetFilterName(),
         extensionCatalogProjection.activeCategoryFilterTitle(),
         inputStates.get(FocusTarget.EXTENSION_SEARCH).text(),
-        focusedExtensionId());
+        focusedExtensionId(),
+        extensionCatalogNavigation.isSelectionAtTop(extensionCatalogProjection.rows()),
+        extensionCatalogProjection.isCategorySectionHeaderSelected(selectedRow));
   }
 
   private UiIntent.ExtensionStateUpdatedIntent extensionStateUpdatedIntent() {
@@ -1249,10 +1192,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     return !isTextInputFocus(currentFocus);
   }
 
-  private static boolean isUpNavigation(KeyEvent keyEvent) {
-    return keyEvent.isUp() || UiKeyMatchers.isVimUpKey(keyEvent);
-  }
-
   private static boolean shouldFocusExtensionSearch(KeyEvent keyEvent, FocusTarget currentFocus) {
     if (AppKeyActions.isFocusExtensionSearchSlashKey(keyEvent)) {
       return !isTextInputFocus(currentFocus) && currentFocus != FocusTarget.EXTENSION_SEARCH;
@@ -1317,10 +1256,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   private UiAction routeSharedAction(CommandPaletteAction action) {
     return routeIntent(new UiIntent.SharedActionIntent(action));
-  }
-
-  private UiAction routeExtensionCommand(UiIntent.ExtensionCommand command) {
-    return routeIntent(new UiIntent.ExtensionCommandIntent(command));
   }
 
   static String catalogLoadedStatusMessage(CatalogSource source, boolean stale) {

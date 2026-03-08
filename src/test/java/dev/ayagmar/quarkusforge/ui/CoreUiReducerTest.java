@@ -515,7 +515,7 @@ class CoreUiReducerTest {
     UiState state =
         stateWithExtensionView(
             stateWithFocus(baseState(), FocusTarget.EXTENSION_SEARCH),
-            new UiState.ExtensionView(1, 2, 1, true, true, "web", "Core", "rest", ""));
+            new UiState.ExtensionView(1, 2, 1, true, true, "web", "Core", "rest", "", true, false));
 
     ReduceResult result = reducer.reduce(state, new UiIntent.ExtensionCancelIntent());
 
@@ -530,7 +530,7 @@ class CoreUiReducerTest {
     UiState state =
         stateWithExtensionView(
             stateWithFocus(baseState(), FocusTarget.EXTENSION_SEARCH),
-            new UiState.ExtensionView(2, 2, 0, false, false, "", "", "", ""));
+            new UiState.ExtensionView(2, 2, 0, false, false, "", "", "", "", true, false));
 
     ReduceResult result = reducer.reduce(state, new UiIntent.ExtensionCancelIntent());
 
@@ -575,10 +575,12 @@ class CoreUiReducerTest {
   @Test
   void extensionStateUpdatedIntentMakesExtensionViewReducerOwned() {
     UiState.ExtensionView nextExtensions =
-        new UiState.ExtensionView(1, 2, 1, true, false, "web", "Core", "rest", "io.quarkus:rest");
+        new UiState.ExtensionView(
+            1, 2, 1, true, false, "web", "Core", "rest", "io.quarkus:rest", false, false);
     UiState state =
         stateWithExtensionView(
-            baseState(), new UiState.ExtensionView(7, 7, 0, false, false, "", "", "", ""));
+            baseState(),
+            new UiState.ExtensionView(7, 7, 0, false, false, "", "", "", "", true, true));
 
     ReduceResult result =
         reducer.reduce(state, new UiIntent.ExtensionStateUpdatedIntent(nextExtensions));
@@ -589,12 +591,11 @@ class CoreUiReducerTest {
   }
 
   @Test
-  void extensionNavigationIntentRoutesListMovementThroughEffect() {
+  void extensionInteractionIntentRoutesListMovementThroughEffect() {
     ReduceResult result =
         reducer.reduce(
             stateWithFocus(baseState(), FocusTarget.EXTENSION_LIST),
-            new UiIntent.ExtensionNavigationIntent(
-                KeyEvent.ofChar('j'), FocusTarget.EXTENSION_LIST));
+            new UiIntent.ExtensionInteractionIntent(KeyEvent.ofChar('j')));
 
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
     assertThat(result.effects())
@@ -604,12 +605,80 @@ class CoreUiReducerTest {
   }
 
   @Test
-  void extensionNavigationIntentIgnoresNonNavigationKeys() {
+  void extensionInteractionIntentMovesSearchFocusToListOnDown() {
+    ReduceResult result =
+        reducer.reduce(
+            stateWithFocus(baseState(), FocusTarget.EXTENSION_SEARCH),
+            new UiIntent.ExtensionInteractionIntent(KeyEvent.ofKey(KeyCode.DOWN)));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects()).isEmpty();
+    assertThat(result.nextState().focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
+    assertThat(result.nextState().statusMessage()).isEqualTo("Focus moved to extensionList");
+  }
+
+  @Test
+  void extensionInteractionIntentMovesTopListSelectionBackToSearch() {
+    UiState state =
+        stateWithExtensionView(
+            stateWithFocus(baseState(), FocusTarget.EXTENSION_LIST),
+            new UiState.ExtensionView(7, 7, 0, false, false, "", "", "", "", true, true));
+
+    ReduceResult result =
+        reducer.reduce(state, new UiIntent.ExtensionInteractionIntent(KeyEvent.ofChar('k')));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects())
+        .containsExactly(new UiEffect.MoveTextInputCursorToEnd(FocusTarget.EXTENSION_SEARCH));
+    assertThat(result.nextState().focusTarget()).isEqualTo(FocusTarget.EXTENSION_SEARCH);
+    assertThat(result.nextState().statusMessage()).isEqualTo("Focus moved to extensionSearch");
+  }
+
+  @Test
+  void extensionInteractionIntentTogglesSectionHeadersThroughSharedActionPath() {
+    UiState state =
+        stateWithExtensionView(
+            stateWithFocus(baseState(), FocusTarget.EXTENSION_LIST),
+            new UiState.ExtensionView(7, 7, 0, false, false, "", "", "", "", true, true));
+
+    ReduceResult result =
+        reducer.reduce(
+            state, new UiIntent.ExtensionInteractionIntent(KeyEvent.ofKey(KeyCode.ENTER)));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.nextState().focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
+    assertThat(result.nextState().statusMessage()).isEqualTo("Ready");
+    assertThat(result.effects())
+        .containsExactly(
+            new UiEffect.ExecuteExtensionCommand(
+                UiIntent.ExtensionCommand.TOGGLE_CATEGORY_AT_SELECTION));
+  }
+
+  @Test
+  void extensionInteractionIntentTogglesSelectedExtensionWhenHeaderIsNotFocused() {
+    UiState state =
+        stateWithExtensionView(
+            stateWithFocus(baseState(), FocusTarget.EXTENSION_LIST),
+            new UiState.ExtensionView(
+                7, 7, 0, false, false, "", "", "", "io.quarkus:quarkus-arc", false, false));
+
+    ReduceResult result =
+        reducer.reduce(
+            state, new UiIntent.ExtensionInteractionIntent(KeyEvent.ofKey(KeyCode.ENTER)));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects())
+        .containsExactly(
+            new UiEffect.ExecuteExtensionCommand(
+                UiIntent.ExtensionCommand.TOGGLE_SELECTION_AT_CURSOR));
+  }
+
+  @Test
+  void extensionInteractionIntentIgnoresNonNavigationKeysOutsideExtensionShortcuts() {
     ReduceResult result =
         reducer.reduce(
             stateWithFocus(baseState(), FocusTarget.EXTENSION_LIST),
-            new UiIntent.ExtensionNavigationIntent(
-                KeyEvent.ofChar('x'), FocusTarget.EXTENSION_LIST));
+            new UiIntent.ExtensionInteractionIntent(KeyEvent.ofChar('z')));
 
     assertThat(result.action()).isEqualTo(UiAction.ignored());
     assertThat(result.effects()).isEmpty();
@@ -890,7 +959,9 @@ class CoreUiReducerTest {
             state.extensions().activePresetFilterName(),
             state.extensions().activeCategoryFilterTitle(),
             state.extensions().searchQuery(),
-            state.extensions().focusedExtensionId()),
+            state.extensions().focusedExtensionId(),
+            state.extensions().listSelectionAtTop(),
+            state.extensions().categoryHeaderSelected()),
         state.overlays(),
         state.commandPaletteSelection(),
         state.statusMessage());
