@@ -126,7 +126,7 @@ jobs:
           "$binary" generate --help > /dev/null
 
       - name: Smoke test interactive native startup
-        if: runner.os == 'Linux' && matrix.binary_name == 'quarkus-forge'
+        if: runner.os != 'Windows' && matrix.binary_name == 'quarkus-forge'
         shell: bash
         run: |
           set -euo pipefail
