@@ -57,6 +57,33 @@ Quarkus Forge is a keyboard-first terminal UI (TUI) and headless CLI for generat
 | Keep one local developer jar | `quarkus-forge.jar` | Supports both TUI and `generate` |
 | Avoid the JVM at runtime | native binary | Standalone executable |
 
+## GitHub Release Asset Guide
+
+| Use case | Download this release asset |
+|--|--|
+| Interactive JVM app on any OS | `quarkus-forge-jvm.jar` |
+| Headless JVM app for CI/containers | `quarkus-forge-headless.jar` |
+| Interactive native app on Linux | `quarkus-forge-linux-x86_64` |
+| Interactive native app on macOS (Apple Silicon) | `quarkus-forge-macos-aarch64` |
+| Interactive native app on Windows | `quarkus-forge-windows-x86_64.exe` |
+| Headless native app on Linux | `quarkus-forge-headless-linux-x86_64` |
+| Headless native app on macOS (Apple Silicon) | `quarkus-forge-headless-macos-aarch64` |
+| Headless native app on Windows | `quarkus-forge-headless-windows-x86_64.exe` |
+
+Every GitHub release publishes a matching `.sha256` file for each artifact. Download both files, then verify the artifact locally:
+
+```bash
+sha256sum -c <artifact>.sha256
+```
+
+Examples:
+
+```bash
+sha256sum -c quarkus-forge-jvm.jar.sha256
+sha256sum -c quarkus-forge-headless-linux-x86_64.sha256
+sha256sum -c quarkus-forge-windows-x86_64.exe.sha256
+```
+
 ## Keyboard Quick Reference (TUI)
 
 | Key | Action |
@@ -126,12 +153,12 @@ source target/completions/quarkus-forge-headless.bash
 ```
 
 ### Release Checksums
-Generate `.sha256` files for the release jars:
+Generate `.sha256` files for locally built release jars:
 ```bash
 just release-checksums
 ```
 
-Verify artifacts:
+Verify locally built artifacts:
 ```bash
 sha256sum -c target/quarkus-forge.jar.sha256
 sha256sum -c target/quarkus-forge-headless.jar.sha256
