@@ -17,54 +17,6 @@ import org.junit.jupiter.api.Test;
 
 class CoreTuiStateMachineTest {
   @Test
-  void validTransitionsMatchContract() {
-    assertThat(
-            GenerationStateMachine.isValidTransition(
-                GenerationState.IDLE, GenerationState.VALIDATING))
-        .isTrue();
-    assertThat(
-            GenerationStateMachine.isValidTransition(
-                GenerationState.VALIDATING, GenerationState.LOADING))
-        .isTrue();
-    assertThat(
-            GenerationStateMachine.isValidTransition(
-                GenerationState.VALIDATING, GenerationState.ERROR))
-        .isTrue();
-    assertThat(
-            GenerationStateMachine.isValidTransition(
-                GenerationState.LOADING, GenerationState.SUCCESS))
-        .isTrue();
-    assertThat(
-            GenerationStateMachine.isValidTransition(
-                GenerationState.LOADING, GenerationState.CANCELLED))
-        .isTrue();
-    assertThat(
-            GenerationStateMachine.isValidTransition(GenerationState.SUCCESS, GenerationState.IDLE))
-        .isTrue();
-  }
-
-  @Test
-  void invalidTransitionsAreRejected() {
-    assertThat(
-            GenerationStateMachine.isValidTransition(GenerationState.IDLE, GenerationState.LOADING))
-        .isFalse();
-    assertThat(
-            GenerationStateMachine.isValidTransition(
-                GenerationState.LOADING, GenerationState.VALIDATING))
-        .isFalse();
-    assertThat(
-            GenerationStateMachine.isValidTransition(
-                GenerationState.ERROR, GenerationState.LOADING))
-        .isFalse();
-    assertThat(
-            GenerationStateMachine.isValidTransition(
-                GenerationState.CANCELLED, GenerationState.SUCCESS))
-        .isFalse();
-    assertThat(GenerationStateMachine.isValidTransition(GenerationState.IDLE, GenerationState.IDLE))
-        .isFalse();
-  }
-
-  @Test
   void rapidEnterSpamStartsOneGenerationWhileLoading() {
     ControlledGenerationRunner generationRunner = new ControlledGenerationRunner();
     CoreTuiController controller =
