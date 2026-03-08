@@ -35,15 +35,20 @@ final class HeadlessExtensionResolutionService {
       Set<String> knownExtensionIds,
       Duration timeout)
       throws ExecutionException, InterruptedException, TimeoutException {
+    List<String> safeExtensionInputs = extensionInputs == null ? List.of() : extensionInputs;
+    List<String> safePresetInputs = presetInputs == null ? List.of() : presetInputs;
     Map<String, List<String>> presetExtensionsByName = Map.of();
-    if (requiresBuiltInPresets(presetInputs)) {
+    if (requiresBuiltInPresets(safePresetInputs)) {
       presetExtensionsByName = catalogLoader.loadBuiltInPresets(platformStream, timeout);
     }
     return resolveRequestedExtensions(
-        extensionInputs, presetInputs, knownExtensionIds, presetExtensionsByName);
+        safeExtensionInputs, safePresetInputs, knownExtensionIds, presetExtensionsByName);
   }
 
   static List<String> normalizePresets(List<String> presetInputs) {
+    if (presetInputs == null) {
+      return List.of();
+    }
     return presetInputs.stream()
         .map(HeadlessExtensionResolutionService::normalizePresetName)
         .filter(s -> !s.isEmpty())
@@ -74,6 +79,9 @@ final class HeadlessExtensionResolutionService {
   }
 
   static boolean requiresBuiltInPresets(List<String> presetInputs) {
+    if (presetInputs == null) {
+      return false;
+    }
     for (String presetInput : presetInputs) {
       String preset = normalizePresetName(presetInput);
       if (!preset.isBlank() && !PRESET_FAVORITES.equals(preset)) {

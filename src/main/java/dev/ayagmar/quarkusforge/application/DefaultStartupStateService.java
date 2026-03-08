@@ -3,6 +3,7 @@ package dev.ayagmar.quarkusforge.application;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
 import dev.ayagmar.quarkusforge.domain.ProjectInputDefaults;
+import java.util.Objects;
 
 public final class DefaultStartupStateService implements StartupStateService {
   @Override
@@ -30,24 +31,31 @@ public final class DefaultStartupStateService implements StartupStateService {
 
   private static CliPrefill mergePrefill(
       CliPrefill requestedPrefill, CliPrefill storedPrefill, CliPrefill defaults) {
+    CliPrefill safeRequestedPrefill =
+        Objects.requireNonNull(requestedPrefill, "requestedPrefill must not be null");
     return new CliPrefill(
-        preferRequested(requestedPrefill.groupId(), storedPrefill, CliPrefill::groupId, defaults),
         preferRequested(
-            requestedPrefill.artifactId(), storedPrefill, CliPrefill::artifactId, defaults),
-        preferRequested(requestedPrefill.version(), storedPrefill, CliPrefill::version, defaults),
+            safeRequestedPrefill.groupId(), storedPrefill, CliPrefill::groupId, defaults),
         preferRequested(
-            requestedPrefill.packageName(), storedPrefill, CliPrefill::packageName, defaults),
+            safeRequestedPrefill.artifactId(), storedPrefill, CliPrefill::artifactId, defaults),
         preferRequested(
-            requestedPrefill.outputDirectory(),
+            safeRequestedPrefill.version(), storedPrefill, CliPrefill::version, defaults),
+        preferRequested(
+            safeRequestedPrefill.packageName(), storedPrefill, CliPrefill::packageName, defaults),
+        preferRequested(
+            safeRequestedPrefill.outputDirectory(),
             storedPrefill,
             CliPrefill::outputDirectory,
             defaults),
         preferRequested(
-            requestedPrefill.platformStream(), storedPrefill, CliPrefill::platformStream, defaults),
+            safeRequestedPrefill.platformStream(),
+            storedPrefill,
+            CliPrefill::platformStream,
+            defaults),
         preferRequested(
-            requestedPrefill.buildTool(), storedPrefill, CliPrefill::buildTool, defaults),
+            safeRequestedPrefill.buildTool(), storedPrefill, CliPrefill::buildTool, defaults),
         preferRequested(
-            requestedPrefill.javaVersion(), storedPrefill, CliPrefill::javaVersion, defaults));
+            safeRequestedPrefill.javaVersion(), storedPrefill, CliPrefill::javaVersion, defaults));
   }
 
   private static String preferRequested(

@@ -99,6 +99,19 @@ class HeadlessExtensionResolutionServiceTest {
         .containsExactly("web", "favorites");
   }
 
+  @Test
+  void nullPresetAndExtensionInputsBehaveLikeEmptyLists() throws Exception {
+    HeadlessExtensionResolutionService service =
+        new HeadlessExtensionResolutionService(
+            new StubCatalogLoader(), ExtensionFavoritesStore.inMemory());
+
+    List<String> resolved =
+        service.resolveExtensionIds(
+            "io.quarkus.platform:3.31", null, null, KNOWN_EXTENSION_IDS, Duration.ofSeconds(1));
+
+    assertThat(resolved).isEmpty();
+  }
+
   private static final class StubCatalogLoader implements HeadlessCatalogLoader {
     String lastPresetPlatformStream;
 

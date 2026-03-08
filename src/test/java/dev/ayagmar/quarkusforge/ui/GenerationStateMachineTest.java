@@ -1,6 +1,7 @@
 package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,16 @@ class GenerationStateMachineTest {
             .isFalse();
       }
     }
+  }
+
+  @Test
+  void rejectsNullStatesExplicitly() {
+    assertThatThrownBy(() -> GenerationStateMachine.isValidTransition(null, GenerationState.IDLE))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must not be null");
+    assertThatThrownBy(() -> GenerationStateMachine.isValidTransition(GenerationState.IDLE, null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must not be null");
   }
 
   private record Transition(GenerationState currentState, GenerationState targetState) {}

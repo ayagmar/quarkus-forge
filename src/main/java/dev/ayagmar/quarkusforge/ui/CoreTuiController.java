@@ -338,7 +338,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
               @Override
               public String currentStatusMessage() {
-                return reducerState.statusMessage();
+                return CoreTuiController.this.currentStatusMessage();
               }
             });
     uiRenderStateAssembler =
@@ -643,6 +643,10 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   String statusMessage() {
     return effectiveStatusMessage();
+  }
+
+  private String currentStatusMessage() {
+    return reducerState == null ? "" : reducerState.statusMessage();
   }
 
   String errorMessage() {

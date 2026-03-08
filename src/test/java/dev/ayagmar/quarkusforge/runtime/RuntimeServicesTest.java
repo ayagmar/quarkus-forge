@@ -87,9 +87,10 @@ class RuntimeServicesTest {
             tempDir.resolve("favorites.json"),
             tempDir.resolve("preferences.json"));
 
-    RuntimeServices runtimeServices = RuntimeServices.open(runtimeConfig);
-    try (HeadlessGenerationService service = runtimeServices.openHeadlessGenerationService()) {
-      assertThat(service).isNotNull();
+    try (RuntimeServices runtimeServices = RuntimeServices.open(runtimeConfig)) {
+      try (HeadlessGenerationService service = runtimeServices.openHeadlessGenerationService()) {
+        assertThat(service).isNotNull();
+      }
     }
   }
 }

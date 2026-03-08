@@ -54,9 +54,9 @@ class UiStateSnapshotMapperTest {
     assertThat(loadingRenderModel.generation().state()).isEqualTo(GenerationState.SUCCESS);
     assertThat(loadingRenderModel.reducerState().catalogLoad().loading()).isTrue();
     assertThat(loadingRenderModel.reducerState().overlays().startupOverlayVisible()).isTrue();
-    assertThat(loadingRenderModel.reducerState().postGeneration().visible()).isTrue();
-    assertThat(loadingRenderModel.reducerState().postGeneration().actionLabels()).isNotEmpty();
-    assertThat(loadingRenderModel.reducerState().postGeneration().successHint()).contains("cd ");
+    assertThat(loadingRenderModel.postGeneration().visible()).isTrue();
+    assertThat(loadingRenderModel.postGeneration().actionLabels()).isNotEmpty();
+    assertThat(loadingRenderModel.postGeneration().successHint()).contains("cd ");
 
     loadFuture.complete(
         ExtensionCatalogLoadResult.live(
@@ -291,6 +291,7 @@ class UiStateSnapshotMapperTest {
           SubmitAlertSnapshot.HIDDEN,
           metadataPanel,
           panelState,
+          reducerState.postGeneration(),
           generation,
           startupOverlay);
     }

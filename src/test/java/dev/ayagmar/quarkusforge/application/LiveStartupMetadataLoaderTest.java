@@ -12,17 +12,10 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.concurrent.CancellationException;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class LiveStartupMetadataLoaderTest {
   private WireMockServer wireMockServer;
-
-  @BeforeEach
-  void setUp() {
-    wireMockServer = new WireMockServer(0);
-    wireMockServer.start();
-  }
 
   @AfterEach
   void tearDown() {
@@ -31,8 +24,15 @@ class LiveStartupMetadataLoaderTest {
     }
   }
 
+  private WireMockServer startWireMockServer() {
+    wireMockServer = new WireMockServer(0);
+    wireMockServer.start();
+    return wireMockServer;
+  }
+
   @Test
   void loadReturnsLiveMetadataWhenRefreshSucceeds() {
+    WireMockServer wireMockServer = startWireMockServer();
     CliCommandTestSupport.stubLiveMetadataWithMavenOnly(wireMockServer);
     LiveStartupMetadataLoader loader =
         new LiveStartupMetadataLoader(
@@ -52,6 +52,7 @@ class LiveStartupMetadataLoaderTest {
 
   @Test
   void loadFallsBackToSnapshotWhenRefreshTimesOut() {
+    WireMockServer wireMockServer = startWireMockServer();
     wireMockServer.stubFor(
         get(urlPathEqualTo("/api/streams"))
             .willReturn(
@@ -107,12 +108,16 @@ class LiveStartupMetadataLoaderTest {
             dev.ayagmar.quarkusforge.api.QuarkusApiClient::new,
             DiagnosticLogger.create(false));
 
-    StartupMetadataSelection selection = loader.fallbackSelection(new InterruptedException("stop"));
+    try {
+      StartupMetadataSelection selection =
+          loader.fallbackSelection(new InterruptedException("stop"));
 
-    assertThat(selection.sourceLabel()).isEqualTo("snapshot fallback");
-    assertThat(selection.detailMessage()).contains("Live metadata refresh interrupted");
-    assertThat(Thread.currentThread().isInterrupted()).isTrue();
-    Thread.interrupted();
+      assertThat(selection.sourceLabel()).isEqualTo("snapshot fallback");
+      assertThat(selection.detailMessage()).contains("Live metadata refresh interrupted");
+      assertThat(Thread.currentThread().isInterrupted()).isTrue();
+    } finally {
+      Thread.interrupted();
+    }
   }
 
   @Test

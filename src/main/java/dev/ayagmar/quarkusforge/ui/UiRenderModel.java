@@ -8,6 +8,7 @@ record UiRenderModel(
     MetadataPanelSnapshot metadataPanel,
     ExtensionsPanelSnapshot extensionsPanel,
     FooterSnapshot footer,
+    UiState.PostGenerationView postGeneration,
     UiState.GenerationView generation,
     UiState.StartupOverlayView startupOverlay) {
   UiRenderModel {
@@ -16,6 +17,7 @@ record UiRenderModel(
     metadataPanel = Objects.requireNonNull(metadataPanel);
     extensionsPanel = Objects.requireNonNull(extensionsPanel);
     footer = Objects.requireNonNull(footer);
+    postGeneration = Objects.requireNonNull(postGeneration);
     generation = Objects.requireNonNull(generation);
     startupOverlay = Objects.requireNonNull(startupOverlay);
   }

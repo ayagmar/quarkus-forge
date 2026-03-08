@@ -29,12 +29,12 @@ final class GenerationFlowCoordinator {
       Path outputDirectory,
       GenerationFlowCallbacks callbacks) {
     callbacks.beforeGenerationStart();
-    generationCancelRequested = false;
-    long token = ++generationToken;
     if (!callbacks.transitionTo(GenerationState.LOADING)) {
       callbacks.onSubmitIgnored(callbacks.generationStateLabel());
       return;
     }
+    generationCancelRequested = false;
+    long token = ++generationToken;
 
     generationStartedAtNanos = System.nanoTime();
     onProgress(
@@ -110,6 +110,10 @@ final class GenerationFlowCoordinator {
 
   boolean isCancellationRequested() {
     return generationCancelRequested;
+  }
+
+  long generationToken() {
+    return generationToken;
   }
 
   long elapsedMillisSinceStart() {

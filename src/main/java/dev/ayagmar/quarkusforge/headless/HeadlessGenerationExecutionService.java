@@ -59,6 +59,9 @@ final class HeadlessGenerationExecutionService {
         cancelled.set(true);
         generationFuture.cancel(true);
       }
+      if (exception instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
       throw exception;
     }
   }

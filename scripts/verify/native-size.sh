@@ -7,7 +7,6 @@ mkdir -p target/native-size
 
 run_size_check() {
   if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-    set -o pipefail
     java scripts/CheckNativeSize.java "$@" | tee -a "$GITHUB_STEP_SUMMARY"
     return
   fi
@@ -19,7 +18,6 @@ case "$mode" in
   headless)
     ./mvnw clean
     mkdir -p target/native-size
-    set -o pipefail
     ./mvnw package -Pheadless-native -DskipTests -Djacoco.skip=true | tee target/native-size/headless-native.log
     run_size_check \
       --label headless-native \
@@ -29,7 +27,6 @@ case "$mode" in
       --max-bytes 24500000
     ;;
   interactive)
-    set -o pipefail
     ./mvnw package -Pnative -DskipTests -Djacoco.skip=true | tee target/native-size/native.log
     run_size_check \
       --label native \

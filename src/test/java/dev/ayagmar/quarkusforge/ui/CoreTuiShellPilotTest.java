@@ -423,6 +423,7 @@ class CoreTuiShellPilotTest {
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20)))));
+    assertThat(controller.filteredExtensionCount()).isEqualTo(2);
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
@@ -443,6 +444,7 @@ class CoreTuiShellPilotTest {
                     List.of(
                         new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
                         new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20)))));
+    assertThat(controller.filteredExtensionCount()).isEqualTo(2);
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
 
     controller.onEvent(KeyEvent.ofChar('?'));

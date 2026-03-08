@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 class JustfileTest {
@@ -22,25 +23,32 @@ class JustfileTest {
   void verificationRecipesRouteThroughSharedScripts() throws Exception {
     String justfile = Files.readString(Path.of("justfile"), StandardCharsets.UTF_8);
 
-    assertThat(justfile).contains("test-unit:");
-    assertThat(justfile).contains("scripts/verify/unit.sh");
-    assertThat(justfile).contains("test:");
-    assertThat(justfile).contains("scripts/verify/verify.sh");
-    assertThat(justfile).contains("format-check:");
-    assertThat(justfile).contains("scripts/verify/format-check.sh");
-    assertThat(justfile).contains("headless-check:");
-    assertThat(justfile).contains("scripts/verify/headless-compile.sh");
-    assertThat(justfile).contains("coverage:");
-    assertThat(justfile).contains("scripts/verify/coverage.sh");
-    assertThat(justfile).contains("docs-build:");
-    assertThat(justfile).contains("scripts/verify/docs-build.sh");
-    assertThat(justfile).contains("docs-linkcheck:");
-    assertThat(justfile).contains("scripts/verify/docs-linkcheck.sh");
-    assertThat(justfile).contains("native-size mode:");
-    assertThat(justfile).contains("scripts/verify/native-size.sh {{mode}}");
-    assertThat(justfile).contains("native-smoke-posix binary:");
-    assertThat(justfile).contains("scripts/verify/native-interactive-smoke-posix.sh {{binary}}");
-    assertThat(justfile).contains("native-smoke-windows binary:");
-    assertThat(justfile).contains("scripts/verify/native-interactive-smoke-windows.sh {{binary}}");
+    assertRecipeRunsScript(justfile, "test-unit:", "scripts/verify/unit.sh");
+    assertRecipeRunsScript(justfile, "test:", "scripts/verify/verify.sh");
+    assertRecipeRunsScript(justfile, "format-check:", "scripts/verify/format-check.sh");
+    assertRecipeRunsScript(justfile, "headless-check:", "scripts/verify/headless-compile.sh");
+    assertRecipeRunsScript(justfile, "coverage:", "scripts/verify/coverage.sh");
+    assertRecipeRunsScript(justfile, "docs-build:", "scripts/verify/docs-build.sh");
+    assertRecipeRunsScript(justfile, "docs-linkcheck:", "scripts/verify/docs-linkcheck.sh");
+    assertRecipeRunsScript(justfile, "native-size mode:", "scripts/verify/native-size.sh {{mode}}");
+    assertRecipeRunsScript(
+        justfile,
+        "native-smoke-posix binary:",
+        "scripts/verify/native-interactive-smoke-posix.sh {{binary}}");
+    assertRecipeRunsScript(
+        justfile,
+        "native-smoke-windows binary:",
+        "scripts/verify/native-interactive-smoke-windows.sh {{binary}}");
+  }
+
+  private static void assertRecipeRunsScript(String justfile, String recipe, String script) {
+    Pattern pattern =
+        Pattern.compile(
+            "(?m)^"
+                + Pattern.quote(recipe)
+                + "\\R(?:    .*\\R)*?    "
+                + Pattern.quote(script)
+                + "$");
+    assertThat(pattern.matcher(justfile).find()).isTrue();
   }
 }

@@ -219,6 +219,9 @@ Verify a locally built headless jar:
 ----
 sha256sum -c target/quarkus-forge-headless.jar.sha256
 ----
+
+=== Additional Notes
+
 * When `--from` is set, request metadata fields come from the Forgefile; CLI `--preset` and `--extension` are appended.
 * `--from <name>` falls back to `~/.quarkus-forge/recipes/<name>` when no local file exists.
 * `--save-as <name>` writes to `~/.quarkus-forge/recipes/<name>` when `<name>` has no path separators.

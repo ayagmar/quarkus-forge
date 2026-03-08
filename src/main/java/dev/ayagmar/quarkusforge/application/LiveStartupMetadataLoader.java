@@ -10,6 +10,7 @@ import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -43,15 +44,19 @@ public final class LiveStartupMetadataLoader implements StartupMetadataLoader {
 
   @Override
   public StartupMetadataSelection load() {
+    CompletableFuture<MetadataDto> metadataFuture = null;
     try (QuarkusApiClient apiClient = apiClientFactory.apply(apiBaseUri)) {
-      MetadataDto metadata =
-          apiClient.fetchMetadata().get(refreshTimeout.toMillis(), TimeUnit.MILLISECONDS);
+      metadataFuture = apiClient.fetchMetadata();
+      MetadataDto metadata = metadataFuture.get(refreshTimeout.toMillis(), TimeUnit.MILLISECONDS);
       diagnostics.info("metadata.load.success", of("source", "live"));
       return new StartupMetadataSelection(
           MetadataCompatibilityContext.success(metadata), "live", "");
     } catch (InterruptedException interruptedException) {
       return fallbackSelection(interruptedException);
     } catch (TimeoutException timeoutException) {
+      if (metadataFuture != null) {
+        metadataFuture.cancel(true);
+      }
       return fallbackSelection(timeoutException);
     } catch (ExecutionException executionException) {
       return fallbackSelection(executionException);

@@ -64,6 +64,7 @@ final class UiRenderStateAssembler {
         metadataPanelSnapshot(reducerState, metadataCompatibility),
         new UiStateSnapshotMapper.PanelState(
             extensionsPanelSnapshot(reducerState), footerSnapshot(reducerState, statusMessage)),
+        reducerState.postGeneration(),
         generationView(generationCancellationRequested),
         startupOverlayView(reducerState, metadataCompatibility));
   }

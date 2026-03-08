@@ -19,6 +19,8 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 public final class HeadlessGenerationService implements AutoCloseable {
   private final HeadlessCatalogLoader catalogLoader;
@@ -98,7 +100,14 @@ public final class HeadlessGenerationService implements AutoCloseable {
     CatalogData catalogData;
     try {
       catalogData = loadCatalogData(catalogTimeout, diagnostics);
-    } catch (Exception exception) {
+    } catch (ExecutionException | InterruptedException | TimeoutException exception) {
+      return AsyncFailureHandler.handleFailure(
+          exception,
+          catalogTimeout,
+          "catalog.load",
+          "Failed to load extension catalog",
+          diagnostics);
+    } catch (RuntimeException exception) {
       return AsyncFailureHandler.handleFailure(
           exception,
           catalogTimeout,
@@ -143,7 +152,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
   }
 
   private CatalogData loadCatalogData(Duration catalogTimeout, DiagnosticLogger diagnostics)
-      throws Exception {
+      throws ExecutionException, InterruptedException, TimeoutException {
     CatalogData catalogData = catalogLoader.loadCatalogData(catalogTimeout);
     diagnostics.info(
         "catalog.load.success",

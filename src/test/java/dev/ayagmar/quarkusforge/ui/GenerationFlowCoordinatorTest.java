@@ -79,6 +79,24 @@ class GenerationFlowCoordinatorTest {
   }
 
   @Test
+  void rejectedSubmitWhileLoadingKeepsInFlightTokenAndCancellationState() {
+    GenerationFlowCoordinator coordinator = new GenerationFlowCoordinator();
+    TestCallbacks callbacks = new TestCallbacks();
+    callbacks.transitionAllowed = true;
+    ControlledRunner runner = new ControlledRunner();
+
+    coordinator.startFlow(runner, request(), Path.of("output/demo"), callbacks);
+    long initialToken = coordinator.generationToken();
+    coordinator.requestCancellation(callbacks);
+    callbacks.transitionAllowed = false;
+
+    coordinator.startFlow(new ControlledRunner(), request(), Path.of("output/next"), callbacks);
+
+    assertThat(coordinator.generationToken()).isEqualTo(initialToken);
+    assertThat(coordinator.isCancellationRequested()).isTrue();
+  }
+
+  @Test
   void reconcileCompletionAppliesDoneFutureEvenWhenSchedulerCallbackWasDropped() {
     GenerationFlowCoordinator coordinator = new GenerationFlowCoordinator();
     TestCallbacks callbacks = new TestCallbacks();

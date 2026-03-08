@@ -68,8 +68,8 @@ final class UiRenderer {
     if (state.overlays().helpOverlayVisible()) {
       adapter.renderHelpOverlay(frame, area, state);
     }
-    if (state.postGeneration().visible()) {
-      adapter.renderPostGenerationOverlay(frame, area, state.postGeneration());
+    if (renderModel.postGeneration().visible()) {
+      adapter.renderPostGenerationOverlay(frame, area, renderModel.postGeneration());
     }
     if (state.overlays().startupOverlayVisible()) {
       adapter.renderStartupStatusOverlay(frame, area, renderModel.startupOverlay());
