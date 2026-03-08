@@ -89,6 +89,23 @@ class UiRenderStateAssemblerTest {
     assertThat(snapshot.footer().preGeneratePlan()).isEmpty();
   }
 
+  @Test
+  void renderModelExposesCurrentRenderSlices() {
+    ForgeUiState initialState = UiTestFixtureFactory.defaultForgeUiState();
+    RenderFixture fixture = RenderFixture.create(initialState);
+
+    UiRenderModel renderModel =
+        fixture.assembler.renderModel(
+            fixture.reducerState, "Ready", initialState.metadataCompatibility(), false);
+
+    assertThat(renderModel.reducerState().statusMessage()).isEqualTo("Ready");
+    assertThat(renderModel.metadataPanel().title()).isEqualTo("Project Metadata");
+    assertThat(renderModel.extensionsPanel().catalogSource()).isEqualTo("snapshot");
+    assertThat(renderModel.footer().statusMessage()).isEqualTo("Ready");
+    assertThat(renderModel.generation().state()).isEqualTo(GenerationState.IDLE);
+    assertThat(renderModel.startupOverlay().statusLines()).isNotEmpty();
+  }
+
   private record RenderFixture(
       UiRenderStateAssembler assembler,
       UiState reducerState,

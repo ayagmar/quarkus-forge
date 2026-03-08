@@ -54,10 +54,20 @@ final class UiRenderStateAssembler {
       String statusMessage,
       MetadataCompatibilityContext metadataCompatibility,
       boolean generationCancellationRequested) {
+    return renderModel(
+            reducerState, statusMessage, metadataCompatibility, generationCancellationRequested)
+        .snapshotState();
+  }
+
+  UiRenderModel renderModel(
+      UiState reducerState,
+      String statusMessage,
+      MetadataCompatibilityContext metadataCompatibility,
+      boolean generationCancellationRequested) {
     Objects.requireNonNull(reducerState);
     Objects.requireNonNull(statusMessage);
     Objects.requireNonNull(metadataCompatibility);
-    return uiStateSnapshotMapper.map(
+    return uiStateSnapshotMapper.renderModel(
         reduceInputState(reducerState, metadataCompatibility, generationCancellationRequested),
         statusMessage,
         new UiStateSnapshotMapper.PanelState(

@@ -174,6 +174,8 @@ Render-only `UiState` fields:
 
 The render-only fields above are synchronized from runtime collaborators immediately before render. They are not reducer authority and are the first candidates to move into a dedicated render model in the next slices of this phase.
 
+`UiRenderModel` is now the explicit container for those render-only slices while the codebase transitions away from storing them directly on `UiState`.
+
 === State Machine: Generation Flow
 
 ++++
