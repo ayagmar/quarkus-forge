@@ -17,7 +17,7 @@ import dev.ayagmar.quarkusforge.headless.HeadlessGenerationService;
 import dev.ayagmar.quarkusforge.headless.HeadlessOutputPrinter;
 import dev.ayagmar.quarkusforge.postgen.PostTuiActionExecutor;
 import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
-import dev.ayagmar.quarkusforge.runtime.RuntimeWiring;
+import dev.ayagmar.quarkusforge.runtime.RuntimeServices;
 import dev.ayagmar.quarkusforge.runtime.TuiBootstrapService;
 import dev.ayagmar.quarkusforge.runtime.TuiSessionSummary;
 import java.util.Objects;
@@ -122,7 +122,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
     StartupState startupState =
         loadStartupState(
             requestOptions,
-            dryRun ? null : RuntimeWiring.loadStoredCliPrefill(runtimeConfig),
+            dryRun ? null : RuntimeServices.loadStoredCliPrefill(runtimeConfig),
             diagnostics);
     StartupMetadataSelection startupMetadataSelection = startupState.metadataSelection();
     ForgeUiState initialState = startupState.initialState();
@@ -148,7 +148,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
 
     diagnostics.info("cli.tui.launch", of("searchDebounceMs", searchDebounceMs));
     TuiSessionSummary summary = runTui(initialState, searchDebounceMs, runtimeConfig, diagnostics);
-    RuntimeWiring.saveLastRequest(runtimeConfig, summary.finalRequest());
+    RuntimeServices.saveLastRequest(runtimeConfig, summary.finalRequest());
     POST_TUI_ACTION_EXECUTOR.execute(summary, postGenerateHookCommand, diagnostics);
     return ExitCodes.OK;
   }
@@ -209,7 +209,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
   @Override
   public int runHeadlessGenerate(GenerateCommand command) {
     try (HeadlessGenerationService service =
-        RuntimeWiring.headlessGenerationService(runtimeConfig)) {
+        RuntimeServices.openHeadlessGenerationService(runtimeConfig)) {
       return service.run(command, dryRun, verbose);
     }
   }
