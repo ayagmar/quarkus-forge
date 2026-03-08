@@ -764,7 +764,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   private UiState.ExtensionView extensionViewSnapshot() {
     Integer selectedRow = extensionCatalogNavigation.selectedRow();
-    return new UiState.ExtensionView(
+    return UiState.ExtensionView.snapshot(
         extensionCatalogProjection.filteredExtensions().size(),
         extensionCatalogProjection.totalCatalogExtensionCount(),
         extensionCatalogNavigation.selectedExtensionCount(),

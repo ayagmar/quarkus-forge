@@ -515,7 +515,8 @@ class CoreUiReducerTest {
     UiState state =
         stateWithExtensionView(
             stateWithFocus(baseState(), FocusTarget.EXTENSION_SEARCH),
-            new UiState.ExtensionView(1, 2, 1, true, true, "web", "Core", "rest", "", true, false));
+            UiState.ExtensionView.snapshot(
+                1, 2, 1, true, true, "web", "Core", "rest", "", true, false));
 
     ReduceResult result = reducer.reduce(state, new UiIntent.ExtensionCancelIntent());
 
@@ -530,7 +531,7 @@ class CoreUiReducerTest {
     UiState state =
         stateWithExtensionView(
             stateWithFocus(baseState(), FocusTarget.EXTENSION_SEARCH),
-            new UiState.ExtensionView(2, 2, 0, false, false, "", "", "", "", true, false));
+            UiState.ExtensionView.snapshot(2, 2, 0, false, false, "", "", "", "", true, false));
 
     ReduceResult result = reducer.reduce(state, new UiIntent.ExtensionCancelIntent());
 
@@ -575,12 +576,12 @@ class CoreUiReducerTest {
   @Test
   void extensionStateUpdatedIntentMakesExtensionViewReducerOwned() {
     UiState.ExtensionView nextExtensions =
-        new UiState.ExtensionView(
+        UiState.ExtensionView.snapshot(
             1, 2, 1, true, false, "web", "Core", "rest", "io.quarkus:rest", false, false);
     UiState state =
         stateWithExtensionView(
             baseState(),
-            new UiState.ExtensionView(7, 7, 0, false, false, "", "", "", "", true, true));
+            UiState.ExtensionView.snapshot(7, 7, 0, false, false, "", "", "", "", true, true));
 
     ReduceResult result =
         reducer.reduce(state, new UiIntent.ExtensionStateUpdatedIntent(nextExtensions));
@@ -622,7 +623,7 @@ class CoreUiReducerTest {
     UiState state =
         stateWithExtensionView(
             stateWithFocus(baseState(), FocusTarget.EXTENSION_LIST),
-            new UiState.ExtensionView(7, 7, 0, false, false, "", "", "", "", true, true));
+            UiState.ExtensionView.snapshot(7, 7, 0, false, false, "", "", "", "", true, true));
 
     ReduceResult result =
         reducer.reduce(state, new UiIntent.ExtensionInteractionIntent(KeyEvent.ofChar('k')));
@@ -639,7 +640,7 @@ class CoreUiReducerTest {
     UiState state =
         stateWithExtensionView(
             stateWithFocus(baseState(), FocusTarget.EXTENSION_LIST),
-            new UiState.ExtensionView(7, 7, 0, false, false, "", "", "", "", true, true));
+            UiState.ExtensionView.snapshot(7, 7, 0, false, false, "", "", "", "", true, true));
 
     ReduceResult result =
         reducer.reduce(
@@ -659,7 +660,7 @@ class CoreUiReducerTest {
     UiState state =
         stateWithExtensionView(
             stateWithFocus(baseState(), FocusTarget.EXTENSION_LIST),
-            new UiState.ExtensionView(
+            UiState.ExtensionView.snapshot(
                 7, 7, 0, false, false, "", "", "", "io.quarkus:quarkus-arc", false, false));
 
     ReduceResult result =
@@ -950,7 +951,7 @@ class CoreUiReducerTest {
         state,
         state.focusTarget(),
         state.validation(),
-        new UiState.ExtensionView(
+        UiState.ExtensionView.snapshot(
             state.extensions().filteredCount(),
             state.extensions().totalCount(),
             selectedExtensionCount,

@@ -32,6 +32,6 @@ final class UiTestFixtureFactory {
   }
 
   static UiState.ExtensionView defaultExtensionView() {
-    return new UiState.ExtensionView(7, 7, 0, false, false, "", "", "", "", true, true);
+    return UiState.ExtensionView.snapshot(7, 7, 0, false, false, "", "", "", "", true, true);
   }
 }
