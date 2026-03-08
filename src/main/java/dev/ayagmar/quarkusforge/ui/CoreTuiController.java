@@ -31,11 +31,9 @@ import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.EnumMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
@@ -98,6 +96,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   private final UiRenderStateAssembler uiRenderStateAssembler;
   private final UiRenderer uiRenderer;
   private final CoreUiRenderAdapter uiRenderAdapter;
+  private final CatalogEffects catalogEffects;
   private final CatalogLoadIntentPort catalogLoadIntentPort;
   private final PostGenerationMenuState postGenerationMenu;
 
@@ -133,12 +132,12 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         new UiEffectsPort() {
           @Override
           public void startCatalogLoad(ExtensionCatalogLoader loader) {
-            runCatalogLoadEffect(loader);
+            catalogEffects.startLoad(loader, catalogLoadIntentPort);
           }
 
           @Override
           public void requestCatalogReload() {
-            runCatalogReloadEffect();
+            catalogEffects.requestReload(catalogLoadIntentPort);
           }
 
           @Override
@@ -168,7 +167,13 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
           @Override
           public List<UiIntent> applyCatalogLoadSuccess(CatalogLoadSuccess success) {
-            return applyCatalogLoadSuccessEffect(success);
+            CatalogEffects.ApplyLoadSuccessResult result =
+                catalogEffects.applyLoadSuccess(
+                    success,
+                    metadataCompatibility,
+                    inputStates.get(FocusTarget.EXTENSION_SEARCH).text());
+            metadataCompatibility = result.metadataCompatibility();
+            return result.followUpIntents();
           }
 
           @Override
@@ -255,6 +260,33 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         new ExtensionCatalogProjection(
             scheduler, debounceDelay, inputStates.get(FocusTarget.EXTENSION_SEARCH).text());
     extensionCatalogProjection.initialize(extensionCatalogNavigation, extensionCatalogPreferences);
+    catalogEffects =
+        new CatalogEffects(
+            catalogLoadCoordinator,
+            extensionCatalogPreferences,
+            extensionCatalogNavigation,
+            extensionCatalogProjection,
+            new CatalogEffects.Callbacks() {
+              @Override
+              public UiIntent.ExtensionStateUpdatedIntent extensionStateUpdatedIntent() {
+                return CoreTuiController.this.extensionStateUpdatedIntent();
+              }
+
+              @Override
+              public ProjectRequest currentRequest() {
+                return CoreTuiController.this.currentRequest();
+              }
+
+              @Override
+              public ProjectRequest syncMetadataSelectors(ProjectRequest request) {
+                return CoreTuiController.this.syncMetadataSelectors(request);
+              }
+
+              @Override
+              public ValidationReport validateRequest(ProjectRequest request) {
+                return CoreTuiController.this.validateRequest(request);
+              }
+            });
     extensionInteraction =
         new ExtensionInteractionHandler(
             extensionCatalogPreferences, extensionCatalogNavigation, extensionCatalogProjection);
@@ -782,17 +814,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     return "Toggled extension: " + extension.name();
   }
 
-  private void replaceExtensionCatalog(List<ExtensionCatalogItem> items, String query) {
-    Set<String> availableExtensionIds = new LinkedHashSet<>();
-    for (ExtensionCatalogItem item : items) {
-      availableExtensionIds.add(item.id());
-    }
-    extensionCatalogNavigation.retainAvailableSelections(availableExtensionIds);
-    extensionCatalogPreferences.retainAvailable(availableExtensionIds);
-    extensionCatalogProjection.replaceCatalog(
-        items, query, extensionCatalogNavigation, extensionCatalogPreferences, ignored -> {});
-  }
-
   @Override
   public UiAction handleCommandPaletteKey(KeyEvent keyEvent) {
     if (!commandPaletteVisible()) {
@@ -1034,11 +1055,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   private void scheduleFilteredExtensionsRefresh() {
     String query = inputStates.get(FocusTarget.EXTENSION_SEARCH).text();
-    extensionCatalogProjection.scheduleRefresh(
-        query,
-        extensionCatalogNavigation,
-        extensionCatalogPreferences,
-        this::publishFilteredExtensionUpdate);
+    catalogEffects.scheduleFilteredRefresh(query, this::publishFilteredExtensionUpdate);
   }
 
   private ProjectRequest syncMetadataSelectors(ProjectRequest request) {
@@ -1153,8 +1170,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   private void cancelPendingAsyncOperations() {
-    catalogLoadCoordinator.cancel(catalogLoadIntentPort);
-    extensionCatalogProjection.cancelPendingAsync();
+    catalogEffects.cancelPendingAsync(catalogLoadIntentPort);
   }
 
   private void reconcileGenerationCompletionIfDone() {
@@ -1189,32 +1205,19 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   private void runCatalogLoadEffect(ExtensionCatalogLoader loader) {
-    catalogLoadCoordinator.startLoad(loader, catalogLoadIntentPort);
+    catalogEffects.startLoad(loader, catalogLoadIntentPort);
   }
 
   private void runCatalogReloadEffect() {
-    catalogLoadCoordinator.requestReload(catalogLoadIntentPort);
+    catalogEffects.requestReload(catalogLoadIntentPort);
   }
 
   private List<UiIntent> applyCatalogLoadSuccessEffect(CatalogLoadSuccess success) {
-    if (success.metadata() != null) {
-      metadataCompatibility = MetadataCompatibilityContext.success(success.metadata());
-    }
-    replaceExtensionCatalog(success.items(), inputStates.get(FocusTarget.EXTENSION_SEARCH).text());
-    extensionCatalogProjection.setPresetExtensionsByName(
-        success.presetExtensionsByName(),
-        extensionCatalogNavigation,
-        extensionCatalogPreferences,
-        ignored -> {});
-    List<UiIntent> followUpIntents = new ArrayList<>();
-    followUpIntents.add(extensionStateUpdatedIntent());
-    if (success.metadata() == null) {
-      return List.copyOf(followUpIntents);
-    }
-    ProjectRequest nextRequest = syncMetadataSelectors(currentRequest());
-    followUpIntents.add(
-        new UiIntent.FormStateUpdatedIntent(nextRequest, validateRequest(nextRequest)));
-    return List.copyOf(followUpIntents);
+    CatalogEffects.ApplyLoadSuccessResult result =
+        catalogEffects.applyLoadSuccess(
+            success, metadataCompatibility, inputStates.get(FocusTarget.EXTENSION_SEARCH).text());
+    metadataCompatibility = result.metadataCompatibility();
+    return result.followUpIntents();
   }
 
   private void cancelPendingAsyncEffect() {
@@ -1446,12 +1449,8 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   private List<UiIntent> clearExtensionSearchFilter() {
-    TextInputState searchState = inputStates.get(FocusTarget.EXTENSION_SEARCH);
-    searchState.setText("");
-    searchState.moveCursorToStart();
-    extensionCatalogProjection.refreshNow(
-        "", extensionCatalogNavigation, extensionCatalogPreferences, ignored -> {});
-    return extensionUpdateIntents("Extension search cleared");
+    return extensionUpdateIntents(
+        catalogEffects.clearSearchFilter(inputStates.get(FocusTarget.EXTENSION_SEARCH)));
   }
 
   static String catalogLoadedStatusMessage(CatalogSource source, boolean stale) {
