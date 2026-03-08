@@ -392,6 +392,46 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void commandPaletteSwallowsUnderlyingExtensionQuickActions() {
+    CoreTuiController controller = UiControllerTestHarness.controller();
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20)))));
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+
+    controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
+    controller.onEvent(KeyEvent.ofChar('f'));
+
+    assertThat(controller.commandPaletteVisible()).isTrue();
+    assertThat(controller.favoriteExtensionCount()).isZero();
+    assertThat(controller.favoritesOnlyFilterEnabled()).isFalse();
+  }
+
+  @Test
+  void helpOverlaySwallowsUnderlyingExtensionQuickActions() {
+    CoreTuiController controller = UiControllerTestHarness.controller();
+    controller.loadExtensionCatalogAsync(
+        () ->
+            CompletableFuture.completedFuture(
+                ExtensionCatalogLoadResult.live(
+                    List.of(
+                        new ExtensionDto("io.quarkus:quarkus-arc", "CDI", "cdi", "Core", 10),
+                        new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest", "Web", 20)))));
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
+
+    controller.onEvent(KeyEvent.ofChar('?'));
+    controller.onEvent(KeyEvent.ofChar('f'));
+
+    assertThat(controller.helpOverlayVisible()).isTrue();
+    assertThat(controller.favoriteExtensionCount()).isZero();
+    assertThat(controller.favoritesOnlyFilterEnabled()).isFalse();
+  }
+
+  @Test
   void commandPaletteRunsSelectedAction() {
     CoreTuiController controller = UiControllerTestHarness.controller();
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
