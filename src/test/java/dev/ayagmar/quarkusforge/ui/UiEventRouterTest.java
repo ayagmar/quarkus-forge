@@ -111,6 +111,18 @@ class UiEventRouterTest {
   }
 
   @Test
+  void commandPaletteHandlerWinsBeforeGlobalShortcutAndFocusFlows() {
+    TestRoutingContext context = new TestRoutingContext();
+    context.commandPaletteAction = UiAction.handled(false);
+
+    UiAction action = new UiEventRouter().routeKeyEvent(ANY_KEY, context);
+
+    assertThat(action).isEqualTo(UiAction.handled(false));
+    assertThat(context.calls)
+        .containsExactly("help", "shouldToggleHelp", "isCommandPaletteToggle", "commandPalette");
+  }
+
+  @Test
   void extensionCancelWinsBeforeQuitFlow() {
     TestRoutingContext context = new TestRoutingContext();
     context.cancelAction = UiAction.handled(false);
@@ -135,6 +147,7 @@ class UiEventRouterTest {
     private boolean helpToggled;
     private boolean commandPaletteToggle;
     private boolean commandPaletteToggled;
+    private UiAction commandPaletteAction;
     private UiAction postGenerationAction;
     private UiAction cancelAction;
     private boolean generationInProgress;
@@ -171,7 +184,7 @@ class UiEventRouterTest {
     @Override
     public UiAction handleCommandPaletteKey(KeyEvent keyEvent) {
       calls.add("commandPalette");
-      return null;
+      return commandPaletteAction;
     }
 
     @Override
