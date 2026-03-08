@@ -1208,7 +1208,11 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   private void syncReducerRuntimeState() {
     boolean generationVisible = isGenerationOverlayVisible();
     if (reducerState.overlays().generationVisible() != generationVisible) {
-      reducerState = reducerState.withGenerationOverlayVisible(generationVisible);
+      reducerState =
+          uiReducer
+              .reduce(
+                  reducerState, new UiIntent.GenerationOverlayVisibilityIntent(generationVisible))
+              .nextState();
     }
   }
 

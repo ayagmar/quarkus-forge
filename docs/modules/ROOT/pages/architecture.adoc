@@ -38,6 +38,7 @@ graph TD
 
     subgraph App["Application Layer (application/)"]
         IRS[InputResolutionService]
+        SSS[StartupStateService contract]
     end
 
     subgraph Forge["Forge Layer (forge/)"]
@@ -388,6 +389,7 @@ graph LR
 
     subgraph App["Application Layer (application/)"]
         IRS["InputResolutionService"]
+        SSS["StartupStateService<br/>StartupRequest<br/>StartupState"]
     end
 
     subgraph Forge["Forge Layer (forge/)"]
@@ -398,6 +400,7 @@ graph LR
     IRS -->|resolves| PR
     IRS -->|uses| CPM
     IRS -->|uses| MCC
+    SSS -->|owns startup contract for| IRS
     PRV -->|validates| PR
     MCC -->|constrains| PR
     CPM -->|maps CLI options| PR

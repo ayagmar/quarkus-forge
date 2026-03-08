@@ -149,6 +149,11 @@ final class CoreUiReducer implements UiReducer {
                   false),
               List.of(),
               UiAction.handled(false));
+      case UiIntent.GenerationOverlayVisibilityIntent visibilityIntent ->
+          new ReduceResult(
+              state.withGenerationOverlayVisible(visibilityIntent.visible()),
+              List.of(),
+              UiAction.handled(false));
       case UiIntent.CommandPaletteIntent commandPaletteIntent ->
           reduceCommandPalette(state, commandPaletteIntent.command());
       case UiIntent.HelpOverlayIntent helpOverlayIntent ->

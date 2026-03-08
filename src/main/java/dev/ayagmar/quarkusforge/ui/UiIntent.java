@@ -45,6 +45,8 @@ sealed interface UiIntent {
 
   record GenerationCancellationRequestedIntent() implements UiIntent {}
 
+  record GenerationOverlayVisibilityIntent(boolean visible) implements UiIntent {}
+
   record CommandPaletteIntent(CommandPaletteCommand command) implements UiIntent {}
 
   record HelpOverlayIntent(HelpOverlayCommand command) implements UiIntent {}
