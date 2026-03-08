@@ -34,7 +34,6 @@ public final class HeadlessGenerationService implements AutoCloseable {
   private final HeadlessCatalogLoader catalogLoader;
   private final HeadlessProjectGenerator projectGenerator;
   private final HeadlessExtensionResolutionService extensionResolutionService;
-  private final HeadlessForgefilePersistenceService forgefilePersistenceService;
   private final AutoCloseable closeOwner;
 
   HeadlessGenerationService(
@@ -45,7 +44,6 @@ public final class HeadlessGenerationService implements AutoCloseable {
         catalogLoader,
         projectGenerator,
         new HeadlessExtensionResolutionService(catalogLoader, favoritesStore),
-        new HeadlessForgefilePersistenceService(),
         catalogLoader);
   }
 
@@ -58,7 +56,6 @@ public final class HeadlessGenerationService implements AutoCloseable {
         catalogLoader,
         projectGenerator,
         new HeadlessExtensionResolutionService(catalogLoader, favoritesStore),
-        new HeadlessForgefilePersistenceService(),
         closeOwner);
   }
 
@@ -66,12 +63,10 @@ public final class HeadlessGenerationService implements AutoCloseable {
       HeadlessCatalogLoader catalogLoader,
       HeadlessProjectGenerator projectGenerator,
       HeadlessExtensionResolutionService extensionResolutionService,
-      HeadlessForgefilePersistenceService forgefilePersistenceService,
       AutoCloseable closeOwner) {
     this.catalogLoader = Objects.requireNonNull(catalogLoader);
     this.projectGenerator = Objects.requireNonNull(projectGenerator);
     this.extensionResolutionService = Objects.requireNonNull(extensionResolutionService);
-    this.forgefilePersistenceService = Objects.requireNonNull(forgefilePersistenceService);
     this.closeOwner = Objects.requireNonNull(closeOwner);
   }
 
@@ -124,30 +119,19 @@ public final class HeadlessGenerationService implements AutoCloseable {
     Duration catalogTimeout = HeadlessTimeouts.catalogTimeout();
     CatalogData catalogData;
     try {
-      catalogData = catalogLoader.loadCatalogData(catalogTimeout);
-      diagnostics.info(
-          "catalog.load.success",
-          of("source", catalogData.sourceLabel()),
-          of("stale", catalogData.stale()),
-          of("detail", catalogData.detailMessage()));
+      catalogData = loadCatalogData(catalogTimeout, diagnostics);
     } catch (Exception e) {
       return AsyncFailureHandler.handleFailure(
           e, catalogTimeout, "catalog.load", "Failed to load extension catalog", diagnostics);
     }
 
-    MetadataCompatibilityContext metadataCompatibility =
-        MetadataCompatibilityContext.success(catalogData.metadata());
-    ForgeUiState validatedState =
-        InputResolutionService.resolveInitialState(inputs.template(), metadataCompatibility);
+    ForgeUiState validatedState = resolveValidatedState(inputs, catalogData);
     if (!validatedState.canSubmit()) {
-      diagnostics.error(
-          "generate.validation.failed",
-          of("errorCount", validatedState.validation().errors().size()),
-          of("catalogSource", catalogData.sourceLabel()),
-          of("stale", catalogData.stale()));
-      HeadlessOutputPrinter.printValidationErrors(
-          validatedState.validation(), catalogData.sourceLabel(), catalogData.detailMessage());
-      return ExitCodes.VALIDATION;
+      return validationFailure(
+          validatedState.validation(),
+          catalogData.sourceLabel(),
+          catalogData.detailMessage(),
+          diagnostics);
     }
 
     List<String> extensionIds;
@@ -165,14 +149,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
             inputs, validatedState.request(), extensionIds);
       }
     } catch (ValidationException validationException) {
-      diagnostics.error(
-          "generate.extension-validation.failed",
-          of("errorCount", validationException.errors().size()));
-      HeadlessOutputPrinter.printValidationErrors(
-          new ValidationReport(validationException.errors()),
-          catalogData.sourceLabel(),
-          catalogData.detailMessage());
-      return ExitCodes.VALIDATION;
+      return extensionValidationFailure(validationException, catalogData, diagnostics);
     } catch (Exception e) {
       return AsyncFailureHandler.handleFailure(
           e, catalogTimeout, "preset.load", "Failed to load presets", diagnostics);
@@ -180,27 +157,76 @@ public final class HeadlessGenerationService implements AutoCloseable {
 
     boolean dryRunRequested = command.dryRun() || globalDryRun;
     if (dryRunRequested) {
-      diagnostics.info(
-          "generate.dry-run.validated",
-          of("extensionCount", extensionIds.size()),
-          of("catalogSource", catalogData.sourceLabel()),
-          of("stale", catalogData.stale()));
-      HeadlessOutputPrinter.printDryRunSummary(
-          validatedState.request(), extensionIds, catalogData.sourceLabel());
-      return persistForgefileAndReturn(
-          inputs, validatedState.request(), extensionIds, diagnostics, ExitCodes.OK);
+      return handleDryRun(inputs, validatedState.request(), extensionIds, catalogData, diagnostics);
     }
 
-    Path outputPath = HeadlessOutputPrinter.resolveProjectDirectory(validatedState.request());
-    GenerationRequest generationRequest =
-        new GenerationRequest(
-            validatedState.request().groupId(),
-            validatedState.request().artifactId(),
-            validatedState.request().version(),
-            validatedState.request().platformStream(),
-            validatedState.request().buildTool(),
-            validatedState.request().javaVersion(),
-            extensionIds);
+    return executeGeneration(inputs, validatedState.request(), extensionIds, diagnostics);
+  }
+
+  private CatalogData loadCatalogData(Duration catalogTimeout, DiagnosticLogger diagnostics)
+      throws Exception {
+    CatalogData catalogData = catalogLoader.loadCatalogData(catalogTimeout);
+    diagnostics.info(
+        "catalog.load.success",
+        of("source", catalogData.sourceLabel()),
+        of("stale", catalogData.stale()),
+        of("detail", catalogData.detailMessage()));
+    return catalogData;
+  }
+
+  private static ForgeUiState resolveValidatedState(
+      HeadlessGenerationInputs inputs, CatalogData catalogData) {
+    MetadataCompatibilityContext metadataCompatibility =
+        MetadataCompatibilityContext.success(catalogData.metadata());
+    return InputResolutionService.resolveInitialState(inputs.template(), metadataCompatibility);
+  }
+
+  private static int validationFailure(
+      dev.ayagmar.quarkusforge.domain.ValidationReport validation,
+      String sourceLabel,
+      String detailMessage,
+      DiagnosticLogger diagnostics) {
+    diagnostics.error("generate.validation.failed", of("errorCount", validation.errors().size()));
+    HeadlessOutputPrinter.printValidationErrors(validation, sourceLabel, detailMessage);
+    return ExitCodes.VALIDATION;
+  }
+
+  private static int extensionValidationFailure(
+      ValidationException validationException,
+      CatalogData catalogData,
+      DiagnosticLogger diagnostics) {
+    diagnostics.error(
+        "generate.extension-validation.failed",
+        of("errorCount", validationException.errors().size()));
+    HeadlessOutputPrinter.printValidationErrors(
+        new ValidationReport(validationException.errors()),
+        catalogData.sourceLabel(),
+        catalogData.detailMessage());
+    return ExitCodes.VALIDATION;
+  }
+
+  private int handleDryRun(
+      HeadlessGenerationInputs inputs,
+      ProjectRequest request,
+      List<String> extensionIds,
+      CatalogData catalogData,
+      DiagnosticLogger diagnostics) {
+    diagnostics.info(
+        "generate.dry-run.validated",
+        of("extensionCount", extensionIds.size()),
+        of("catalogSource", catalogData.sourceLabel()),
+        of("stale", catalogData.stale()));
+    HeadlessOutputPrinter.printDryRunSummary(request, extensionIds, catalogData.sourceLabel());
+    return persistForgefileAndReturn(inputs, request, extensionIds, diagnostics, ExitCodes.OK);
+  }
+
+  private int executeGeneration(
+      HeadlessGenerationInputs inputs,
+      ProjectRequest request,
+      List<String> extensionIds,
+      DiagnosticLogger diagnostics) {
+    Path outputPath = HeadlessOutputPrinter.resolveProjectDirectory(request);
+    GenerationRequest generationRequest = toGenerationRequest(request, extensionIds);
 
     CompletableFuture<Path> generationFuture = null;
     Duration generationTimeout = HeadlessTimeouts.generationTimeout();
@@ -216,8 +242,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
       diagnostics.info(
           "generate.execute.success", of("projectRoot", generatedProjectRoot.toString()));
       int persistExitCode =
-          persistForgefileAndReturn(
-              inputs, validatedState.request(), extensionIds, diagnostics, ExitCodes.OK);
+          persistForgefileAndReturn(inputs, request, extensionIds, diagnostics, ExitCodes.OK);
       if (persistExitCode != ExitCodes.OK) {
         return persistExitCode;
       }
@@ -231,6 +256,18 @@ public final class HeadlessGenerationService implements AutoCloseable {
       return AsyncFailureHandler.handleFailure(
           e, generationTimeout, "generate.execute", "Generation failed", diagnostics);
     }
+  }
+
+  private static GenerationRequest toGenerationRequest(
+      ProjectRequest request, List<String> extensionIds) {
+    return new GenerationRequest(
+        request.groupId(),
+        request.artifactId(),
+        request.version(),
+        request.platformStream(),
+        request.buildTool(),
+        request.javaVersion(),
+        extensionIds);
   }
 
   private static HeadlessGenerationInputs loadEffectiveInputs(GenerateCommand command) {

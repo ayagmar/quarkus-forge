@@ -2,17 +2,14 @@
 
 ## Findings
 
-- Async review pending.
+- No findings.
 
-## Local Verification
+## Assumptions And Verification Context
 
+- Review scope covered the extracted headless extension-selection authority and the orchestration boundary in `HeadlessGenerationService`.
+- I verified that Slice 8.1 now stops at preset loading, favorites expansion, preset normalization, and extension-id validation; it does not leave mixed ownership with the tracked Slice 8.2 Forgefile-persistence helpers.
+- `docs/modules/ROOT/pages/architecture.adoc` already reflects the extracted `HeadlessExtensionResolutionService`, so no additional user-facing behavior docs were needed for this slice.
+- Verification passed with:
 - `./mvnw -q spotless:apply -DskipTests`
-- `./mvnw -q -Dtest=HeadlessExtensionResolutionServiceTest,HeadlessGenerationServiceTest,HeadlessCliTest,HeadlessCliGenerateIT,HeadlessArchitectureRulesTest test`
-- `./mvnw -q clean compile -Pheadless`
+- `./mvnw -q -Dtest=HeadlessExtensionResolutionServiceTest,HeadlessGenerationServiceTest,HeadlessCliGenerateIT,HeadlessCliTest test`
 - `./mvnw -q spotless:check -DskipTests`
-
-## Local Notes
-
-- Slice 8.1 extracts preset expansion and extension reconciliation into `HeadlessExtensionResolutionService`, leaving `HeadlessGenerationService` responsible for sequencing, diagnostics, validation exit handling, lock drift checks, persistence, and generation execution.
-- Preset normalization and comparison helpers now live with the extracted headless extension-resolution authority so lock drift and Forgefile persistence reuse the same normalization rules.
-- `docs/modules/ROOT/pages/architecture.adoc` was updated because the headless package shape changed materially.
