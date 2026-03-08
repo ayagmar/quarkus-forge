@@ -158,6 +158,22 @@ CoreTuiController (Orchestration Shell)
 
 Reducer-visible UI semantics are now converged for form and extension read-model state. `ProjectRequest`, `ValidationReport`, and extension search/filter/read-model summaries update through reducer intents/effects and live in reducer-owned `UiState`, while generation progress and startup overlay lines are still synchronized from controller-owned runtime collaborators before render. `UiStateSnapshotMapper` only adds render-only panel/footer snapshots plus the effective status line. Mutable widget internals such as `TextInputState` and `ListState` stay in adapter/runtime context rather than `UiState`.
 
+=== UiState Ownership Map
+
+Reducer-owned `UiState` fields:
+
+* `request`, `validation`, `focusTarget`
+* `statusMessage`, `errorMessage`, `verboseErrorDetails`, `showErrorDetails`
+* `submitRequested`, `submitBlockedByValidation`, `submitBlockedByTargetConflict`
+* `commandPaletteSelection`, `overlays`, `catalogLoad`, `postGeneration`, `extensions`
+
+Render-only `UiState` fields:
+
+* `metadataPanel`, `extensionsPanel`, `footer`
+* `generation`, `startupOverlay`
+
+The render-only fields above are synchronized from runtime collaborators immediately before render. They are not reducer authority and are the first candidates to move into a dedicated render model in the next slices of this phase.
+
 === State Machine: Generation Flow
 
 ++++
@@ -166,8 +182,10 @@ stateDiagram-v2
     [*] --> IDLE
     IDLE --> VALIDATING: Enter / Alt+G
     VALIDATING --> ERROR: validation fails
+    VALIDATING --> IDLE: submit reset
     VALIDATING --> LOADING: validation passes
     LOADING --> CANCELLED: Esc / Ctrl+C
+    LOADING --> ERROR: generation fails
     LOADING --> SUCCESS: download complete
     ERROR --> IDLE: dismissed
     CANCELLED --> IDLE: dismissed
