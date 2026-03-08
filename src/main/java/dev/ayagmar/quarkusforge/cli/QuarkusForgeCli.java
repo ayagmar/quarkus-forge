@@ -6,6 +6,7 @@ import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
 import dev.ayagmar.quarkusforge.application.InputResolutionService;
 import dev.ayagmar.quarkusforge.application.StartupMetadataSelection;
+import dev.ayagmar.quarkusforge.application.StartupState;
 import dev.ayagmar.quarkusforge.diagnostics.BoundaryFailure;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
@@ -84,9 +85,6 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
       defaultValue = "",
       description = "Shell command executed in generated project directory after TUI exits")
   private String postGenerateHookCommand;
-
-  private record StartupState(
-      ForgeUiState initialState, StartupMetadataSelection metadataSelection) {}
 
   public QuarkusForgeCli() {
     this(RuntimeConfig.defaults());

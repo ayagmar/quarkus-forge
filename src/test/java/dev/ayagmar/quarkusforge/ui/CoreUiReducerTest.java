@@ -192,6 +192,16 @@ class CoreUiReducerTest {
   }
 
   @Test
+  void generationOverlayVisibilityIntentUpdatesReducerOwnedOverlayState() {
+    ReduceResult result =
+        reducer.reduce(baseState(), new UiIntent.GenerationOverlayVisibilityIntent(true));
+
+    assertThat(result.action()).isEqualTo(UiAction.handled(false));
+    assertThat(result.effects()).isEmpty();
+    assertThat(result.nextState().overlays().generationVisible()).isTrue();
+  }
+
+  @Test
   void generationProgressClearsErrorsWithoutRecomputingStatusText() {
     UiState state =
         baseState()
