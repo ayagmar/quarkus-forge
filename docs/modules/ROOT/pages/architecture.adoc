@@ -17,6 +17,7 @@ graph TD
 
     subgraph Runtime["Runtime Layer (runtime/)"]
         RW[RuntimeWiring]
+        RS[RuntimeServices]
         TBS[TuiBootstrapService]
     end
 
@@ -66,9 +67,11 @@ graph TD
         ID[IdeDetector]
     end
 
+    CLI --> SSS
     CLI --> RW
     CLI --> TBS
     HCLI --> RW
+    RW --> RS
     RW --> UPS
     RW --> EFS
     RW --> HGS
@@ -83,6 +86,10 @@ graph TD
     HCC --> QAC
     QAC --> APP
     APP --> JFR
+    RS --> QAC
+    RS --> CDS
+    RS --> PAS
+    RS --> EFS
     QAC --> CDS
     CDS --> CSC
     QAC --> PAS
@@ -92,7 +99,7 @@ graph TD
 </pre>
 ++++
 
-`RuntimeWiring` is the single composition owner for persistence-backed stores plus shared API and archive services. Headless orchestration now resolves favorites through `persistence` and depends on a catalog loader plus project generator rather than pulling `RuntimeConfig` into `HeadlessGenerationService`.
+`RuntimeServices` now defines the shared session-lifetime composition root for API client, catalog, archive, and favorites collaborators. `RuntimeWiring` remains as the thin adapter for older callers while Phase 7 moves TUI and headless entry paths onto the explicit bundle shape.
 
 Startup policy now lives under `application/`: `LiveStartupMetadataLoader` owns the live-metadata timeout and snapshot-fallback path, while `DefaultStartupStateService` merges explicit CLI overrides, optional stored prefill, and compiled defaults before handing the result to `InputResolutionService`.
 
