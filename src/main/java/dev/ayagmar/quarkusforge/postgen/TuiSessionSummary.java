@@ -1,4 +1,4 @@
-package dev.ayagmar.quarkusforge.runtime;
+package dev.ayagmar.quarkusforge.postgen;
 
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.ui.PostGenerationExitPlan;

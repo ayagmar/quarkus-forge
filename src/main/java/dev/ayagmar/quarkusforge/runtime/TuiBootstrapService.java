@@ -9,6 +9,7 @@ import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
 import dev.ayagmar.quarkusforge.persistence.ExtensionFavoritesStore;
 import dev.ayagmar.quarkusforge.postgen.IdeDetector;
+import dev.ayagmar.quarkusforge.postgen.TuiSessionSummary;
 import dev.ayagmar.quarkusforge.ui.CoreTuiController;
 import dev.ayagmar.quarkusforge.ui.ExtensionCatalogLoadResult;
 import dev.ayagmar.quarkusforge.ui.GenerationProgressUpdate;

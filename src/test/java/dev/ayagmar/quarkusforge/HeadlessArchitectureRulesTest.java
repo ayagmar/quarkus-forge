@@ -30,11 +30,11 @@ class HeadlessArchitectureRulesTest {
           .that()
           .resideInAnyPackage("dev.ayagmar.quarkusforge.headless..")
           .or()
-          .haveSimpleName("HeadlessCli")
+          .haveFullyQualifiedName("dev.ayagmar.quarkusforge.cli.HeadlessCli")
           .or()
-          .haveSimpleName("GenerateCommand")
+          .haveFullyQualifiedName("dev.ayagmar.quarkusforge.cli.GenerateCommand")
           .or()
-          .haveSimpleName("InputResolutionService")
+          .haveFullyQualifiedName("dev.ayagmar.quarkusforge.application.InputResolutionService")
           .should()
           .onlyDependOnClassesThat()
           .resideOutsideOfPackages("dev.ayagmar.quarkusforge.ui..", "dev.tamboui..");
@@ -118,9 +118,10 @@ class HeadlessArchitectureRulesTest {
           .that()
           .resideInAnyPackage("dev.ayagmar.quarkusforge.headless..")
           .and()
-          .doNotHaveSimpleName("HeadlessGenerationInputs")
+          .doNotHaveFullyQualifiedName("dev.ayagmar.quarkusforge.headless.HeadlessGenerationInputs")
           .and()
-          .doNotHaveSimpleName("HeadlessGenerationService")
+          .doNotHaveFullyQualifiedName(
+              "dev.ayagmar.quarkusforge.headless.HeadlessGenerationService")
           .should()
           .dependOnClassesThat()
           .resideInAnyPackage("dev.ayagmar.quarkusforge.cli..");
@@ -131,7 +132,7 @@ class HeadlessArchitectureRulesTest {
           .that()
           .resideInAnyPackage("dev.ayagmar.quarkusforge.runtime..")
           .and()
-          .doNotHaveSimpleName("RuntimeServices")
+          .doNotHaveFullyQualifiedName("dev.ayagmar.quarkusforge.runtime.RuntimeServices")
           .should()
           .dependOnClassesThat()
           .resideInAnyPackage("dev.ayagmar.quarkusforge.headless..");
@@ -160,12 +161,10 @@ class HeadlessArchitectureRulesTest {
               "dev.tamboui..");
 
   @ArchTest
-  static final ArchRule onlyPostTuiActionExecutorMayDependOnRuntime =
+  static final ArchRule postgenLayerDoesNotDependOnRuntime =
       noClasses()
           .that()
           .resideInAnyPackage("dev.ayagmar.quarkusforge.postgen..")
-          .and()
-          .doNotHaveSimpleName("PostTuiActionExecutor")
           .should()
           .dependOnClassesThat()
           .resideInAnyPackage("dev.ayagmar.quarkusforge.runtime..");
