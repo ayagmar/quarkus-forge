@@ -7,7 +7,8 @@
 ## Local Verification
 
 - `./mvnw -q spotless:apply -DskipTests`
-- `./mvnw -q -Dtest=HeadlessExtensionResolutionServiceTest,HeadlessGenerationServiceTest,HeadlessCliTest,HeadlessCliGenerateIT,RuntimeServicesTest test`
+- `./mvnw -q -Dtest=HeadlessExtensionResolutionServiceTest,HeadlessGenerationServiceTest,HeadlessCliTest,HeadlessCliGenerateIT,HeadlessArchitectureRulesTest test`
+- `./mvnw -q clean compile -Pheadless`
 - `./mvnw -q spotless:check -DskipTests`
 
 ## Local Notes
