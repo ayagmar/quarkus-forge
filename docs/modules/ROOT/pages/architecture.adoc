@@ -32,6 +32,7 @@ graph TD
     subgraph Headless["Headless Layer (headless/)"]
         HGS[HeadlessGenerationService]
         HERS[HeadlessExtensionResolutionService]
+        HFPS[HeadlessForgefilePersistenceService]
         HCC[HeadlessCatalogClient]
         HOP[HeadlessOutputPrinter]
         HT[HeadlessTimeouts]
@@ -73,11 +74,13 @@ graph TD
     HCLI --> RS
     HCLI --> HGS
     HGS --> HERS
+    HGS --> HFPS
     HGS --> HCC
     HGS --> HOP
     HGS --> HT
     HGS --> IRS
-    HGS --> EFS
+    HERS --> HCC
+    HERS --> EFS
     TBS --> CTC
     TBS --> RS
     CTC --> QAC
@@ -100,7 +103,7 @@ graph TD
 
 `RuntimeServices` now defines the runtime composition root for session-lifetime API/catalog/archive/favorites collaborators plus preference-store access used by CLI entrypoints. `TuiBootstrapService`, `QuarkusForgeCli`, and `HeadlessCli` now consume that explicit runtime surface directly instead of routing through a separate static wiring bag.
 
-Within `headless/`, `HeadlessGenerationService` is now narrowing toward orchestration-only responsibility: extension/preset reconciliation lives in `HeadlessExtensionResolutionService`, while catalog transport stays in `HeadlessCatalogClient` and generation execution remains delegated to the project generator path.
+Within `headless/`, `HeadlessGenerationService` is now narrowing toward orchestration-only responsibility: extension/preset reconciliation lives in `HeadlessExtensionResolutionService`, Forgefile lock/persistence rules live in `HeadlessForgefilePersistenceService`, catalog transport stays in `HeadlessCatalogClient`, and generation execution remains delegated to the project generator path.
 
 Startup policy now lives under `application/`: `LiveStartupMetadataLoader` owns the live-metadata timeout and snapshot-fallback path, while `DefaultStartupStateService` merges explicit CLI overrides, optional stored prefill, and compiled defaults before handing the result to `InputResolutionService`.
 
