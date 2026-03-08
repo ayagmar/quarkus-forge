@@ -56,5 +56,12 @@ class GenerationStateMachineTest {
         .hasMessageContaining("must not be null");
   }
 
+  @Test
+  void rejectsBothNullStatesExplicitly() {
+    assertThatThrownBy(() -> GenerationStateMachine.isValidTransition(null, null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must not be null");
+  }
+
   private record Transition(GenerationState currentState, GenerationState targetState) {}
 }

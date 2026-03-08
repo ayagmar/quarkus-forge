@@ -203,7 +203,13 @@ On Windows PowerShell:
 ----
 $expected = (Get-Content .\quarkus-forge-headless-windows-x86_64.exe.sha256).Split(' ')[0].ToLower()
 $actual = (Get-FileHash .\quarkus-forge-headless-windows-x86_64.exe -Algorithm SHA256).Hash.ToLower()
-$actual -eq $expected
+if ($actual -eq $expected) {
+  Write-Host "Checksum verified"
+  exit 0
+} else {
+  Write-Error "Checksum mismatch"
+  exit 1
+}
 ----
 
 Generate checksum files for locally built release artifacts:
@@ -225,4 +231,4 @@ sha256sum -c target/quarkus-forge-headless.jar.sha256
 * When `--from` is set, request metadata fields come from the Forgefile; CLI `--preset` and `--extension` are appended.
 * `--from <name>` falls back to `~/.quarkus-forge/recipes/<name>` when no local file exists.
 * `--save-as <name>` writes to `~/.quarkus-forge/recipes/<name>` when `<name>` has no path separators.
-* Source mode is surfaced in diagnostics (`live`, `cache`, `snapshot`).
+* Source mode is surfaced in diagnostics (`live`, `cache`, `snapshot`). This is informational and shows where data came from: `live` means fetched from upstream in real time, `cache` means served from a local cache, and `snapshot` means served from a bundled immutable snapshot.

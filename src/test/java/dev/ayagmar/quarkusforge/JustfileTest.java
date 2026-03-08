@@ -14,8 +14,7 @@ class JustfileTest {
   void testItRecipeRunsFailsafeGoalsWithoutSkipTests() throws Exception {
     String justfile = Files.readString(Path.of("justfile"), StandardCharsets.UTF_8);
 
-    assertThat(justfile).contains("test-it:");
-    assertThat(justfile).contains("scripts/verify/integration.sh");
+    assertRecipeCalls(justfile, "test-it:", "scripts/verify/integration.sh");
     assertThat(justfile).doesNotContain("test-it:\n    {{mvn}} verify -DskipTests");
   }
 
@@ -23,25 +22,25 @@ class JustfileTest {
   void verificationRecipesRouteThroughSharedScripts() throws Exception {
     String justfile = Files.readString(Path.of("justfile"), StandardCharsets.UTF_8);
 
-    assertRecipeRunsScript(justfile, "test-unit:", "scripts/verify/unit.sh");
-    assertRecipeRunsScript(justfile, "test:", "scripts/verify/verify.sh");
-    assertRecipeRunsScript(justfile, "format-check:", "scripts/verify/format-check.sh");
-    assertRecipeRunsScript(justfile, "headless-check:", "scripts/verify/headless-compile.sh");
-    assertRecipeRunsScript(justfile, "coverage:", "scripts/verify/coverage.sh");
-    assertRecipeRunsScript(justfile, "docs-build:", "scripts/verify/docs-build.sh");
-    assertRecipeRunsScript(justfile, "docs-linkcheck:", "scripts/verify/docs-linkcheck.sh");
-    assertRecipeRunsScript(justfile, "native-size mode:", "scripts/verify/native-size.sh {{mode}}");
-    assertRecipeRunsScript(
+    assertRecipeCalls(justfile, "test-unit:", "scripts/verify/unit.sh");
+    assertRecipeCalls(justfile, "test:", "scripts/verify/verify.sh");
+    assertRecipeCalls(justfile, "format-check:", "scripts/verify/format-check.sh");
+    assertRecipeCalls(justfile, "headless-check:", "scripts/verify/headless-compile.sh");
+    assertRecipeCalls(justfile, "coverage:", "scripts/verify/coverage.sh");
+    assertRecipeCalls(justfile, "docs-build:", "scripts/verify/docs-build.sh");
+    assertRecipeCalls(justfile, "docs-linkcheck:", "scripts/verify/docs-linkcheck.sh");
+    assertRecipeCalls(justfile, "native-size mode:", "scripts/verify/native-size.sh {{mode}}");
+    assertRecipeCalls(
         justfile,
         "native-smoke-posix binary:",
         "scripts/verify/native-interactive-smoke-posix.sh {{binary}}");
-    assertRecipeRunsScript(
+    assertRecipeCalls(
         justfile,
         "native-smoke-windows binary:",
         "scripts/verify/native-interactive-smoke-windows.sh {{binary}}");
   }
 
-  private static void assertRecipeRunsScript(String justfile, String recipe, String script) {
+  private static void assertRecipeCalls(String justfile, String recipe, String script) {
     Pattern pattern =
         Pattern.compile(
             "(?m)^"

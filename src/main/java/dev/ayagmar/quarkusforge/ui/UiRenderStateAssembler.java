@@ -29,12 +29,25 @@ final class UiRenderStateAssembler {
       GenerationStateTracker generationStateTracker,
       UiStateSnapshotMapper uiStateSnapshotMapper) {
     this.inputStates = Objects.requireNonNull(inputStates);
+    requireInputState(inputStates, FocusTarget.GROUP_ID);
+    requireInputState(inputStates, FocusTarget.ARTIFACT_ID);
+    requireInputState(inputStates, FocusTarget.VERSION);
+    requireInputState(inputStates, FocusTarget.PACKAGE_NAME);
+    requireInputState(inputStates, FocusTarget.OUTPUT_DIR);
+    requireInputState(inputStates, FocusTarget.EXTENSION_SEARCH);
     this.metadataSelectors = Objects.requireNonNull(metadataSelectors);
     this.extensionCatalogPreferences = Objects.requireNonNull(extensionCatalogPreferences);
     this.extensionCatalogNavigation = Objects.requireNonNull(extensionCatalogNavigation);
     this.extensionCatalogProjection = Objects.requireNonNull(extensionCatalogProjection);
     this.generationStateTracker = Objects.requireNonNull(generationStateTracker);
     this.uiStateSnapshotMapper = Objects.requireNonNull(uiStateSnapshotMapper);
+  }
+
+  private static void requireInputState(
+      EnumMap<FocusTarget, TextInputState> inputStates, FocusTarget target) {
+    if (inputStates.get(target) == null) {
+      throw new IllegalArgumentException("Missing TextInputState for " + target);
+    }
   }
 
   CoreUiRenderAdapter.RenderContext renderContext(

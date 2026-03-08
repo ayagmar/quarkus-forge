@@ -80,8 +80,10 @@ class VerificationScriptsTest {
             headless)
                 ./mvnw clean
                 mkdir -p target/native-size
-            """)
-        .doesNotContain("set -o pipefail");
+            """);
+    // The script already enables pipefail via `set -euo pipefail`; this keeps duplicate legacy
+    // `set -o pipefail` lines from creeping back in.
+    assertThat(nativeSize).doesNotContain("set -o pipefail");
   }
 
   private static List<Path> listScripts() throws IOException {
