@@ -24,15 +24,15 @@ build-native:
 
 # Run all tests (unit + integration)
 test:
-    {{mvn}} verify
+    scripts/verify/verify.sh
 
 # Run unit tests only
 test-unit:
-    {{mvn}} test
+    scripts/verify/unit.sh
 
 # Run integration tests only (Failsafe; compiles tests without running Surefire)
 test-it:
-    {{mvn}} test-compile failsafe:integration-test failsafe:verify
+    scripts/verify/integration.sh
 
 # Generate bash completion scripts for both entry points
 completion-bash:
@@ -51,7 +51,7 @@ release-checksums:
 
 # Run a full clean verify and print merged coverage report paths
 coverage:
-    {{mvn}} clean verify
+    scripts/verify/coverage.sh
     @echo "HTML coverage: target/site/jacoco/index.html"
     @echo "XML coverage:  target/site/jacoco/jacoco.xml"
 
@@ -61,11 +61,31 @@ format:
 
 # Check formatting without modifying files (used in CI)
 format-check:
-    {{mvn}} spotless:check
+    scripts/verify/format-check.sh
 
 # Verify headless profile compiles cleanly
 headless-check:
-    {{mvn}} clean compile -Pheadless
+    scripts/verify/headless-compile.sh
+
+# Build docs locally using the same entrypoint planned for CI
+docs-build:
+    scripts/verify/docs-build.sh
+
+# Check docs links locally using the same entrypoint planned for CI
+docs-linkcheck:
+    scripts/verify/docs-linkcheck.sh
+
+# Check native-image size budgets
+native-size mode:
+    scripts/verify/native-size.sh {{mode}}
+
+# Smoke-test an interactive native binary on POSIX runners
+native-smoke-posix binary:
+    scripts/verify/native-interactive-smoke-posix.sh {{binary}}
+
+# Smoke-test the interactive native binary using the Windows smoke mode
+native-smoke-windows binary:
+    scripts/verify/native-interactive-smoke-windows.sh {{binary}}
 
 # Build and launch the interactive TUI
 tui: build
