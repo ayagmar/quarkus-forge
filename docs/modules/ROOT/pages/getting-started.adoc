@@ -160,7 +160,20 @@ sha256sum -c quarkus-forge-jvm.jar.sha256
 sha256sum -c quarkus-forge-headless-linux-x86_64.sha256
 ----
 
-For Windows downloads, use the PowerShell example above.
+For Windows downloads, use the PowerShell example below.
+
+[source,powershell]
+----
+$expected = (Get-Content .\quarkus-forge-headless-windows-x86_64.exe.sha256).Split(' ')[0].ToLower()
+$actual = (Get-FileHash .\quarkus-forge-headless-windows-x86_64.exe -Algorithm SHA256).Hash.ToLower()
+if ($actual -eq $expected) {
+  Write-Host "Checksum verified"
+  exit 0
+} else {
+  Write-Error "Checksum mismatch"
+  exit 1
+}
+----
 
 === Generate checksums for locally built jars
 

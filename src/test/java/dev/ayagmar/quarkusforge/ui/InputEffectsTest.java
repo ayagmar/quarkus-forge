@@ -55,6 +55,24 @@ class InputEffectsTest {
   }
 
   @Test
+  void cursorMovementDoesNotTriggerSubmitRecoveryOrSearchRefresh() {
+    TestFixture fixture = new TestFixture();
+
+    List<UiIntent> formIntents =
+        fixture.inputEffects.applyTextInputKey(
+            FocusTarget.ARTIFACT_ID, KeyEvent.ofKey(KeyCode.LEFT));
+    List<UiIntent> searchIntents =
+        fixture.inputEffects.applyTextInputKey(
+            FocusTarget.EXTENSION_SEARCH, KeyEvent.ofKey(KeyCode.HOME));
+
+    assertThat(formIntents).isEmpty();
+    assertThat(searchIntents).isEmpty();
+    assertThat(fixture.callbacks.submitRecoveryCalls).isZero();
+    assertThat(fixture.callbacks.scheduledQuery).isNull();
+    assertThat(fixture.callbacks.dispatchedIntents).isEmpty();
+  }
+
+  @Test
   void metadataSelectorEffectCyclesBuildToolAndEmitsStatus() {
     TestFixture fixture = new TestFixture();
     String expectedBuildTool =
@@ -131,6 +149,7 @@ class InputEffectsTest {
     private ProjectRequest currentRequest;
     private String scheduledQuery;
     private IntConsumer scheduledRefresh;
+    private int submitRecoveryCalls;
     private final List<UiIntent> dispatchedIntents = new ArrayList<>();
 
     private TestCallbacks(
@@ -168,6 +187,7 @@ class InputEffectsTest {
     @Override
     public UiIntent.SubmitEditRecoveryIntent submitRecoveryIntent(ProjectRequest request) {
       currentRequest = request;
+      submitRecoveryCalls++;
       return new UiIntent.SubmitEditRecoveryIntent(new UiIntent.SubmitRecoveryContext(""));
     }
 

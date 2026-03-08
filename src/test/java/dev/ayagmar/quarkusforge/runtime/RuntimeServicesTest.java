@@ -56,11 +56,11 @@ class RuntimeServicesTest {
         new ProjectRequest(
             "com.example", "demo-app", "1.0.0", "com.example.demo", ".", "maven", "21"));
 
-    assertThat(RuntimeServices.loadStoredCliPrefill(runtimeConfig)).isNotNull();
-    assertThat(RuntimeServices.loadStoredCliPrefill(runtimeConfig).groupId())
-        .isEqualTo("com.example");
-    assertThat(RuntimeServices.loadStoredCliPrefill(runtimeConfig).artifactId())
-        .isEqualTo("demo-app");
+    var prefill = RuntimeServices.loadStoredCliPrefill(runtimeConfig);
+
+    assertThat(prefill).isNotNull();
+    assertThat(prefill.groupId()).isEqualTo("com.example");
+    assertThat(prefill.artifactId()).isEqualTo("demo-app");
   }
 
   @Test

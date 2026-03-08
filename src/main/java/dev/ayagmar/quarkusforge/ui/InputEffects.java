@@ -86,7 +86,11 @@ final class InputEffects {
   }
 
   List<UiIntent> applyTextInputKey(FocusTarget target, KeyEvent keyEvent) {
-    if (!handleTextInputKey(inputStates.get(target), keyEvent)) {
+    TextInputEffectResult result = handleTextInputKey(inputStates.get(target), keyEvent);
+    if (result == TextInputEffectResult.IGNORED) {
+      return List.of();
+    }
+    if (result == TextInputEffectResult.CURSOR_MOVED) {
       return List.of();
     }
     if (target == FocusTarget.EXTENSION_SEARCH) {
@@ -195,38 +199,44 @@ final class InputEffects {
     };
   }
 
-  private static boolean handleTextInputKey(TextInputState state, KeyEvent event) {
+  private static TextInputEffectResult handleTextInputKey(TextInputState state, KeyEvent event) {
     if (state == null || !UiTextInputKeys.isSupportedEditKey(event)) {
-      return false;
+      return TextInputEffectResult.IGNORED;
     }
     if (event.code() == KeyCode.CHAR) {
       state.insert(event.character());
-      return true;
+      return TextInputEffectResult.MUTATED;
     }
     if (event.isDeleteBackward()) {
       state.deleteBackward();
-      return true;
+      return TextInputEffectResult.MUTATED;
     }
     if (event.isDeleteForward()) {
       state.deleteForward();
-      return true;
+      return TextInputEffectResult.MUTATED;
     }
     if (event.isLeft()) {
       state.moveCursorLeft();
-      return true;
+      return TextInputEffectResult.CURSOR_MOVED;
     }
     if (event.isRight()) {
       state.moveCursorRight();
-      return true;
+      return TextInputEffectResult.CURSOR_MOVED;
     }
     if (event.isHome()) {
       state.moveCursorToStart();
-      return true;
+      return TextInputEffectResult.CURSOR_MOVED;
     }
     if (event.isEnd()) {
       state.moveCursorToEnd();
-      return true;
+      return TextInputEffectResult.CURSOR_MOVED;
     }
-    return false;
+    return TextInputEffectResult.IGNORED;
+  }
+
+  private enum TextInputEffectResult {
+    IGNORED,
+    CURSOR_MOVED,
+    MUTATED
   }
 }

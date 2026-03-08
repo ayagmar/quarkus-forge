@@ -52,6 +52,9 @@ public final class LiveStartupMetadataLoader implements StartupMetadataLoader {
       return new StartupMetadataSelection(
           MetadataCompatibilityContext.success(metadata), "live", "");
     } catch (InterruptedException interruptedException) {
+      if (metadataFuture != null) {
+        metadataFuture.cancel(true);
+      }
       return fallbackSelection(interruptedException);
     } catch (TimeoutException timeoutException) {
       if (metadataFuture != null) {

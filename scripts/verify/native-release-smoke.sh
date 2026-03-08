@@ -14,6 +14,7 @@ mode="${2:?usage: native-release-smoke.sh <binary> <headless|interactive-posix|i
 case "$mode" in
   headless)
     exit 0
+    ;;
   interactive-posix)
     exec "$SCRIPT_DIR/native-interactive-smoke-posix.sh" "$binary"
     ;;
