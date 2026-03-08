@@ -2,17 +2,14 @@
 
 ## Findings
 
-- Async review pending.
+- Low: `src/main/java/dev/ayagmar/quarkusforge/headless/package-info.java:4` still documents the `headless` package as depending only on application/domain/API/persistence/forge code, but Slice 8.3 moved command reconciliation into `src/main/java/dev/ayagmar/quarkusforge/headless/HeadlessGenerationInputs.java:3-22`, which now imports `dev.ayagmar.quarkusforge.cli.GenerateCommand`. The ArchUnit guardrail already reflects that new boundary exception in `src/test/java/dev/ayagmar/quarkusforge/HeadlessArchitectureRulesTest.java:116-126`, so the package-level contract is now stale and can mislead future boundary reviews/refactors.
 
-## Local Verification
+## Assumptions / Verification Context
 
-- `./mvnw -q spotless:apply -DskipTests`
 - `./mvnw -q -Dtest=HeadlessGenerationInputsTest,HeadlessGenerationExecutionServiceTest,HeadlessExtensionResolutionServiceTest,HeadlessForgefilePersistenceServiceTest,HeadlessGenerationServiceTest,HeadlessCliTest,HeadlessCliGenerateIT,HeadlessArchitectureRulesTest test`
-- `./mvnw -q clean compile -Pheadless`
-- `./mvnw -q spotless:check -DskipTests`
+- Reviewed commit `8c7144f` (`refactor(headless): slim generation orchestration`) against the current headless sources and docs, focusing on `HeadlessGenerationService`, `HeadlessGenerationInputs`, `HeadlessGenerationExecutionService`, `HeadlessForgefilePersistenceService`, `HeadlessArchitectureRulesTest`, `headless/package-info.java`, and the updated architecture/headless-maintenance documentation.
+- No behavioral regressions were reproduced in the targeted headless/CLI/ArchUnit suite; the only issue found was the package-level documentation drift above.
 
-## Local Notes
+## Resolution
 
-- Slice 8.3 reduces `HeadlessGenerationService` to a sequencing shell with exit-code ownership while delegating generation execution mechanics to `HeadlessGenerationExecutionService`.
-- Command and Forgefile reconciliation now live on `HeadlessGenerationInputs.fromCommand(...)`, so the headless package no longer carries a duplicate input-loading service.
-- `docs/modules/ROOT/pages/architecture.adoc` was updated because the final headless decomposition changed again in this slice.
+- Updated `src/main/java/dev/ayagmar/quarkusforge/headless/package-info.java` to document the small CLI command-model seam now used by `HeadlessGenerationInputs`, keeping the package contract aligned with the implemented boundary and ArchUnit rules.

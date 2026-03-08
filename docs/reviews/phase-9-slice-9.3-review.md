@@ -2,15 +2,18 @@
 
 ## Findings
 
-- Async review pending.
+- Medium: [docs/modules/ROOT/pages/reference/testing-strategy.adoc](/home/ayagmar/Projects/Personal/java/quarkus-forge/docs/modules/ROOT/pages/reference/testing-strategy.adoc#L65), [docs/modules/ROOT/pages/reference/testing-strategy.adoc](/home/ayagmar/Projects/Personal/java/quarkus-forge/docs/modules/ROOT/pages/reference/testing-strategy.adoc#L78), and [docs/modules/ROOT/pages/architecture.adoc](/home/ayagmar/Projects/Personal/java/quarkus-forge/docs/modules/ROOT/pages/architecture.adoc#L336) present `HeadlessArchitectureRulesTest` as the active package-boundary lock-in and direct verification entrypoint, but the documented command currently fails on this branch during test compilation. [src/test/java/dev/ayagmar/quarkusforge/HeadlessArchitectureRulesTest.java](/home/ayagmar/Projects/Personal/java/quarkus-forge/src/test/java/dev/ayagmar/quarkusforge/HeadlessArchitectureRulesTest.java#L13) and [src/test/java/dev/ayagmar/quarkusforge/HeadlessArchitectureRulesTest.java](/home/ayagmar/Projects/Personal/java/quarkus-forge/src/test/java/dev/ayagmar/quarkusforge/HeadlessArchitectureRulesTest.java#L14) import package-private headless types, so `./mvnw -q -Dtest=HeadlessArchitectureRulesTest,MetadataSelectorManagerTest,CatalogRowBuilderTest,StartupOverlayTrackerTest,HeadlessCliTest test` stops at `testCompile` before the ArchUnit suite can run. That leaves the new docs overstating the currently usable verification path.
+- Low: [docs/modules/ROOT/pages/reference/testing-strategy.adoc](/home/ayagmar/Projects/Personal/java/quarkus-forge/docs/modules/ROOT/pages/reference/testing-strategy.adoc#L46) and [docs/modules/ROOT/pages/reference/testing-strategy.adoc](/home/ayagmar/Projects/Personal/java/quarkus-forge/docs/modules/ROOT/pages/reference/testing-strategy.adoc#L50) hard-code extracted-suite counts that no longer match the repository. `MetadataSelectorManagerTest` currently contains 12 `@Test` methods, not 18, and `CatalogRowBuilderTest` contains 24, not 16, while `StartupOverlayTracker` still matches at 8. Those stale numbers turn the reference page itself into documentation drift even though the surrounding coverage descriptions are still accurate.
 
-## Local Verification
+## Assumptions / Verification Context
 
-- `scripts/verify/docs-build.sh`
-- `./mvnw -q -Dtest=HeadlessArchitectureRulesTest test`
+- Reviewed only [docs/modules/ROOT/pages/architecture.adoc](/home/ayagmar/Projects/Personal/java/quarkus-forge/docs/modules/ROOT/pages/architecture.adoc) and [docs/modules/ROOT/pages/reference/testing-strategy.adoc](/home/ayagmar/Projects/Personal/java/quarkus-forge/docs/modules/ROOT/pages/reference/testing-strategy.adoc), and recorded results only in this owned file.
+- Cross-checked the documented package boundaries against [src/test/java/dev/ayagmar/quarkusforge/HeadlessArchitectureRulesTest.java](/home/ayagmar/Projects/Personal/java/quarkus-forge/src/test/java/dev/ayagmar/quarkusforge/HeadlessArchitectureRulesTest.java), the current `application`/`cli`/`runtime`/`headless`/`postgen`/`persistence`/`ui` package layout under `src/main/java`, and the runtime wiring classes (`RuntimeServices`, `QuarkusForgeCli`, `HeadlessCli`, `PostTuiActionExecutor`).
+- `scripts/verify/docs-build.sh` passed locally.
+- `./mvnw -q -Dtest=HeadlessArchitectureRulesTest,MetadataSelectorManagerTest,CatalogRowBuilderTest,StartupOverlayTrackerTest,HeadlessCliTest test` failed at test compilation because `HeadlessArchitectureRulesTest` imports non-public `HeadlessGenerationInputs` and `HeadlessGenerationService`.
+- Verified the extracted-suite counts with `rg -c "@Test"` against `MetadataSelectorManagerTest`, `CatalogRowBuilderTest`, and `StartupOverlayTrackerTest`.
 
-## Local Notes
+## Resolution
 
-- Slice 9.3 aligns the maintained architecture and testing docs with the final package-boundary rules and verification flow that now exist in the codebase.
-- `architecture.adoc` now documents the explicit application, runtime, headless, post-generation, and persistence ownership seams that the ArchUnit suite enforces.
-- `reference/testing-strategy.adoc` now names `HeadlessArchitectureRulesTest` as the lock-in suite and shows the direct verification command for it.
+- Switched the `HeadlessArchitectureRulesTest` boundary exceptions to fully qualified name checks so the documented direct verification command compiles and runs again without widening package visibility.
+- Updated the extracted-suite counts in `docs/modules/ROOT/pages/reference/testing-strategy.adoc` to the current repository totals for `MetadataSelectorManagerTest`, `CatalogRowBuilderTest`, and `StartupOverlayTrackerTest`.

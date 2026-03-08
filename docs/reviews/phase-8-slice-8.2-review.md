@@ -2,17 +2,10 @@
 
 ## Findings
 
-- Async review pending.
+No findings.
 
-## Local Verification
+## Assumptions / Verification Context
 
-- `./mvnw -q spotless:apply -DskipTests`
-- `./mvnw -q -Dtest=HeadlessForgefilePersistenceServiceTest,HeadlessExtensionResolutionServiceTest,HeadlessGenerationServiceTest,HeadlessCliGenerateIT,HeadlessCliTest,RuntimeServicesTest test`
-- `./mvnw -q spotless:check -DskipTests`
-
-## Local Notes
-
-- Slice 8.2 extracts Forgefile lock drift checks plus Forgefile save/update rules into `HeadlessForgefilePersistenceService`.
-- `HeadlessGenerationService` now decides only when lock drift must be validated, when persistence should run, and how persistence failures map to diagnostics plus exit codes.
-- `HeadlessGenerationInputs` is the shared package-local input record for the headless orchestration and persistence seams, replacing the private nested input carrier in `HeadlessGenerationService`.
-- `docs/modules/ROOT/pages/architecture.adoc` was updated because the headless package shape changed materially.
+- Reviewed commit `a6a9177` (`refactor(headless): extract forgefile persistence`) against the current headless implementation, focusing on `HeadlessGenerationService`, `HeadlessForgefilePersistenceService`, `HeadlessGenerationInputs`, related CLI/docs surfaces, and the headless architecture guardrails.
+- Verified with `./mvnw -q -Dtest=HeadlessGenerationInputsTest,HeadlessForgefilePersistenceServiceTest,HeadlessGenerationExecutionServiceTest,HeadlessExtensionResolutionServiceTest,HeadlessGenerationServiceTest,HeadlessCliTest,HeadlessCliGenerateIT,HeadlessArchitectureRulesTest test`.
+- Current docs checked: `docs/modules/ROOT/pages/architecture.adoc`, `docs/modules/ROOT/pages/cli/headless-mode.adoc`, `docs/modules/ROOT/pages/reference/forge-files-and-state.adoc`, and `docs/modules/ROOT/pages/reference/headless-maintenance.adoc`.
