@@ -7,7 +7,6 @@ import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.widgets.input.TextInputState;
-import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Objects;
@@ -154,21 +153,14 @@ final class InputEffects {
   }
 
   private List<UiIntent> extensionUpdateIntents(String statusMessage) {
-    List<UiIntent> intents = new ArrayList<>();
-    intents.add(callbacks.extensionStateUpdatedIntent());
-    if (statusMessage != null) {
-      intents.add(new UiIntent.ExtensionStatusIntent(statusMessage));
-    }
-    return List.copyOf(intents);
+    return ExtensionIntentFactory.updateWithStatus(
+        callbacks.extensionStateUpdatedIntent(), statusMessage);
   }
 
   private List<UiIntent> filteredExtensionUpdateIntents(int filteredCount) {
-    List<UiIntent> intents = new ArrayList<>();
-    intents.add(callbacks.extensionStateUpdatedIntent());
-    if (!callbacks.isGenerationInProgress()) {
-      intents.add(new UiIntent.ExtensionStatusIntent("Extensions filtered: " + filteredCount));
-    }
-    return List.copyOf(intents);
+    return ExtensionIntentFactory.updateWithStatus(
+        callbacks.extensionStateUpdatedIntent(),
+        callbacks.isGenerationInProgress() ? null : "Extensions filtered: " + filteredCount);
   }
 
   private static String selectorStatusMessage(FocusTarget target, ProjectRequest request) {
