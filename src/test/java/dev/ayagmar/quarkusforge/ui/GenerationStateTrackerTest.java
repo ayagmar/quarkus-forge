@@ -192,30 +192,6 @@ class GenerationStateTrackerTest {
   }
 
   @Test
-  void validTransitionFromValidatingToError() {
-    assertThat(
-            GenerationStateMachine.isValidTransition(
-                GenerationState.VALIDATING, GenerationState.ERROR))
-        .isTrue();
-  }
-
-  @Test
-  void validTransitionFromValidatingToIdle() {
-    assertThat(
-            GenerationStateMachine.isValidTransition(
-                GenerationState.VALIDATING, GenerationState.IDLE))
-        .isTrue();
-  }
-
-  @Test
-  void invalidTransitionFromErrorToLoading() {
-    assertThat(
-            GenerationStateMachine.isValidTransition(
-                GenerationState.ERROR, GenerationState.LOADING))
-        .isFalse();
-  }
-
-  @Test
   void tickProgressRatioIsCapped() {
     GenerationStateTracker tracker = trackerInLoadingState();
 

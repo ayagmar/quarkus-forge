@@ -137,6 +137,7 @@ CoreTuiController (Orchestration Shell)
     │       └── FooterLinesComposer      Status bar composition
     │
     ├── State Managers
+    │       ├── GenerationState          Top-level generation phase model
     │       ├── MetadataSelectorManager  Platform/build/java selectors
     │       ├── ExtensionCatalogProjection  Search/filter state + row projection
     │       ├── ExtensionCatalogNavigation  Selection + list navigation
@@ -151,6 +152,7 @@ CoreTuiController (Orchestration Shell)
             ├── UiTextConstants              UI text content
             ├── CatalogLoadCoordinator       Async catalog lifecycle + startup-overlay timing via reducer intents
             ├── GenerationFlowCoordinator    Async generation lifecycle
+            ├── GenerationStateMachine       Allowed generation-state transitions
             └── UiTextInputKeys              Text-input edit-key normalization
 ....
 
