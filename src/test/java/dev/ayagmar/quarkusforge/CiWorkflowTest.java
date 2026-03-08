@@ -22,5 +22,10 @@ class CiWorkflowTest {
     assertThat(workflow).contains("scripts/verify/coverage.sh");
     assertThat(workflow).contains("scripts/verify/native-size.sh headless");
     assertThat(workflow).contains("scripts/verify/native-size.sh interactive");
+    assertThat(workflow).contains("name: native-size-reports");
+    assertThat(workflow).contains("target/quarkus-forge-build-report.html");
+    assertThat(workflow).contains("target/quarkus-forge-headless-build-report.html");
+    assertThat(workflow).contains("needs: [quality, tests, coverage, native-size]");
+    assertThat(workflow).contains("needs.native-size.result");
   }
 }

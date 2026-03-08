@@ -150,6 +150,30 @@ class CheckNativeSizeScriptTest {
   }
 
   @Test
+  void rejectsReportMissingImageTotal() throws Exception {
+    Path binary = binaryFile("quarkus-forge", 1024);
+
+    ProcessResult result =
+        runScript(
+            "--label",
+            "native",
+            "--binary",
+            binary.toString(),
+            "--report",
+            fixture("missing-image-total-build-report.html").toString(),
+            "--log",
+            fixture("native.log").toString(),
+            "--max-bytes",
+            "2048");
+
+    assertThat(result.exitCode()).isEqualTo(1);
+    assertThat(result.stderr())
+        .contains(
+            "failed to parse native build report: "
+                + fixture("missing-image-total-build-report.html").toString());
+  }
+
+  @Test
   void rejectsNegativeMaxBytes() throws Exception {
     Path binary = binaryFile("binary", 16);
     Path report = textFile("report.html", "stub");
