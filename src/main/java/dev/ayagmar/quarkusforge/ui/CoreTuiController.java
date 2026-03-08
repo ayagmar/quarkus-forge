@@ -3,7 +3,6 @@ package dev.ayagmar.quarkusforge.ui;
 import dev.ayagmar.quarkusforge.api.BuildToolCodec;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
-import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.CliPrefillMapper;
@@ -93,6 +92,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   private final UiReducer uiReducer;
   private final UiEffectsRunner uiEffectsRunner;
   private final UiEffectsPort uiEffectsPort;
+  private final GenerationEffects generationEffects;
   private final UiRenderStateAssembler uiRenderStateAssembler;
   private final UiRenderer uiRenderer;
   private final CoreUiRenderAdapter uiRenderAdapter;
@@ -178,17 +178,21 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
           @Override
           public void startGeneration() {
-            startGenerationEffect();
+            generationEffects.startGeneration(
+                currentRequest(),
+                extensionCatalogNavigation.selectedExtensionIds(),
+                resolveGeneratedProjectDirectory(currentRequest()),
+                CoreTuiController.this);
           }
 
           @Override
           public void transitionGenerationState(GenerationState targetState) {
-            transitionGenerationStateEffect(targetState);
+            generationEffects.transitionGenerationState(targetState);
           }
 
           @Override
           public void requestGenerationCancellation() {
-            requestGenerationCancellationEffect();
+            generationEffects.requestCancellation(CoreTuiController.this);
           }
 
           @Override
@@ -260,6 +264,9 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         new ExtensionCatalogProjection(
             scheduler, debounceDelay, inputStates.get(FocusTarget.EXTENSION_SEARCH).text());
     extensionCatalogProjection.initialize(extensionCatalogNavigation, extensionCatalogPreferences);
+    generationEffects =
+        new GenerationEffects(
+            generationFlowCoordinator, generationStateTracker, this.projectGenerationRunner);
     catalogEffects =
         new CatalogEffects(
             catalogLoadCoordinator,
@@ -558,7 +565,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   @Override
   public boolean transitionTo(GenerationState targetState) {
-    return transitionGenerationState(targetState);
+    return generationEffects.transitionGenerationState(targetState);
   }
 
   @Override
@@ -1182,18 +1189,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     return generationStateTracker.isInProgress();
   }
 
-  private GenerationRequest toGenerationRequest() {
-    ProjectRequest request = currentRequest();
-    return new GenerationRequest(
-        request.groupId(),
-        request.artifactId(),
-        request.version(),
-        request.platformStream(),
-        request.buildTool(),
-        request.javaVersion(),
-        extensionCatalogNavigation.selectedExtensionIds());
-  }
-
   private Path resolveGeneratedProjectDirectory(ProjectRequest request) {
     Path outputRoot = OutputPathResolver.resolveOutputRoot(request.outputDirectory());
     return outputRoot.resolve(request.artifactId()).normalize();
@@ -1201,23 +1196,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   private void prepareForGenerationEffect() {
     generationStatusNotice = "";
-    resetGenerationStateAfterTerminalOutcome();
-  }
-
-  private void runCatalogLoadEffect(ExtensionCatalogLoader loader) {
-    catalogEffects.startLoad(loader, catalogLoadIntentPort);
-  }
-
-  private void runCatalogReloadEffect() {
-    catalogEffects.requestReload(catalogLoadIntentPort);
-  }
-
-  private List<UiIntent> applyCatalogLoadSuccessEffect(CatalogLoadSuccess success) {
-    CatalogEffects.ApplyLoadSuccessResult result =
-        catalogEffects.applyLoadSuccess(
-            success, metadataCompatibility, inputStates.get(FocusTarget.EXTENSION_SEARCH).text());
-    metadataCompatibility = result.metadataCompatibility();
-    return result.followUpIntents();
+    generationEffects.prepareForGeneration();
   }
 
   private void cancelPendingAsyncEffect() {
@@ -1226,26 +1205,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   private String exportRecipeAndLockEffect() {
     return exportRecipeAndLockFiles();
-  }
-
-  private void resetGenerationStateAfterTerminalOutcome() {
-    generationStateTracker.resetAfterTerminalOutcome();
-  }
-
-  private void startGenerationEffect() {
-    generationFlowCoordinator.startFlow(
-        projectGenerationRunner,
-        toGenerationRequest(),
-        resolveGeneratedProjectDirectory(currentRequest()),
-        this);
-  }
-
-  private void transitionGenerationStateEffect(GenerationState targetState) {
-    transitionGenerationState(targetState);
-  }
-
-  private void requestGenerationCancellationEffect() {
-    generationFlowCoordinator.requestCancellation(this);
   }
 
   private void requestAsyncRepaintEffect() {
@@ -1290,10 +1249,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   @Override
   public void scheduleOnRenderThread(Runnable task) {
     scheduler.schedule(Duration.ZERO, task);
-  }
-
-  private boolean transitionGenerationState(GenerationState targetState) {
-    return generationStateTracker.transitionTo(targetState);
   }
 
   static boolean isValidTransition(GenerationState currentState, GenerationState targetState) {
