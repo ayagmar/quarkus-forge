@@ -15,6 +15,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 /**
@@ -82,12 +83,15 @@ final class HeadlessCatalogClient implements HeadlessCatalogOperations {
 
   @Override
   public CompletableFuture<Path> startGeneration(
-      GenerationRequest generationRequest, Path outputPath, Consumer<String> progressLineConsumer) {
+      GenerationRequest generationRequest,
+      Path outputPath,
+      BooleanSupplier cancelled,
+      Consumer<String> progressLineConsumer) {
     return projectArchiveService.downloadAndExtract(
         generationRequest,
         outputPath,
         OverwritePolicy.FAIL_IF_EXISTS,
-        () -> Thread.currentThread().isInterrupted(),
+        cancelled,
         progress ->
             progressLineConsumer.accept(
                 switch (progress) {

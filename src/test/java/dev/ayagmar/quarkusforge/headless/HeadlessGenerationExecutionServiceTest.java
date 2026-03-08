@@ -9,6 +9,7 @@ import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -81,6 +82,7 @@ class HeadlessGenerationExecutionServiceTest {
                     DiagnosticLogger.create(false)))
         .isInstanceOf(java.util.concurrent.TimeoutException.class);
     assertThat(projectGenerator.generationFuture.isCancelled()).isTrue();
+    assertThat(projectGenerator.cancelled.getAsBoolean()).isTrue();
   }
 
   private static final class StubProjectGenerator implements HeadlessProjectGenerator {
@@ -88,14 +90,17 @@ class HeadlessGenerationExecutionServiceTest {
         CompletableFuture.completedFuture(Path.of("output/demo-app"));
     GenerationRequest lastRequest;
     Path lastOutputPath;
+    BooleanSupplier cancelled = () -> false;
 
     @Override
     public CompletableFuture<Path> startGeneration(
         GenerationRequest generationRequest,
         Path outputPath,
+        BooleanSupplier cancelled,
         Consumer<String> progressLineConsumer) {
       lastRequest = generationRequest;
       lastOutputPath = outputPath;
+      this.cancelled = cancelled;
       return generationFuture;
     }
   }
