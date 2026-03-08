@@ -126,6 +126,24 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void blockedSubmitListsOtherInvalidFieldsAndNavigationHint() {
+    CoreTuiController controller = UiControllerTestHarness.controller();
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.GROUP_ID);
+    for (int i = 0; i < 30; i++) {
+      controller.onEvent(KeyEvent.ofKey(KeyCode.BACKSPACE));
+    }
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.ARTIFACT_ID);
+    controller.onEvent(KeyEvent.ofChar('X'));
+    UiControllerTestHarness.moveFocusTo(controller, FocusTarget.SUBMIT);
+
+    controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
+
+    assertThat(UiControllerTestHarness.renderToString(controller, 120, 34))
+        .contains("Also check: Artifact ID")
+        .contains("Alt+N / Alt+P moves between invalid fields.");
+  }
+
+  @Test
   void submitButtonShowsBlockedLabelWhenValidationFails() {
     CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.ARTIFACT_ID);

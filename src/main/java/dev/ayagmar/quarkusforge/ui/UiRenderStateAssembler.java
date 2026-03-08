@@ -224,6 +224,8 @@ final class UiRenderStateAssembler {
       }
     } else {
       int issueCount = reducerState.validation().errors().size();
+      List<FocusTarget> invalidTargets =
+          ValidationFocusTargets.orderedInvalid(reducerState.validation());
       lines.add(
           "Fix "
               + focusedField
@@ -233,9 +235,30 @@ final class UiRenderStateAssembler {
       if (!issue.isBlank()) {
         lines.add(issue);
       }
+      if (invalidTargets.size() > 1) {
+        lines.add(
+            "Also check: "
+                + additionalInvalidFieldsLabel(invalidTargets, reducerState.focusTarget()));
+        lines.add("Alt+N / Alt+P moves between invalid fields.");
+      }
     }
     lines.add("Focus moved to " + focusedField + ". Update the field and press Enter to retry.");
     return new SubmitAlertSnapshot(true, "Submit blocked", lines);
+  }
+
+  private String additionalInvalidFieldsLabel(
+      List<FocusTarget> invalidTargets, FocusTarget focusedTarget) {
+    List<String> labels = new ArrayList<>();
+    for (FocusTarget invalidTarget : invalidTargets) {
+      if (invalidTarget == focusedTarget) {
+        continue;
+      }
+      labels.add(UiFocusTargets.displayNameOf(invalidTarget));
+      if (labels.size() == 3) {
+        break;
+      }
+    }
+    return String.join(", ", labels);
   }
 
   private String resolvedTargetPathForFooter(UiState reducerState) {
