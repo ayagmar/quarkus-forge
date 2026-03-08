@@ -355,6 +355,14 @@ scripts/verify/docs-build.sh
 scripts/verify/docs-linkcheck.sh
 ```
 
+Native packaging and release smoke checks use the same shared scripts as release automation:
+
+```bash
+scripts/verify/native-size.sh headless
+scripts/verify/native-size.sh interactive
+scripts/verify/native-release-smoke.sh <binary> <headless|interactive-posix|interactive-windows>
+```
+
 Or without `just`, use the shared scripts directly instead of retyping the underlying Maven and npm commands.
 
 Coverage reports (after `scripts/verify/coverage.sh`): `target/site/jacoco/index.html` (HTML) and `target/site/jacoco/jacoco.xml` (XML).
