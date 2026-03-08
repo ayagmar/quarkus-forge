@@ -70,18 +70,27 @@ Quarkus Forge is a keyboard-first terminal UI (TUI) and headless CLI for generat
 | Headless native app on macOS (Apple Silicon) | `quarkus-forge-headless-macos-aarch64` |
 | Headless native app on Windows | `quarkus-forge-headless-windows-x86_64.exe` |
 
-Every GitHub release publishes a matching `.sha256` file for each artifact. Download both files, then verify the artifact locally:
+Every GitHub release publishes a matching `.sha256` file for each artifact.
+
+On Linux or macOS, download both files and verify locally:
 
 ```bash
-sha256sum -c <artifact>.sha256
+shasum -a 256 -c <artifact>.sha256
 ```
 
 Examples:
 
 ```bash
-sha256sum -c quarkus-forge-jvm.jar.sha256
-sha256sum -c quarkus-forge-headless-linux-x86_64.sha256
-sha256sum -c quarkus-forge-windows-x86_64.exe.sha256
+shasum -a 256 -c quarkus-forge-jvm.jar.sha256
+shasum -a 256 -c quarkus-forge-headless-linux-x86_64.sha256
+```
+
+On Windows PowerShell:
+
+```powershell
+$expected = (Get-Content .\quarkus-forge-windows-x86_64.exe.sha256).Split(' ')[0].ToLower()
+$actual = (Get-FileHash .\quarkus-forge-windows-x86_64.exe -Algorithm SHA256).Hash.ToLower()
+$actual -eq $expected
 ```
 
 ## Keyboard Quick Reference (TUI)
