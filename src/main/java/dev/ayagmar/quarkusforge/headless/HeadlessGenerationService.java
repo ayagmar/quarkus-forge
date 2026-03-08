@@ -4,7 +4,6 @@ import static dev.ayagmar.quarkusforge.diagnostics.DiagnosticField.of;
 
 import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogDataService;
-import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
@@ -28,28 +27,26 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 
 public final class HeadlessGenerationService implements AutoCloseable {
-  private static final String PRESET_FAVORITES = "favorites";
-
   private final HeadlessCatalogLoader catalogLoader;
   private final HeadlessProjectGenerator projectGenerator;
-  private final ExtensionFavoritesStore favoritesStore;
+  private final HeadlessExtensionResolutionService extensionResolutionService;
   private final AutoCloseable closeOwner;
 
   HeadlessGenerationService(
       HeadlessCatalogLoader catalogLoader,
       HeadlessProjectGenerator projectGenerator,
       ExtensionFavoritesStore favoritesStore) {
-    this(catalogLoader, projectGenerator, favoritesStore, catalogLoader);
+    this(
+        catalogLoader,
+        projectGenerator,
+        new HeadlessExtensionResolutionService(catalogLoader, favoritesStore),
+        catalogLoader);
   }
 
   HeadlessGenerationService(
@@ -57,9 +54,21 @@ public final class HeadlessGenerationService implements AutoCloseable {
       HeadlessProjectGenerator projectGenerator,
       ExtensionFavoritesStore favoritesStore,
       AutoCloseable closeOwner) {
+    this(
+        catalogLoader,
+        projectGenerator,
+        new HeadlessExtensionResolutionService(catalogLoader, favoritesStore),
+        closeOwner);
+  }
+
+  HeadlessGenerationService(
+      HeadlessCatalogLoader catalogLoader,
+      HeadlessProjectGenerator projectGenerator,
+      HeadlessExtensionResolutionService extensionResolutionService,
+      AutoCloseable closeOwner) {
     this.catalogLoader = Objects.requireNonNull(catalogLoader);
     this.projectGenerator = Objects.requireNonNull(projectGenerator);
-    this.favoritesStore = Objects.requireNonNull(favoritesStore);
+    this.extensionResolutionService = Objects.requireNonNull(extensionResolutionService);
     this.closeOwner = Objects.requireNonNull(closeOwner);
   }
 
@@ -138,31 +147,15 @@ public final class HeadlessGenerationService implements AutoCloseable {
       return ExitCodes.VALIDATION;
     }
 
-    Set<String> knownExtensionIds =
-        catalogData.extensions().stream()
-            .map(ExtensionDto::id)
-            .collect(Collectors.toCollection(LinkedHashSet::new));
-
-    Map<String, List<String>> presetExtensionsByName = Map.of();
-    if (requiresBuiltInPresets(inputs.presetInputs())) {
-      try {
-        presetExtensionsByName =
-            catalogLoader.loadBuiltInPresets(
-                validatedState.request().platformStream(), catalogTimeout);
-      } catch (Exception e) {
-        return AsyncFailureHandler.handleFailure(
-            e, catalogTimeout, "preset.load", "Failed to load presets", diagnostics);
-      }
-    }
-
     List<String> extensionIds;
     try {
       extensionIds =
-          resolveRequestedExtensions(
+          extensionResolutionService.resolveExtensionIds(
+              validatedState.request().platformStream(),
               inputs.extensionInputs(),
               inputs.presetInputs(),
-              knownExtensionIds,
-              presetExtensionsByName);
+              HeadlessExtensionResolutionService.knownExtensionIds(catalogData),
+              catalogTimeout);
 
       if (inputs.lockCheck()) {
         validateLockDrift(inputs.forgefile(), validatedState.request(), inputs, extensionIds);
@@ -176,6 +169,9 @@ public final class HeadlessGenerationService implements AutoCloseable {
           catalogData.sourceLabel(),
           catalogData.detailMessage());
       return ExitCodes.VALIDATION;
+    } catch (Exception e) {
+      return AsyncFailureHandler.handleFailure(
+          e, catalogTimeout, "preset.load", "Failed to load presets", diagnostics);
     }
 
     boolean dryRunRequested = command.dryRun() || globalDryRun;
@@ -233,59 +229,6 @@ public final class HeadlessGenerationService implements AutoCloseable {
     }
   }
 
-  private List<String> resolveRequestedExtensions(
-      List<String> extensionInputs,
-      List<String> presetInputs,
-      Set<String> knownExtensionIds,
-      Map<String, List<String>> presetExtensionsByName) {
-    List<ValidationError> errors = new ArrayList<>();
-    LinkedHashSet<String> resolved = new LinkedHashSet<>();
-
-    for (String presetInput : presetInputs) {
-      String preset = normalizePresetName(presetInput);
-      if (preset.isBlank()) {
-        continue;
-      }
-      if (PRESET_FAVORITES.equals(preset)) {
-        favoritesStore.loadFavoriteExtensionIds().stream()
-            .filter(knownExtensionIds::contains)
-            .forEach(resolved::add);
-        continue;
-      }
-      List<String> presetExtensions = presetExtensionsByName.get(preset);
-      if (presetExtensions == null) {
-        List<String> allowed = new ArrayList<>(presetExtensionsByName.keySet());
-        allowed.add(PRESET_FAVORITES);
-        allowed.sort(String::compareTo);
-        errors.add(
-            new ValidationError(
-                "preset",
-                "unknown preset '" + presetInput + "'. Allowed: " + String.join(", ", allowed)));
-        continue;
-      }
-      resolved.addAll(presetExtensions);
-    }
-
-    for (String extensionInput : extensionInputs) {
-      if (extensionInput == null || extensionInput.isBlank()) {
-        errors.add(new ValidationError("extension", "must not be blank"));
-        continue;
-      }
-      resolved.add(extensionInput.trim());
-    }
-
-    for (String extensionId : resolved) {
-      if (!knownExtensionIds.contains(extensionId)) {
-        errors.add(new ValidationError("extension", "unknown extension id '" + extensionId + "'"));
-      }
-    }
-
-    if (!errors.isEmpty()) {
-      throw new ValidationException(errors);
-    }
-    return List.copyOf(resolved);
-  }
-
   private static EffectiveInputs loadEffectiveInputs(GenerateCommand command) {
     Forgefile template = command.explicitTemplate();
     List<String> presetInputs = new ArrayList<>(command.presets());
@@ -330,16 +273,6 @@ public final class HeadlessGenerationService implements AutoCloseable {
         saveAsPath);
   }
 
-  private static boolean requiresBuiltInPresets(List<String> presetInputs) {
-    for (String presetInput : presetInputs) {
-      String preset = normalizePresetName(presetInput);
-      if (!preset.isBlank() && !PRESET_FAVORITES.equals(preset)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   private static void validateLockDrift(
       Forgefile forgefile,
       ProjectRequest request,
@@ -355,17 +288,21 @@ public final class HeadlessGenerationService implements AutoCloseable {
     checkDrift(errors, "buildTool", lock.buildTool(), request.buildTool());
     checkDrift(errors, "javaVersion", lock.javaVersion(), request.javaVersion());
     List<String> lockedExtensions = lock.extensions() == null ? List.of() : lock.extensions();
-    if (!normalizedExtensionIdsForComparison(lockedExtensions)
-        .equals(normalizedExtensionIdsForComparison(extensionIds))) {
+    if (!HeadlessExtensionResolutionService.normalizedExtensionIdsForComparison(lockedExtensions)
+        .equals(
+            HeadlessExtensionResolutionService.normalizedExtensionIdsForComparison(extensionIds))) {
       errors.add(
           new ValidationError(
               "locked",
               "extensions drift: locked=" + lockedExtensions + ", request=" + extensionIds));
     }
-    List<String> normalizedPresets = normalizePresets(inputs.presetInputs());
+    List<String> normalizedPresets =
+        HeadlessExtensionResolutionService.normalizePresets(inputs.presetInputs());
     List<String> lockedPresets = lock.presets() == null ? List.of() : lock.presets();
-    if (!normalizedPresetIdsForComparison(lockedPresets)
-        .equals(normalizedPresetIdsForComparison(normalizedPresets))) {
+    if (!HeadlessExtensionResolutionService.normalizedPresetIdsForComparison(lockedPresets)
+        .equals(
+            HeadlessExtensionResolutionService.normalizedPresetIdsForComparison(
+                normalizedPresets))) {
       errors.add(
           new ValidationError(
               "locked",
@@ -389,40 +326,10 @@ public final class HeadlessGenerationService implements AutoCloseable {
     }
   }
 
-  private static List<String> normalizePresets(List<String> presetInputs) {
-    return presetInputs.stream()
-        .map(HeadlessGenerationService::normalizePresetName)
-        .filter(s -> !s.isEmpty())
-        .distinct()
-        .toList();
-  }
-
-  private static List<String> normalizedPresetIdsForComparison(List<String> presetInputs) {
-    return normalizePresets(presetInputs).stream().sorted().toList();
-  }
-
-  private static List<String> normalizedExtensionIdsForComparison(List<String> extensionIds) {
-    return extensionIds == null
-        ? List.of()
-        : extensionIds.stream()
-            .filter(Objects::nonNull)
-            .map(String::trim)
-            .filter(value -> !value.isEmpty())
-            .distinct()
-            .sorted()
-            .toList();
-  }
-
-  private static String normalizePresetName(String presetName) {
-    if (presetName == null) {
-      return "";
-    }
-    return presetName.trim().toLowerCase(Locale.ROOT);
-  }
-
   private static void saveForgefileIfRequested(
       EffectiveInputs inputs, ProjectRequest request, List<String> extensionIds) {
-    List<String> normalizedPresets = normalizePresets(inputs.presetInputs());
+    List<String> normalizedPresets =
+        HeadlessExtensionResolutionService.normalizePresets(inputs.presetInputs());
     Forgefile forgefile =
         inputs.template().withSelections(normalizedPresets, inputs.extensionInputs());
     if (inputs.writeLock()) {
