@@ -11,8 +11,7 @@ class ReleaseWorkflowTest {
 
   @Test
   void releaseWorkflowUsesSharedNativeSmokeEntrypoint() throws Exception {
-    String workflow =
-        Files.readString(Path.of(".github", "workflows", "release.yml"), StandardCharsets.UTF_8);
+    String workflow = normalizedText(Path.of(".github", "workflows", "release.yml"));
 
     assertThat(workflow)
         .contains(
@@ -41,7 +40,7 @@ class ReleaseWorkflowTest {
 
   @Test
   void releaseMetadataPublishesIndividualSha256Checksums() throws Exception {
-    String jreleaser = Files.readString(Path.of("jreleaser.yml"), StandardCharsets.UTF_8);
+    String jreleaser = normalizedText(Path.of("jreleaser.yml"));
 
     assertThat(jreleaser).contains("checksum:");
     assertThat(jreleaser).contains("  individual: true");
@@ -73,5 +72,9 @@ class ReleaseWorkflowTest {
                 "            profiles: " + profiles,
                 "            binary_name: " + binaryName,
                 "            smoke_mode: " + smokeMode));
+  }
+
+  private static String normalizedText(Path path) throws Exception {
+    return Files.readString(path, StandardCharsets.UTF_8).replace("\r\n", "\n");
   }
 }
