@@ -78,13 +78,16 @@ jobs:
         run: npm ci --prefix site
 
       - name: Docs build
-        run: npm run docs:build --prefix site
+        run: scripts/verify/docs-build.sh
+
+      - name: Docs link check
+        run: scripts/verify/docs-linkcheck.sh
 
       - name: Spotless check
-        run: ./mvnw spotless:check
+        run: scripts/verify/format-check.sh
 
       - name: Headless profile compile check
-        run: ./mvnw clean compile -Pheadless
+        run: scripts/verify/headless-compile.sh
 
   tests:
     name: Tests (${{ matrix.os }})
@@ -109,7 +112,7 @@ jobs:
 
       - name: Run tests
         shell: bash
-        run: ./mvnw verify -Djacoco.skip=true
+        run: scripts/verify/verify.sh
 
   coverage:
     name: Coverage
@@ -131,7 +134,7 @@ jobs:
           cache: 'maven'
 
       - name: Run tests with coverage
-        run: ./mvnw clean verify
+        run: scripts/verify/coverage.sh
 
       - name: Verify coverage files exist
         run: |
@@ -176,40 +179,11 @@ jobs:
 
       - name: Build headless native image
         shell: bash
-        run: |
-          ./mvnw clean
-          mkdir -p target/native-size
-          set -o pipefail
-          ./mvnw package -Pheadless-native -DskipTests -Djacoco.skip=true | tee target/native-size/headless-native.log
-
-      - name: Check headless native size budget
-        shell: bash
-        run: |
-          set -o pipefail
-          java scripts/CheckNativeSize.java \
-            --label headless-native \
-            --binary target/quarkus-forge-headless \
-            --report target/quarkus-forge-headless-build-report.html \
-            --log target/native-size/headless-native.log \
-            --max-bytes 24500000 | tee -a "$GITHUB_STEP_SUMMARY"
+        run: scripts/verify/native-size.sh headless
 
       - name: Build native image
         shell: bash
-        run: |
-          mkdir -p target/native-size
-          set -o pipefail
-          ./mvnw package -Pnative -DskipTests -Djacoco.skip=true | tee target/native-size/native.log
-
-      - name: Check native size budget
-        shell: bash
-        run: |
-          set -o pipefail
-          java scripts/CheckNativeSize.java \
-            --label native \
-            --binary target/quarkus-forge \
-            --report target/quarkus-forge-build-report.html \
-            --log target/native-size/native.log \
-            --max-bytes 27000000 | tee -a "$GITHUB_STEP_SUMMARY"
+        run: scripts/verify/native-size.sh interactive
 
       - name: Upload native size reports
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
