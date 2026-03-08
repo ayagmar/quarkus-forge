@@ -42,6 +42,23 @@ TIP: A https://github.com/casey/just[justfile] is included with common recipes. 
 | Smallest runtime footprint | native binary | No JVM required at runtime (build separately with GraalVM Native Image prerequisites)
 |===
 
+== GitHub Release Asset Guide
+
+[cols="1,2", options="header"]
+|===
+| Use case | Download this release asset
+| Interactive JVM app on any OS | `quarkus-forge-jvm.jar`
+| Headless JVM app for CI/containers | `quarkus-forge-headless.jar`
+| Interactive native app on Linux | `quarkus-forge-linux-x86_64`
+| Interactive native app on macOS (Apple Silicon) | `quarkus-forge-macos-aarch64`
+| Interactive native app on Windows | `quarkus-forge-windows-x86_64.exe`
+| Headless native app on Linux | `quarkus-forge-headless-linux-x86_64`
+| Headless native app on macOS (Apple Silicon) | `quarkus-forge-headless-macos-aarch64`
+| Headless native app on Windows | `quarkus-forge-headless-windows-x86_64.exe`
+|===
+
+Every GitHub release also publishes a matching `.sha256` file for each asset.
+
 TUI mode (interactive):
 
 [source,bash]
@@ -136,16 +153,38 @@ source target/completions/quarkus-forge-headless.bash
 
 == Release Checksums
 
+GitHub releases publish a matching `.sha256` file for each JVM jar and native binary.
+
+Use the asset names from the GitHub Release Asset Guide above when verifying downloaded releases.
+
+=== Verify a downloaded release artifact
+
+[source,bash]
+----
+sha256sum -c <artifact>.sha256
+----
+
+Examples:
+
+[source,bash]
+----
+sha256sum -c quarkus-forge-jvm.jar.sha256
+sha256sum -c quarkus-forge-headless-linux-x86_64.sha256
+sha256sum -c quarkus-forge-windows-x86_64.exe.sha256
+----
+
+=== Generate checksums for locally built jars
+
 For locally built release jars in `target/`:
 
-Generate `.sha256` files for the release jars:
+Generate `.sha256` files:
 
 [source,bash]
 ----
 just release-checksums
 ----
 
-Verify artifacts:
+Verify locally built artifacts:
 
 [source,bash]
 ----
