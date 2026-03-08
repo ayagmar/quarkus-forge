@@ -25,6 +25,7 @@ class CiWorkflowTest {
     assertThat(workflow).contains("name: native-size-reports");
     assertThat(workflow).contains("target/quarkus-forge-build-report.html");
     assertThat(workflow).contains("target/quarkus-forge-headless-build-report.html");
+    assertThat(workflow).contains("ci-status:\n    name: CI Status\n    if: always()");
     assertThat(workflow).contains("needs: [quality, tests, coverage, native-size]");
     assertThat(workflow).contains("needs.native-size.result");
   }
