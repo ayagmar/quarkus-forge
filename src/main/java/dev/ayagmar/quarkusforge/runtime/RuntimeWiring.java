@@ -1,10 +1,8 @@
 package dev.ayagmar.quarkusforge.runtime;
 
 import dev.ayagmar.quarkusforge.api.CatalogDataService;
-import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
 import dev.ayagmar.quarkusforge.archive.ProjectArchiveService;
-import dev.ayagmar.quarkusforge.archive.SafeZipExtractor;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.headless.HeadlessGenerationService;
@@ -15,11 +13,11 @@ public final class RuntimeWiring {
   private RuntimeWiring() {}
 
   static ExtensionFavoritesStore favoritesStore(RuntimeConfig runtimeConfig) {
-    return ExtensionFavoritesStore.fileBacked(runtimeConfig.favoritesFile());
+    return RuntimeServices.favoritesStore(runtimeConfig);
   }
 
   static UserPreferencesStore userPreferencesStore(RuntimeConfig runtimeConfig) {
-    return UserPreferencesStore.fileBacked(runtimeConfig.preferencesFile());
+    return RuntimeServices.userPreferencesStore(runtimeConfig);
   }
 
   public static CliPrefill loadStoredCliPrefill(RuntimeConfig runtimeConfig) {
@@ -32,20 +30,19 @@ public final class RuntimeWiring {
 
   static CatalogDataService catalogDataService(
       QuarkusApiClient apiClient, RuntimeConfig runtimeConfig) {
-    return new CatalogDataService(
-        apiClient, new CatalogSnapshotCache(runtimeConfig.catalogCacheFile()));
+    return RuntimeServices.catalogDataService(apiClient, runtimeConfig);
   }
 
   static ProjectArchiveService projectArchiveService(QuarkusApiClient apiClient) {
-    return new ProjectArchiveService(apiClient, new SafeZipExtractor());
+    return RuntimeServices.projectArchiveService(apiClient);
   }
 
   public static HeadlessGenerationService headlessGenerationService(RuntimeConfig runtimeConfig) {
-    QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri());
+    RuntimeServices runtimeServices = RuntimeServices.open(runtimeConfig);
     return HeadlessGenerationService.create(
-        apiClient,
-        catalogDataService(apiClient, runtimeConfig),
-        projectArchiveService(apiClient),
-        favoritesStore(runtimeConfig));
+        runtimeServices.apiClient(),
+        runtimeServices.catalogDataService(),
+        runtimeServices.projectArchiveService(),
+        runtimeServices.favoritesStore());
   }
 }
