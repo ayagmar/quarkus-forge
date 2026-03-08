@@ -18,6 +18,7 @@ run_size_check() {
 case "$mode" in
   headless)
     ./mvnw clean
+    mkdir -p target/native-size
     set -o pipefail
     ./mvnw package -Pheadless-native -DskipTests -Djacoco.skip=true | tee target/native-size/headless-native.log
     run_size_check \

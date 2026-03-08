@@ -63,6 +63,20 @@ class VerificationScriptsTest {
     assertThat(releaseSmoke).contains("scripts/verify/native-interactive-smoke-windows.sh");
   }
 
+  @Test
+  void nativeSizeScriptRecreatesLogDirectoryAfterClean() throws Exception {
+    String nativeSize =
+        Files.readString(VERIFY_DIR.resolve("native-size.sh"), StandardCharsets.UTF_8);
+
+    assertThat(nativeSize)
+        .contains(
+            """
+            headless)
+                ./mvnw clean
+                mkdir -p target/native-size
+            """);
+  }
+
   private static List<Path> listScripts() throws IOException {
     try (var stream = Files.list(VERIFY_DIR)) {
       return stream.filter(path -> path.getFileName().toString().endsWith(".sh")).toList();
