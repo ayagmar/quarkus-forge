@@ -193,7 +193,7 @@ record UiState(
         submitBlockedByValidation,
         submitBlockedByTargetConflict,
         commandPaletteSelection,
-        overlays.withPostGenerationVisible(nextPostGeneration.visible()),
+        overlays,
         catalogLoad,
         nextPostGeneration,
         extensions);
@@ -308,16 +308,11 @@ record UiState(
       boolean generationVisible,
       boolean commandPaletteVisible,
       boolean helpOverlayVisible,
-      boolean postGenerationVisible,
       boolean startupOverlayVisible) {
 
     OverlayState withGenerationVisible(boolean nextGenerationVisible) {
       return new OverlayState(
-          nextGenerationVisible,
-          commandPaletteVisible,
-          helpOverlayVisible,
-          postGenerationVisible,
-          startupOverlayVisible);
+          nextGenerationVisible, commandPaletteVisible, helpOverlayVisible, startupOverlayVisible);
     }
 
     OverlayState withCommandPaletteAndHelp(
@@ -326,26 +321,12 @@ record UiState(
           generationVisible,
           nextCommandPaletteVisible,
           nextHelpOverlayVisible,
-          postGenerationVisible,
-          startupOverlayVisible);
-    }
-
-    OverlayState withPostGenerationVisible(boolean nextPostGenerationVisible) {
-      return new OverlayState(
-          generationVisible,
-          commandPaletteVisible,
-          helpOverlayVisible,
-          nextPostGenerationVisible,
           startupOverlayVisible);
     }
 
     OverlayState withStartupOverlayVisible(boolean nextStartupOverlayVisible) {
       return new OverlayState(
-          generationVisible,
-          commandPaletteVisible,
-          helpOverlayVisible,
-          postGenerationVisible,
-          nextStartupOverlayVisible);
+          generationVisible, commandPaletteVisible, helpOverlayVisible, nextStartupOverlayVisible);
     }
   }
 
