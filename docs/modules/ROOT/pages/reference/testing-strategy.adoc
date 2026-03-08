@@ -7,7 +7,7 @@
 * **Deterministic async harnesses**: TUI state machine tests use `UiScheduler.immediate()` and `Duration.ZERO` debounce.
 * **Property-based tests**: ZIP extraction edge cases (path traversal, large archives).
 * **Headless CLI tests**: `HeadlessCli` entry point smoke tests (no-subcommand, help, version).
-* **Architecture guardrails**: ArchUnit tests prevent headless/UI boundary drift.
+* **Architecture guardrails**: ArchUnit tests prevent package-boundary drift across `application`, `cli`, `runtime`, `headless`, `postgen`, `persistence`, and `ui`.
 
 == TUI Test Strategy
 
@@ -59,6 +59,24 @@ Before and during the UI state-machine migration, these semantic contracts must 
 | contract-focused
 | Reducer intent/effect outcomes and immutable state snapshot mapping contracts
 |===
+
+== Architecture Guardrails
+
+`HeadlessArchitectureRulesTest` is the package-boundary lock-in suite for the refactored codebase.
+
+It asserts, among other things, that:
+
+* `application/` stays independent from CLI, runtime, headless, post-generation, persistence, and UI packages.
+* `headless/` remains independent from runtime and TamboUI, with CLI coupling limited to the orchestration boundary types.
+* `runtime/` owns the composition root, with `RuntimeServices` as the only runtime entrypoint allowed to open the headless generation service.
+* `postgen/` stays isolated from CLI/headless/persistence concerns, with `PostTuiActionExecutor` as the only class allowed to consume `TuiSessionSummary`.
+
+Run the suite directly with:
+
+[source,bash]
+----
+./mvnw -q -Dtest=HeadlessArchitectureRulesTest test
+----
 
 == Core Verification Commands
 
