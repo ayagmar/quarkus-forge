@@ -59,6 +59,23 @@ TIP: A https://github.com/casey/just[justfile] is included with common recipes. 
 
 Every GitHub release also publishes a matching `.sha256` file for each asset.
 
+On Linux or macOS:
+
+[source,bash]
+----
+shasum -a 256 -c quarkus-forge-jvm.jar.sha256
+shasum -a 256 -c quarkus-forge-headless-linux-x86_64.sha256
+----
+
+On Windows PowerShell:
+
+[source,powershell]
+----
+$expected = (Get-Content .\quarkus-forge-windows-x86_64.exe.sha256).Split(' ')[0].ToLower()
+$actual = (Get-FileHash .\quarkus-forge-windows-x86_64.exe -Algorithm SHA256).Hash.ToLower()
+$actual -eq $expected
+----
+
 TUI mode (interactive):
 
 [source,bash]
