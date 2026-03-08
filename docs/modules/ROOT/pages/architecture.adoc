@@ -94,7 +94,7 @@ graph TD
 
 `RuntimeWiring` is the single composition owner for persistence-backed stores plus shared API and archive services. Headless orchestration now resolves favorites through `persistence` and depends on a catalog loader plus project generator rather than pulling `RuntimeConfig` into `HeadlessGenerationService`.
 
-Startup policy now lives under `application/`: `LiveStartupMetadataLoader` owns the live-metadata timeout and snapshot-fallback path, while `DefaultStartupStateService` merges requested prefill, stored prefill, and compiled defaults before handing the result to `InputResolutionService`.
+Startup policy now lives under `application/`: `LiveStartupMetadataLoader` owns the live-metadata timeout and snapshot-fallback path, while `DefaultStartupStateService` merges explicit CLI overrides, optional stored prefill, and compiled defaults before handing the result to `InputResolutionService`.
 
 == UI Layer Design
 

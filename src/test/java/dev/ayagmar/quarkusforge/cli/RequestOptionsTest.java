@@ -139,4 +139,30 @@ class RequestOptionsTest {
     assertThat(opts.toExplicitTemplate().javaVersion()).isEqualTo("21");
     assertThat(opts.toExplicitTemplate().platformStream()).isNull();
   }
+
+  @Test
+  void toExplicitCliPrefillIncludesOnlyExplicitValues() {
+    RequestOptions opts =
+        RequestOptions.explicitFromCliPrefill(
+            new CliPrefill(
+                "com.example",
+                "demo-app",
+                "1.2.3",
+                "com.example.demo",
+                "generated",
+                "",
+                "gradle",
+                "21"));
+
+    CliPrefill explicitPrefill = opts.toExplicitCliPrefill();
+
+    assertThat(explicitPrefill.groupId()).isEqualTo("com.example");
+    assertThat(explicitPrefill.artifactId()).isEqualTo("demo-app");
+    assertThat(explicitPrefill.version()).isEqualTo("1.2.3");
+    assertThat(explicitPrefill.packageName()).isEqualTo("com.example.demo");
+    assertThat(explicitPrefill.outputDirectory()).isEqualTo("generated");
+    assertThat(explicitPrefill.buildTool()).isEqualTo("gradle");
+    assertThat(explicitPrefill.javaVersion()).isEqualTo("21");
+    assertThat(explicitPrefill.platformStream()).isNull();
+  }
 }
