@@ -19,39 +19,48 @@ class CoreTuiStateMachineTest {
   @Test
   void validTransitionsMatchContract() {
     assertThat(
-            CoreTuiController.isValidTransition(GenerationState.IDLE, GenerationState.VALIDATING))
+            GenerationStateMachine.isValidTransition(
+                GenerationState.IDLE, GenerationState.VALIDATING))
         .isTrue();
     assertThat(
-            CoreTuiController.isValidTransition(
+            GenerationStateMachine.isValidTransition(
                 GenerationState.VALIDATING, GenerationState.LOADING))
         .isTrue();
     assertThat(
-            CoreTuiController.isValidTransition(GenerationState.VALIDATING, GenerationState.ERROR))
+            GenerationStateMachine.isValidTransition(
+                GenerationState.VALIDATING, GenerationState.ERROR))
         .isTrue();
     assertThat(
-            CoreTuiController.isValidTransition(GenerationState.LOADING, GenerationState.SUCCESS))
+            GenerationStateMachine.isValidTransition(
+                GenerationState.LOADING, GenerationState.SUCCESS))
         .isTrue();
     assertThat(
-            CoreTuiController.isValidTransition(GenerationState.LOADING, GenerationState.CANCELLED))
+            GenerationStateMachine.isValidTransition(
+                GenerationState.LOADING, GenerationState.CANCELLED))
         .isTrue();
-    assertThat(CoreTuiController.isValidTransition(GenerationState.SUCCESS, GenerationState.IDLE))
+    assertThat(
+            GenerationStateMachine.isValidTransition(GenerationState.SUCCESS, GenerationState.IDLE))
         .isTrue();
   }
 
   @Test
   void invalidTransitionsAreRejected() {
-    assertThat(CoreTuiController.isValidTransition(GenerationState.IDLE, GenerationState.LOADING))
+    assertThat(
+            GenerationStateMachine.isValidTransition(GenerationState.IDLE, GenerationState.LOADING))
         .isFalse();
     assertThat(
-            CoreTuiController.isValidTransition(
+            GenerationStateMachine.isValidTransition(
                 GenerationState.LOADING, GenerationState.VALIDATING))
         .isFalse();
-    assertThat(CoreTuiController.isValidTransition(GenerationState.ERROR, GenerationState.LOADING))
+    assertThat(
+            GenerationStateMachine.isValidTransition(
+                GenerationState.ERROR, GenerationState.LOADING))
         .isFalse();
     assertThat(
-            CoreTuiController.isValidTransition(GenerationState.CANCELLED, GenerationState.SUCCESS))
+            GenerationStateMachine.isValidTransition(
+                GenerationState.CANCELLED, GenerationState.SUCCESS))
         .isFalse();
-    assertThat(CoreTuiController.isValidTransition(GenerationState.IDLE, GenerationState.IDLE))
+    assertThat(GenerationStateMachine.isValidTransition(GenerationState.IDLE, GenerationState.IDLE))
         .isFalse();
   }
 
