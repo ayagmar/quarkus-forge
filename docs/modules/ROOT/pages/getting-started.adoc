@@ -42,22 +42,8 @@ TIP: A https://github.com/casey/just[justfile] is included with common recipes. 
 | Smallest runtime footprint | native binary | No JVM required at runtime (build separately with GraalVM Native Image prerequisites)
 |===
 
-== GitHub Release Asset Guide
-
-[cols="1,2", options="header"]
-|===
-| Use case | Download this release asset
-| Interactive JVM app on any OS | `quarkus-forge-jvm.jar`
-| Headless JVM app for CI/containers | `quarkus-forge-headless.jar`
-| Interactive native app on Linux | `quarkus-forge-linux-x86_64`
-| Interactive native app on macOS (Apple Silicon) | `quarkus-forge-macos-aarch64`
-| Interactive native app on Windows | `quarkus-forge-windows-x86_64.exe`
-| Headless native app on Linux | `quarkus-forge-headless-linux-x86_64`
-| Headless native app on macOS (Apple Silicon) | `quarkus-forge-headless-macos-aarch64`
-| Headless native app on Windows | `quarkus-forge-headless-windows-x86_64.exe`
-|===
-
-Every GitHub release also publishes a matching `.sha256` file for each asset.
+GitHub releases use `quarkus-forge-jvm.jar` for the interactive JVM asset and publish a matching
+`.sha256` file for every jar and native download.
 
 On Linux or macOS:
 

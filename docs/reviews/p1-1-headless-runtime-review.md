@@ -2,7 +2,7 @@
 
 ## Findings
 
-- Pending async review.
+- No findings.
 
 ## Summary
 
