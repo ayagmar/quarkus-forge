@@ -81,6 +81,7 @@ graph TD
     HGS --> IRS
     HGS --> EFS
     TBS --> CTC
+    TBS --> RS
     CTC --> QAC
     CTC --> FFS
     HCC --> QAC
@@ -99,7 +100,7 @@ graph TD
 </pre>
 ++++
 
-`RuntimeServices` now defines the shared session-lifetime composition root for API client, catalog, archive, and favorites collaborators. `RuntimeWiring` remains as the thin adapter for older callers while Phase 7 moves TUI and headless entry paths onto the explicit bundle shape.
+`RuntimeServices` now defines the shared session-lifetime composition root for API client, catalog, archive, and favorites collaborators. `TuiBootstrapService` consumes that bundle for interactive and smoke sessions, while `RuntimeWiring` remains the thin adapter for the remaining headless and CLI assembly steps.
 
 Startup policy now lives under `application/`: `LiveStartupMetadataLoader` owns the live-metadata timeout and snapshot-fallback path, while `DefaultStartupStateService` merges explicit CLI overrides, optional stored prefill, and compiled defaults before handing the result to `InputResolutionService`.
 
