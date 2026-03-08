@@ -134,6 +134,44 @@ class UiStateSnapshotMapperTest {
     assertThat(state.statusMessage()).isEqualTo("Ready");
   }
 
+  @Test
+  void renderModelCarriesRenderOnlySlicesSeparately() {
+    FooterSnapshot footerSnapshot =
+        new FooterSnapshot(
+            true,
+            FocusTarget.SUBMIT,
+            false,
+            false,
+            false,
+            "Rendering",
+            "",
+            "",
+            false,
+            "",
+            "",
+            "",
+            "",
+            "");
+    UiStateFixtureBuilder fixture =
+        new UiStateFixtureBuilder()
+            .withPanelState(
+                new UiStateSnapshotMapper.PanelState(
+                    new ExtensionsPanelSnapshot(
+                        true, true, false, false, false, "", "live", false, false, false, 0, "", "",
+                        0, 0, 0, List.of(), List.of(), "", ""),
+                    footerSnapshot));
+
+    UiRenderModel renderModel = fixture.renderModel();
+
+    assertThat(renderModel.reducerState().statusMessage()).isEqualTo("Ready");
+    assertThat(renderModel.metadataPanel()).isEqualTo(fixture.reducerState().metadataPanel());
+    assertThat(renderModel.extensionsPanel()).isEqualTo(fixture.panelState().extensionsPanel());
+    assertThat(renderModel.footer()).isEqualTo(footerSnapshot);
+    assertThat(renderModel.generation()).isEqualTo(fixture.reducerState().generation());
+    assertThat(renderModel.startupOverlay()).isEqualTo(fixture.reducerState().startupOverlay());
+    assertThat(renderModel.snapshotState().footer()).isEqualTo(footerSnapshot);
+  }
+
   private static final class UiStateFixtureBuilder {
     private final UiStateSnapshotMapper mapper = new UiStateSnapshotMapper();
     private final ForgeUiState initialState = UiTestFixtureFactory.defaultForgeUiState();
@@ -235,6 +273,18 @@ class UiStateSnapshotMapperTest {
 
     UiState build() {
       return mapper.map(reducerState, reducerState.statusMessage(), panelState);
+    }
+
+    UiRenderModel renderModel() {
+      return mapper.renderModel(reducerState, reducerState.statusMessage(), panelState);
+    }
+
+    UiState reducerState() {
+      return reducerState;
+    }
+
+    UiStateSnapshotMapper.PanelState panelState() {
+      return panelState;
     }
   }
 }
