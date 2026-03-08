@@ -15,10 +15,8 @@ import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
 import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
-import dev.ayagmar.quarkusforge.domain.ValidationError;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.ayagmar.quarkusforge.forge.Forgefile;
-import dev.ayagmar.quarkusforge.forge.ForgefileLock;
 import dev.ayagmar.quarkusforge.forge.ForgefileStore;
 import dev.ayagmar.quarkusforge.persistence.ExtensionFavoritesStore;
 import java.nio.file.Files;
@@ -36,6 +34,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
   private final HeadlessCatalogLoader catalogLoader;
   private final HeadlessProjectGenerator projectGenerator;
   private final HeadlessExtensionResolutionService extensionResolutionService;
+  private final HeadlessForgefilePersistenceService forgefilePersistenceService;
   private final AutoCloseable closeOwner;
 
   HeadlessGenerationService(
@@ -46,6 +45,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
         catalogLoader,
         projectGenerator,
         new HeadlessExtensionResolutionService(catalogLoader, favoritesStore),
+        new HeadlessForgefilePersistenceService(),
         catalogLoader);
   }
 
@@ -58,6 +58,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
         catalogLoader,
         projectGenerator,
         new HeadlessExtensionResolutionService(catalogLoader, favoritesStore),
+        new HeadlessForgefilePersistenceService(),
         closeOwner);
   }
 
@@ -65,10 +66,12 @@ public final class HeadlessGenerationService implements AutoCloseable {
       HeadlessCatalogLoader catalogLoader,
       HeadlessProjectGenerator projectGenerator,
       HeadlessExtensionResolutionService extensionResolutionService,
+      HeadlessForgefilePersistenceService forgefilePersistenceService,
       AutoCloseable closeOwner) {
     this.catalogLoader = Objects.requireNonNull(catalogLoader);
     this.projectGenerator = Objects.requireNonNull(projectGenerator);
     this.extensionResolutionService = Objects.requireNonNull(extensionResolutionService);
+    this.forgefilePersistenceService = Objects.requireNonNull(forgefilePersistenceService);
     this.closeOwner = Objects.requireNonNull(closeOwner);
   }
 
@@ -108,7 +111,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
     diagnostics.info(
         "generate.start", of("mode", command.dryRun() || globalDryRun ? "dry-run" : "apply"));
 
-    EffectiveInputs inputs;
+    HeadlessGenerationInputs inputs;
     try {
       inputs = loadEffectiveInputs(command);
     } catch (IllegalArgumentException illegalArgumentException) {
@@ -158,7 +161,8 @@ public final class HeadlessGenerationService implements AutoCloseable {
               catalogTimeout);
 
       if (inputs.lockCheck()) {
-        validateLockDrift(inputs.forgefile(), validatedState.request(), inputs, extensionIds);
+        forgefilePersistenceService.validateLockDrift(
+            inputs, validatedState.request(), extensionIds);
       }
     } catch (ValidationException validationException) {
       diagnostics.error(
@@ -229,7 +233,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
     }
   }
 
-  private static EffectiveInputs loadEffectiveInputs(GenerateCommand command) {
+  private static HeadlessGenerationInputs loadEffectiveInputs(GenerateCommand command) {
     Forgefile template = command.explicitTemplate();
     List<String> presetInputs = new ArrayList<>(command.presets());
     List<String> extensionInputs = new ArrayList<>(command.extensions());
@@ -262,7 +266,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
           "--lock-check requires --from pointing to a Forgefile with a locked section");
     }
 
-    return new EffectiveInputs(
+    return new HeadlessGenerationInputs(
         template,
         List.copyOf(presetInputs),
         List.copyOf(extensionInputs),
@@ -273,94 +277,14 @@ public final class HeadlessGenerationService implements AutoCloseable {
         saveAsPath);
   }
 
-  private static void validateLockDrift(
-      Forgefile forgefile,
-      ProjectRequest request,
-      EffectiveInputs inputs,
-      List<String> extensionIds) {
-    if (forgefile == null || forgefile.locked() == null) {
-      return;
-    }
-    ForgefileLock lock = forgefile.locked();
-
-    List<ValidationError> errors = new ArrayList<>();
-    checkDrift(errors, "platformStream", lock.platformStream(), request.platformStream());
-    checkDrift(errors, "buildTool", lock.buildTool(), request.buildTool());
-    checkDrift(errors, "javaVersion", lock.javaVersion(), request.javaVersion());
-    List<String> lockedExtensions = lock.extensions() == null ? List.of() : lock.extensions();
-    if (!HeadlessExtensionResolutionService.normalizedExtensionIdsForComparison(lockedExtensions)
-        .equals(
-            HeadlessExtensionResolutionService.normalizedExtensionIdsForComparison(extensionIds))) {
-      errors.add(
-          new ValidationError(
-              "locked",
-              "extensions drift: locked=" + lockedExtensions + ", request=" + extensionIds));
-    }
-    List<String> normalizedPresets =
-        HeadlessExtensionResolutionService.normalizePresets(inputs.presetInputs());
-    List<String> lockedPresets = lock.presets() == null ? List.of() : lock.presets();
-    if (!HeadlessExtensionResolutionService.normalizedPresetIdsForComparison(lockedPresets)
-        .equals(
-            HeadlessExtensionResolutionService.normalizedPresetIdsForComparison(
-                normalizedPresets))) {
-      errors.add(
-          new ValidationError(
-              "locked",
-              "presets drift: locked=" + lockedPresets + ", request=" + normalizedPresets));
-    }
-
-    if (!errors.isEmpty()) {
-      errors.add(
-          new ValidationError(
-              "locked", "rerun with --lock to accept and update the locked section"));
-      throw new ValidationException(errors);
-    }
-  }
-
-  private static void checkDrift(
-      List<ValidationError> errors, String field, String locked, String actual) {
-    if (!Objects.equals(locked, actual)) {
-      errors.add(
-          new ValidationError(
-              "locked", field + " drift: locked='" + locked + "', request='" + actual + "'"));
-    }
-  }
-
-  private static void saveForgefileIfRequested(
-      EffectiveInputs inputs, ProjectRequest request, List<String> extensionIds) {
-    List<String> normalizedPresets =
-        HeadlessExtensionResolutionService.normalizePresets(inputs.presetInputs());
-    Forgefile forgefile =
-        inputs.template().withSelections(normalizedPresets, inputs.extensionInputs());
-    if (inputs.writeLock()) {
-      ForgefileLock lock =
-          ForgefileLock.of(
-              request.platformStream(),
-              request.buildTool(),
-              request.javaVersion(),
-              normalizedPresets,
-              extensionIds);
-      forgefile = forgefile.withLock(lock);
-    }
-
-    Path writePath = inputs.saveAsFile();
-    if (writePath == null && inputs.writeLock() && inputs.forgefilePath() != null) {
-      writePath = inputs.forgefilePath();
-    }
-    if (writePath == null) {
-      return;
-    }
-    ForgefileStore.save(writePath, forgefile);
-  }
-
-  private static int persistForgefileAndReturn(
-      EffectiveInputs inputs,
+  private int persistForgefileAndReturn(
+      HeadlessGenerationInputs inputs,
       ProjectRequest request,
       List<String> extensionIds,
       DiagnosticLogger diagnostics,
       int successExitCode) {
     try {
-      saveForgefileIfRequested(inputs, request, extensionIds);
+      forgefilePersistenceService.persist(inputs, request, extensionIds);
       return successExitCode;
     } catch (IllegalArgumentException illegalArgumentException) {
       diagnostics.error(
@@ -393,14 +317,4 @@ public final class HeadlessGenerationService implements AutoCloseable {
     }
     return ForgeDataPaths.recipesRoot().resolve(requestedPath).toAbsolutePath().normalize();
   }
-
-  private record EffectiveInputs(
-      Forgefile template,
-      List<String> presetInputs,
-      List<String> extensionInputs,
-      Forgefile forgefile,
-      Path forgefilePath,
-      boolean writeLock,
-      boolean lockCheck,
-      Path saveAsFile) {}
 }
