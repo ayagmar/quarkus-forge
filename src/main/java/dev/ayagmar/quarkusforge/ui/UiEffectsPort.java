@@ -22,7 +22,7 @@ interface UiEffectsPort {
 
   void startGeneration();
 
-  void transitionGenerationState(CoreTuiController.GenerationState targetState);
+  void transitionGenerationState(GenerationState targetState);
 
   void requestGenerationCancellation();
 

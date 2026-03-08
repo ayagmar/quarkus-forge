@@ -52,7 +52,7 @@ class CoreTuiGenerationFlowTest {
 
     generationRunner.complete(Path.of("build/generated-project"));
 
-    assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.SUCCESS);
+    assertThat(controller.generationState()).isEqualTo(GenerationState.SUCCESS);
     assertThat(controller.statusMessage()).contains("Generation succeeded");
     assertThat(controller.postGenerationMenuVisible()).isTrue();
     assertThat(controller.postGenerationSuccessHint()).contains("cd ").contains("mvn quarkus:dev");
@@ -391,7 +391,7 @@ class CoreTuiGenerationFlowTest {
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
-    assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.ERROR);
+    assertThat(controller.generationState()).isEqualTo(GenerationState.ERROR);
     assertThat(controller.statusMessage()).contains("Generation failed");
     assertThat(controller.errorMessage()).contains("runner crashed");
   }
@@ -407,7 +407,7 @@ class CoreTuiGenerationFlowTest {
 
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
-    assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.ERROR);
+    assertThat(controller.generationState()).isEqualTo(GenerationState.ERROR);
     assertThat(controller.statusMessage()).contains("Generation failed");
     assertThat(controller.errorMessage()).contains("Generation service returned null future");
   }
@@ -427,11 +427,11 @@ class CoreTuiGenerationFlowTest {
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
     generationRunner.complete(Path.of("build/generated-project"));
 
-    assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.LOADING);
+    assertThat(controller.generationState()).isEqualTo(GenerationState.LOADING);
 
     UiControllerTestHarness.renderToString(controller, 120, 34);
 
-    assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.SUCCESS);
+    assertThat(controller.generationState()).isEqualTo(GenerationState.SUCCESS);
     assertThat(controller.statusMessage()).contains("Generation succeeded");
   }
 
@@ -453,7 +453,7 @@ class CoreTuiGenerationFlowTest {
     UiAction action = controller.onEvent(KeyEvent.ofKey(KeyCode.ESCAPE));
 
     assertThat(action.shouldQuit()).isTrue();
-    assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.SUCCESS);
+    assertThat(controller.generationState()).isEqualTo(GenerationState.SUCCESS);
     assertThat(controller.statusMessage()).contains("Generation succeeded");
   }
 

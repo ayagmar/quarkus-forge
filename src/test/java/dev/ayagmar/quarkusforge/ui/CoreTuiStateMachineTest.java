@@ -19,59 +19,39 @@ class CoreTuiStateMachineTest {
   @Test
   void validTransitionsMatchContract() {
     assertThat(
-            CoreTuiController.isValidTransition(
-                CoreTuiController.GenerationState.IDLE,
-                CoreTuiController.GenerationState.VALIDATING))
+            CoreTuiController.isValidTransition(GenerationState.IDLE, GenerationState.VALIDATING))
         .isTrue();
     assertThat(
             CoreTuiController.isValidTransition(
-                CoreTuiController.GenerationState.VALIDATING,
-                CoreTuiController.GenerationState.LOADING))
+                GenerationState.VALIDATING, GenerationState.LOADING))
         .isTrue();
     assertThat(
-            CoreTuiController.isValidTransition(
-                CoreTuiController.GenerationState.VALIDATING,
-                CoreTuiController.GenerationState.ERROR))
+            CoreTuiController.isValidTransition(GenerationState.VALIDATING, GenerationState.ERROR))
         .isTrue();
     assertThat(
-            CoreTuiController.isValidTransition(
-                CoreTuiController.GenerationState.LOADING,
-                CoreTuiController.GenerationState.SUCCESS))
+            CoreTuiController.isValidTransition(GenerationState.LOADING, GenerationState.SUCCESS))
         .isTrue();
     assertThat(
-            CoreTuiController.isValidTransition(
-                CoreTuiController.GenerationState.LOADING,
-                CoreTuiController.GenerationState.CANCELLED))
+            CoreTuiController.isValidTransition(GenerationState.LOADING, GenerationState.CANCELLED))
         .isTrue();
-    assertThat(
-            CoreTuiController.isValidTransition(
-                CoreTuiController.GenerationState.SUCCESS, CoreTuiController.GenerationState.IDLE))
+    assertThat(CoreTuiController.isValidTransition(GenerationState.SUCCESS, GenerationState.IDLE))
         .isTrue();
   }
 
   @Test
   void invalidTransitionsAreRejected() {
-    assertThat(
-            CoreTuiController.isValidTransition(
-                CoreTuiController.GenerationState.IDLE, CoreTuiController.GenerationState.LOADING))
+    assertThat(CoreTuiController.isValidTransition(GenerationState.IDLE, GenerationState.LOADING))
         .isFalse();
     assertThat(
             CoreTuiController.isValidTransition(
-                CoreTuiController.GenerationState.LOADING,
-                CoreTuiController.GenerationState.VALIDATING))
+                GenerationState.LOADING, GenerationState.VALIDATING))
+        .isFalse();
+    assertThat(CoreTuiController.isValidTransition(GenerationState.ERROR, GenerationState.LOADING))
         .isFalse();
     assertThat(
-            CoreTuiController.isValidTransition(
-                CoreTuiController.GenerationState.ERROR, CoreTuiController.GenerationState.LOADING))
+            CoreTuiController.isValidTransition(GenerationState.CANCELLED, GenerationState.SUCCESS))
         .isFalse();
-    assertThat(
-            CoreTuiController.isValidTransition(
-                CoreTuiController.GenerationState.CANCELLED,
-                CoreTuiController.GenerationState.SUCCESS))
-        .isFalse();
-    assertThat(
-            CoreTuiController.isValidTransition(
-                CoreTuiController.GenerationState.IDLE, CoreTuiController.GenerationState.IDLE))
+    assertThat(CoreTuiController.isValidTransition(GenerationState.IDLE, GenerationState.IDLE))
         .isFalse();
   }
 
@@ -90,7 +70,7 @@ class CoreTuiStateMachineTest {
     }
 
     assertThat(generationRunner.callCount()).isEqualTo(1);
-    assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.LOADING);
+    assertThat(controller.generationState()).isEqualTo(GenerationState.LOADING);
     assertThat(controller.statusMessage()).contains("already in progress");
   }
 
@@ -110,15 +90,14 @@ class CoreTuiStateMachineTest {
     assertThat(cancelAction.shouldQuit()).isFalse();
     assertThat(cancelAction.handled()).isTrue();
     assertThat(controller.generationState())
-        .isIn(
-            CoreTuiController.GenerationState.LOADING, CoreTuiController.GenerationState.CANCELLED);
+        .isIn(GenerationState.LOADING, GenerationState.CANCELLED);
     assertThat(controller.statusMessage())
         .containsAnyOf("Cancellation requested", "Generation cancelled");
-    if (controller.generationState() == CoreTuiController.GenerationState.LOADING) {
+    if (controller.generationState() == GenerationState.LOADING) {
       generationRunner.fail(new CancellationException("cancelled"));
     }
 
-    assertThat(controller.generationState()).isEqualTo(CoreTuiController.GenerationState.CANCELLED);
+    assertThat(controller.generationState()).isEqualTo(GenerationState.CANCELLED);
     assertThat(controller.statusMessage()).contains("Generation cancelled");
   }
 

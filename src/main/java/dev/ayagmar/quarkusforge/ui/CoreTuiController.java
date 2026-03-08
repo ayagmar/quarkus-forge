@@ -1376,15 +1376,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
             "Focus moved to invalid field: " + UiFocusTargets.nameOf(nextFocusTarget)));
   }
 
-  enum GenerationState {
-    IDLE,
-    VALIDATING,
-    LOADING,
-    SUCCESS,
-    ERROR,
-    CANCELLED
-  }
-
   private static boolean handleTextInputKey(TextInputState state, KeyEvent event) {
     if (!UiTextInputKeys.isSupportedEditKey(event)) {
       return false;

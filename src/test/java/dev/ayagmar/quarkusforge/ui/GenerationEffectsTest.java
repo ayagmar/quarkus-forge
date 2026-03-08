@@ -17,15 +17,15 @@ class GenerationEffectsTest {
   @Test
   void prepareForGenerationResetsTerminalTrackerState() {
     GenerationStateTracker tracker = new GenerationStateTracker();
-    tracker.transitionTo(CoreTuiController.GenerationState.VALIDATING);
-    tracker.transitionTo(CoreTuiController.GenerationState.LOADING);
-    tracker.transitionTo(CoreTuiController.GenerationState.SUCCESS);
+    tracker.transitionTo(GenerationState.VALIDATING);
+    tracker.transitionTo(GenerationState.LOADING);
+    tracker.transitionTo(GenerationState.SUCCESS);
     GenerationEffects effects =
         new GenerationEffects(new GenerationFlowCoordinator(), tracker, new ControlledRunner());
 
     effects.prepareForGeneration();
 
-    assertThat(tracker.currentState()).isEqualTo(CoreTuiController.GenerationState.IDLE);
+    assertThat(tracker.currentState()).isEqualTo(GenerationState.IDLE);
   }
 
   @Test
@@ -65,8 +65,7 @@ class GenerationEffectsTest {
                 List.of("io.quarkus:quarkus-rest", "io.quarkus:quarkus-smallrye-openapi")));
     assertThat(runner.outputDirectory).isEqualTo(Path.of("output/demo"));
     assertThat(callbacks.transitions)
-        .containsExactly(
-            CoreTuiController.GenerationState.LOADING, CoreTuiController.GenerationState.SUCCESS);
+        .containsExactly(GenerationState.LOADING, GenerationState.SUCCESS);
     assertThat(callbacks.successPaths).containsExactly(Path.of("output/demo").toAbsolutePath());
   }
 
@@ -93,22 +92,22 @@ class GenerationEffectsTest {
   }
 
   private static final class RecordingCallbacks implements GenerationFlowCallbacks {
-    private final List<CoreTuiController.GenerationState> transitions = new ArrayList<>();
+    private final List<GenerationState> transitions = new ArrayList<>();
     private final List<Path> successPaths = new ArrayList<>();
-    private CoreTuiController.GenerationState currentState = CoreTuiController.GenerationState.IDLE;
+    private GenerationState currentState = GenerationState.IDLE;
 
     @Override
     public void beforeGenerationStart() {}
 
     @Override
-    public boolean transitionTo(CoreTuiController.GenerationState targetState) {
+    public boolean transitionTo(GenerationState targetState) {
       currentState = targetState;
       transitions.add(targetState);
       return true;
     }
 
     @Override
-    public CoreTuiController.GenerationState currentState() {
+    public GenerationState currentState() {
       return currentState;
     }
 

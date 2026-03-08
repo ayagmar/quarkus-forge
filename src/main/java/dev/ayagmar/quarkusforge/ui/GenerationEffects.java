@@ -36,7 +36,7 @@ final class GenerationEffects {
         callbacks);
   }
 
-  boolean transitionGenerationState(CoreTuiController.GenerationState targetState) {
+  boolean transitionGenerationState(GenerationState targetState) {
     return generationStateTracker.transitionTo(targetState);
   }
 

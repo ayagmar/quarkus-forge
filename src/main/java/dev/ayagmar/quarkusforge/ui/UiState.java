@@ -459,8 +459,8 @@ record UiState(
   }
 
   private static boolean isGenerationVisible(GenerationView generationView) {
-    return generationView.state() == CoreTuiController.GenerationState.VALIDATING
-        || generationView.state() == CoreTuiController.GenerationState.LOADING;
+    return generationView.state() == GenerationState.VALIDATING
+        || generationView.state() == GenerationState.LOADING;
   }
 
   record OverlayState(
@@ -471,7 +471,7 @@ record UiState(
       boolean startupOverlayVisible) {}
 
   record GenerationView(
-      CoreTuiController.GenerationState state,
+      GenerationState state,
       double progressRatio,
       String progressPhase,
       boolean cancellationRequested) {}

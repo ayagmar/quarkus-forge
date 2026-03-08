@@ -20,8 +20,7 @@ sealed interface UiEffect {
 
   record StartGeneration() implements UiEffect {}
 
-  record TransitionGenerationState(CoreTuiController.GenerationState targetState)
-      implements UiEffect {}
+  record TransitionGenerationState(GenerationState targetState) implements UiEffect {}
 
   record RequestGenerationCancellation() implements UiEffect {}
 
