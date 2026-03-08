@@ -22,7 +22,7 @@ final class GenerationStateTracker {
   }
 
   boolean transitionTo(GenerationState targetState) {
-    if (!isValidTransition(currentState, targetState)) {
+    if (!GenerationStateMachine.isValidTransition(currentState, targetState)) {
       return false;
     }
     currentState = targetState;
@@ -112,24 +112,6 @@ final class GenerationStateTracker {
       case SUCCESS -> "last run succeeded";
       case ERROR -> "last run failed";
       case CANCELLED -> "last run cancelled";
-    };
-  }
-
-  static boolean isValidTransition(GenerationState currentState, GenerationState targetState) {
-    if (currentState == targetState) {
-      return false;
-    }
-    return switch (currentState) {
-      case IDLE -> targetState == GenerationState.VALIDATING;
-      case VALIDATING ->
-          targetState == GenerationState.LOADING
-              || targetState == GenerationState.ERROR
-              || targetState == GenerationState.IDLE;
-      case LOADING ->
-          targetState == GenerationState.SUCCESS
-              || targetState == GenerationState.ERROR
-              || targetState == GenerationState.CANCELLED;
-      case SUCCESS, ERROR, CANCELLED -> targetState == GenerationState.IDLE;
     };
   }
 

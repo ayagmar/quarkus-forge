@@ -181,7 +181,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
             generationEffects.startGeneration(
                 currentRequest(),
                 extensionCatalogNavigation.selectedExtensionIds(),
-                resolveGeneratedProjectDirectory(currentRequest()),
+                OutputPathResolver.resolveGeneratedProjectDirectory(currentRequest()),
                 CoreTuiController.this);
           }
 
@@ -1130,10 +1130,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     return generationStateTracker.isInProgress();
   }
 
-  private Path resolveGeneratedProjectDirectory(ProjectRequest request) {
-    return OutputPathResolver.resolveGeneratedProjectDirectory(request);
-  }
-
   private void prepareForGenerationEffect() {
     generationStatusNotice = "";
     generationEffects.prepareForGeneration();
@@ -1189,10 +1185,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   @Override
   public void scheduleOnRenderThread(Runnable task) {
     scheduler.schedule(Duration.ZERO, task);
-  }
-
-  static boolean isValidTransition(GenerationState currentState, GenerationState targetState) {
-    return GenerationStateTracker.isValidTransition(currentState, targetState);
   }
 
   private static String nextStepCommand(String buildTool) {
@@ -1311,7 +1303,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   private String currentTargetConflictErrorMessage(ProjectRequest request) {
     try {
-      Path generatedProjectDirectory = resolveGeneratedProjectDirectory(request);
+      Path generatedProjectDirectory = OutputPathResolver.resolveGeneratedProjectDirectory(request);
       if (!Files.exists(generatedProjectDirectory)) {
         return "";
       }

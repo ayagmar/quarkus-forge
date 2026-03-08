@@ -194,7 +194,7 @@ class GenerationStateTrackerTest {
   @Test
   void validTransitionFromValidatingToError() {
     assertThat(
-            GenerationStateTracker.isValidTransition(
+            GenerationStateMachine.isValidTransition(
                 GenerationState.VALIDATING, GenerationState.ERROR))
         .isTrue();
   }
@@ -202,7 +202,7 @@ class GenerationStateTrackerTest {
   @Test
   void validTransitionFromValidatingToIdle() {
     assertThat(
-            GenerationStateTracker.isValidTransition(
+            GenerationStateMachine.isValidTransition(
                 GenerationState.VALIDATING, GenerationState.IDLE))
         .isTrue();
   }
@@ -210,7 +210,7 @@ class GenerationStateTrackerTest {
   @Test
   void invalidTransitionFromErrorToLoading() {
     assertThat(
-            GenerationStateTracker.isValidTransition(
+            GenerationStateMachine.isValidTransition(
                 GenerationState.ERROR, GenerationState.LOADING))
         .isFalse();
   }
