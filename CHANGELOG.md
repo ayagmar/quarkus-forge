@@ -3,7 +3,15 @@
 All notable changes to Quarkus Forge are documented here.
 This project uses [Conventional Commits](https://www.conventionalcommits.org/). GitHub Releases contain auto-generated notes from [JReleaser](https://jreleaser.org/).
 
-## [Unreleased](https://github.com/ayagmar/quarkus-forge/compare/v0.6.1...HEAD)
+## [Unreleased](https://github.com/ayagmar/quarkus-forge/compare/v0.6.2...HEAD)
+
+## [0.6.2](https://github.com/ayagmar/quarkus-forge/compare/v0.6.1...v0.6.2) (2026-03-08)
+
+### Changed
+
+- fix(native): pin tamboui snapshot dependencies (#37) (5157e58)
+- chore(release): prepare next iteration 0.6.2-SNAPSHOT (adce15b)
+
 
 ## [0.6.1](https://github.com/ayagmar/quarkus-forge/compare/v0.6.0...v0.6.1) (2026-03-07)
 
