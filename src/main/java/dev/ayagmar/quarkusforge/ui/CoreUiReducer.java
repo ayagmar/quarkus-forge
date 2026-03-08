@@ -358,7 +358,7 @@ final class CoreUiReducer implements UiReducer {
               List.of(),
               UiAction.handled(false));
         }
-        if (state.overlays().postGenerationVisible()) {
+        if (state.postGeneration().visible()) {
           yield new ReduceResult(
               state.withStatusAndError("Post-generation actions are open.", state.errorMessage()),
               List.of(),
@@ -553,7 +553,7 @@ final class CoreUiReducer implements UiReducer {
               List.of(),
               UiAction.handled(false));
         }
-        if (state.overlays().postGenerationVisible()) {
+        if (state.postGeneration().visible()) {
           yield new ReduceResult(
               state.withStatusAndError("Post-generation actions are open.", state.errorMessage()),
               List.of(),
@@ -702,9 +702,6 @@ final class CoreUiReducer implements UiReducer {
   private static ReduceResult reducePostGeneration(
       UiState state, UiIntent.PostGenerationCommand command) {
     UiState.PostGenerationView postGeneration = state.postGeneration();
-    if (command instanceof UiIntent.PostGenerationCommand.Noop) {
-      return new ReduceResult(state, List.of(), UiAction.handled(false));
-    }
     if (!postGeneration.visible()) {
       return new ReduceResult(state, List.of(), UiAction.handled(false));
     }

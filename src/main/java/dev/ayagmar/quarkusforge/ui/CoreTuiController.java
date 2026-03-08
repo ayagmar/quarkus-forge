@@ -765,7 +765,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         false,
         false,
         0,
-        new UiState.OverlayState(false, false, false, false, false),
+        new UiState.OverlayState(false, false, false, false),
         new UiState.CatalogLoadView(CatalogLoadState.initial()),
         postGenerationMenu.initialView(),
         extensions);
@@ -1166,10 +1166,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   private static boolean isTextInputFocus(FocusTarget focusTarget) {
     return UiFocusPredicates.isTextInputFocus(focusTarget);
-  }
-
-  private static String panelTitle(String baseTitle, boolean focused) {
-    return focused ? baseTitle + " [focus]" : baseTitle;
   }
 
   private UiAction handleTickEvent() {

@@ -129,7 +129,7 @@ class UiRenderStateAssemblerTest {
         false,
         false,
         0,
-        new UiState.OverlayState(false, false, false, false, false),
+        new UiState.OverlayState(false, false, false, false),
         new UiState.CatalogLoadView(CatalogLoadState.initial()),
         new UiState.PostGenerationView(false, false, 0, 0, List.of(), null, "", null),
         UiTestFixtureFactory.defaultExtensionView());

@@ -451,7 +451,7 @@ class CoreUiReducerTest {
   void commandPaletteToggleOpensAndClosesOverlaysThroughReducerState() {
     UiState helpVisibleState =
         stateWithOverlayState(
-            baseState(), new UiState.OverlayState(false, false, true, false, false), 3, "Ready");
+            baseState(), new UiState.OverlayState(false, false, true, false), 3, "Ready");
 
     ReduceResult openResult =
         reducer.reduce(
@@ -480,7 +480,7 @@ class CoreUiReducerTest {
   void commandPaletteConfirmClosesOverlayAndRoutesFocusActionThroughSharedReducerPath() {
     UiState paletteState =
         stateWithOverlayState(
-            baseState(), new UiState.OverlayState(false, true, false, false, false), 0, "Ready");
+            baseState(), new UiState.OverlayState(false, true, false, false), 0, "Ready");
 
     ReduceResult confirmResult =
         reducer.reduce(
@@ -619,7 +619,7 @@ class CoreUiReducerTest {
   void commandPaletteToggleUsesReducerStateForBlockedMessages() {
     UiState generationVisibleState =
         stateWithOverlayState(
-            baseState(), new UiState.OverlayState(true, false, false, false, false), 0, "Ready");
+            baseState(), new UiState.OverlayState(true, false, false, false), 0, "Ready");
 
     ReduceResult result =
         reducer.reduce(
@@ -636,7 +636,7 @@ class CoreUiReducerTest {
   void helpOverlayToggleOpensAndClosesOverlaysThroughReducerState() {
     UiState paletteVisibleState =
         stateWithOverlayState(
-            baseState(), new UiState.OverlayState(false, true, false, false, false), 4, "Ready");
+            baseState(), new UiState.OverlayState(false, true, false, false), 4, "Ready");
 
     ReduceResult openResult =
         reducer.reduce(
@@ -663,7 +663,7 @@ class CoreUiReducerTest {
     UiState postGenerationVisibleState =
         stateWithOverlayState(
             postGenerationVisibleState(),
-            new UiState.OverlayState(false, false, false, true, false),
+            new UiState.OverlayState(false, false, false, false),
             0,
             "Ready");
 
