@@ -68,37 +68,50 @@ just              # list all recipes
 just build        # build full jar
 just test         # unit + integration tests
 just coverage     # tests + JaCoCo report
+just docs-build   # docs build verification
+just docs-linkcheck # docs link verification
 just format       # auto-format
 just verify       # format-check + headless-compile + all tests
 just tui          # build and launch TUI
 ```
 
-Or use Maven directly (`./mvnw` or `mvn`):
+The shared `scripts/verify/` entrypoints are the source of truth used by CI and release automation:
+
+```bash
+scripts/verify/format-check.sh
+scripts/verify/verify.sh
+scripts/verify/headless-compile.sh
+scripts/verify/coverage.sh
+scripts/verify/docs-build.sh
+scripts/verify/docs-linkcheck.sh
+```
+
+The `just` recipes above are thin shortcuts over those scripts.
 
 ### Run tests
 
 ```bash
-./mvnw test                          # unit tests only
-./mvnw clean verify                  # unit + integration tests + coverage reports
+./mvnw test               # unit tests only
+scripts/verify/verify.sh  # CI-aligned unit + integration verification
 ```
 
 ### Format code
 
 ```bash
 ./mvnw spotless:apply                # auto-format (Google Java Format)
-./mvnw spotless:check                # check only (used in CI)
+scripts/verify/format-check.sh       # check only (used in CI)
 ```
 
 ### Check headless profile compiles
 
 ```bash
-./mvnw clean compile -Pheadless
+scripts/verify/headless-compile.sh
 ```
 
 ### View coverage report
 
 ```bash
-./mvnw clean verify
+scripts/verify/coverage.sh
 open target/site/jacoco/index.html       # unit test coverage
 ```
 
@@ -123,7 +136,7 @@ open target/site/jacoco/index.html       # unit test coverage
 
 ## Pull Request Checklist
 
-- [ ] `./mvnw clean verify` passes
+- [ ] `scripts/verify/verify.sh` passes
 - [ ] New code is covered by tests
 - [ ] Docs updated if public behavior changed (CLI flags, keybindings, file paths, etc.)
 - [ ] PR description filled out with summary and test notes
