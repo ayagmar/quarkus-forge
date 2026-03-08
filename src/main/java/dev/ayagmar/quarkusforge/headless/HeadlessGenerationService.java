@@ -4,8 +4,6 @@ import static dev.ayagmar.quarkusforge.diagnostics.DiagnosticField.of;
 
 import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogDataService;
-import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
-import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
 import dev.ayagmar.quarkusforge.application.InputResolutionService;
 import dev.ayagmar.quarkusforge.archive.ProjectArchiveService;
@@ -16,24 +14,17 @@ import dev.ayagmar.quarkusforge.domain.ForgeUiState;
 import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
-import dev.ayagmar.quarkusforge.forge.Forgefile;
-import dev.ayagmar.quarkusforge.forge.ForgefileStore;
 import dev.ayagmar.quarkusforge.persistence.ExtensionFavoritesStore;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 public final class HeadlessGenerationService implements AutoCloseable {
   private final HeadlessCatalogLoader catalogLoader;
-  private final HeadlessProjectGenerator projectGenerator;
   private final HeadlessExtensionResolutionService extensionResolutionService;
+  private final HeadlessForgefilePersistenceService forgefilePersistenceService;
+  private final HeadlessGenerationExecutionService generationExecutionService;
   private final AutoCloseable closeOwner;
 
   HeadlessGenerationService(
@@ -42,8 +33,9 @@ public final class HeadlessGenerationService implements AutoCloseable {
       ExtensionFavoritesStore favoritesStore) {
     this(
         catalogLoader,
-        projectGenerator,
         new HeadlessExtensionResolutionService(catalogLoader, favoritesStore),
+        new HeadlessForgefilePersistenceService(),
+        new HeadlessGenerationExecutionService(projectGenerator),
         catalogLoader);
   }
 
@@ -54,19 +46,22 @@ public final class HeadlessGenerationService implements AutoCloseable {
       AutoCloseable closeOwner) {
     this(
         catalogLoader,
-        projectGenerator,
         new HeadlessExtensionResolutionService(catalogLoader, favoritesStore),
+        new HeadlessForgefilePersistenceService(),
+        new HeadlessGenerationExecutionService(projectGenerator),
         closeOwner);
   }
 
   HeadlessGenerationService(
       HeadlessCatalogLoader catalogLoader,
-      HeadlessProjectGenerator projectGenerator,
       HeadlessExtensionResolutionService extensionResolutionService,
+      HeadlessForgefilePersistenceService forgefilePersistenceService,
+      HeadlessGenerationExecutionService generationExecutionService,
       AutoCloseable closeOwner) {
     this.catalogLoader = Objects.requireNonNull(catalogLoader);
-    this.projectGenerator = Objects.requireNonNull(projectGenerator);
     this.extensionResolutionService = Objects.requireNonNull(extensionResolutionService);
+    this.forgefilePersistenceService = Objects.requireNonNull(forgefilePersistenceService);
+    this.generationExecutionService = Objects.requireNonNull(generationExecutionService);
     this.closeOwner = Objects.requireNonNull(closeOwner);
   }
 
@@ -87,7 +82,11 @@ public final class HeadlessGenerationService implements AutoCloseable {
     HeadlessCatalogClient client =
         new HeadlessCatalogClient(apiClient, catalogDataService, projectArchiveService);
     return new HeadlessGenerationService(
-        client, client, favoritesStore, closeOwner == null ? client : closeOwner);
+        client,
+        new HeadlessExtensionResolutionService(client, favoritesStore),
+        new HeadlessForgefilePersistenceService(),
+        new HeadlessGenerationExecutionService(client),
+        closeOwner == null ? client : closeOwner);
   }
 
   @Override
@@ -108,7 +107,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
 
     HeadlessGenerationInputs inputs;
     try {
-      inputs = loadEffectiveInputs(command);
+      inputs = HeadlessGenerationInputs.fromCommand(command);
     } catch (IllegalArgumentException illegalArgumentException) {
       diagnostics.error(
           "generate.inputs.failed", of("message", illegalArgumentException.getMessage()));
@@ -120,9 +119,13 @@ public final class HeadlessGenerationService implements AutoCloseable {
     CatalogData catalogData;
     try {
       catalogData = loadCatalogData(catalogTimeout, diagnostics);
-    } catch (Exception e) {
+    } catch (Exception exception) {
       return AsyncFailureHandler.handleFailure(
-          e, catalogTimeout, "catalog.load", "Failed to load extension catalog", diagnostics);
+          exception,
+          catalogTimeout,
+          "catalog.load",
+          "Failed to load extension catalog",
+          diagnostics);
     }
 
     ForgeUiState validatedState = resolveValidatedState(inputs, catalogData);
@@ -143,23 +146,20 @@ public final class HeadlessGenerationService implements AutoCloseable {
               inputs.presetInputs(),
               HeadlessExtensionResolutionService.knownExtensionIds(catalogData),
               catalogTimeout);
-
       if (inputs.lockCheck()) {
         forgefilePersistenceService.validateLockDrift(
             inputs, validatedState.request(), extensionIds);
       }
     } catch (ValidationException validationException) {
       return extensionValidationFailure(validationException, catalogData, diagnostics);
-    } catch (Exception e) {
+    } catch (Exception exception) {
       return AsyncFailureHandler.handleFailure(
-          e, catalogTimeout, "preset.load", "Failed to load presets", diagnostics);
+          exception, catalogTimeout, "preset.load", "Failed to load presets", diagnostics);
     }
 
-    boolean dryRunRequested = command.dryRun() || globalDryRun;
-    if (dryRunRequested) {
+    if (command.dryRun() || globalDryRun) {
       return handleDryRun(inputs, validatedState.request(), extensionIds, catalogData, diagnostics);
     }
-
     return executeGeneration(inputs, validatedState.request(), extensionIds, diagnostics);
   }
 
@@ -182,7 +182,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
   }
 
   private static int validationFailure(
-      dev.ayagmar.quarkusforge.domain.ValidationReport validation,
+      ValidationReport validation,
       String sourceLabel,
       String detailMessage,
       DiagnosticLogger diagnostics) {
@@ -225,22 +225,10 @@ public final class HeadlessGenerationService implements AutoCloseable {
       ProjectRequest request,
       List<String> extensionIds,
       DiagnosticLogger diagnostics) {
-    Path outputPath = HeadlessOutputPrinter.resolveProjectDirectory(request);
-    GenerationRequest generationRequest = toGenerationRequest(request, extensionIds);
-
-    CompletableFuture<Path> generationFuture = null;
     Duration generationTimeout = HeadlessTimeouts.generationTimeout();
-    diagnostics.info(
-        "generate.execute.start",
-        of("outputPath", outputPath.toString()),
-        of("extensionCount", extensionIds.size()));
     try {
-      generationFuture =
-          projectGenerator.startGeneration(generationRequest, outputPath, System.out::println);
       Path generatedProjectRoot =
-          generationFuture.get(generationTimeout.toMillis(), TimeUnit.MILLISECONDS);
-      diagnostics.info(
-          "generate.execute.success", of("projectRoot", generatedProjectRoot.toString()));
+          generationExecutionService.execute(request, extensionIds, generationTimeout, diagnostics);
       int persistExitCode =
           persistForgefileAndReturn(inputs, request, extensionIds, diagnostics, ExitCodes.OK);
       if (persistExitCode != ExitCodes.OK) {
@@ -249,69 +237,10 @@ public final class HeadlessGenerationService implements AutoCloseable {
       System.out.println(
           "Generation succeeded: " + generatedProjectRoot.toAbsolutePath().normalize());
       return ExitCodes.OK;
-    } catch (Exception e) {
-      if (e instanceof TimeoutException && generationFuture != null) {
-        generationFuture.cancel(true);
-      }
+    } catch (Exception exception) {
       return AsyncFailureHandler.handleFailure(
-          e, generationTimeout, "generate.execute", "Generation failed", diagnostics);
+          exception, generationTimeout, "generate.execute", "Generation failed", diagnostics);
     }
-  }
-
-  private static GenerationRequest toGenerationRequest(
-      ProjectRequest request, List<String> extensionIds) {
-    return new GenerationRequest(
-        request.groupId(),
-        request.artifactId(),
-        request.version(),
-        request.platformStream(),
-        request.buildTool(),
-        request.javaVersion(),
-        extensionIds);
-  }
-
-  private static HeadlessGenerationInputs loadEffectiveInputs(GenerateCommand command) {
-    Forgefile template = command.explicitTemplate();
-    List<String> presetInputs = new ArrayList<>(command.presets());
-    List<String> extensionInputs = new ArrayList<>(command.extensions());
-    Forgefile forgefile = null;
-    Path forgefilePath = null;
-    boolean hasFromFile = command.fromFile() != null && !command.fromFile().isBlank();
-    Path saveAsPath = saveAsPathOrNull(command.saveAsFile());
-
-    if (command.lock() && !hasFromFile && saveAsPath == null) {
-      throw new IllegalArgumentException("--lock requires --from or --save-as");
-    }
-    if (command.lockCheck() && !hasFromFile) {
-      throw new IllegalArgumentException(
-          "--lock-check requires --from pointing to a Forgefile with a locked section");
-    }
-
-    if (hasFromFile) {
-      forgefilePath = resolveForgefileReadPath(command.fromFile());
-      forgefile = ForgefileStore.load(forgefilePath);
-      template = forgefile.withOverrides(template);
-      presetInputs = new ArrayList<>(new LinkedHashSet<>(safeSelections(forgefile.presets())));
-      presetInputs.addAll(command.presets());
-      extensionInputs =
-          new ArrayList<>(new LinkedHashSet<>(safeSelections(forgefile.extensions())));
-      extensionInputs.addAll(command.extensions());
-    }
-
-    if (command.lockCheck() && (forgefile == null || forgefile.locked() == null)) {
-      throw new IllegalArgumentException(
-          "--lock-check requires --from pointing to a Forgefile with a locked section");
-    }
-
-    return new HeadlessGenerationInputs(
-        template,
-        List.copyOf(presetInputs),
-        List.copyOf(extensionInputs),
-        forgefile,
-        forgefilePath,
-        command.lock(),
-        command.lockCheck(),
-        saveAsPath);
   }
 
   private int persistForgefileAndReturn(
@@ -329,29 +258,5 @@ public final class HeadlessGenerationService implements AutoCloseable {
       System.err.println("Failed to save Forgefile: " + illegalArgumentException.getMessage());
       return ExitCodes.INTERNAL;
     }
-  }
-
-  private static List<String> safeSelections(List<String> values) {
-    return values == null ? List.of() : values;
-  }
-
-  private static Path resolveForgefileReadPath(String reference) {
-    Path requestedPath = Path.of(reference);
-    Path localPath = requestedPath.toAbsolutePath().normalize();
-    if (requestedPath.isAbsolute() || Files.exists(localPath)) {
-      return localPath;
-    }
-    return ForgeDataPaths.recipesRoot().resolve(requestedPath).toAbsolutePath().normalize();
-  }
-
-  private static Path saveAsPathOrNull(String pathValue) {
-    if (pathValue == null || pathValue.isBlank()) {
-      return null;
-    }
-    Path requestedPath = Path.of(pathValue);
-    if (requestedPath.isAbsolute() || requestedPath.getParent() != null) {
-      return requestedPath.toAbsolutePath().normalize();
-    }
-    return ForgeDataPaths.recipesRoot().resolve(requestedPath).toAbsolutePath().normalize();
   }
 }

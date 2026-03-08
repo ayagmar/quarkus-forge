@@ -467,6 +467,22 @@ class HeadlessGenerationServiceTest {
   }
 
   @Test
+  void saveAsWritesForgefileAfterSuccessfulGeneration() throws Exception {
+    Path saveAsPath = tempDir.resolve("generated.forgefile.json");
+
+    StubCatalogOperations client = new StubCatalogOperations();
+    HeadlessGenerationService service = serviceWith(client);
+
+    GenerateCommand command = commandWithOutput();
+    command.setSaveAsFile(saveAsPath.toString());
+    int exitCode = service.run(command, false, false);
+
+    assertThat(exitCode).isEqualTo(ExitCodes.OK);
+    assertThat(client.startGenerationCalls).isEqualTo(1);
+    assertThat(java.nio.file.Files.exists(saveAsPath)).isTrue();
+  }
+
+  @Test
   void saveAsFromExistingForgefilePreservesOmittedFieldsAndExistingLock() throws Exception {
     Path sourcePath = tempDir.resolve("source.forgefile.json");
     Path saveAsPath = tempDir.resolve("copy.forgefile.json");
