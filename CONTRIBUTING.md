@@ -84,6 +84,8 @@ scripts/verify/headless-compile.sh
 scripts/verify/coverage.sh
 scripts/verify/docs-build.sh
 scripts/verify/docs-linkcheck.sh
+scripts/verify/native-size.sh <headless|interactive>
+scripts/verify/native-release-smoke.sh <binary> <headless|interactive-posix|interactive-windows>
 ```
 
 The `just` recipes above are thin shortcuts over those scripts.
@@ -113,6 +115,14 @@ scripts/verify/headless-compile.sh
 ```bash
 scripts/verify/coverage.sh
 open target/site/jacoco/index.html       # unit test coverage
+```
+
+### Run native verification helpers
+
+```bash
+scripts/verify/native-size.sh headless
+scripts/verify/native-size.sh interactive
+scripts/verify/native-release-smoke.sh target/quarkus-forge interactive-posix
 ```
 
 ## Code Style

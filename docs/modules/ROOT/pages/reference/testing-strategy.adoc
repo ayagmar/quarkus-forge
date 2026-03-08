@@ -74,6 +74,7 @@ scripts/verify/docs-build.sh
 scripts/verify/docs-linkcheck.sh
 scripts/verify/native-size.sh headless
 scripts/verify/native-size.sh interactive
+scripts/verify/native-release-smoke.sh <binary> <headless|interactive-posix|interactive-windows>
 ----
 
 Or using the included https://github.com/casey/just[justfile]:
@@ -90,6 +91,8 @@ just verify            # format-check + headless-check + test
 ----
 
 CI runs both docs build and docs link checking as separate verification steps. Docs Pages uses the same shared entrypoints when publishing the site.
+
+Release packaging uses `scripts/verify/native-release-smoke.sh` for both headless and interactive native artifacts, selecting the platform-specific interactive smoke mode through the release workflow matrix.
 
 See also: xref:reference/headless-maintenance.adoc[Headless Maintenance Guardrails]
 
