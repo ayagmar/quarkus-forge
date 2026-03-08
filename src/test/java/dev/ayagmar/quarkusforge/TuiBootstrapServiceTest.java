@@ -33,8 +33,15 @@ class TuiBootstrapServiceTest {
   // ── static accessors ──────────────────────────────────────────────
 
   @Test
-  void defaultBackendPreferenceIsPanama() {
+  void defaultBackendPreferenceUsesPanamaOnNonWindows() {
+    systemProperties.set("os.name", "Linux");
     assertThat(TuiBootstrapService.defaultBackendPreference()).isEqualTo("panama");
+  }
+
+  @Test
+  void defaultBackendPreferenceUsesJlineOnWindows() {
+    systemProperties.set("os.name", "Windows 11");
+    assertThat(TuiBootstrapService.defaultBackendPreference()).isEqualTo("jline3");
   }
 
   @Test
@@ -62,14 +69,20 @@ class TuiBootstrapServiceTest {
 
   @Test
   void configureTerminalBackendPreferenceSetsDefaultOnlyWhenUnset() throws Exception {
-    invokeConfigureTerminalBackendPreference(null, null);
+    invokeConfigureTerminalBackendPreference(null, null, "Linux");
     assertThat(System.getProperty("tamboui.backend")).isEqualTo("panama");
 
     System.setProperty("tamboui.backend", "custom");
 
-    invokeConfigureTerminalBackendPreference("custom", null);
+    invokeConfigureTerminalBackendPreference("custom", null, "Linux");
 
     assertThat(System.getProperty("tamboui.backend")).isEqualTo("custom");
+  }
+
+  @Test
+  void configureTerminalBackendPreferenceUsesJlineDefaultOnWindows() throws Exception {
+    invokeConfigureTerminalBackendPreference(null, null, "Windows 11");
+    assertThat(System.getProperty("tamboui.backend")).isEqualTo("jline3");
   }
 
   @Test
@@ -159,12 +172,12 @@ class TuiBootstrapServiceTest {
   }
 
   private static void invokeConfigureTerminalBackendPreference(
-      String propertyValue, String envValue) throws Exception {
+      String propertyValue, String envValue, String osName) throws Exception {
     Method method =
         TuiBootstrapService.class.getDeclaredMethod(
-            "configureTerminalBackendPreference", String.class, String.class);
+            "configureTerminalBackendPreference", String.class, String.class, String.class);
     method.setAccessible(true);
-    method.invoke(null, propertyValue, envValue);
+    method.invoke(null, propertyValue, envValue, osName);
   }
 
   private static void invokeConfigureTerminalBackendPreference() throws Exception {
