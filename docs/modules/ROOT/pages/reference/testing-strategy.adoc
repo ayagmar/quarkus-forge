@@ -62,11 +62,18 @@ Before and during the UI state-machine migration, these semantic contracts must 
 
 == Core Verification Commands
 
+The shared verification entrypoints under `scripts/verify/` are the source of truth used by CI, release automation, and local maintainer workflows.
+
 [source,bash]
 ----
-./mvnw -q spotless:check
-./mvnw -q verify
-./mvnw -q clean compile -Pheadless  # verify headless profile compiles
+scripts/verify/format-check.sh
+scripts/verify/verify.sh
+scripts/verify/headless-compile.sh
+scripts/verify/coverage.sh
+scripts/verify/docs-build.sh
+scripts/verify/docs-linkcheck.sh
+scripts/verify/native-size.sh headless
+scripts/verify/native-size.sh interactive
 ----
 
 Or using the included https://github.com/casey/just[justfile]:
@@ -77,27 +84,31 @@ just format-check      # spotless:check
 just test-unit         # unit tests only
 just test              # unit + integration (verify)
 just headless-check    # headless profile compile
+just docs-build        # docs build verification
+just docs-linkcheck    # docs link checking
 just verify            # format-check + headless-check + test
 ----
+
+CI runs both docs build and docs link checking as separate verification steps. Docs Pages uses the same shared entrypoints when publishing the site.
 
 See also: xref:reference/headless-maintenance.adoc[Headless Maintenance Guardrails]
 
 == Coverage
 
-JaCoCo reports are generated during a full `./mvnw clean verify` run.
+JaCoCo reports are generated during `scripts/verify/coverage.sh` (or `just coverage`).
 
 * `./mvnw test` (unit-only) does not publish JaCoCo site reports.
-* `./mvnw clean verify` publishes merged reports:
+* `scripts/verify/coverage.sh` publishes merged reports:
 ** HTML: `target/site/jacoco/index.html`
 ** XML: `target/site/jacoco/jacoco.xml`
 
-In CI, a dedicated `coverage` job runs `./mvnw clean verify` on Linux, generates both reports, and uploads them to Codecov and as GitHub Actions artifacts (14-day retention).
+In CI, a dedicated `coverage` job runs `scripts/verify/coverage.sh` on Linux, generates both reports, and uploads them to Codecov and as GitHub Actions artifacts (14-day retention).
 
 To generate coverage locally:
 
 [source,bash]
 ----
-./mvnw clean verify
+scripts/verify/coverage.sh
 # or: just coverage
 open target/site/jacoco/index.html  # macOS
 x-www-browser target/site/jacoco/index.html  # Linux
@@ -113,6 +124,6 @@ start target/site/jacoco/index.html  # Windows (cmd.exe)
 
 [source,bash]
 ----
-npm run docs:build --prefix site
-npm run docs:linkcheck --prefix site
+scripts/verify/docs-build.sh
+scripts/verify/docs-linkcheck.sh
 ----

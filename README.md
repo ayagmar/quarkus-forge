@@ -343,12 +343,20 @@ Antora docs source: `docs/` · Site build scripts: `site/` · Local site guide: 
 
 ```bash
 sdk env install          # install Java 25 via SDKMAN! (.sdkmanrc)
+scripts/verify/verify.sh # shared CI/local verification entrypoint
 just verify              # format-check + headless compile + all tests
 just format              # auto-format
 ```
 
-Or without `just`: `./mvnw clean verify` and `./mvnw spotless:apply`.
+Docs verification uses the same shared entrypoints as CI:
 
-Coverage reports (after `./mvnw clean verify`): `target/site/jacoco/index.html` (HTML) and `target/site/jacoco/jacoco.xml` (XML).
+```bash
+scripts/verify/docs-build.sh
+scripts/verify/docs-linkcheck.sh
+```
+
+Or without `just`, use the shared scripts directly instead of retyping the underlying Maven and npm commands.
+
+Coverage reports (after `scripts/verify/coverage.sh`): `target/site/jacoco/index.html` (HTML) and `target/site/jacoco/jacoco.xml` (XML).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for full setup guide, code style, testing conventions, and commit format. PRs welcome.
