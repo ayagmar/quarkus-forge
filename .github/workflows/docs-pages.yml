@@ -38,7 +38,7 @@ jobs:
         run: npm ci --prefix site
 
       - name: Build docs site
-        run: npm run docs:build --prefix site
+        run: scripts/verify/docs-build.sh
 
       - name: Validate Pages artifact layout
         run: |
@@ -46,7 +46,7 @@ jobs:
           test -f site/build/pages/docs/index.html
 
       - name: Verify links
-        run: npm run docs:linkcheck --prefix site
+        run: scripts/verify/docs-linkcheck.sh
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

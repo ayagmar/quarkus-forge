@@ -30,9 +30,17 @@ class JustfileTest {
     assertThat(justfile).contains("scripts/verify/format-check.sh");
     assertThat(justfile).contains("headless-check:");
     assertThat(justfile).contains("scripts/verify/headless-compile.sh");
+    assertThat(justfile).contains("coverage:");
+    assertThat(justfile).contains("scripts/verify/coverage.sh");
     assertThat(justfile).contains("docs-build:");
     assertThat(justfile).contains("scripts/verify/docs-build.sh");
+    assertThat(justfile).contains("docs-linkcheck:");
+    assertThat(justfile).contains("scripts/verify/docs-linkcheck.sh");
+    assertThat(justfile).contains("native-size mode:");
+    assertThat(justfile).contains("scripts/verify/native-size.sh {{mode}}");
     assertThat(justfile).contains("native-smoke-posix binary:");
     assertThat(justfile).contains("scripts/verify/native-interactive-smoke-posix.sh {{binary}}");
+    assertThat(justfile).contains("native-smoke-windows binary:");
+    assertThat(justfile).contains("scripts/verify/native-interactive-smoke-windows.sh {{binary}}");
   }
 }

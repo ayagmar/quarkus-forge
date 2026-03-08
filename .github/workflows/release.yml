@@ -59,31 +59,37 @@ jobs:
             ext: ''
             profiles: -Pnative
             binary_name: quarkus-forge
+            smoke_mode: interactive-posix
           - os: macos-latest
             platform: macos-aarch64
             ext: ''
             profiles: -Pnative
             binary_name: quarkus-forge
+            smoke_mode: interactive-posix
           - os: windows-latest
             platform: windows-x86_64
             ext: '.exe'
             profiles: -Pnative
             binary_name: quarkus-forge
+            smoke_mode: interactive-windows
           - os: ubuntu-latest
             platform: linux-x86_64
             ext: ''
             profiles: -Pheadless,headless-native
             binary_name: quarkus-forge-headless
+            smoke_mode: headless
           - os: macos-latest
             platform: macos-aarch64
             ext: ''
             profiles: -Pheadless,headless-native
             binary_name: quarkus-forge-headless
+            smoke_mode: headless
           - os: windows-latest
             platform: windows-x86_64
             ext: '.exe'
             profiles: -Pheadless,headless-native
             binary_name: quarkus-forge-headless
+            smoke_mode: headless
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 
@@ -121,34 +127,7 @@ jobs:
         run: |
           set -euo pipefail
           binary="target/${{ matrix.binary_name }}-${{ matrix.platform }}${{ matrix.ext }}"
-          "$binary" --help > /dev/null
-          "$binary" --version > /dev/null
-          "$binary" generate --help > /dev/null
-
-      - name: Smoke test interactive native startup
-        if: runner.os != 'Windows' && matrix.binary_name == 'quarkus-forge'
-        shell: bash
-        run: |
-          set -euo pipefail
-          binary="target/${{ matrix.binary_name }}-${{ matrix.platform }}${{ matrix.ext }}"
-          python3 scripts/interactive_native_smoke.py --binary "$binary"
-
-      - name: Smoke test Windows interactive native startup
-        if: runner.os == 'Windows' && matrix.binary_name == 'quarkus-forge'
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p target/native-smoke
-          binary="target/${{ matrix.binary_name }}-${{ matrix.platform }}${{ matrix.ext }}"
-          log_path="target/native-smoke/windows-interactive.log"
-          if ! "$binary" --interactive-smoke-test --verbose 2> "$log_path"; then
-            cat "$log_path"
-            exit 1
-          fi
-          if ! grep -F '"event":"tui.render.ready"' "$log_path" > /dev/null; then
-            cat "$log_path"
-            exit 1
-          fi
+          scripts/verify/native-release-smoke.sh "$binary" "${{ matrix.smoke_mode }}"
 
       - name: Upload native artifact
         uses: actions/upload-artifact@v7

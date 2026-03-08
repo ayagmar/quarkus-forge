@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/_lib.sh"
 
 binary="${1:?usage: native-interactive-smoke-windows.sh <binary>}"
 mkdir -p target/native-smoke
