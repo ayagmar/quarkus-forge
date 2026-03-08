@@ -125,6 +125,14 @@ jobs:
           "$binary" --version > /dev/null
           "$binary" generate --help > /dev/null
 
+      - name: Smoke test interactive native startup
+        if: runner.os == 'Linux' && matrix.binary_name == 'quarkus-forge'
+        shell: bash
+        run: |
+          set -euo pipefail
+          binary="target/${{ matrix.binary_name }}-${{ matrix.platform }}${{ matrix.ext }}"
+          python3 scripts/interactive_native_smoke.py --binary "$binary"
+
       - name: Upload native artifact
         uses: actions/upload-artifact@v7
         with:
