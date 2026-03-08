@@ -2,7 +2,6 @@ package dev.ayagmar.quarkusforge.ui;
 
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.widgets.input.TextInputState;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -101,12 +100,8 @@ final class ExtensionEffects {
   }
 
   private List<UiIntent> extensionUpdateIntents(String statusMessage) {
-    List<UiIntent> intents = new ArrayList<>();
-    intents.add(callbacks.extensionStateUpdatedIntent());
-    if (statusMessage != null) {
-      intents.add(new UiIntent.ExtensionStatusIntent(statusMessage));
-    }
-    return List.copyOf(intents);
+    return ExtensionIntentFactory.updateWithStatus(
+        callbacks.extensionStateUpdatedIntent(), statusMessage);
   }
 
   private String toggleSelectionAtCursor() {

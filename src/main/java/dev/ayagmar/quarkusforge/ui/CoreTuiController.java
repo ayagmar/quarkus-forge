@@ -25,7 +25,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Objects;
@@ -780,15 +779,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   private UiIntent.ExtensionStateUpdatedIntent extensionStateUpdatedIntent() {
     return new UiIntent.ExtensionStateUpdatedIntent(extensionViewSnapshot());
-  }
-
-  private List<UiIntent> extensionUpdateIntents(String statusMessage) {
-    List<UiIntent> intents = new ArrayList<>();
-    intents.add(extensionStateUpdatedIntent());
-    if (statusMessage != null) {
-      intents.add(new UiIntent.ExtensionStatusIntent(statusMessage));
-    }
-    return List.copyOf(intents);
   }
 
   @Override
