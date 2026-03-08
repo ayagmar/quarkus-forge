@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -82,6 +83,7 @@ class HeadlessGenerationServiceTest {
     assertThat(exitCode).isEqualTo(ExitCodes.NETWORK);
     assertThat(client.startGenerationCalls).isEqualTo(1);
     assertThat(client.generationFuture.isCancelled()).isTrue();
+    assertThat(client.cancelled.getAsBoolean()).isTrue();
   }
 
   @Test
@@ -623,6 +625,7 @@ class HeadlessGenerationServiceTest {
     int closeCalls;
     String lastPresetPlatformStream;
     Path lastOutputPath;
+    BooleanSupplier cancelled = () -> false;
 
     @Override
     public CatalogData loadCatalogData(Duration timeout)
@@ -650,12 +653,14 @@ class HeadlessGenerationServiceTest {
     public CompletableFuture<Path> startGeneration(
         GenerationRequest generationRequest,
         Path outputPath,
+        BooleanSupplier cancelled,
         Consumer<String> progressLineConsumer) {
       if (startGenerationFailure != null) {
         throw startGenerationFailure;
       }
       startGenerationCalls++;
       lastOutputPath = outputPath;
+      this.cancelled = cancelled;
       return generationFuture;
     }
 

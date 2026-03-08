@@ -12,6 +12,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 final class HeadlessGenerationExecutionService {
   private final HeadlessProjectGenerator projectGenerator;
@@ -43,9 +44,11 @@ final class HeadlessGenerationExecutionService {
         of("extensionCount", extensionIds.size()));
 
     CompletableFuture<Path> generationFuture = null;
+    AtomicBoolean cancelled = new AtomicBoolean(false);
     try {
       generationFuture =
-          projectGenerator.startGeneration(generationRequest, outputPath, System.out::println);
+          projectGenerator.startGeneration(
+              generationRequest, outputPath, cancelled::get, System.out::println);
       Path generatedProjectRoot =
           generationFuture.get(generationTimeout.toMillis(), TimeUnit.MILLISECONDS);
       diagnostics.info(
@@ -53,6 +56,7 @@ final class HeadlessGenerationExecutionService {
       return generatedProjectRoot;
     } catch (Exception exception) {
       if (exception instanceof TimeoutException && generationFuture != null) {
+        cancelled.set(true);
         generationFuture.cancel(true);
       }
       throw exception;

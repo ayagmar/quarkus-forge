@@ -180,7 +180,8 @@ class HeadlessCatalogClientTest {
     Path outputPath = tempDir.resolve("generated-project");
 
     try (HeadlessCatalogClient client = client(runtimeConfig())) {
-      Path generatedRoot = client.startGeneration(request, outputPath, progressLines::add).join();
+      Path generatedRoot =
+          client.startGeneration(request, outputPath, () -> false, progressLines::add).join();
 
       wireMockServer.verify(
           1,
