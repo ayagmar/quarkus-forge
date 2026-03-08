@@ -8,9 +8,13 @@ verification refactors.
 Closed planning docs for the architecture execution program are intentionally not treated as active
 backlog authorities here. This keeps one maintained source per currently open workstream.
 
+Product, UX, delivery, and site-facing backlog items live in `docs/product-improvements-backlog.md`
+so this file can stay focused on engineering follow-up work.
+
 Items that are already reflected in the codebase were intentionally omitted. In particular:
 
-- the broader package split into `cli`, `runtime`, `headless`, `postgen`, `persistence`, and `forge` is largely in place
+- the broader package split into `application`, `cli`, `runtime`, `headless`, `postgen`,
+  `persistence`, and `forge` is largely in place
 - direct tests already exist for `UrlConnectionTransport` and `HeadlessCatalogClient`
 - the system-property JUnit helper already exists
 - `justfile` coverage output already points to merged JaCoCo paths
@@ -31,8 +35,6 @@ Items that are already reflected in the codebase were intentionally omitted. In 
   - `src/main/java/dev/ayagmar/quarkusforge/Forgefile.java`
   - `src/main/java/dev/ayagmar/quarkusforge/ForgefileLock.java`
   - `src/main/java/dev/ayagmar/quarkusforge/ForgefileStore.java`
-- Finish persistence ownership cleanup by moving `ExtensionFavoritesStore` abstractions/implementations out of `api` if the team wants package ownership to reflect storage rather than transport concerns.
-- Add stronger ArchUnit/package-boundary rules beyond the current UI/headless guards, especially around `cli`, `runtime`, `postgen`, and persistence ownership.
 
 ## Runtime Seams
 
@@ -43,37 +45,4 @@ Items that are already reflected in the codebase were intentionally omitted. In 
 ## Tests And Tooling
 
 - Add direct automated coverage for any still-uncovered CI gating around native-size enforcement and malformed report handling if current Python fixtures are not yet exhaustive.
-- Replace remaining ad hoc `withSystemProperty(...)` helpers in tests with the shared JUnit extension where practical.
 - Recheck whether `just test-it` should be simplified further if the current `test-compile verify` recipe remains confusing for maintainers.
-- Add architecture-sensitive maintainer checklists for routing, reducer/effects, native release changes, and other failure-prone areas.
-
-## Product / UX
-
-- Add a pre-generate “Safe Generate” preflight summary for output conflicts, invalid fields, and missing tools.
-- Add a short, dismissible, remembered first-run onboarding flow.
-- Add progressive UI density modes such as `compact`, `normal`, and `verbose`.
-- Add short-lived “what changed” feedback after key actions.
-- Add undo for recent extension/filter actions.
-- Improve extension relevance ranking with deterministic tie-breakers.
-- Improve long-text behavior in narrow terminals with a consistent clipping/ellipsis policy.
-- Add better keyboard-shortcut discoverability by context.
-- Expand post-generation prechecks so unavailable actions are shown with actionable reasons before selection.
-
-## CLI / Delivery
-
-- Add `--print-plan` for resolved generation plans without generating files.
-- Add `--log-format text|json` instead of a boolean-only verbose toggle.
-- Add `--non-interactive` to the full `quarkus-forge` command so the full binary can force headless behavior.
-- Add shell completions for `bash`, `zsh`, `fish`, and `powershell` as a delivered feature, not just local generation helpers.
-- Publish release checksum files and verification snippets as part of the release workflow.
-- Expand native release smoke tests and add event-loop/render-cycle latency sanity checks where useful.
-- Surface architecture-fitness summaries in CI, such as ArchUnit and contract-test counts.
-
-## Docs / Site
-
-- Expand the README binary comparison into a clear “Which binary should I use?” decision table.
-- Expand troubleshooting into a symptom-driven index.
-- Keep short ADR-style decision records for major architecture changes.
-- Add an install selector by OS and usage mode to the landing page/site.
-- Add an interactive terminal demo.
-- Surface trust signals prominently: checksums, release freshness, CI status, and native smoke status.
