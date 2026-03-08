@@ -8,13 +8,19 @@
 
 ## Findings
 
-- Pending async review
+- No findings.
 
-## Local Verification
+## Summary
+
+- Reviewed the remaining extension-flow ownership path across `CoreTuiController`, `CoreUiReducer`, `UiIntent`, `UiState`, and the listed reducer/shell/snapshot tests. I did not find bugs, regressions, architectural drift, duplication, or boundary violations in the current slice.
+- The extension keyboard flow is now reducer-classified for focus handoff, escape unwind order, and shared shortcut routing, while controller code is limited to event dispatch plus effect/runtime bridging.
+- The folded Windows backend fix also looks sound in the reviewed code: backend selection now normalizes `os.name` before matching Windows, and the targeted bootstrap tests cover Linux, Darwin, and Windows expectations.
+
+## Verification
 
 - `./mvnw -q -Dtest=CoreUiReducerTest,CoreTuiShellPilotTest,UiStateSnapshotMapperTest,TuiBootstrapServiceTest test`
 - `./mvnw -q spotless:check -DskipTests`
 
-## Notes
+## Documentation
 
-- No user-facing doc change was needed for this slice because behavior stayed the same; the change removes controller-local authority and adds reducer-level regression coverage for the existing shortcuts and focus handoff rules.
+- No additional user-facing documentation gap surfaced in this slice. Behavior remains unchanged; the change is an ownership cleanup plus regression coverage expansion.

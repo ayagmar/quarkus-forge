@@ -4,8 +4,6 @@ import dev.ayagmar.quarkusforge.api.BuildToolCodec;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ErrorMessageMapper;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
-import dev.ayagmar.quarkusforge.domain.CliPrefill;
-import dev.ayagmar.quarkusforge.domain.CliPrefillMapper;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
 import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
@@ -19,7 +17,6 @@ import dev.ayagmar.quarkusforge.postgen.IdeDetector;
 import dev.ayagmar.quarkusforge.util.OutputPathResolver;
 import dev.tamboui.terminal.Frame;
 import dev.tamboui.tui.event.Event;
-import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.ResizeEvent;
 import dev.tamboui.tui.event.TickEvent;
@@ -69,6 +66,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   private final UiReducer uiReducer;
   private final UiEffectsRunner uiEffectsRunner;
   private final UiEffectsPort uiEffectsPort;
+  private final InputEffects inputEffects;
   private final GenerationEffects generationEffects;
   private final UiRenderStateAssembler uiRenderStateAssembler;
   private final UiRenderer uiRenderer;
@@ -179,17 +177,17 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
           @Override
           public void moveTextInputCursorToEnd(FocusTarget target) {
-            moveTextInputCursorToEndEffect(target);
+            inputEffects.moveTextInputCursorToEnd(target);
           }
 
           @Override
           public List<UiIntent> applyMetadataSelectorKey(FocusTarget target, KeyEvent keyEvent) {
-            return applyMetadataSelectorKeyEffect(target, keyEvent);
+            return inputEffects.applyMetadataSelectorKey(target, keyEvent);
           }
 
           @Override
           public List<UiIntent> applyTextInputKey(FocusTarget target, KeyEvent keyEvent) {
-            return applyTextInputKeyEffect(target, keyEvent);
+            return inputEffects.applyTextInputKey(target, keyEvent);
           }
         };
     uiRenderer = new UiRenderer();
@@ -269,6 +267,53 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
               @Override
               public ValidationReport validateRequest(ProjectRequest request) {
                 return CoreTuiController.this.validateRequest(request);
+              }
+            });
+    inputEffects =
+        new InputEffects(
+            inputStates,
+            metadataSelectors,
+            new InputEffects.Callbacks() {
+              @Override
+              public ProjectRequest currentRequest() {
+                return CoreTuiController.this.currentRequest();
+              }
+
+              @Override
+              public ProjectRequest syncMetadataSelectors(ProjectRequest request) {
+                return CoreTuiController.this.syncMetadataSelectors(request);
+              }
+
+              @Override
+              public ValidationReport validateRequest(ProjectRequest request) {
+                return CoreTuiController.this.validateRequest(request);
+              }
+
+              @Override
+              public UiIntent.SubmitEditRecoveryIntent submitRecoveryIntent(
+                  ProjectRequest request) {
+                return CoreTuiController.this.submitRecoveryIntent(request);
+              }
+
+              @Override
+              public UiIntent.ExtensionStateUpdatedIntent extensionStateUpdatedIntent() {
+                return CoreTuiController.this.extensionStateUpdatedIntent();
+              }
+
+              @Override
+              public boolean isGenerationInProgress() {
+                return CoreTuiController.this.isGenerationInProgress();
+              }
+
+              @Override
+              public void scheduleFilteredRefresh(
+                  String query, java.util.function.IntConsumer onFiltered) {
+                catalogEffects.scheduleFilteredRefresh(query, onFiltered);
+              }
+
+              @Override
+              public void dispatchIntents(List<UiIntent> intents) {
+                intents.forEach(CoreTuiController.this::dispatchIntent);
               }
             });
     extensionEffects =
@@ -913,115 +958,14 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         .anyMatch(error -> error.field().equalsIgnoreCase(fieldName));
   }
 
-  private void scheduleFilteredExtensionsRefresh() {
-    String query = inputStates.get(FocusTarget.EXTENSION_SEARCH).text();
-    catalogEffects.scheduleFilteredRefresh(query, this::publishFilteredExtensionUpdate);
-  }
-
   private ProjectRequest syncMetadataSelectors(ProjectRequest request) {
     MetadataDto metadataSnapshot = metadataCompatibility.metadataSnapshot();
     MetadataSelectorManager.ResolvedSelections resolved =
         metadataSelectors.sync(
             metadataSnapshot, request.platformStream(), request.buildTool(), request.javaVersion());
 
-    return buildRequestFromInputs(
+    return inputEffects.buildRequestFromInputs(
         resolved.platformStream(), resolved.buildTool(), resolved.javaVersion());
-  }
-
-  private List<UiIntent> handleMetadataSelectorKey(FocusTarget target, KeyEvent keyEvent) {
-    if (keyEvent.isLeft()
-        || UiKeyMatchers.isVimLeftKey(keyEvent)
-        || keyEvent.isUp()
-        || UiKeyMatchers.isVimUpKey(keyEvent)) {
-      return applySelectorCycle(target, -1);
-    }
-    if (keyEvent.isRight()
-        || UiKeyMatchers.isVimRightKey(keyEvent)
-        || keyEvent.isDown()
-        || UiKeyMatchers.isVimDownKey(keyEvent)) {
-      return applySelectorCycle(target, 1);
-    }
-    if (keyEvent.isHome()) {
-      return applySelectorEdge(target, true);
-    }
-    if (keyEvent.isEnd()) {
-      return applySelectorEdge(target, false);
-    }
-    return List.of();
-  }
-
-  private List<UiIntent> applySelectorCycle(FocusTarget target, int delta) {
-    String newValue =
-        metadataSelectors.cycle(target, selectorValue(currentRequest(), target), delta);
-    if (newValue == null) {
-      return List.of();
-    }
-    return applySelector(target, newValue);
-  }
-
-  private List<UiIntent> applySelectorEdge(FocusTarget target, boolean first) {
-    String newValue = metadataSelectors.selectEdge(target, first);
-    if (newValue == null) {
-      return List.of();
-    }
-    return applySelector(target, newValue);
-  }
-
-  private List<UiIntent> applySelector(FocusTarget target, String selectedValue) {
-    ProjectRequest request = currentRequest();
-    String platformStream = request.platformStream();
-    String buildTool = request.buildTool();
-    String javaVersion = request.javaVersion();
-
-    if (target == FocusTarget.PLATFORM_STREAM) {
-      platformStream = selectedValue;
-    } else if (target == FocusTarget.BUILD_TOOL) {
-      buildTool = selectedValue;
-    } else if (target == FocusTarget.JAVA_VERSION) {
-      javaVersion = selectedValue;
-    }
-
-    ProjectRequest nextRequest =
-        syncMetadataSelectors(buildRequestFromInputs(platformStream, buildTool, javaVersion));
-    ValidationReport nextValidation = validateRequest(nextRequest);
-    return List.of(
-        new UiIntent.FormStateUpdatedIntent(nextRequest, nextValidation),
-        new UiIntent.StatusMessageIntent(selectorStatusMessage(target, nextRequest)),
-        submitRecoveryIntent(nextRequest));
-  }
-
-  private String selectorStatusMessage(FocusTarget target, ProjectRequest request) {
-    return switch (target) {
-      case PLATFORM_STREAM ->
-          "Platform stream selected: "
-              + (request.platformStream().isBlank() ? "default" : request.platformStream());
-      case BUILD_TOOL -> "Build tool selected: " + request.buildTool();
-      case JAVA_VERSION -> "Java version selected: " + request.javaVersion();
-      default -> "Selection updated";
-    };
-  }
-
-  private String selectorValue(ProjectRequest request, FocusTarget target) {
-    return switch (target) {
-      case PLATFORM_STREAM -> request.platformStream();
-      case BUILD_TOOL -> request.buildTool();
-      case JAVA_VERSION -> request.javaVersion();
-      default -> "";
-    };
-  }
-
-  private ProjectRequest buildRequestFromInputs(
-      String platformStream, String buildTool, String javaVersion) {
-    return CliPrefillMapper.map(
-        new CliPrefill(
-            inputStates.get(FocusTarget.GROUP_ID).text(),
-            inputStates.get(FocusTarget.ARTIFACT_ID).text(),
-            inputStates.get(FocusTarget.VERSION).text(),
-            inputStates.get(FocusTarget.PACKAGE_NAME).text(),
-            inputStates.get(FocusTarget.OUTPUT_DIR).text(),
-            platformStream,
-            buildTool,
-            javaVersion));
   }
 
   private ValidationReport validateRequest(ProjectRequest request) {
@@ -1057,36 +1001,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   private void requestAsyncRepaintEffect() {
     requestAsyncRepaint();
-  }
-
-  private void moveTextInputCursorToEndEffect(FocusTarget target) {
-    TextInputState inputState = inputStates.get(target);
-    if (inputState != null) {
-      inputState.moveCursorToEnd();
-    }
-  }
-
-  private List<UiIntent> applyMetadataSelectorKeyEffect(FocusTarget target, KeyEvent keyEvent) {
-    return handleMetadataSelectorKey(target, keyEvent);
-  }
-
-  private List<UiIntent> applyTextInputKeyEffect(FocusTarget target, KeyEvent keyEvent) {
-    if (!handleTextInputKey(inputStates.get(target), keyEvent)) {
-      return List.of();
-    }
-    if (target == FocusTarget.EXTENSION_SEARCH) {
-      scheduleFilteredExtensionsRefresh();
-      return extensionUpdateIntents("Searching extensions...");
-    }
-    ProjectRequest currentRequest = currentRequest();
-    ProjectRequest nextRequest =
-        buildRequestFromInputs(
-            currentRequest.platformStream(),
-            currentRequest.buildTool(),
-            currentRequest.javaVersion());
-    return List.of(
-        new UiIntent.FormStateUpdatedIntent(nextRequest, validateRequest(nextRequest)),
-        submitRecoveryIntent(nextRequest));
   }
 
   @Override
@@ -1131,13 +1045,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
       shouldRender = true;
     }
     return shouldRender ? new UiAction(true, false) : UiAction.ignored();
-  }
-
-  private void publishFilteredExtensionUpdate(int filteredCount) {
-    dispatchIntent(extensionStateUpdatedIntent());
-    if (!isGenerationInProgress()) {
-      dispatchIntent(new UiIntent.ExtensionStatusIntent("Extensions filtered: " + filteredCount));
-    }
   }
 
   private void requestAsyncRepaint() {
@@ -1289,40 +1196,5 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         new UiIntent.FocusStatusIntent(
             nextFocusTarget,
             "Focus moved to invalid field: " + UiFocusTargets.nameOf(nextFocusTarget)));
-  }
-
-  private static boolean handleTextInputKey(TextInputState state, KeyEvent event) {
-    if (!UiTextInputKeys.isSupportedEditKey(event)) {
-      return false;
-    }
-    if (event.code() == KeyCode.CHAR) {
-      state.insert(event.character());
-      return true;
-    }
-    if (event.isDeleteBackward()) {
-      state.deleteBackward();
-      return true;
-    }
-    if (event.isDeleteForward()) {
-      state.deleteForward();
-      return true;
-    }
-    if (event.isLeft()) {
-      state.moveCursorLeft();
-      return true;
-    }
-    if (event.isRight()) {
-      state.moveCursorRight();
-      return true;
-    }
-    if (event.isHome()) {
-      state.moveCursorToStart();
-      return true;
-    }
-    if (event.isEnd()) {
-      state.moveCursorToEnd();
-      return true;
-    }
-    return false;
   }
 }
