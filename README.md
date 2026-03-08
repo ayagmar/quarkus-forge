@@ -72,7 +72,13 @@ Quarkus Forge is a keyboard-first terminal UI (TUI) and headless CLI for generat
 
 Every GitHub release publishes a matching `.sha256` file for each artifact.
 
-On Linux or macOS, download both files and verify locally:
+On Linux, download both files and verify locally:
+
+```bash
+sha256sum -c <artifact>.sha256
+```
+
+On macOS:
 
 ```bash
 shasum -a 256 -c <artifact>.sha256
@@ -81,8 +87,8 @@ shasum -a 256 -c <artifact>.sha256
 Examples:
 
 ```bash
-shasum -a 256 -c quarkus-forge-jvm.jar.sha256
-shasum -a 256 -c quarkus-forge-headless-linux-x86_64.sha256
+sha256sum -c quarkus-forge-jvm.jar.sha256
+shasum -a 256 -c quarkus-forge-headless-macos-aarch64.sha256
 ```
 
 On Windows PowerShell:

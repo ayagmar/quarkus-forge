@@ -45,12 +45,20 @@ TIP: A https://github.com/casey/just[justfile] is included with common recipes. 
 GitHub releases use `quarkus-forge-jvm.jar` for the interactive JVM asset and publish a matching
 `.sha256` file for every jar and native download.
 
-On Linux or macOS:
+On Linux:
+
+[source,bash]
+----
+sha256sum -c quarkus-forge-jvm.jar.sha256
+sha256sum -c quarkus-forge-headless-linux-x86_64.sha256
+----
+
+On macOS:
 
 [source,bash]
 ----
 shasum -a 256 -c quarkus-forge-jvm.jar.sha256
-shasum -a 256 -c quarkus-forge-headless-linux-x86_64.sha256
+shasum -a 256 -c quarkus-forge-headless-macos-aarch64.sha256
 ----
 
 On Windows PowerShell:
@@ -158,13 +166,12 @@ source target/completions/quarkus-forge-headless.bash
 
 GitHub releases publish a matching `.sha256` file for each JVM jar and native binary.
 
-Use the asset names from the GitHub Release Asset Guide above when verifying downloaded releases.
-
 === Verify a downloaded release artifact
 
-[source,bash]
+[source,text]
 ----
-sha256sum -c <artifact>.sha256
+Linux:   sha256sum -c <artifact>.sha256
+macOS:   shasum -a 256 -c <artifact>.sha256
 ----
 
 Examples:
@@ -173,8 +180,9 @@ Examples:
 ----
 sha256sum -c quarkus-forge-jvm.jar.sha256
 sha256sum -c quarkus-forge-headless-linux-x86_64.sha256
-sha256sum -c quarkus-forge-windows-x86_64.exe.sha256
 ----
+
+For Windows downloads, use the PowerShell example above.
 
 === Generate checksums for locally built jars
 
