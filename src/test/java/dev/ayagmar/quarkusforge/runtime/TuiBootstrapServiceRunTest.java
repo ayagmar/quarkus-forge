@@ -14,6 +14,7 @@ import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
 import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.persistence.ExtensionFavoritesStore;
+import dev.ayagmar.quarkusforge.postgen.TuiSessionSummary;
 import dev.ayagmar.quarkusforge.ui.UiScheduler;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;

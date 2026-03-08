@@ -4,7 +4,6 @@ import static dev.ayagmar.quarkusforge.diagnostics.DiagnosticField.of;
 
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticField;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
-import dev.ayagmar.quarkusforge.runtime.TuiSessionSummary;
 import dev.ayagmar.quarkusforge.ui.GitHubVisibility;
 import dev.ayagmar.quarkusforge.ui.PostGenerationExitPlan;
 import java.nio.file.Path;

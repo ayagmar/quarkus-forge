@@ -344,7 +344,7 @@ Headless/TUI boundaries are protected by ArchUnit tests to prevent dependency dr
 * Only `RuntimeServices` may cross from `runtime/` into `headless/` to open the headless generation service.
 * UI classes must not depend on `cli`, `headless`, or `runtime`.
 * Post-generation classes must not depend on `cli`, `headless`, or `persistence`.
-* Only `PostTuiActionExecutor` may depend on `runtime/` for `TuiSessionSummary`.
+* `TuiSessionSummary` lives in `postgen/`, so post-generation actions no longer depend back on `runtime/`.
 * Persistence classes must not depend on `cli`, `headless`, `runtime`, `ui`, or `postgen`.
 * Core non-UI layers (`application`, `api`, `archive`, `diagnostics`, `domain`, `forge`, `headless`, `persistence`, `util`) must not depend on `ui`.
 
