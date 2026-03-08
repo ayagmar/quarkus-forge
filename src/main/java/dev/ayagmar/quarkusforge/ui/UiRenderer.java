@@ -22,6 +22,7 @@ final class UiRenderer {
     void renderBody(
         Frame frame,
         Rect area,
+        SubmitAlertSnapshot submitAlert,
         MetadataPanelSnapshot metadataPanelSnapshot,
         ExtensionsPanelSnapshot extensionsPanelSnapshot);
 
@@ -52,7 +53,11 @@ final class UiRenderer {
 
     adapter.renderHeader(frame, rootLayout.get(0));
     adapter.renderBody(
-        frame, rootLayout.get(1), renderModel.metadataPanel(), renderModel.extensionsPanel());
+        frame,
+        rootLayout.get(1),
+        renderModel.submitAlert(),
+        renderModel.metadataPanel(),
+        renderModel.extensionsPanel());
     adapter.renderFooter(frame, rootLayout.get(2), footerLines);
     if (state.overlays().generationVisible()) {
       adapter.renderGenerationOverlay(frame, area, renderModel.generation());

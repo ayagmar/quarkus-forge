@@ -4,6 +4,7 @@ import java.util.Objects;
 
 record UiRenderModel(
     UiState reducerState,
+    SubmitAlertSnapshot submitAlert,
     MetadataPanelSnapshot metadataPanel,
     ExtensionsPanelSnapshot extensionsPanel,
     FooterSnapshot footer,
@@ -11,6 +12,7 @@ record UiRenderModel(
     UiState.StartupOverlayView startupOverlay) {
   UiRenderModel {
     reducerState = Objects.requireNonNull(reducerState);
+    submitAlert = Objects.requireNonNull(submitAlert);
     metadataPanel = Objects.requireNonNull(metadataPanel);
     extensionsPanel = Objects.requireNonNull(extensionsPanel);
     footer = Objects.requireNonNull(footer);

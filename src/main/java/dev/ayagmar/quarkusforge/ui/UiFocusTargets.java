@@ -44,4 +44,20 @@ final class UiFocusTargets {
       case SUBMIT -> "submit";
     };
   }
+
+  static String displayNameOf(FocusTarget target) {
+    return switch (target) {
+      case GROUP_ID -> "Group ID";
+      case ARTIFACT_ID -> "Artifact ID";
+      case VERSION -> "Version";
+      case PACKAGE_NAME -> "Package name";
+      case OUTPUT_DIR -> "Output directory";
+      case PLATFORM_STREAM -> "Platform stream";
+      case BUILD_TOOL -> "Build tool";
+      case JAVA_VERSION -> "Java version";
+      case EXTENSION_SEARCH -> "Extension search";
+      case EXTENSION_LIST -> "Extension list";
+      case SUBMIT -> "Submit";
+    };
+  }
 }

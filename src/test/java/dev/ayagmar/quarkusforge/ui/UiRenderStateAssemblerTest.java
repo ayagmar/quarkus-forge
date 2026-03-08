@@ -24,6 +24,7 @@ class UiRenderStateAssemblerTest {
     assertThat(renderModel.metadataPanel().title()).isEqualTo("Project Metadata");
     assertThat(renderModel.metadataPanel().focused()).isTrue();
     assertThat(renderModel.metadataPanel().groupId()).isEqualTo(initialState.request().groupId());
+    assertThat(renderModel.submitAlert()).isEqualTo(SubmitAlertSnapshot.HIDDEN);
     assertThat(renderModel.extensionsPanel().catalogSource()).isEqualTo("snapshot");
     assertThat(renderModel.extensionsPanel().filteredExtensionCount()).isEqualTo(7);
     assertThat(renderModel.footer().statusMessage()).isEqualTo("Ready");
@@ -75,11 +76,50 @@ class UiRenderStateAssemblerTest {
             fixture.reducerState, "Ready", initialState.metadataCompatibility(), false);
 
     assertThat(renderModel.reducerState().statusMessage()).isEqualTo("Ready");
+    assertThat(renderModel.submitAlert()).isEqualTo(SubmitAlertSnapshot.HIDDEN);
     assertThat(renderModel.metadataPanel().title()).isEqualTo("Project Metadata");
     assertThat(renderModel.extensionsPanel().catalogSource()).isEqualTo("snapshot");
     assertThat(renderModel.footer().statusMessage()).isEqualTo("Ready");
     assertThat(renderModel.generation().state()).isEqualTo(GenerationState.IDLE);
     assertThat(renderModel.startupOverlay().statusLines()).isNotEmpty();
+  }
+
+  @Test
+  void renderModelSurfacesSubmitBlockAlertAndFocusedIssue() {
+    ForgeUiState initialState = UiTestFixtureFactory.defaultForgeUiState();
+    RenderFixture fixture = RenderFixture.create(initialState);
+    UiState reducerState =
+        new UiState(
+            fixture.reducerState.request(),
+            fixture.reducerState.validation(),
+            FocusTarget.OUTPUT_DIR,
+            "Submit blocked: target folder exists (change output/artifact)",
+            "Output directory already exists: /tmp/demo",
+            "",
+            false,
+            true,
+            false,
+            true,
+            fixture.reducerState.commandPaletteSelection(),
+            fixture.reducerState.overlays(),
+            fixture.reducerState.catalogLoad(),
+            fixture.reducerState.postGeneration(),
+            fixture.reducerState.extensions());
+
+    UiRenderModel renderModel =
+        fixture.assembler.renderModel(
+            reducerState,
+            reducerState.statusMessage(),
+            initialState.metadataCompatibility(),
+            false);
+
+    assertThat(renderModel.submitAlert().visible()).isTrue();
+    assertThat(renderModel.submitAlert().title()).isEqualTo("Submit blocked");
+    assertThat(renderModel.submitAlert().lines())
+        .anyMatch(line -> line.contains("Target folder already exists"))
+        .anyMatch(line -> line.contains("Focus moved to Output directory"));
+    assertThat(renderModel.metadataPanel().focusedFieldIssue())
+        .contains("Output directory already exists: /tmp/demo");
   }
 
   private record RenderFixture(

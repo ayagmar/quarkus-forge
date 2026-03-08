@@ -8,6 +8,7 @@ final class UiStateSnapshotMapper {
   UiRenderModel renderModel(
       UiState reducerState,
       String statusMessage,
+      SubmitAlertSnapshot submitAlert,
       MetadataPanelSnapshot metadataPanel,
       PanelState panelState,
       UiState.GenerationView generation,
@@ -15,6 +16,7 @@ final class UiStateSnapshotMapper {
     UiState synchronizedState = reducerState.withStatusMessage(statusMessage);
     return new UiRenderModel(
         synchronizedState,
+        submitAlert,
         metadataPanel,
         panelState.extensionsPanel(),
         panelState.footer(),

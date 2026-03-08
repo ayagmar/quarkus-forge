@@ -47,7 +47,7 @@ class CoreUiReducerTest {
             new UiEffect.TransitionGenerationState(GenerationState.ERROR));
     assertThat(result.nextState().focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
     assertThat(result.nextState().statusMessage())
-        .isEqualTo("Submit blocked: fix groupId (1 issue)");
+        .isEqualTo("Submit blocked: fix Group ID (1 issue)");
     assertThat(result.nextState().errorMessage()).isEqualTo("groupId: must not be blank");
     assertThat(result.nextState().submitBlockedByValidation()).isTrue();
     assertThat(result.nextState().submitBlockedByTargetConflict()).isFalse();

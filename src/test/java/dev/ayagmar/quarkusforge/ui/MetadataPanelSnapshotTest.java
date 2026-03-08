@@ -11,8 +11,9 @@ class MetadataPanelSnapshotTest {
     MetadataPanelSnapshot snapshot =
         new MetadataPanelSnapshot(
             "Config", false, false, null, null, null, null, null, null, null, null, null, null,
-            null);
+            null, null);
 
+    assertThat(snapshot.focusedFieldIssue()).isEmpty();
     assertThat(snapshot.groupId()).isEmpty();
     assertThat(snapshot.artifactId()).isEmpty();
     assertThat(snapshot.version()).isEmpty();
@@ -30,6 +31,7 @@ class MetadataPanelSnapshotTest {
             "Config",
             true,
             false,
+            "",
             "org.acme",
             "demo",
             "1.0",
@@ -55,6 +57,7 @@ class MetadataPanelSnapshotTest {
             "Config",
             false,
             true,
+            "must not be blank",
             "org.acme",
             "demo",
             "1.0.0",
@@ -70,6 +73,7 @@ class MetadataPanelSnapshotTest {
     assertThat(snapshot.title()).isEqualTo("Config");
     assertThat(snapshot.focused()).isFalse();
     assertThat(snapshot.invalid()).isTrue();
+    assertThat(snapshot.focusedFieldIssue()).isEqualTo("must not be blank");
     assertThat(snapshot.groupId()).isEqualTo("org.acme");
     assertThat(snapshot.platformStreamInfo().selectedIndex()).isEqualTo(2);
     assertThat(snapshot.platformStreamInfo().totalOptions()).isEqualTo(5);

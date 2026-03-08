@@ -192,6 +192,7 @@ class UiStateSnapshotMapperTest {
             "",
             "",
             "",
+            "",
             MetadataPanelSnapshot.SelectorInfo.EMPTY,
             MetadataPanelSnapshot.SelectorInfo.EMPTY,
             MetadataPanelSnapshot.SelectorInfo.EMPTY);
@@ -287,6 +288,7 @@ class UiStateSnapshotMapperTest {
       return mapper.renderModel(
           reducerState,
           reducerState.statusMessage(),
+          SubmitAlertSnapshot.HIDDEN,
           metadataPanel,
           panelState,
           generation,

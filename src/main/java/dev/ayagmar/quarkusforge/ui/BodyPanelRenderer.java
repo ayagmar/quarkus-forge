@@ -91,6 +91,9 @@ final class BodyPanelRenderer {
     for (int i = 0; i < 8; i++) {
       constraints.add(Constraint.length(1));
     }
+    if (!snapshot.focusedFieldIssue().isBlank()) {
+      constraints.add(Constraint.length(1));
+    }
     constraints.add(Constraint.fill());
     List<Rect> rows = Layout.vertical().constraints(constraints).split(area);
 
@@ -157,6 +160,9 @@ final class BodyPanelRenderer {
         snapshot.outputDir(),
         renderContext,
         FocusTarget.OUTPUT_DIR);
+    if (!snapshot.focusedFieldIssue().isBlank()) {
+      renderMetadataIssue(frame, rows.get(++rowIdx), snapshot.focusedFieldIssue());
+    }
   }
 
   private void renderMetadataPanelWide(
@@ -167,7 +173,11 @@ final class BodyPanelRenderer {
       MetadataFieldRenderContext renderContext) {
     List<Rect> rows =
         Layout.vertical()
-            .constraints(Constraint.length(1), Constraint.length(1), Constraint.fill())
+            .constraints(
+                Constraint.length(1),
+                Constraint.length(1),
+                snapshot.focusedFieldIssue().isBlank() ? Constraint.fill() : Constraint.length(1),
+                Constraint.fill())
             .split(area);
 
     List<Rect> topRow =
@@ -240,6 +250,19 @@ final class BodyPanelRenderer {
         snapshot.outputDir(),
         renderContext,
         FocusTarget.OUTPUT_DIR);
+    if (!snapshot.focusedFieldIssue().isBlank()) {
+      renderMetadataIssue(frame, rows.get(2), snapshot.focusedFieldIssue());
+    }
+  }
+
+  private void renderMetadataIssue(Frame frame, Rect area, String focusedFieldIssue) {
+    frame.renderWidget(
+        Paragraph.builder()
+            .text("  Issue: " + focusedFieldIssue)
+            .style(Style.EMPTY.fg(theme.color("error")).bold())
+            .overflow(Overflow.ELLIPSIS)
+            .build(),
+        area);
   }
 
   void renderExtensionsPanel(
