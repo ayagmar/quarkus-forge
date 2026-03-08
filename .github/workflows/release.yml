@@ -133,6 +133,16 @@ jobs:
           binary="target/${{ matrix.binary_name }}-${{ matrix.platform }}${{ matrix.ext }}"
           python3 scripts/interactive_native_smoke.py --binary "$binary"
 
+      - name: Smoke test Windows interactive native startup
+        if: runner.os == 'Windows' && matrix.binary_name == 'quarkus-forge'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/native-smoke
+          binary="target/${{ matrix.binary_name }}-${{ matrix.platform }}${{ matrix.ext }}"
+          "$binary" --interactive-smoke-test --verbose 2>&1 | tee target/native-smoke/windows-interactive.log
+          grep -F '"event":"tui.render.ready"' target/native-smoke/windows-interactive.log > /dev/null
+
       - name: Upload native artifact
         uses: actions/upload-artifact@v7
         with:

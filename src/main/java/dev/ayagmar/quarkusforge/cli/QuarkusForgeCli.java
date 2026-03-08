@@ -64,6 +64,9 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
       description = "Emit structured JSON-line diagnostics to stderr")
   private boolean verbose;
 
+  @Option(names = "--interactive-smoke-test", hidden = true, defaultValue = "false")
+  private boolean interactiveSmokeTest;
+
   @Option(
       names = {"-h", "--help"},
       usageHelp = true,
@@ -102,6 +105,15 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
   @Override
   public Integer call() throws Exception {
     DiagnosticLogger diagnostics = DiagnosticLogger.create(verbose);
+    if (interactiveSmokeTest) {
+      return runSmoke(
+          diagnostics,
+          "interactive-smoke",
+          (initialState, smokeDiagnostics) ->
+              TUI_BOOTSTRAP_SERVICE.runInteractiveSmoke(
+                  initialState, runtimeConfig, smokeDiagnostics));
+    }
+
     diagnostics.info("cli.start", of("mode", dryRun ? "dry-run" : "tui"));
 
     if (!dryRun) {
@@ -161,25 +173,20 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
     return TUI_BOOTSTRAP_SERVICE.run(initialState, searchDebounceMs, runtimeConfig, diagnostics);
   }
 
-  int runSmokeForTest(boolean verbose) {
-    DiagnosticLogger diagnostics = DiagnosticLogger.create(verbose);
-    diagnostics.info("cli.start", of("mode", "smoke-test"));
+  int runSmokeForTest(boolean verbose) throws Exception {
+    return runSmoke(
+        DiagnosticLogger.create(verbose),
+        "smoke-test",
+        (initialState, diagnostics) ->
+            TuiBootstrapService.runHeadlessSmoke(runtimeConfig, diagnostics));
+  }
 
-    StartupState startupState = loadStartupState(RequestOptions.defaults(), diagnostics);
-    StartupMetadataSelection startupMetadataSelection = startupState.metadataSelection();
-    ForgeUiState initialState = startupState.initialState();
-    if (!initialState.canSubmit()) {
-      diagnostics.error(
-          "cli.validation.failed", of("errorCount", initialState.validation().errors().size()));
-      HeadlessOutputPrinter.printValidationErrors(
-          initialState.validation(),
-          startupMetadataSelection.sourceLabel(),
-          startupMetadataSelection.detailMessage());
-      return ExitCodes.VALIDATION;
-    }
-
-    TuiBootstrapService.runHeadlessSmoke(runtimeConfig, diagnostics);
-    return ExitCodes.OK;
+  int runInteractiveSmokeForTest(boolean verbose) throws Exception {
+    return runSmoke(
+        DiagnosticLogger.create(verbose),
+        "interactive-smoke",
+        (initialState, diagnostics) ->
+            TUI_BOOTSTRAP_SERVICE.runInteractiveSmoke(initialState, runtimeConfig, diagnostics));
   }
 
   /** Package-private for testing. */
@@ -344,5 +351,31 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
         RuntimeWiring.headlessGenerationService(runtimeConfig)) {
       return service.run(command, dryRun, verbose);
     }
+  }
+
+  private int runSmoke(DiagnosticLogger diagnostics, String mode, SmokeRunner smokeRunner)
+      throws Exception {
+    diagnostics.info("cli.start", of("mode", mode));
+
+    StartupState startupState = loadStartupState(RequestOptions.defaults(), diagnostics);
+    StartupMetadataSelection startupMetadataSelection = startupState.metadataSelection();
+    ForgeUiState initialState = startupState.initialState();
+    if (!initialState.canSubmit()) {
+      diagnostics.error(
+          "cli.validation.failed", of("errorCount", initialState.validation().errors().size()));
+      HeadlessOutputPrinter.printValidationErrors(
+          initialState.validation(),
+          startupMetadataSelection.sourceLabel(),
+          startupMetadataSelection.detailMessage());
+      return ExitCodes.VALIDATION;
+    }
+
+    smokeRunner.run(initialState, diagnostics);
+    return ExitCodes.OK;
+  }
+
+  @FunctionalInterface
+  private interface SmokeRunner {
+    void run(ForgeUiState initialState, DiagnosticLogger diagnostics) throws Exception;
   }
 }

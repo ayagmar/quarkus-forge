@@ -99,6 +99,68 @@ public final class TuiBootstrapService {
     }
   }
 
+  public void runInteractiveSmoke(
+      ForgeUiState initialState, RuntimeConfig runtimeConfig, DiagnosticLogger diagnostics)
+      throws Exception {
+    BACKEND_PROPERTY_LOCK.lock();
+    String previousBackendPreference = System.getProperty(BACKEND_PROPERTY_NAME);
+    try {
+      configureTerminalBackendPreference();
+      TuiConfig tuiConfig = appTuiConfig();
+      try (var tui = TuiRunner.create(tuiConfig);
+          QuarkusApiClient apiClient = new QuarkusApiClient(runtimeConfig.apiBaseUri())) {
+        CatalogDataService catalogDataService =
+            RuntimeWiring.catalogDataService(apiClient, runtimeConfig);
+        runInteractiveSmokeSession(
+            initialState,
+            diagnostics,
+            new CatalogLoader() {
+              @Override
+              public CompletableFuture<CatalogData> load() {
+                return catalogDataService.load();
+              }
+
+              @Override
+              public CompletableFuture<CatalogData> loadForStartup() {
+                return catalogDataService.loadForStartup();
+              }
+            },
+            apiClient::fetchPresets,
+            RuntimeWiring.favoritesStore(runtimeConfig),
+            UiScheduler.fromScheduledExecutor(tui.scheduler(), tui::runOnRenderThread),
+            IdeDetector.detect(),
+            (controller, sessionDiagnostics) -> {
+              AtomicBoolean renderReady = new AtomicBoolean();
+              tui.run(
+                  (event, runner) -> {
+                    if (renderReady.get()) {
+                      runner.quit();
+                      return true;
+                    }
+                    UiAction action = controller.onEvent(event);
+                    if (action.shouldQuit()) {
+                      sessionDiagnostics.info("tui.session.quit.requested", of("reason", "smoke"));
+                      runner.quit();
+                    }
+                    return action.handled();
+                  },
+                  frame -> {
+                    controller.render(frame);
+                    if (renderReady.compareAndSet(false, true)) {
+                      sessionDiagnostics.info("tui.render.ready", of("mode", "interactive-smoke"));
+                    }
+                  });
+            });
+      }
+    } finally {
+      try {
+        restoreTerminalBackendPreference(previousBackendPreference);
+      } finally {
+        BACKEND_PROPERTY_LOCK.unlock();
+      }
+    }
+  }
+
   public TuiSessionSummary run(
       ForgeUiState initialState,
       int searchDebounceMs,
@@ -248,6 +310,32 @@ public final class TuiBootstrapService {
           of("message", ErrorMessageMapper.userFriendlyError(exception)));
       throw exception;
     }
+  }
+
+  void runInteractiveSmokeSession(
+      ForgeUiState initialState,
+      DiagnosticLogger diagnostics,
+      CatalogLoader catalogLoader,
+      PresetLoader presetLoader,
+      ExtensionFavoritesStore favoritesStore,
+      UiScheduler scheduler,
+      List<IdeDetector.DetectedIde> detectedIdes,
+      TuiSessionLoop sessionLoop)
+      throws Exception {
+    diagnostics.info("tui.session.start", of("smokeMode", true), of("mode", "interactive-smoke"));
+    runSession(
+        initialState,
+        0,
+        diagnostics,
+        catalogLoader,
+        presetLoader,
+        (generationRequest, outputDirectory, cancelled, progressListener) ->
+            CompletableFuture.failedFuture(
+                new IllegalStateException("interactive smoke should not generate projects")),
+        favoritesStore,
+        scheduler,
+        detectedIdes,
+        sessionLoop);
   }
 
   private static void restoreTerminalBackendPreference(String previousBackendPreference) {

@@ -21,4 +21,15 @@ class ReleaseWorkflowTest {
     assertThat(workflow).contains("\"$binary\" --help > /dev/null");
     assertThat(workflow).contains("\"$binary\" --version > /dev/null");
   }
+
+  @Test
+  void releaseWorkflowRunsWindowsInteractiveNativeSmoke() throws Exception {
+    String workflow =
+        Files.readString(Path.of(".github", "workflows", "release.yml"), StandardCharsets.UTF_8);
+
+    assertThat(workflow)
+        .contains("if: runner.os == 'Windows' && matrix.binary_name == 'quarkus-forge'");
+    assertThat(workflow).contains("\"$binary\" --interactive-smoke-test --verbose 2>&1 | tee");
+    assertThat(workflow).contains("grep -F '\"event\":\"tui.render.ready\"'");
+  }
 }

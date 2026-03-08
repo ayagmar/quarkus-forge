@@ -177,6 +177,43 @@ class TuiBootstrapServiceRunTest {
         .contains("boom");
   }
 
+  @Test
+  void runInteractiveSmokeSessionLogsInteractiveSmokeLifecycle() throws Exception {
+    TuiBootstrapService service = new TuiBootstrapService();
+    ForgeUiState initialState = defaultState();
+    CatalogData catalogData =
+        new CatalogData(
+            METADATA,
+            List.of(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "web")),
+            CatalogSource.LIVE,
+            false,
+            "live catalog ready");
+
+    String stderr =
+        captureStandardError(
+            () ->
+                service.runInteractiveSmokeSession(
+                    initialState,
+                    DiagnosticLogger.create(true),
+                    completedCatalogLoader(catalogData),
+                    streamKey -> CompletableFuture.completedFuture(Map.of()),
+                    ExtensionFavoritesStore.inMemory(),
+                    UiScheduler.immediate(),
+                    List.of(),
+                    (controller, diagnostics) ->
+                        diagnostics.info(
+                            "tui.render.ready",
+                            dev.ayagmar.quarkusforge.diagnostics.DiagnosticField.of(
+                                "mode", "interactive-smoke"))));
+
+    assertThat(stderr)
+        .contains("\"event\":\"tui.session.start\"")
+        .contains("\"mode\":\"interactive-smoke\"")
+        .contains("\"event\":\"catalog.load.start\"")
+        .contains("\"event\":\"tui.render.ready\"")
+        .contains("\"event\":\"tui.session.exit\"");
+  }
+
   private static ForgeUiState defaultState() {
     return InputResolutionService.resolveInitialState(
         new CliPrefill("com.example", "forge-app", "1.0.0", "", ".", "", "maven", "25"),
