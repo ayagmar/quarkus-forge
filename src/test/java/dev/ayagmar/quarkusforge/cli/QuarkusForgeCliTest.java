@@ -2,13 +2,33 @@ package dev.ayagmar.quarkusforge.cli;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.ayagmar.quarkusforge.api.MetadataDto;
+import dev.ayagmar.quarkusforge.api.PlatformStream;
+import dev.ayagmar.quarkusforge.application.InputResolutionService;
+import dev.ayagmar.quarkusforge.application.StartupMetadataSelection;
+import dev.ayagmar.quarkusforge.application.StartupState;
+import dev.ayagmar.quarkusforge.application.StartupStateService;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
+import dev.ayagmar.quarkusforge.domain.ForgeUiState;
+import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import picocli.CommandLine;
 
 class QuarkusForgeCliTest {
+  private static final MetadataDto METADATA =
+      new MetadataDto(
+          List.of("21", "25"),
+          List.of("maven", "gradle"),
+          Map.of("maven", List.of("21", "25"), "gradle", List.of("21", "25")),
+          List.of(
+              new PlatformStream("io.quarkus.platform:3.31", "3.31", true, List.of("21", "25"))));
+
   @Test
   void helpCommandReturnsSuccessExitCode() {
     int exitCode = QuarkusForgeCli.runWithArgs(new String[] {"--help"});
@@ -99,55 +119,50 @@ class QuarkusForgeCliTest {
   }
 
   @Test
-  void applyStoredRequestDefaultsWithNullStoredPrefillDoesNothing() {
-    RequestOptions options = new RequestOptions();
-    String originalGroupId = options.groupId;
+  void dryRunDelegatesExplicitOverridesToStartupService() throws Exception {
+    AtomicReference<CliPrefill> requestedPrefill = new AtomicReference<>();
+    AtomicReference<CliPrefill> storedPrefill = new AtomicReference<>();
+    StartupStateService startupStateService =
+        request -> {
+          requestedPrefill.set(request.requestedPrefill());
+          storedPrefill.set(request.storedPrefill());
+          return validStartupState();
+        };
+    QuarkusForgeCli cli =
+        new QuarkusForgeCli(
+            dev.ayagmar.quarkusforge.runtime.RuntimeConfig.defaults(),
+            uri -> {
+              throw new AssertionError("startup service stub should own startup resolution");
+            },
+            startupStateService);
 
-    QuarkusForgeCli.applyStoredRequestDefaults(options, null);
+    CliCommandTestSupport.CommandResult result =
+        CliCommandTestSupport.captureCommandOutput(
+            () ->
+                new CommandLine(cli)
+                    .execute(
+                        "--dry-run",
+                        "--group-id",
+                        RequestOptions.DEFAULT_GROUP_ID,
+                        "--artifact-id",
+                        "forge-app"));
 
-    assertThat(options.groupId).isEqualTo(originalGroupId);
+    assertThat(result.exitCode()).isZero();
+    assertThat(requestedPrefill.get().groupId()).isEqualTo(RequestOptions.DEFAULT_GROUP_ID);
+    assertThat(requestedPrefill.get().artifactId()).isEqualTo("forge-app");
+    assertThat(requestedPrefill.get().version()).isNull();
+    assertThat(requestedPrefill.get().buildTool()).isNull();
+    assertThat(storedPrefill.get()).isNull();
   }
 
-  @Test
-  void applyStoredRequestDefaultsAppliesStoredValues() {
-    RequestOptions options = RequestOptions.defaults();
-    CliPrefill stored =
-        new CliPrefill(
-            "com.stored", "stored-app", "2.0.0", "com.stored.app", "/stored", "", "gradle", "21");
-
-    QuarkusForgeCli.applyStoredRequestDefaults(options, stored);
-
-    // Stored values should apply since current values match defaults
-    assertThat(options.groupId).isEqualTo("com.stored");
-    assertThat(options.artifactId).isEqualTo("stored-app");
-    assertThat(options.version).isEqualTo("2.0.0");
-    assertThat(options.buildTool).isEqualTo("gradle");
-    assertThat(options.javaVersion).isEqualTo("21");
-  }
-
-  @Test
-  void applyStoredRequestDefaultsPreservesExplicitValues() {
-    RequestOptions options = RequestOptions.defaults();
-    options.groupId = "com.explicit"; // explicitly set, different from default
-
-    CliPrefill stored = new CliPrefill("com.stored", "stored-app", "", "", "", "", "", "");
-
-    QuarkusForgeCli.applyStoredRequestDefaults(options, stored);
-
-    // Explicitly set values should not be overridden
-    assertThat(options.groupId).isEqualTo("com.explicit");
-  }
-
-  @Test
-  void applyStoredRequestDefaultsTreatsPreviouslyAppliedStoredValuesAsNonExplicit() {
-    RequestOptions options = RequestOptions.defaults();
-
-    QuarkusForgeCli.applyStoredRequestDefaults(
-        options, new CliPrefill("com.first", "first-app", "", "", "", "", "", ""));
-    QuarkusForgeCli.applyStoredRequestDefaults(
-        options, new CliPrefill("com.second", "second-app", "", "", "", "", "", ""));
-
-    assertThat(options.groupId).isEqualTo("com.second");
-    assertThat(options.artifactId).isEqualTo("second-app");
+  private static StartupState validStartupState() {
+    MetadataCompatibilityContext metadataCompatibility =
+        MetadataCompatibilityContext.success(METADATA);
+    ForgeUiState initialState =
+        InputResolutionService.resolveInitialState(
+            new CliPrefill("com.example", "forge-app", "1.0.0", null, ".", "", "maven", "21"),
+            metadataCompatibility);
+    return new StartupState(
+        initialState, new StartupMetadataSelection(metadataCompatibility, "live", ""));
   }
 }

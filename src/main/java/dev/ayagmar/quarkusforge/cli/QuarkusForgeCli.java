@@ -37,12 +37,12 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
 
   private static final PostTuiActionExecutor POST_TUI_ACTION_EXECUTOR = new PostTuiActionExecutor();
   private static final TuiBootstrapService TUI_BOOTSTRAP_SERVICE = new TuiBootstrapService();
-  private static final StartupStateService STARTUP_STATE_SERVICE = new DefaultStartupStateService();
 
   @Mixin private RequestOptions requestOptions = new RequestOptions();
 
   private final RuntimeConfig runtimeConfig;
   private final Function<java.net.URI, QuarkusApiClient> apiClientFactory;
+  private final StartupStateService startupStateService;
 
   @Option(
       names = "--dry-run",
@@ -88,13 +88,21 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
   }
 
   QuarkusForgeCli(RuntimeConfig runtimeConfig) {
-    this(runtimeConfig, QuarkusApiClient::new);
+    this(runtimeConfig, QuarkusApiClient::new, new DefaultStartupStateService());
   }
 
   QuarkusForgeCli(
       RuntimeConfig runtimeConfig, Function<java.net.URI, QuarkusApiClient> apiClientFactory) {
+    this(runtimeConfig, apiClientFactory, new DefaultStartupStateService());
+  }
+
+  QuarkusForgeCli(
+      RuntimeConfig runtimeConfig,
+      Function<java.net.URI, QuarkusApiClient> apiClientFactory,
+      StartupStateService startupStateService) {
     this.runtimeConfig = Objects.requireNonNull(runtimeConfig);
     this.apiClientFactory = Objects.requireNonNull(apiClientFactory);
+    this.startupStateService = Objects.requireNonNull(startupStateService);
   }
 
   @Override
@@ -111,10 +119,11 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
 
     diagnostics.info("cli.start", of("mode", dryRun ? "dry-run" : "tui"));
 
-    if (!dryRun) {
-      applyStoredRequestDefaults(requestOptions, RuntimeWiring.loadStoredCliPrefill(runtimeConfig));
-    }
-    StartupState startupState = loadStartupState(requestOptions, diagnostics);
+    StartupState startupState =
+        loadStartupState(
+            requestOptions,
+            dryRun ? null : RuntimeWiring.loadStoredCliPrefill(runtimeConfig),
+            diagnostics);
     StartupMetadataSelection startupMetadataSelection = startupState.metadataSelection();
     ForgeUiState initialState = startupState.initialState();
     if (!initialState.canSubmit() && dryRun) {
@@ -189,96 +198,12 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
     return requestOptions;
   }
 
-  /** Package-private for testing. */
-  static void applyStoredRequestDefaults(RequestOptions requestOptions, CliPrefill storedPrefill) {
-    if (storedPrefill == null) {
-      return;
-    }
-    RequestOptions defaults = RequestOptions.defaults();
-    requestOptions.groupId =
-        applyIfNotExplicit(
-            requestOptions,
-            RequestOptions.OPT_GROUP_ID,
-            requestOptions.groupId,
-            defaults.groupId,
-            storedPrefill.groupId());
-    requestOptions.artifactId =
-        applyIfNotExplicit(
-            requestOptions,
-            RequestOptions.OPT_ARTIFACT_ID,
-            requestOptions.artifactId,
-            defaults.artifactId,
-            storedPrefill.artifactId());
-    requestOptions.version =
-        applyIfNotExplicit(
-            requestOptions,
-            RequestOptions.OPT_VERSION,
-            requestOptions.version,
-            defaults.version,
-            storedPrefill.version());
-    requestOptions.packageName =
-        applyIfNotExplicit(
-            requestOptions,
-            RequestOptions.OPT_PACKAGE_NAME,
-            requestOptions.packageName,
-            defaults.packageName,
-            storedPrefill.packageName());
-    requestOptions.outputDirectory =
-        applyIfNotExplicit(
-            requestOptions,
-            RequestOptions.OPT_OUTPUT_DIR,
-            requestOptions.outputDirectory,
-            defaults.outputDirectory,
-            storedPrefill.outputDirectory());
-    requestOptions.platformStream =
-        applyIfNotExplicit(
-            requestOptions,
-            RequestOptions.OPT_PLATFORM_STREAM,
-            requestOptions.platformStream,
-            defaults.platformStream,
-            storedPrefill.platformStream());
-    requestOptions.buildTool =
-        applyIfNotExplicit(
-            requestOptions,
-            RequestOptions.OPT_BUILD_TOOL,
-            requestOptions.buildTool,
-            defaults.buildTool,
-            storedPrefill.buildTool());
-    requestOptions.javaVersion =
-        applyIfNotExplicit(
-            requestOptions,
-            RequestOptions.OPT_JAVA_VERSION,
-            requestOptions.javaVersion,
-            defaults.javaVersion,
-            storedPrefill.javaVersion());
-  }
-
-  /**
-   * Returns the stored value when the option was not explicitly provided on the command line. Uses
-   * {@link RequestOptions#isExplicitlySet} to detect explicit CLI input, which avoids overriding an
-   * intentional default-equal value with old prefill data.
-   */
-  private static String applyIfNotExplicit(
-      RequestOptions requestOptions,
-      String optionName,
-      String current,
-      String defaultValue,
-      String stored) {
-    if (!requestOptions.isExplicitlySet(optionName, current, defaultValue)
-        && stored != null
-        && !stored.isBlank()) {
-      requestOptions.markPrefilled(optionName);
-      return stored;
-    }
-    return current;
-  }
-
   private StartupState loadStartupState(
-      RequestOptions requestOptions, DiagnosticLogger diagnostics) {
+      RequestOptions requestOptions, CliPrefill storedPrefill, DiagnosticLogger diagnostics) {
     StartupMetadataLoader metadataLoader =
         new LiveStartupMetadataLoader(runtimeConfig.apiBaseUri(), apiClientFactory, diagnostics);
-    return STARTUP_STATE_SERVICE.resolve(
-        new StartupRequest(requestOptions.toCliPrefill(), null, metadataLoader));
+    return startupStateService.resolve(
+        new StartupRequest(requestOptions.toExplicitCliPrefill(), storedPrefill, metadataLoader));
   }
 
   @Override
@@ -293,7 +218,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
       throws Exception {
     diagnostics.info("cli.start", of("mode", mode));
 
-    StartupState startupState = loadStartupState(RequestOptions.defaults(), diagnostics);
+    StartupState startupState = loadStartupState(RequestOptions.defaults(), null, diagnostics);
     StartupMetadataSelection startupMetadataSelection = startupState.metadataSelection();
     ForgeUiState initialState = startupState.initialState();
     if (!initialState.canSubmit()) {

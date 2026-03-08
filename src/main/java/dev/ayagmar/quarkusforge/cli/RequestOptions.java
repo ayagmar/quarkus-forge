@@ -115,8 +115,8 @@ final class RequestOptions {
         javaVersion);
   }
 
-  Forgefile toExplicitTemplate() {
-    return new Forgefile(
+  CliPrefill toExplicitCliPrefill() {
+    return new CliPrefill(
         explicitValue(OPT_GROUP_ID, groupId, DEFAULT_GROUP_ID),
         explicitValue(OPT_ARTIFACT_ID, artifactId, DEFAULT_ARTIFACT_ID),
         explicitValue(OPT_VERSION, version, DEFAULT_VERSION),
@@ -124,7 +124,20 @@ final class RequestOptions {
         explicitValue(OPT_OUTPUT_DIR, outputDirectory, DEFAULT_OUTPUT_DIRECTORY),
         explicitValue(OPT_PLATFORM_STREAM, platformStream, DEFAULT_PLATFORM_STREAM),
         explicitValue(OPT_BUILD_TOOL, buildTool, DEFAULT_BUILD_TOOL),
-        explicitValue(OPT_JAVA_VERSION, javaVersion, DEFAULT_JAVA_VERSION),
+        explicitValue(OPT_JAVA_VERSION, javaVersion, DEFAULT_JAVA_VERSION));
+  }
+
+  Forgefile toExplicitTemplate() {
+    CliPrefill explicitPrefill = toExplicitCliPrefill();
+    return new Forgefile(
+        explicitPrefill.groupId(),
+        explicitPrefill.artifactId(),
+        explicitPrefill.version(),
+        explicitPrefill.packageName(),
+        explicitPrefill.outputDirectory(),
+        explicitPrefill.platformStream(),
+        explicitPrefill.buildTool(),
+        explicitPrefill.javaVersion(),
         null,
         null);
   }
@@ -164,10 +177,6 @@ final class RequestOptions {
         options.applyCliValue(
             OPT_JAVA_VERSION, prefill.javaVersion(), options.javaVersion, markPrefilled);
     return options;
-  }
-
-  void markPrefilled(String optionName) {
-    prefilledOptions.add(optionName);
   }
 
   /**

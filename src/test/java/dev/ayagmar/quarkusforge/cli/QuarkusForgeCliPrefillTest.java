@@ -13,11 +13,12 @@ import picocli.CommandLine;
 
 /**
  * Tests verifying that {@link QuarkusForgeCli} correctly detects explicitly-provided CLI options
- * and does not allow stored prefill values to override options the user intentionally passed —
- * including options whose value happens to equal the compiled-in default.
+ * and preserves that explicitness when routing startup inputs into the application-layer startup
+ * service.
  *
- * <p>These tests exercise the fix for the {@code applyIfDefault} value-equality bug, where {@code
- * --group-id org.acme} (the default) would silently get replaced by an older stored prefill value.
+ * <p>These tests exercise the explicit-default-equal bug shape, where {@code --group-id org.acme}
+ * (the default) must remain explicit so the application-layer startup service can prefer it over
+ * stored prefill.
  */
 class QuarkusForgeCliPrefillTest {
 
@@ -97,70 +98,42 @@ class QuarkusForgeCliPrefillTest {
         .isFalse();
   }
 
-  // ── applyStoredRequestDefaults: stored prefill NOT applied when option was explicitly passed ──
+  // ── Explicit startup prefill routing ───────────────────────────────────────
 
   @Test
-  void applyStoredDefaultsDoesNotOverrideExplicitGroupId() {
-    // Simulate: user passes --group-id org.acme (equals the default) explicitly.
-    // Stored prefill has a DIFFERENT group-id (org.old-company).
-    // After applying stored defaults, group-id must remain org.acme — NOT org.old-company.
+  void explicitCliPrefillRetainsExplicitDefaultEqualGroupId() {
     QuarkusForgeCli cli = new QuarkusForgeCli();
     new CommandLine(cli).parseArgs("--dry-run", "--group-id", RequestOptions.DEFAULT_GROUP_ID);
 
-    CliPrefill storedPrefill =
-        new CliPrefill("org.old-company", "old-app", "2.0.0", null, ".", "", "maven", "21");
-
-    QuarkusForgeCli.applyStoredRequestDefaults(cli.requestOptions(), storedPrefill);
-
-    assertThat(cli.requestOptions().groupId)
-        .as(
-            "Explicit --group-id (even when it equals the default) must not be replaced"
-                + " by stored prefill")
+    assertThat(cli.requestOptions().toExplicitCliPrefill().groupId())
+        .as("Explicit --group-id must remain explicit even when it equals the default")
         .isEqualTo(RequestOptions.DEFAULT_GROUP_ID);
   }
 
   @Test
-  void applyStoredDefaultsAppliesStoredValueWhenOptionWasNotExplicit() {
-    // Simulate: user omits --group-id; stored prefill has a non-default group-id.
-    // After applying stored defaults, group-id should be the stored value.
-    QuarkusForgeCli cli = new QuarkusForgeCli();
-    new CommandLine(cli).parseArgs("--dry-run"); // --group-id not passed
-
-    CliPrefill storedPrefill =
-        new CliPrefill("org.stored-company", "stored-app", "3.0.0", null, ".", "", "gradle", "21");
-
-    QuarkusForgeCli.applyStoredRequestDefaults(cli.requestOptions(), storedPrefill);
-
-    assertThat(cli.requestOptions().groupId)
-        .as("When --group-id was not provided, stored prefill should be applied")
-        .isEqualTo("org.stored-company");
-    assertThat(cli.requestOptions().buildTool).isEqualTo("gradle");
-    assertThat(cli.requestOptions().javaVersion).isEqualTo("21");
-  }
-
-  @Test
-  void applyStoredDefaultsIgnoresBlankStoredValues() {
-    // Blank stored values must not overwrite the Picocli default.
+  void explicitCliPrefillLeavesOmittedDefaultsUnset() {
     QuarkusForgeCli cli = new QuarkusForgeCli();
     new CommandLine(cli).parseArgs("--dry-run");
 
-    CliPrefill storedPrefillWithBlanks =
-        new CliPrefill("", "  ", null, null, ".", "", "maven", "25");
+    CliPrefill explicitPrefill = cli.requestOptions().toExplicitCliPrefill();
 
-    QuarkusForgeCli.applyStoredRequestDefaults(cli.requestOptions(), storedPrefillWithBlanks);
-
-    assertThat(cli.requestOptions().groupId).isEqualTo(RequestOptions.DEFAULT_GROUP_ID);
-    assertThat(cli.requestOptions().artifactId).isEqualTo(RequestOptions.DEFAULT_ARTIFACT_ID);
+    assertThat(explicitPrefill.groupId()).isNull();
+    assertThat(explicitPrefill.artifactId()).isNull();
+    assertThat(explicitPrefill.buildTool()).isNull();
+    assertThat(explicitPrefill.javaVersion()).isNull();
   }
 
   @Test
-  void applyStoredDefaultsDoesNothingWhenStoredPrefillIsNull() {
+  void explicitCliPrefillPreservesMultipleExplicitOptions() {
     QuarkusForgeCli cli = new QuarkusForgeCli();
-    new CommandLine(cli).parseArgs("--dry-run");
+    new CommandLine(cli)
+        .parseArgs("--dry-run", "--group-id", "com.example", "--java-version", "21");
 
-    QuarkusForgeCli.applyStoredRequestDefaults(cli.requestOptions(), null);
+    CliPrefill explicitPrefill = cli.requestOptions().toExplicitCliPrefill();
 
-    assertThat(cli.requestOptions().groupId).isEqualTo(RequestOptions.DEFAULT_GROUP_ID);
+    assertThat(explicitPrefill.groupId()).isEqualTo("com.example");
+    assertThat(explicitPrefill.javaVersion()).isEqualTo("21");
+    assertThat(explicitPrefill.buildTool()).isNull();
   }
 
   // ── End-to-end dry-run validation ──────────────────────────────────────────
@@ -214,8 +187,8 @@ class QuarkusForgeCliPrefillTest {
             tempDir.resolve("favorites.json"),
             prefsFile);
 
-    // --dry-run skips applyStoredRequestDefaults; this verifies that the CLI boots cleanly
-    // even when a preferences file is present and the dry-run validation path succeeds.
+    // --dry-run passes null stored prefill into the startup service; this verifies that the CLI
+    // still boots cleanly even when a preferences file is present.
     int exitCode =
         QuarkusForgeCli.runWithArgs(
             new String[] {"--dry-run", "--group-id", "org.acme", "--artifact-id", "test-app"},
