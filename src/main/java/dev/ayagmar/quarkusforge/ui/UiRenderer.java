@@ -7,7 +7,7 @@ import dev.tamboui.terminal.Frame;
 import java.util.List;
 
 /**
- * Render orchestrator that consumes immutable {@link UiState} and delegates concrete drawing to an
+ * Render orchestrator that consumes immutable {@link UiRenderModel} and delegates drawing to an
  * adapter.
  */
 final class UiRenderer {
@@ -40,9 +40,10 @@ final class UiRenderer {
         Frame frame, Rect viewport, UiState.StartupOverlayView startupOverlay);
   }
 
-  void render(Frame frame, UiState state, Adapter adapter) {
+  void render(Frame frame, UiRenderModel renderModel, Adapter adapter) {
+    UiState state = renderModel.reducerState();
     Rect area = frame.area();
-    List<String> footerLines = adapter.composeFooterLines(area.width(), state.footer());
+    List<String> footerLines = adapter.composeFooterLines(area.width(), renderModel.footer());
     int footerHeight = adapter.estimateFooterHeight(footerLines, Math.max(1, area.width() - 2));
     List<Rect> rootLayout =
         Layout.vertical()
@@ -50,10 +51,11 @@ final class UiRenderer {
             .split(area);
 
     adapter.renderHeader(frame, rootLayout.get(0));
-    adapter.renderBody(frame, rootLayout.get(1), state.metadataPanel(), state.extensionsPanel());
+    adapter.renderBody(
+        frame, rootLayout.get(1), renderModel.metadataPanel(), renderModel.extensionsPanel());
     adapter.renderFooter(frame, rootLayout.get(2), footerLines);
     if (state.overlays().generationVisible()) {
-      adapter.renderGenerationOverlay(frame, area, state.generation());
+      adapter.renderGenerationOverlay(frame, area, renderModel.generation());
     }
     if (state.overlays().commandPaletteVisible()) {
       adapter.renderCommandPalette(frame, area, state.commandPaletteSelection());
@@ -65,7 +67,7 @@ final class UiRenderer {
       adapter.renderPostGenerationOverlay(frame, area, state.postGeneration());
     }
     if (state.overlays().startupOverlayVisible()) {
-      adapter.renderStartupStatusOverlay(frame, area, state.startupOverlay());
+      adapter.renderStartupStatusOverlay(frame, area, renderModel.startupOverlay());
     }
   }
 }

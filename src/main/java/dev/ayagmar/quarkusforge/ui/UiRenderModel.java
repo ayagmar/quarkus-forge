@@ -17,12 +17,4 @@ record UiRenderModel(
     generation = Objects.requireNonNull(generation);
     startupOverlay = Objects.requireNonNull(startupOverlay);
   }
-
-  UiState snapshotState() {
-    return reducerState
-        .withMetadataPanel(metadataPanel)
-        .withGeneration(generation)
-        .withStartupOverlay(startupOverlay)
-        .withRenderSnapshot(reducerState.statusMessage(), extensionsPanel, footer);
-  }
 }

@@ -12,47 +12,23 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class UiRenderStateAssemblerTest {
-  private static final MetadataPanelSnapshot EMPTY_METADATA_PANEL =
-      new MetadataPanelSnapshot(
-          "",
-          false,
-          false,
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          MetadataPanelSnapshot.SelectorInfo.EMPTY,
-          MetadataPanelSnapshot.SelectorInfo.EMPTY,
-          MetadataPanelSnapshot.SelectorInfo.EMPTY);
-  private static final ExtensionsPanelSnapshot EMPTY_EXTENSIONS_PANEL =
-      new ExtensionsPanelSnapshot(
-          false, false, false, false, false, "", "", false, false, false, 0, "", "", 0, 0, 0,
-          List.of(), List.of(), "", "");
-  private static final FooterSnapshot EMPTY_FOOTER =
-      new FooterSnapshot(
-          false, FocusTarget.GROUP_ID, false, false, false, "", "", "", false, "", "", "", "", "");
-
   @Test
-  void uiStateCombinesReducerAndRuntimeRenderSlices() {
+  void renderModelCombinesReducerAndRuntimeRenderSlices() {
     ForgeUiState initialState = UiTestFixtureFactory.defaultForgeUiState();
     RenderFixture fixture = RenderFixture.create(initialState);
 
-    UiState snapshot =
-        fixture.assembler.uiState(
+    UiRenderModel renderModel =
+        fixture.assembler.renderModel(
             fixture.reducerState, "Ready", initialState.metadataCompatibility(), false);
 
-    assertThat(snapshot.metadataPanel().title()).isEqualTo("Project Metadata");
-    assertThat(snapshot.metadataPanel().focused()).isTrue();
-    assertThat(snapshot.metadataPanel().groupId()).isEqualTo(initialState.request().groupId());
-    assertThat(snapshot.extensionsPanel().catalogSource()).isEqualTo("snapshot");
-    assertThat(snapshot.extensionsPanel().filteredExtensionCount()).isEqualTo(7);
-    assertThat(snapshot.footer().statusMessage()).isEqualTo("Ready");
-    assertThat(snapshot.footer().preGeneratePlan()).contains("forge-app");
-    assertThat(snapshot.startupOverlay().statusLines()).isNotEmpty();
+    assertThat(renderModel.metadataPanel().title()).isEqualTo("Project Metadata");
+    assertThat(renderModel.metadataPanel().focused()).isTrue();
+    assertThat(renderModel.metadataPanel().groupId()).isEqualTo(initialState.request().groupId());
+    assertThat(renderModel.extensionsPanel().catalogSource()).isEqualTo("snapshot");
+    assertThat(renderModel.extensionsPanel().filteredExtensionCount()).isEqualTo(7);
+    assertThat(renderModel.footer().statusMessage()).isEqualTo("Ready");
+    assertThat(renderModel.footer().preGeneratePlan()).contains("forge-app");
+    assertThat(renderModel.startupOverlay().statusLines()).isNotEmpty();
   }
 
   @Test
@@ -81,12 +57,12 @@ class UiRenderStateAssemblerTest {
             new UiState.PostGenerationView(
                 true, false, 0, 0, List.of(), Path.of("output/forge-app"), "", null));
 
-    UiState snapshot =
-        fixture.assembler.uiState(
+    UiRenderModel renderModel =
+        fixture.assembler.renderModel(
             reducerState, "Ready", initialState.metadataCompatibility(), false);
 
-    assertThat(snapshot.footer().resolvedTargetPath()).isEmpty();
-    assertThat(snapshot.footer().preGeneratePlan()).isEmpty();
+    assertThat(renderModel.footer().resolvedTargetPath()).isEmpty();
+    assertThat(renderModel.footer().preGeneratePlan()).isEmpty();
   }
 
   @Test
@@ -153,14 +129,9 @@ class UiRenderStateAssemblerTest {
         false,
         false,
         0,
-        EMPTY_METADATA_PANEL,
-        EMPTY_EXTENSIONS_PANEL,
-        EMPTY_FOOTER,
         new UiState.OverlayState(false, false, false, false, false),
-        new UiState.GenerationView(GenerationState.IDLE, 0.0, "", false),
         new UiState.CatalogLoadView(CatalogLoadState.initial()),
         new UiState.PostGenerationView(false, false, 0, 0, List.of(), null, "", null),
-        new UiState.StartupOverlayView(false, List.of()),
         UiTestFixtureFactory.defaultExtensionView());
   }
 

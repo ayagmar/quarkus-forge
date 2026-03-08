@@ -156,7 +156,7 @@ CoreTuiController (Orchestration Shell)
             └── UiTextInputKeys              Text-input edit-key normalization
 ....
 
-Reducer-visible UI semantics are now converged for form and extension read-model state. `ProjectRequest`, `ValidationReport`, and extension search/filter/read-model summaries update through reducer intents/effects and live in reducer-owned `UiState`, while generation progress and startup overlay lines are still synchronized from controller-owned runtime collaborators before render. `UiStateSnapshotMapper` only adds render-only panel/footer snapshots plus the effective status line. Mutable widget internals such as `TextInputState` and `ListState` stay in adapter/runtime context rather than `UiState`.
+Reducer-visible UI semantics are now converged for form and extension read-model state. `ProjectRequest`, `ValidationReport`, extension search/filter/read-model summaries, catalog lifecycle semantics, and overlay visibility flags update through reducer intents/effects and live in reducer-owned `UiState`. `UiRenderModel` is assembled immediately before render and carries the derived `metadataPanel`, `extensionsPanel`, `footer`, `generation`, and `startupOverlay` slices. Mutable widget internals such as `TextInputState` and `ListState` stay in adapter/runtime context rather than `UiState`.
 
 === UiState Ownership Map
 
@@ -167,14 +167,12 @@ Reducer-owned `UiState` fields:
 * `submitRequested`, `submitBlockedByValidation`, `submitBlockedByTargetConflict`
 * `commandPaletteSelection`, `overlays`, `catalogLoad`, `postGeneration`, `extensions`
 
-Render-only `UiState` fields:
+Render-only `UiRenderModel` fields:
 
 * `metadataPanel`, `extensionsPanel`, `footer`
 * `generation`, `startupOverlay`
 
-The render-only fields above are synchronized from runtime collaborators immediately before render. They are not reducer authority and are the first candidates to move into a dedicated render model in the next slices of this phase.
-
-`UiRenderModel` is now the explicit container for those render-only slices while the codebase transitions away from storing them directly on `UiState`.
+The render-only fields above are synchronized from runtime collaborators immediately before render. They are not reducer authority, and `UiRenderModel` is the single container for those slices.
 
 === State Machine: Generation Flow
 

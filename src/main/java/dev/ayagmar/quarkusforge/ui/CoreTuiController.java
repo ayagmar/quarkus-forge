@@ -48,29 +48,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
       (generationRequest, outputDirectory, cancelled, progressListener) ->
           CompletableFuture.failedFuture(
               new IllegalStateException("Generation flow is not configured in this runtime"));
-  private static final MetadataPanelSnapshot EMPTY_METADATA_PANEL =
-      new MetadataPanelSnapshot(
-          "",
-          false,
-          false,
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          MetadataPanelSnapshot.SelectorInfo.EMPTY,
-          MetadataPanelSnapshot.SelectorInfo.EMPTY,
-          MetadataPanelSnapshot.SelectorInfo.EMPTY);
-  private static final ExtensionsPanelSnapshot EMPTY_EXTENSIONS_PANEL =
-      new ExtensionsPanelSnapshot(
-          false, false, false, false, false, "", "", false, false, false, 0, "", "", 0, 0, 0,
-          List.of(), List.of(), "", "");
-  private static final FooterSnapshot EMPTY_FOOTER =
-      new FooterSnapshot(
-          false, FocusTarget.GROUP_ID, false, false, false, "", "", "", false, "", "", "", "", "");
   private final EnumMap<FocusTarget, TextInputState> inputStates = new EnumMap<>(FocusTarget.class);
   private final ProjectRequestValidator requestValidator = new ProjectRequestValidator();
   private MetadataCompatibilityContext metadataCompatibility;
@@ -573,7 +550,9 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   @Override
   public UiAction handleMetadataSelectorFlow(KeyEvent keyEvent) {
-    return routeIntent(new UiIntent.MetadataInputIntent(keyEvent, focusTarget()));
+    FocusTarget focusTarget = focusTarget();
+    return routeIntent(
+        new UiIntent.MetadataInputIntent(keyEvent, focusTarget, hasSelectorOptions(focusTarget)));
   }
 
   @Override
@@ -645,11 +624,17 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     reconcileGenerationCompletionIfDone();
     uiRenderAdapter.updateContext(
         uiRenderStateAssembler.renderContext(reducerState, metadataCompatibility));
-    uiRenderer.render(frame, uiState(), uiRenderAdapter);
+    uiRenderer.render(frame, renderModel(), uiRenderAdapter);
   }
 
   UiState uiState() {
-    return uiRenderStateAssembler.uiState(
+    syncReducerRuntimeState();
+    return reducerState.withStatusMessage(effectiveStatusMessage());
+  }
+
+  UiRenderModel renderModel() {
+    syncReducerRuntimeState();
+    return uiRenderStateAssembler.renderModel(
         reducerState,
         effectiveStatusMessage(),
         metadataCompatibility,
@@ -780,14 +765,9 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         false,
         false,
         0,
-        EMPTY_METADATA_PANEL,
-        EMPTY_EXTENSIONS_PANEL,
-        EMPTY_FOOTER,
         new UiState.OverlayState(false, false, false, false, false),
-        new UiState.GenerationView(GenerationState.IDLE, 0.0, "", false),
         new UiState.CatalogLoadView(CatalogLoadState.initial()),
         postGenerationMenu.initialView(),
-        new UiState.StartupOverlayView(false, List.of()),
         extensions);
   }
 
@@ -890,18 +870,13 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   private ReduceResult dispatchIntent(UiIntent intent) {
+    syncReducerRuntimeState();
     ArrayDeque<UiIntent> pendingIntents = new ArrayDeque<>();
     pendingIntents.add(intent);
     ReduceResult firstResult = null;
     while (!pendingIntents.isEmpty()) {
       UiIntent nextIntent = pendingIntents.removeFirst();
-      ReduceResult reduceResult =
-          uiReducer.reduce(
-              uiRenderStateAssembler.reduceInputState(
-                  reducerState,
-                  metadataCompatibility,
-                  generationFlowCoordinator.isCancellationRequested()),
-              nextIntent);
+      ReduceResult reduceResult = uiReducer.reduce(reducerState, nextIntent);
       if (firstResult == null) {
         firstResult = reduceResult;
       }
@@ -909,13 +884,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
       pendingIntents.addAll(uiEffectsRunner.run(reduceResult.effects(), uiEffectsPort));
     }
     return firstResult == null
-        ? new ReduceResult(
-            uiRenderStateAssembler.reduceInputState(
-                reducerState,
-                metadataCompatibility,
-                generationFlowCoordinator.isCancellationRequested()),
-            List.of(),
-            UiAction.ignored())
+        ? new ReduceResult(reducerState, List.of(), UiAction.ignored())
         : firstResult;
   }
 
@@ -1204,10 +1173,11 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   private UiAction handleTickEvent() {
+    syncReducerRuntimeState();
     boolean loading = catalogLoadState().isLoading();
     CatalogLoadCoordinator.StartupOverlayTickResult overlayTick =
         catalogLoadCoordinator.tickStartupOverlay(catalogLoadState());
-    if (reducerState.startupOverlay().visible() != overlayTick.visible()) {
+    if (reducerState.overlays().startupOverlayVisible() != overlayTick.visible()) {
       dispatchIntent(new UiIntent.StartupOverlayVisibilityIntent(overlayTick.visible()));
     }
     boolean shouldRender = loading || overlayTick.visible() || overlayTick.repaintRequired();
@@ -1233,6 +1203,24 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   private void requestAsyncRepaint() {
     asyncRepaintSignal.request();
+  }
+
+  private void syncReducerRuntimeState() {
+    boolean generationVisible = isGenerationOverlayVisible();
+    if (reducerState.overlays().generationVisible() != generationVisible) {
+      reducerState = reducerState.withGenerationOverlayVisible(generationVisible);
+    }
+  }
+
+  private boolean hasSelectorOptions(FocusTarget focusTarget) {
+    return MetadataSelectorManager.isSelectorFocus(focusTarget)
+        && !metadataSelectors.optionsFor(focusTarget).isEmpty();
+  }
+
+  private boolean isGenerationOverlayVisible() {
+    GenerationState generationState = generationStateTracker.currentState();
+    return generationState == GenerationState.VALIDATING
+        || generationState == GenerationState.LOADING;
   }
 
   private String effectiveStatusMessage() {

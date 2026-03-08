@@ -39,25 +39,9 @@ final class UiStateOwnership {
               Category.REDUCER_OWNED,
               "Overlay selection state owned by reducer."),
           new Entry(
-              "metadataPanel",
-              Category.RENDER_ONLY,
-              "Derived render snapshot assembled from reducer and runtime collaborators."),
-          new Entry(
-              "extensionsPanel",
-              Category.RENDER_ONLY,
-              "Derived render snapshot assembled from reducer and runtime collaborators."),
-          new Entry(
-              "footer",
-              Category.RENDER_ONLY,
-              "Derived render snapshot assembled from reducer and runtime collaborators."),
-          new Entry(
               "overlays",
               Category.REDUCER_OWNED,
               "Semantic overlay visibility state used by routing and rendering."),
-          new Entry(
-              "generation",
-              Category.RENDER_ONLY,
-              "Runtime-derived generation progress view synchronized before render."),
           new Entry(
               "catalogLoad",
               Category.REDUCER_OWNED,
@@ -66,10 +50,6 @@ final class UiStateOwnership {
               "postGeneration",
               Category.REDUCER_OWNED,
               "Reducer-owned post-generation menu semantics."),
-          new Entry(
-              "startupOverlay",
-              Category.RENDER_ONLY,
-              "Runtime-derived startup overlay lines synchronized before render."),
           new Entry(
               "extensions",
               Category.REDUCER_OWNED,

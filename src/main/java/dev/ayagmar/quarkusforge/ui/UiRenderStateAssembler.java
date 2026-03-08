@@ -49,16 +49,6 @@ final class UiRenderStateAssembler {
         extensionCatalogPreferences::isFavorite);
   }
 
-  UiState uiState(
-      UiState reducerState,
-      String statusMessage,
-      MetadataCompatibilityContext metadataCompatibility,
-      boolean generationCancellationRequested) {
-    return renderModel(
-            reducerState, statusMessage, metadataCompatibility, generationCancellationRequested)
-        .snapshotState();
-  }
-
   UiRenderModel renderModel(
       UiState reducerState,
       String statusMessage,
@@ -68,26 +58,13 @@ final class UiRenderStateAssembler {
     Objects.requireNonNull(statusMessage);
     Objects.requireNonNull(metadataCompatibility);
     return uiStateSnapshotMapper.renderModel(
-        reduceInputState(reducerState, metadataCompatibility, generationCancellationRequested),
+        reducerState,
         statusMessage,
+        metadataPanelSnapshot(reducerState, metadataCompatibility),
         new UiStateSnapshotMapper.PanelState(
-            extensionsPanelSnapshot(reducerState), footerSnapshot(reducerState, statusMessage)));
-  }
-
-  UiState reduceInputState(
-      UiState reducerState,
-      MetadataCompatibilityContext metadataCompatibility,
-      boolean generationCancellationRequested) {
-    return reducerState
-        .withMetadataPanel(metadataPanelSnapshot(reducerState, metadataCompatibility))
-        .withGeneration(
-            new UiState.GenerationView(
-                generationStateTracker.currentState(),
-                generationStateTracker.progressRatio(),
-                generationStateTracker.progressPhase(),
-                generationCancellationRequested))
-        .withStartupOverlayStatusLines(
-            startupOverlayStatusLines(reducerState.catalogLoad().state(), metadataCompatibility));
+            extensionsPanelSnapshot(reducerState), footerSnapshot(reducerState, statusMessage)),
+        generationView(generationCancellationRequested),
+        startupOverlayView(reducerState, metadataCompatibility));
   }
 
   private MetadataPanelSnapshot metadataPanelSnapshot(
@@ -185,6 +162,21 @@ final class UiRenderStateAssembler {
     lines.add("");
     lines.add("  " + spinner + " Please wait...");
     return List.copyOf(lines);
+  }
+
+  private UiState.GenerationView generationView(boolean generationCancellationRequested) {
+    return new UiState.GenerationView(
+        generationStateTracker.currentState(),
+        generationStateTracker.progressRatio(),
+        generationStateTracker.progressPhase(),
+        generationCancellationRequested);
+  }
+
+  private UiState.StartupOverlayView startupOverlayView(
+      UiState reducerState, MetadataCompatibilityContext metadataCompatibility) {
+    return new UiState.StartupOverlayView(
+        reducerState.overlays().startupOverlayVisible(),
+        startupOverlayStatusLines(reducerState.catalogLoad().state(), metadataCompatibility));
   }
 
   private String focusedExtensionDescription() {

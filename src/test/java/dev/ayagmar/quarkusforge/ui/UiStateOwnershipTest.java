@@ -22,19 +22,8 @@ class UiStateOwnershipTest {
   }
 
   @Test
-  void renderOnlyOwnershipIsExplicitForDerivedViewSlices() {
-    assertThat(entry("metadataPanel").category()).isEqualTo(UiStateOwnership.Category.RENDER_ONLY);
-    assertThat(entry("extensionsPanel").category())
-        .isEqualTo(UiStateOwnership.Category.RENDER_ONLY);
-    assertThat(entry("footer").category()).isEqualTo(UiStateOwnership.Category.RENDER_ONLY);
-    assertThat(entry("generation").category()).isEqualTo(UiStateOwnership.Category.RENDER_ONLY);
-    assertThat(entry("startupOverlay").category()).isEqualTo(UiStateOwnership.Category.RENDER_ONLY);
-  }
-
-  private static UiStateOwnership.Entry entry(String fieldName) {
-    return UiStateOwnership.entries().stream()
-        .filter(entry -> entry.fieldName().equals(fieldName))
-        .findFirst()
-        .orElseThrow();
+  void currentUiStateFieldsAreAllReducerOwned() {
+    assertThat(UiStateOwnership.entries())
+        .allMatch(entry -> entry.category() == UiStateOwnership.Category.REDUCER_OWNED);
   }
 }
