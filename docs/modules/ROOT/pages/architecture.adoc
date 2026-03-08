@@ -38,7 +38,9 @@ graph TD
 
     subgraph App["Application Layer (application/)"]
         IRS[InputResolutionService]
-        SSS[StartupStateService contract]
+        SSS[StartupStateService]
+        DSS[DefaultStartupStateService]
+        SML[LiveStartupMetadataLoader]
     end
 
     subgraph Forge["Forge Layer (forge/)"]
@@ -91,6 +93,8 @@ graph TD
 ++++
 
 `RuntimeWiring` is the single composition owner for persistence-backed stores plus shared API and archive services. Headless orchestration now resolves favorites through `persistence` and depends on a catalog loader plus project generator rather than pulling `RuntimeConfig` into `HeadlessGenerationService`.
+
+Startup policy now lives under `application/`: `LiveStartupMetadataLoader` owns the live-metadata timeout and snapshot-fallback path, while `DefaultStartupStateService` merges requested prefill, stored prefill, and compiled defaults before handing the result to `InputResolutionService`.
 
 == UI Layer Design
 
@@ -389,7 +393,8 @@ graph LR
 
     subgraph App["Application Layer (application/)"]
         IRS["InputResolutionService"]
-        SSS["StartupStateService<br/>StartupRequest<br/>StartupState"]
+        SSS["StartupStateService<br/>DefaultStartupStateService"]
+        SML["LiveStartupMetadataLoader<br/>StartupRequest<br/>StartupState"]
     end
 
     subgraph Forge["Forge Layer (forge/)"]
@@ -400,7 +405,8 @@ graph LR
     IRS -->|resolves| PR
     IRS -->|uses| CPM
     IRS -->|uses| MCC
-    SSS -->|owns startup contract for| IRS
+    SSS -->|owns startup policy for| IRS
+    SML -->|loads metadata for| SSS
     PRV -->|validates| PR
     MCC -->|constrains| PR
     CPM -->|maps CLI options| PR

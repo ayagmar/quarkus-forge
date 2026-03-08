@@ -6,14 +6,10 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
-import dev.ayagmar.quarkusforge.application.StartupMetadataSelection;
-import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
-import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.CancellationException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -237,32 +233,6 @@ class QuarkusForgeCliStartupMetadataTest {
   }
 
   @Test
-  void fallbackStartupMetadataSelectionInterruptsThreadForInterruptedFailure() throws Exception {
-    QuarkusForgeCli cli = new QuarkusForgeCli(runtimeConfig(URI.create(wireMockServer.baseUrl())));
-
-    StartupMetadataSelection selection =
-        invokeFallbackStartupMetadataSelection(
-            cli, new InterruptedException("stop"), DiagnosticLogger.create(false));
-
-    assertThat(selection.sourceLabel()).isEqualTo("snapshot fallback");
-    assertThat(selection.detailMessage()).contains("Live metadata refresh interrupted");
-    assertThat(Thread.currentThread().isInterrupted()).isTrue();
-    Thread.interrupted();
-  }
-
-  @Test
-  void fallbackStartupMetadataSelectionUsesCancelledReasonForCancellation() throws Exception {
-    QuarkusForgeCli cli = new QuarkusForgeCli(runtimeConfig(URI.create(wireMockServer.baseUrl())));
-
-    StartupMetadataSelection selection =
-        invokeFallbackStartupMetadataSelection(
-            cli, new CancellationException("cancelled"), DiagnosticLogger.create(false));
-
-    assertThat(selection.sourceLabel()).isEqualTo("snapshot fallback");
-    assertThat(selection.detailMessage()).contains("Live metadata refresh cancelled");
-  }
-
-  @Test
   void dryRunIgnoresStoredTuiPreferences() throws Exception {
     CliCommandTestSupport.stubLiveMetadataWithMavenOnly(wireMockServer);
     RuntimeConfig runtimeConfig = runtimeConfig(URI.create(wireMockServer.baseUrl()));
@@ -311,14 +281,5 @@ class QuarkusForgeCliStartupMetadataTest {
     } catch (Exception exception) {
       throw new RuntimeException(exception);
     }
-  }
-
-  private static StartupMetadataSelection invokeFallbackStartupMetadataSelection(
-      QuarkusForgeCli cli, Throwable throwable, DiagnosticLogger diagnostics) throws Exception {
-    Method method =
-        QuarkusForgeCli.class.getDeclaredMethod(
-            "fallbackStartupMetadataSelection", Throwable.class, DiagnosticLogger.class);
-    method.setAccessible(true);
-    return (StartupMetadataSelection) method.invoke(cli, throwable, diagnostics);
   }
 }

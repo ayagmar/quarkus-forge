@@ -2,16 +2,17 @@ package dev.ayagmar.quarkusforge.cli;
 
 import static dev.ayagmar.quarkusforge.diagnostics.DiagnosticField.of;
 
-import dev.ayagmar.quarkusforge.api.MetadataDto;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
-import dev.ayagmar.quarkusforge.application.InputResolutionService;
+import dev.ayagmar.quarkusforge.application.DefaultStartupStateService;
+import dev.ayagmar.quarkusforge.application.LiveStartupMetadataLoader;
+import dev.ayagmar.quarkusforge.application.StartupMetadataLoader;
 import dev.ayagmar.quarkusforge.application.StartupMetadataSelection;
+import dev.ayagmar.quarkusforge.application.StartupRequest;
 import dev.ayagmar.quarkusforge.application.StartupState;
-import dev.ayagmar.quarkusforge.diagnostics.BoundaryFailure;
+import dev.ayagmar.quarkusforge.application.StartupStateService;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
-import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.headless.HeadlessGenerationService;
 import dev.ayagmar.quarkusforge.headless.HeadlessOutputPrinter;
 import dev.ayagmar.quarkusforge.postgen.PostTuiActionExecutor;
@@ -19,12 +20,8 @@ import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
 import dev.ayagmar.quarkusforge.runtime.RuntimeWiring;
 import dev.ayagmar.quarkusforge.runtime.TuiBootstrapService;
 import dev.ayagmar.quarkusforge.runtime.TuiSessionSummary;
-import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -38,9 +35,9 @@ import picocli.CommandLine.Option;
     description = "Quarkus forge terminal UI")
 public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner {
 
-  private static final Duration STARTUP_METADATA_REFRESH_TIMEOUT = Duration.ofSeconds(2);
   private static final PostTuiActionExecutor POST_TUI_ACTION_EXECUTOR = new PostTuiActionExecutor();
   private static final TuiBootstrapService TUI_BOOTSTRAP_SERVICE = new TuiBootstrapService();
+  private static final StartupStateService STARTUP_STATE_SERVICE = new DefaultStartupStateService();
 
   @Mixin private RequestOptions requestOptions = new RequestOptions();
 
@@ -278,69 +275,10 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
 
   private StartupState loadStartupState(
       RequestOptions requestOptions, DiagnosticLogger diagnostics) {
-    StartupMetadataSelection startupMetadataSelection = loadStartupMetadataSelection(diagnostics);
-    ForgeUiState initialState =
-        InputResolutionService.resolveInitialState(
-            requestOptions.toCliPrefill(), startupMetadataSelection.metadataCompatibility());
-    return new StartupState(initialState, startupMetadataSelection);
-  }
-
-  private StartupMetadataSelection loadStartupMetadataSelection(DiagnosticLogger diagnostics) {
-    try (QuarkusApiClient apiClient = apiClientFactory.apply(runtimeConfig.apiBaseUri())) {
-      MetadataDto metadata =
-          apiClient
-              .fetchMetadata()
-              .get(STARTUP_METADATA_REFRESH_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-      diagnostics.info("metadata.load.success", of("source", "live"));
-      return new StartupMetadataSelection(
-          MetadataCompatibilityContext.success(metadata), "live", "");
-    } catch (InterruptedException interruptedException) {
-      return fallbackStartupMetadataSelection(interruptedException, diagnostics);
-    } catch (TimeoutException timeoutException) {
-      return fallbackStartupMetadataSelection(timeoutException, diagnostics);
-    } catch (ExecutionException executionException) {
-      return fallbackStartupMetadataSelection(executionException, diagnostics);
-    } catch (RuntimeException runtimeException) {
-      return fallbackStartupMetadataSelection(runtimeException, diagnostics);
-    }
-  }
-
-  private StartupMetadataSelection fallbackStartupMetadataSelection(
-      Throwable throwable, DiagnosticLogger diagnostics) {
-    BoundaryFailure.Details failure = BoundaryFailure.fromThrowable(throwable);
-    if ("interrupted".equals(failure.cancellationPhase())) {
-      Thread.currentThread().interrupt();
-    }
-    StartupMetadataSelection selection = snapshotFallbackSelection(fallbackReason(failure));
-    diagnostics.warn(
-        "metadata.load.fallback",
-        of("source", selection.sourceLabel()),
-        of("detail", selection.detailMessage()),
-        of("causeType", failure.causeType()));
-    return selection;
-  }
-
-  private static String fallbackReason(BoundaryFailure.Details failure) {
-    return switch (failure.kind()) {
-      case CANCELLED ->
-          "Live metadata refresh "
-              + ("interrupted".equals(failure.cancellationPhase()) ? "interrupted" : "cancelled");
-      case TIMEOUT ->
-          "Live metadata refresh timed out after "
-              + STARTUP_METADATA_REFRESH_TIMEOUT.toMillis()
-              + "ms";
-      case FAILURE -> "Live metadata unavailable (%s)".formatted(failure.userMessage());
-    };
-  }
-
-  private static StartupMetadataSelection snapshotFallbackSelection(String fallbackReason) {
-    MetadataCompatibilityContext snapshotCompatibility = MetadataCompatibilityContext.loadDefault();
-    String detailMessage =
-        fallbackReason
-            + (snapshotCompatibility.loadError() == null
-                ? "; using bundled metadata snapshot"
-                : "; bundled metadata snapshot unavailable");
-    return new StartupMetadataSelection(snapshotCompatibility, "snapshot fallback", detailMessage);
+    StartupMetadataLoader metadataLoader =
+        new LiveStartupMetadataLoader(runtimeConfig.apiBaseUri(), apiClientFactory, diagnostics);
+    return STARTUP_STATE_SERVICE.resolve(
+        new StartupRequest(requestOptions.toCliPrefill(), null, metadataLoader));
   }
 
   @Override

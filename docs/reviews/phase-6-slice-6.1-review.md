@@ -1,17 +1,13 @@
 # Phase 6 Slice 6.1 Review
 
-## Status
+## Findings
 
-- Async review agent `019ccdf9-baeb-7811-8897-f22c33d2f7a4` was started for this slice and had not completed when the slice verification loop finished, so the current review trail is recorded here immediately and can be amended by follow-up findings in a later slice if needed.
+- No findings in the current uncommitted Slice 6.1 worktree.
 
-## Local Verification
+## Assumptions And Verification Context
 
-- `./mvnw -q -Dtest=StartupRequestTest,StartupStateTest,InputResolutionServiceTest,QuarkusForgeCliStartupMetadataTest test`
-- `./mvnw -q spotless:apply -DskipTests`
-- `./mvnw -q -Dtest=CoreUiReducerTest,UiRenderStateAssemblerTest,UiStateOwnershipTest,UiStateSnapshotMapperTest,CoreTuiShellPilotTest,StartupRequestTest,StartupStateTest,InputResolutionServiceTest,QuarkusForgeCliStartupMetadataTest test`
-- `./mvnw -q spotless:check -DskipTests`
-
-## Current Findings
-
-- No local findings after the verification loop above.
-- This slice deliberately defines the reusable startup contract types and shared startup result in `application/` without moving the existing CLI startup policy yet; the policy move remains scoped to Phase 6 Slice 6.2.
+- Review scope was the current uncommitted work on `codex/master-plan-execution` for the new application-layer startup contract types (`StartupRequest`, `StartupState`, `StartupMetadataLoader`, `StartupStateService`), the package/docs updates around that contract, and the adjacent 5.3 generation-overlay follow-up included in the same worktree.
+- I inspected the new `application/` contract types, their current CLI/UI call sites, the updated architecture/package docs, and the targeted tests covering both the new startup records and the reducer ownership follow-up.
+- Targeted verification passed with `./mvnw -q -Dtest=StartupRequestTest,StartupStateTest,InputResolutionServiceTest,QuarkusForgeCliStartupMetadataTest,CoreUiReducerTest test`, `./mvnw -q -Dtest=UiRenderStateAssemblerTest,UiStateOwnershipTest,UiStateSnapshotMapperTest,CoreTuiShellPilotTest test`, and `./mvnw -q spotless:check -DskipTests`.
+- Slice 6.1 is contract-only per the current master plan, so I did not treat the still-CLI-owned startup policy as a defect in this review.
+- The adjacent 5.3 follow-up correctly routes generation overlay visibility through `UiIntent.GenerationOverlayVisibilityIntent`, resolving the controller-side direct `UiState` mutation previously called out in `docs/reviews/phase-5-slice-5.3-review.md`.
