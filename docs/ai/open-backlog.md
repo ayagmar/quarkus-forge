@@ -2,14 +2,13 @@
 
 Last compared against the codebase on 2026-03-07.
 
-This file extracts the still-open work from:
+This file tracks forward-looking work that remains open after the completed architecture and
+verification refactors.
 
-- `docs/product-improvements-backlog.md`
-- `docs/codebase-improvement-plan.md`
-- `docs/ui-state-machine-refactor-spec.md`
-- `docs/core-tui-controller-hardening-plan.md`
+Closed planning docs for the architecture execution program are intentionally not treated as active
+backlog authorities here. This keeps one maintained source per currently open workstream.
 
-Items that are already reflected in the codebase were intentionally omitted here. In particular:
+Items that are already reflected in the codebase were intentionally omitted. In particular:
 
 - the broader package split into `cli`, `runtime`, `headless`, `postgen`, `persistence`, and `forge` is largely in place
 - direct tests already exist for `UrlConnectionTransport` and `HeadlessCatalogClient`
