@@ -29,7 +29,9 @@ class ReleaseWorkflowTest {
 
     assertThat(workflow)
         .contains("if: runner.os == 'Windows' && matrix.binary_name == 'quarkus-forge'");
-    assertThat(workflow).contains("\"$binary\" --interactive-smoke-test --verbose 2>&1 | tee");
+    assertThat(workflow)
+        .contains("if ! \"$binary\" --interactive-smoke-test --verbose 2> \"$log_path\"; then");
     assertThat(workflow).contains("grep -F '\"event\":\"tui.render.ready\"'");
+    assertThat(workflow).contains("cat \"$log_path\"");
   }
 }
