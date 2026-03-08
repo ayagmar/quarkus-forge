@@ -45,13 +45,12 @@ public record RuntimeServices(
 
   public static HeadlessGenerationService openHeadlessGenerationService(
       RuntimeConfig runtimeConfig) {
-    RuntimeServices runtimeServices = open(runtimeConfig);
+    return open(runtimeConfig).openHeadlessGenerationService();
+  }
+
+  public HeadlessGenerationService openHeadlessGenerationService() {
     return HeadlessGenerationService.create(
-        runtimeServices.apiClient(),
-        runtimeServices.catalogDataService(),
-        runtimeServices.projectArchiveService(),
-        runtimeServices.favoritesStore(),
-        runtimeServices);
+        apiClient, catalogDataService, projectArchiveService, favoritesStore, this);
   }
 
   static ExtensionFavoritesStore favoritesStore(RuntimeConfig runtimeConfig) {

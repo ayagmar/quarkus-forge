@@ -77,4 +77,19 @@ class RuntimeServicesTest {
       assertThat(service).isNotNull();
     }
   }
+
+  @Test
+  void runtimeSessionOwnsHeadlessGenerationServiceOpening() {
+    RuntimeConfig runtimeConfig =
+        new RuntimeConfig(
+            URI.create("http://localhost:18080"),
+            tempDir.resolve("catalog-cache.json"),
+            tempDir.resolve("favorites.json"),
+            tempDir.resolve("preferences.json"));
+
+    RuntimeServices runtimeServices = RuntimeServices.open(runtimeConfig);
+    try (HeadlessGenerationService service = runtimeServices.openHeadlessGenerationService()) {
+      assertThat(service).isNotNull();
+    }
+  }
 }
