@@ -95,7 +95,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   private final UiReducer uiReducer;
   private final UiEffectsRunner uiEffectsRunner;
   private final UiEffectsPort uiEffectsPort;
-  private final UiStateSnapshotMapper uiStateSnapshotMapper;
+  private final UiRenderStateAssembler uiRenderStateAssembler;
   private final UiRenderer uiRenderer;
   private final CoreUiRenderAdapter uiRenderAdapter;
   private final CatalogLoadIntentPort catalogLoadIntentPort;
@@ -206,7 +206,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
             return applyTextInputKeyEffect(target, keyEvent);
           }
         };
-    uiStateSnapshotMapper = new UiStateSnapshotMapper();
     uiRenderer = new UiRenderer();
     uiRenderAdapter =
         new CoreUiRenderAdapter(
@@ -259,6 +258,15 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     extensionInteraction =
         new ExtensionInteractionHandler(
             extensionCatalogPreferences, extensionCatalogNavigation, extensionCatalogProjection);
+    uiRenderStateAssembler =
+        new UiRenderStateAssembler(
+            inputStates,
+            metadataSelectors,
+            extensionCatalogPreferences,
+            extensionCatalogNavigation,
+            extensionCatalogProjection,
+            generationStateTracker,
+            new UiStateSnapshotMapper());
 
     ProjectRequest synchronizedRequest = syncMetadataSelectors(initialRequest);
     ValidationReport synchronizedValidation = validateRequest(synchronizedRequest);
@@ -574,32 +582,16 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   public void render(Frame frame) {
     reconcileGenerationCompletionIfDone();
     uiRenderAdapter.updateContext(
-        new CoreUiRenderAdapter.RenderContext(
-            metadataRenderContext(),
-            inputStates.get(FocusTarget.EXTENSION_SEARCH),
-            extensionCatalogNavigation.listState(),
-            extensionCatalogNavigation::isSelected,
-            extensionCatalogPreferences::isFavorite));
+        uiRenderStateAssembler.renderContext(reducerState, metadataCompatibility));
     uiRenderer.render(frame, uiState(), uiRenderAdapter);
   }
 
   UiState uiState() {
-    return uiStateSnapshotMapper.map(
-        reducerStateSnapshot(),
+    return uiRenderStateAssembler.uiState(
+        reducerState,
         effectiveStatusMessage(),
-        new UiStateSnapshotMapper.PanelState(extensionsPanelSnapshot(), footerSnapshot()));
-  }
-
-  private UiState reducerStateSnapshot() {
-    return reducerState
-        .withMetadataPanel(metadataPanelSnapshot())
-        .withGeneration(
-            new UiState.GenerationView(
-                generationStateTracker.currentState(),
-                generationStateTracker.progressRatio(),
-                generationStateTracker.progressPhase(),
-                generationFlowCoordinator.isCancellationRequested()))
-        .withStartupOverlayStatusLines(startupOverlayStatusLines());
+        metadataCompatibility,
+        generationFlowCoordinator.isCancellationRequested());
   }
 
   FocusTarget focusTarget() {
@@ -737,94 +729,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         extensions);
   }
 
-  private MetadataPanelSnapshot metadataPanelSnapshot() {
-    ProjectRequest request = currentRequest();
-    ValidationReport validation = currentValidation();
-    return new MetadataPanelSnapshot(
-        metadataPanelTitle(),
-        isMetadataFocused(),
-        !validation.isValid(),
-        request.groupId(),
-        request.artifactId(),
-        request.version(),
-        request.packageName(),
-        OutputPathResolver.absoluteDisplayPath(request.outputDirectory()),
-        MetadataSelectorManager.optionDisplayLabel(
-            FocusTarget.PLATFORM_STREAM,
-            selectorValue(request, FocusTarget.PLATFORM_STREAM),
-            metadataCompatibility.metadataSnapshot()),
-        selectorValue(request, FocusTarget.BUILD_TOOL),
-        selectorValue(request, FocusTarget.JAVA_VERSION),
-        metadataSelectors.selectorInfo(
-            FocusTarget.PLATFORM_STREAM, selectorValue(request, FocusTarget.PLATFORM_STREAM)),
-        metadataSelectors.selectorInfo(
-            FocusTarget.BUILD_TOOL, selectorValue(request, FocusTarget.BUILD_TOOL)),
-        metadataSelectors.selectorInfo(
-            FocusTarget.JAVA_VERSION, selectorValue(request, FocusTarget.JAVA_VERSION)));
-  }
-
-  private ExtensionsPanelSnapshot extensionsPanelSnapshot() {
-    ValidationReport validation = currentValidation();
-    return new ExtensionsPanelSnapshot(
-        isExtensionPanelFocused(),
-        focusTarget() == FocusTarget.EXTENSION_LIST,
-        focusTarget() == FocusTarget.SUBMIT,
-        focusTarget() == FocusTarget.EXTENSION_SEARCH,
-        catalogLoadState().isLoading(),
-        catalogLoadState().errorMessage(),
-        catalogLoadState().sourceLabel(),
-        catalogLoadState().isStale(),
-        extensionCatalogProjection.favoritesOnlyFilterEnabled(),
-        extensionCatalogProjection.selectedOnlyFilterEnabled(),
-        extensionCatalogPreferences.favoriteExtensionCount(),
-        extensionCatalogProjection.activePresetFilterName(),
-        extensionCatalogProjection.activeCategoryFilterTitle(),
-        validation.errors().size(),
-        extensionCatalogProjection.filteredExtensions().size(),
-        extensionCatalogProjection.totalCatalogExtensionCount(),
-        extensionCatalogProjection.filteredRows(),
-        extensionCatalogNavigation.selectedExtensionIds(),
-        inputStates.get(FocusTarget.EXTENSION_SEARCH).text(),
-        focusedExtensionDescription());
-  }
-
-  private MetadataFieldRenderContext metadataRenderContext() {
-    ValidationReport validation = currentValidation();
-    EnumMap<FocusTarget, List<String>> selectorDisplayOptions = new EnumMap<>(FocusTarget.class);
-    selectorDisplayOptions.put(
-        FocusTarget.PLATFORM_STREAM,
-        selectorDisplayOptions(
-            FocusTarget.PLATFORM_STREAM,
-            metadataSelectors.optionsFor(FocusTarget.PLATFORM_STREAM)));
-    selectorDisplayOptions.put(
-        FocusTarget.BUILD_TOOL,
-        selectorDisplayOptions(
-            FocusTarget.BUILD_TOOL, metadataSelectors.optionsFor(FocusTarget.BUILD_TOOL)));
-    selectorDisplayOptions.put(
-        FocusTarget.JAVA_VERSION,
-        selectorDisplayOptions(
-            FocusTarget.JAVA_VERSION, metadataSelectors.optionsFor(FocusTarget.JAVA_VERSION)));
-    return new MetadataFieldRenderContext(
-        focusTarget(), validation, inputStates, selectorDisplayOptions);
-  }
-
-  private List<String> startupOverlayStatusLines() {
-    String metadataLabel =
-        metadataCompatibility.loadError() == null ? "done" : "done (snapshot fallback)";
-    String catalogLabel = catalogLoadState().isLoading() ? "in progress" : "done";
-    String readyLabel = catalogLoadState().isLoading() ? "waiting" : "ready";
-    String spinner = catalogLoadState().isLoading() ? "|" : "-";
-    List<String> lines = new ArrayList<>();
-    lines.addAll(UiTextConstants.STARTUP_SPLASH_ART);
-    lines.add("");
-    lines.add("  metadata fetch   : " + metadataLabel);
-    lines.add("  catalog load     : " + catalogLabel);
-    lines.add("  ready            : " + readyLabel);
-    lines.add("");
-    lines.add("  " + spinner + " Please wait...");
-    return List.copyOf(lines);
-  }
-
   private String focusedExtensionId() {
     String focusedId =
         extensionCatalogProjection.itemIdAtRow(extensionCatalogNavigation.selectedRow());
@@ -857,15 +761,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     return List.copyOf(intents);
   }
 
-  private String focusedExtensionDescription() {
-    Integer selectedRow = extensionCatalogNavigation.selectedRow();
-    if (selectedRow == null) {
-      return "";
-    }
-    ExtensionCatalogItem selected = extensionCatalogProjection.itemAtRow(selectedRow);
-    return selected == null ? "" : selected.description();
-  }
-
   private String toggleExtensionSelectionAtCursor() {
     Integer selectedRow = extensionCatalogNavigation.selectedRow();
     if (selectedRow == null) {
@@ -896,61 +791,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     extensionCatalogPreferences.retainAvailable(availableExtensionIds);
     extensionCatalogProjection.replaceCatalog(
         items, query, extensionCatalogNavigation, extensionCatalogPreferences, ignored -> {});
-  }
-
-  private FooterSnapshot footerSnapshot() {
-    return new FooterSnapshot(
-        isGenerationInProgress(),
-        focusTarget(),
-        commandPaletteVisible(),
-        helpOverlayVisible(),
-        postGenerationMenuVisible(),
-        effectiveStatusMessage(),
-        activeErrorDetails(),
-        verboseErrorDetails(),
-        reducerState.showErrorDetails(),
-        postGenerationSuccessHint(),
-        preGeneratePlan(),
-        resolvedTargetPathForFooter(),
-        focusedFieldValueForFooter(),
-        focusedFieldIssueForFooter());
-  }
-
-  private String resolvedTargetPathForFooter() {
-    if (helpOverlayVisible() || commandPaletteVisible() || postGenerationMenuVisible()) {
-      return "";
-    }
-    try {
-      return resolveGeneratedProjectDirectory(currentRequest()).toString();
-    } catch (RuntimeException pathError) {
-      return "";
-    }
-  }
-
-  private String focusedFieldValueForFooter() {
-    if (helpOverlayVisible() || commandPaletteVisible() || postGenerationMenuVisible()) {
-      return "";
-    }
-    return switch (focusTarget()) {
-      case GROUP_ID, ARTIFACT_ID, VERSION, PACKAGE_NAME, OUTPUT_DIR ->
-          inputStates.get(focusTarget()).text();
-      default -> "";
-    };
-  }
-
-  private String focusedFieldIssueForFooter() {
-    if (helpOverlayVisible() || commandPaletteVisible() || postGenerationMenuVisible()) {
-      return "";
-    }
-    if (!hasValidationErrorFor(focusTarget())) {
-      return "";
-    }
-    String fieldName = UiFocusTargets.nameOf(focusTarget());
-    return currentValidation().errors().stream()
-        .filter(error -> error.field().equalsIgnoreCase(fieldName))
-        .findFirst()
-        .map(error -> error.message())
-        .orElse("");
   }
 
   @Override
@@ -1025,7 +865,13 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     ReduceResult firstResult = null;
     while (!pendingIntents.isEmpty()) {
       UiIntent nextIntent = pendingIntents.removeFirst();
-      ReduceResult reduceResult = uiReducer.reduce(reducerStateSnapshot(), nextIntent);
+      ReduceResult reduceResult =
+          uiReducer.reduce(
+              uiRenderStateAssembler.reduceInputState(
+                  reducerState,
+                  metadataCompatibility,
+                  generationFlowCoordinator.isCancellationRequested()),
+              nextIntent);
       if (firstResult == null) {
         firstResult = reduceResult;
       }
@@ -1033,7 +879,13 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
       pendingIntents.addAll(uiEffectsRunner.run(reduceResult.effects(), uiEffectsPort));
     }
     return firstResult == null
-        ? new ReduceResult(reducerStateSnapshot(), List.of(), UiAction.ignored())
+        ? new ReduceResult(
+            uiRenderStateAssembler.reduceInputState(
+                reducerState,
+                metadataCompatibility,
+                generationFlowCoordinator.isCancellationRequested()),
+            List.of(),
+            UiAction.ignored())
         : firstResult;
   }
 
@@ -1170,29 +1022,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         new UiIntent.HelpOverlayIntent(new UiIntent.HelpOverlayCommand.ToggleVisibility()));
   }
 
-  private boolean isMetadataFocused() {
-    FocusTarget focusTarget = focusTarget();
-    return focusTarget == FocusTarget.GROUP_ID
-        || focusTarget == FocusTarget.ARTIFACT_ID
-        || focusTarget == FocusTarget.VERSION
-        || focusTarget == FocusTarget.PACKAGE_NAME
-        || focusTarget == FocusTarget.OUTPUT_DIR
-        || focusTarget == FocusTarget.PLATFORM_STREAM
-        || focusTarget == FocusTarget.BUILD_TOOL
-        || focusTarget == FocusTarget.JAVA_VERSION;
-  }
-
-  private boolean isExtensionPanelFocused() {
-    FocusTarget focusTarget = focusTarget();
-    return focusTarget == FocusTarget.EXTENSION_SEARCH
-        || focusTarget == FocusTarget.EXTENSION_LIST
-        || focusTarget == FocusTarget.SUBMIT;
-  }
-
-  private String metadataPanelTitle() {
-    return currentValidation().isValid() ? "Project Metadata" : "Project Metadata [invalid]";
-  }
-
   private boolean hasValidationErrorFor(FocusTarget target) {
     if ((!isTextInputFocus(target) && !MetadataSelectorManager.isSelectorFocus(target))
         || target == FocusTarget.EXTENSION_SEARCH) {
@@ -1201,26 +1030,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     String fieldName = UiFocusTargets.nameOf(target);
     return currentValidation().errors().stream()
         .anyMatch(error -> error.field().equalsIgnoreCase(fieldName));
-  }
-
-  private String activeErrorDetails() {
-    if (!reducerState.errorMessage().isBlank()) {
-      return reducerState.errorMessage();
-    }
-    if (!catalogLoadState().errorMessage().isBlank()) {
-      return catalogLoadState().errorMessage();
-    }
-    return "";
-  }
-
-  private String verboseErrorDetails() {
-    if (!reducerState.verboseErrorDetails().isBlank()) {
-      return reducerState.verboseErrorDetails();
-    }
-    if (!catalogLoadState().errorMessage().isBlank()) {
-      return catalogLoadState().errorMessage();
-    }
-    return "";
   }
 
   private void scheduleFilteredExtensionsRefresh() {
@@ -1322,19 +1131,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
       case JAVA_VERSION -> request.javaVersion();
       default -> "";
     };
-  }
-
-  private List<String> selectorDisplayOptions(FocusTarget target, List<String> options) {
-    if (target != FocusTarget.PLATFORM_STREAM) {
-      return options;
-    }
-    MetadataDto metadataSnapshot = metadataCompatibility.metadataSnapshot();
-    List<String> displayOptions = new ArrayList<>(options.size());
-    for (String option : options) {
-      displayOptions.add(
-          MetadataSelectorManager.optionDisplayLabel(target, option, metadataSnapshot));
-    }
-    return List.copyOf(displayOptions);
   }
 
   private ProjectRequest buildRequestFromInputs(
@@ -1689,27 +1485,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
         new UiIntent.FocusStatusIntent(
             nextFocusTarget,
             "Focus moved to invalid field: " + UiFocusTargets.nameOf(nextFocusTarget)));
-  }
-
-  private String preGeneratePlan() {
-    if (isGenerationInProgress() || postGenerationMenuVisible()) {
-      return "";
-    }
-    ProjectRequest request = currentRequest();
-    String targetPathDisplay;
-    try {
-      targetPathDisplay = resolveGeneratedProjectDirectory(request).toString();
-    } catch (RuntimeException pathError) {
-      targetPathDisplay = request.outputDirectory() + "/" + request.artifactId();
-    }
-    return targetPathDisplay
-        + " | "
-        + request.buildTool()
-        + " | Java "
-        + request.javaVersion()
-        + " | "
-        + extensionCatalogNavigation.selectedExtensionCount()
-        + " ext";
   }
 
   enum GenerationState {

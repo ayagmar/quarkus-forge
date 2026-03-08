@@ -18,10 +18,20 @@ class ReleaseWorkflowTest {
         .contains(
             "scripts/verify/native-release-smoke.sh \"$binary\" \"${{ matrix.smoke_mode }}\"");
     assertContainsNativeMatrixEntry(
-        workflow, "ubuntu-latest", "linux-x86_64", "''", "-Pnative", "quarkus-forge",
+        workflow,
+        "ubuntu-latest",
+        "linux-x86_64",
+        "''",
+        "-Pnative",
+        "quarkus-forge",
         "interactive-posix");
     assertContainsNativeMatrixEntry(
-        workflow, "macos-latest", "macos-aarch64", "''", "-Pnative", "quarkus-forge",
+        workflow,
+        "macos-latest",
+        "macos-aarch64",
+        "''",
+        "-Pnative",
+        "quarkus-forge",
         "interactive-posix");
     assertThat(workflow).contains("smoke_mode: interactive-posix");
     assertThat(workflow).contains("smoke_mode: interactive-windows");
