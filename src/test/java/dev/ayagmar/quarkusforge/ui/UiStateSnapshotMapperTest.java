@@ -31,6 +31,7 @@ class UiStateSnapshotMapperTest {
     assertThat(state.postGeneration().visible()).isFalse();
     assertThat(state.extensions().filteredCount()).isEqualTo(controller.filteredExtensionCount());
     assertThat(state.extensions().searchQuery()).isEmpty();
+    assertThat(state.extensions().selection()).isNotNull();
   }
 
   @Test
@@ -251,7 +252,7 @@ class UiStateSnapshotMapperTest {
             new UiState.OverlayState(false, false, false, false),
             new UiState.CatalogLoadView(CatalogLoadState.initial()),
             new UiState.PostGenerationView(false, false, 0, 0, List.of(), null, "", null),
-            new UiState.ExtensionView(0, 0, 0, false, false, "", "", "", "", true, false));
+            UiState.ExtensionView.snapshot(0, 0, 0, false, false, "", "", "", "", true, false));
     private UiState.GenerationView generation =
         new UiState.GenerationView(GenerationState.IDLE, 0.0, "", false);
     private UiState.StartupOverlayView startupOverlay =

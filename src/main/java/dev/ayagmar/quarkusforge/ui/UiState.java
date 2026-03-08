@@ -4,6 +4,7 @@ import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 
 /** Immutable reducer-owned UI state. */
 record UiState(
@@ -504,7 +505,52 @@ record UiState(
       String activePresetFilterName,
       String activeCategoryFilterTitle,
       String searchQuery,
-      String focusedExtensionId,
-      boolean listSelectionAtTop,
-      boolean categoryHeaderSelected) {}
+      SelectionView selection) {
+    ExtensionView {
+      selection = Objects.requireNonNull(selection);
+    }
+
+    static ExtensionView snapshot(
+        int filteredCount,
+        int totalCount,
+        int selectedCount,
+        boolean favoritesOnlyEnabled,
+        boolean selectedOnlyEnabled,
+        String activePresetFilterName,
+        String activeCategoryFilterTitle,
+        String searchQuery,
+        String focusedExtensionId,
+        boolean listSelectionAtTop,
+        boolean categoryHeaderSelected) {
+      return new ExtensionView(
+          filteredCount,
+          totalCount,
+          selectedCount,
+          favoritesOnlyEnabled,
+          selectedOnlyEnabled,
+          activePresetFilterName,
+          activeCategoryFilterTitle,
+          searchQuery,
+          new SelectionView(focusedExtensionId, listSelectionAtTop, categoryHeaderSelected));
+    }
+
+    String focusedExtensionId() {
+      return selection.focusedExtensionId();
+    }
+
+    boolean listSelectionAtTop() {
+      return selection.listSelectionAtTop();
+    }
+
+    boolean categoryHeaderSelected() {
+      return selection.categoryHeaderSelected();
+    }
+
+    record SelectionView(
+        String focusedExtensionId, boolean listSelectionAtTop, boolean categoryHeaderSelected) {
+      SelectionView {
+        focusedExtensionId = focusedExtensionId == null ? "" : focusedExtensionId;
+      }
+    }
+  }
 }
