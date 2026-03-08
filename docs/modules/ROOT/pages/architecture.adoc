@@ -33,6 +33,8 @@ graph TD
         HGS[HeadlessGenerationService]
         HERS[HeadlessExtensionResolutionService]
         HFPS[HeadlessForgefilePersistenceService]
+        HGI[HeadlessGenerationInputs]
+        HGES[HeadlessGenerationExecutionService]
         HCC[HeadlessCatalogClient]
         HOP[HeadlessOutputPrinter]
         HT[HeadlessTimeouts]
@@ -75,6 +77,8 @@ graph TD
     HCLI --> HGS
     HGS --> HERS
     HGS --> HFPS
+    HGS --> HGI
+    HGS --> HGES
     HGS --> HCC
     HGS --> HOP
     HGS --> HT
@@ -103,7 +107,7 @@ graph TD
 
 `RuntimeServices` now defines the runtime composition root for session-lifetime API/catalog/archive/favorites collaborators plus preference-store access used by CLI entrypoints. `TuiBootstrapService`, `QuarkusForgeCli`, and `HeadlessCli` now consume that explicit runtime surface directly instead of routing through a separate static wiring bag.
 
-Within `headless/`, `HeadlessGenerationService` is now narrowing toward orchestration-only responsibility: extension/preset reconciliation lives in `HeadlessExtensionResolutionService`, Forgefile lock/persistence rules live in `HeadlessForgefilePersistenceService`, catalog transport stays in `HeadlessCatalogClient`, and generation execution remains delegated to the project generator path.
+Within `headless/`, `HeadlessGenerationService` is now an orchestration shell: `HeadlessGenerationInputs.fromCommand(...)` owns command/Forgefile reconciliation, `HeadlessExtensionResolutionService` owns extension and preset resolution, `HeadlessForgefilePersistenceService` owns lock/persistence rules, `HeadlessGenerationExecutionService` owns generation request execution and timeout cancellation, and `HeadlessCatalogClient` remains the transport adapter.
 
 Startup policy now lives under `application/`: `LiveStartupMetadataLoader` owns the live-metadata timeout and snapshot-fallback path, while `DefaultStartupStateService` merges explicit CLI overrides, optional stored prefill, and compiled defaults before handing the result to `InputResolutionService`.
 
