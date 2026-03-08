@@ -68,7 +68,7 @@ It asserts, among other things, that:
 
 * `application/` stays independent from CLI, runtime, headless, post-generation, persistence, and UI packages.
 * `headless/` remains independent from runtime and TamboUI, with CLI coupling limited to the orchestration boundary types.
-* `runtime/` owns the composition root, with `RuntimeServices` as the only runtime entrypoint allowed to open the headless generation service.
+* `runtime/` owns the composition root, with `RuntimeServices` as the only runtime entrypoint allowed to open the headless generation service from an active runtime session.
 * `postgen/` stays isolated from CLI/headless/persistence/runtime concerns, and owns `TuiSessionSummary` so the post-generation seam does not depend back on `runtime/`.
 
 Run the suite directly with:
