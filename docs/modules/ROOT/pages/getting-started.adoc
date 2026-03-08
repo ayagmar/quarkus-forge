@@ -45,30 +45,8 @@ TIP: A https://github.com/casey/just[justfile] is included with common recipes. 
 GitHub releases use `quarkus-forge-jvm.jar` for the interactive JVM asset and publish a matching
 `.sha256` file for every jar and native download.
 
-On Linux:
-
-[source,bash]
-----
-sha256sum -c quarkus-forge-jvm.jar.sha256
-sha256sum -c quarkus-forge-headless-linux-x86_64.sha256
-----
-
-On macOS:
-
-[source,bash]
-----
-shasum -a 256 -c quarkus-forge-jvm.jar.sha256
-shasum -a 256 -c quarkus-forge-headless-macos-aarch64.sha256
-----
-
-On Windows PowerShell:
-
-[source,powershell]
-----
-$expected = (Get-Content .\quarkus-forge-windows-x86_64.exe.sha256).Split(' ')[0].ToLower()
-$actual = (Get-FileHash .\quarkus-forge-windows-x86_64.exe -Algorithm SHA256).Hash.ToLower()
-$actual -eq $expected
-----
+Checksum verification examples for Linux, macOS, and Windows are collected in
+xref:#release-checksums[Release Checksums].
 
 TUI mode (interactive):
 

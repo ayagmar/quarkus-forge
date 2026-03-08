@@ -4,6 +4,9 @@ final class GenerationStateMachine {
   private GenerationStateMachine() {}
 
   static boolean isValidTransition(GenerationState currentState, GenerationState targetState) {
+    if (currentState == null || targetState == null) {
+      throw new IllegalArgumentException("generation states must not be null");
+    }
     if (currentState == targetState) {
       return false;
     }

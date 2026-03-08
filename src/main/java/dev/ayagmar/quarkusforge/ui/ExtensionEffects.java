@@ -113,6 +113,8 @@ final class ExtensionEffects {
     if (extension == null) {
       return "No extension selected to toggle";
     }
+    // `select` returns false when the cursor item is already selected, so the explicit deselect
+    // branch owns removing it and rebuilding the projection from the updated selection.
     if (extensionCatalogNavigation.select(extension.id())) {
       extensionCatalogPreferences.recordRecentSelection(extension.id());
       extensionCatalogProjection.refreshRows(

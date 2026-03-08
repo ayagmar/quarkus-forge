@@ -14,7 +14,7 @@ class DocsPagesWorkflowTest {
     String workflow =
         Files.readString(Path.of(".github", "workflows", "docs-pages.yml"), StandardCharsets.UTF_8);
 
-    assertThat(workflow).contains("scripts/verify/docs-build.sh");
-    assertThat(workflow).contains("scripts/verify/docs-linkcheck.sh");
+    assertThat(workflow)
+        .contains("scripts/verify/docs-build.sh", "scripts/verify/docs-linkcheck.sh");
   }
 }

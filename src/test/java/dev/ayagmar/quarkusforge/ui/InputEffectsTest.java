@@ -73,6 +73,23 @@ class InputEffectsTest {
     assertThat(intents.get(2)).isInstanceOf(UiIntent.SubmitEditRecoveryIntent.class);
   }
 
+  @Test
+  void constructorRejectsMissingRequiredInputState() {
+    EnumMap<FocusTarget, TextInputState> inputStates = new EnumMap<>(FocusTarget.class);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                new InputEffects(
+                    inputStates,
+                    new MetadataSelectorManager(),
+                    new TestCallbacks(
+                        UiTestFixtureFactory.defaultForgeUiState().request(),
+                        MetadataCompatibilityContext.loadDefault(),
+                        new MetadataSelectorManager())))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("GROUP_ID");
+  }
+
   private static final class TestFixture {
     private final MetadataCompatibilityContext metadataCompatibility =
         MetadataCompatibilityContext.loadDefault();
@@ -82,8 +99,7 @@ class InputEffectsTest {
     private final MetadataSelectorManager metadataSelectors = new MetadataSelectorManager();
     private final TestCallbacks callbacks =
         new TestCallbacks(initialState.request(), metadataCompatibility, metadataSelectors);
-    private final InputEffects inputEffects =
-        new InputEffects(inputStates, metadataSelectors, callbacks);
+    private final InputEffects inputEffects;
 
     private TestFixture() {
       for (FocusTarget target : FocusTarget.values()) {
@@ -105,6 +121,7 @@ class InputEffectsTest {
           request.platformStream(),
           request.buildTool(),
           request.javaVersion());
+      inputEffects = new InputEffects(inputStates, metadataSelectors, callbacks);
     }
   }
 

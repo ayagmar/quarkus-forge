@@ -40,8 +40,20 @@ final class InputEffects {
       MetadataSelectorManager metadataSelectors,
       Callbacks callbacks) {
     this.inputStates = Objects.requireNonNull(inputStates);
+    requireInputState(inputStates, FocusTarget.GROUP_ID);
+    requireInputState(inputStates, FocusTarget.ARTIFACT_ID);
+    requireInputState(inputStates, FocusTarget.VERSION);
+    requireInputState(inputStates, FocusTarget.PACKAGE_NAME);
+    requireInputState(inputStates, FocusTarget.OUTPUT_DIR);
     this.metadataSelectors = Objects.requireNonNull(metadataSelectors);
     this.callbacks = Objects.requireNonNull(callbacks);
+  }
+
+  private static void requireInputState(
+      EnumMap<FocusTarget, TextInputState> inputStates, FocusTarget target) {
+    if (inputStates.get(target) == null) {
+      throw new IllegalArgumentException("Missing TextInputState for " + target);
+    }
   }
 
   void moveTextInputCursorToEnd(FocusTarget target) {

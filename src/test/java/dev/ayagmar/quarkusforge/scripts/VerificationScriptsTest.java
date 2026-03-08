@@ -55,12 +55,18 @@ class VerificationScriptsTest {
     String releaseSmoke =
         Files.readString(VERIFY_DIR.resolve("native-release-smoke.sh"), StandardCharsets.UTF_8);
 
-    assertThat(posixSmoke).contains("scripts/interactive_native_smoke.py");
+    assertThat(posixSmoke)
+        .contains("SCRIPT_DIR=")
+        .contains("python3 \"$SCRIPT_DIR/../interactive_native_smoke.py\" --binary \"$binary\"");
     assertThat(windowsSmoke).contains("--interactive-smoke-test --verbose");
     assertThat(windowsSmoke).contains("\"event\":\"tui.render.ready\"");
-    assertThat(releaseSmoke).contains("\"$binary\" --help > /dev/null");
-    assertThat(releaseSmoke).contains("scripts/verify/native-interactive-smoke-posix.sh");
-    assertThat(releaseSmoke).contains("scripts/verify/native-interactive-smoke-windows.sh");
+    assertThat(releaseSmoke)
+        .contains("SCRIPT_DIR=")
+        .contains("\"$binary\" --help > /dev/null")
+        .contains(
+            "\"$binary\" generate --dry-run --group-id org.acme --artifact-id native-smoke-app > /dev/null")
+        .contains("exec \"$SCRIPT_DIR/native-interactive-smoke-posix.sh\" \"$binary\"")
+        .contains("exec \"$SCRIPT_DIR/native-interactive-smoke-windows.sh\" \"$binary\"");
   }
 
   @Test
@@ -74,7 +80,8 @@ class VerificationScriptsTest {
             headless)
                 ./mvnw clean
                 mkdir -p target/native-size
-            """);
+            """)
+        .doesNotContain("set -o pipefail");
   }
 
   private static List<Path> listScripts() throws IOException {

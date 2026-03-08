@@ -102,7 +102,7 @@ def terminate_process_group(process: subprocess.Popen[bytes]) -> None:
 def main() -> int:
     args = parse_args()
     expected_texts = args.expect_text or ["Project Metadata"]
-    command = [args.binary, *(args.extra_arg or ["--verbose"])]
+    command = [args.binary, *(args.extra_arg or [])]
 
     master_fd, slave_fd = pty.openpty()
     fcntl.ioctl(slave_fd, termios.TIOCSWINSZ, struct.pack("HHHH", args.rows, args.cols, 0, 0))

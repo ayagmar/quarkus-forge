@@ -11,6 +11,7 @@ final class UiStateSnapshotMapper {
       SubmitAlertSnapshot submitAlert,
       MetadataPanelSnapshot metadataPanel,
       PanelState panelState,
+      UiState.PostGenerationView postGeneration,
       UiState.GenerationView generation,
       UiState.StartupOverlayView startupOverlay) {
     UiState synchronizedState = reducerState.withStatusMessage(statusMessage);
@@ -20,6 +21,7 @@ final class UiStateSnapshotMapper {
         metadataPanel,
         panelState.extensionsPanel(),
         panelState.footer(),
+        postGeneration,
         generation,
         startupOverlay);
   }

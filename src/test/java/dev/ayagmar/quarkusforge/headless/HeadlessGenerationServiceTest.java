@@ -473,11 +473,19 @@ class HeadlessGenerationServiceTest {
     Path saveAsPath = tempDir.resolve("generated.forgefile.json");
 
     StubCatalogOperations client = new StubCatalogOperations();
+    client.generationFuture = new CompletableFuture<>();
     HeadlessGenerationService service = serviceWith(client);
 
     GenerateCommand command = commandWithOutput();
     command.setSaveAsFile(saveAsPath.toString());
-    int exitCode = service.run(command, false, false);
+    CompletableFuture<Integer> exitCodeFuture =
+        CompletableFuture.supplyAsync(() -> service.run(command, false, false));
+
+    waitFor(() -> client.startGenerationCalls == 1);
+    assertThat(java.nio.file.Files.exists(saveAsPath)).isFalse();
+    client.generationFuture.complete(Path.of("output/demo-app"));
+
+    int exitCode = exitCodeFuture.get();
 
     assertThat(exitCode).isEqualTo(ExitCodes.OK);
     assertThat(client.startGenerationCalls).isEqualTo(1);
@@ -612,6 +620,17 @@ class HeadlessGenerationServiceTest {
   private static HeadlessGenerationService serviceWith(
       StubCatalogOperations client, ExtensionFavoritesStore favoritesStore) {
     return HeadlessGenerationService.create(client, favoritesStore);
+  }
+
+  private static void waitFor(java.util.function.BooleanSupplier condition) throws Exception {
+    long deadline = System.nanoTime() + Duration.ofSeconds(2).toNanos();
+    while (System.nanoTime() < deadline) {
+      if (condition.getAsBoolean()) {
+        return;
+      }
+      Thread.sleep(10);
+    }
+    throw new AssertionError("Condition not met before timeout");
   }
 
   private static final class StubCatalogOperations implements HeadlessCatalogOperations {
