@@ -67,6 +67,21 @@ class HeadlessArchitectureRulesTest {
           .resideInAnyPackage("picocli..");
 
   @ArchTest
+  static final ArchRule applicationLayerDoesNotDependOnCliHeadlessRuntimePostgenOrPersistence =
+      noClasses()
+          .that()
+          .resideInAnyPackage("dev.ayagmar.quarkusforge.application..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage(
+              "dev.ayagmar.quarkusforge.cli..",
+              "dev.ayagmar.quarkusforge.headless..",
+              "dev.ayagmar.quarkusforge.persistence..",
+              "dev.ayagmar.quarkusforge.postgen..",
+              "dev.ayagmar.quarkusforge.runtime..",
+              "dev.ayagmar.quarkusforge.ui..");
+
+  @ArchTest
   static final ArchRule runtimeLayerDoesNotDependOnCliOrPicocli =
       noClasses()
           .that()
@@ -98,6 +113,30 @@ class HeadlessArchitectureRulesTest {
           .resideInAnyPackage("dev.ayagmar.quarkusforge.runtime..");
 
   @ArchTest
+  static final ArchRule onlyHeadlessBoundaryAdaptersMayDependOnCli =
+      noClasses()
+          .that()
+          .resideInAnyPackage("dev.ayagmar.quarkusforge.headless..")
+          .and()
+          .doNotHaveSimpleName("HeadlessGenerationInputs")
+          .and()
+          .doNotHaveSimpleName("HeadlessGenerationService")
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage("dev.ayagmar.quarkusforge.cli..");
+
+  @ArchTest
+  static final ArchRule onlyRuntimeServicesMayDependOnHeadless =
+      noClasses()
+          .that()
+          .resideInAnyPackage("dev.ayagmar.quarkusforge.runtime..")
+          .and()
+          .doNotHaveSimpleName("RuntimeServices")
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage("dev.ayagmar.quarkusforge.headless..");
+
+  @ArchTest
   static final ArchRule cliLayerDoesNotDependOnPersistence =
       noClasses()
           .that()
@@ -119,6 +158,17 @@ class HeadlessArchitectureRulesTest {
               "dev.ayagmar.quarkusforge.persistence..",
               "picocli..",
               "dev.tamboui..");
+
+  @ArchTest
+  static final ArchRule onlyPostTuiActionExecutorMayDependOnRuntime =
+      noClasses()
+          .that()
+          .resideInAnyPackage("dev.ayagmar.quarkusforge.postgen..")
+          .and()
+          .doNotHaveSimpleName("PostTuiActionExecutor")
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage("dev.ayagmar.quarkusforge.runtime..");
 
   @ArchTest
   static final ArchRule persistenceLayerDoesNotDependOnCliHeadlessRuntimeUiOrPostgen =
