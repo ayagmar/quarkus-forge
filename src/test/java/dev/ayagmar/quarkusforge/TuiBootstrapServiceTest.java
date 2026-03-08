@@ -51,6 +51,11 @@ class TuiBootstrapServiceTest {
   }
 
   @Test
+  void defaultBackendPreferenceHandlesNullOsName() throws Exception {
+    assertThat(invokeDefaultBackendPreference(null)).isEqualTo("panama");
+  }
+
+  @Test
   void startupSplashMinDurationIs450ms() {
     assertThat(TuiBootstrapService.STARTUP_SPLASH_MIN_DURATION).isEqualTo(Duration.ofMillis(450));
   }
@@ -95,8 +100,26 @@ class TuiBootstrapServiceTest {
   void backendPreferenceIsExplicitlyConfiguredOnlyForNonBlankProperty() throws Exception {
     assertThat(invokeIsBackendPreferenceExplicitlyConfigured(null, null)).isFalse();
     assertThat(invokeIsBackendPreferenceExplicitlyConfigured("   ", null)).isFalse();
+    assertThat(invokeIsBackendPreferenceExplicitlyConfigured(null, "   ")).isFalse();
     assertThat(invokeIsBackendPreferenceExplicitlyConfigured("panama", null)).isTrue();
     assertThat(invokeIsBackendPreferenceExplicitlyConfigured(null, "ansi")).isTrue();
+  }
+
+  @Test
+  void resolvePresetStreamKeyPrefersCurrentThenRecommendedThenBlank() throws Exception {
+    dev.ayagmar.quarkusforge.api.MetadataDto metadata =
+        new dev.ayagmar.quarkusforge.api.MetadataDto(
+            java.util.List.of("21"),
+            java.util.List.of("maven"),
+            java.util.Map.of("maven", java.util.List.of("21")),
+            java.util.List.of(
+                new dev.ayagmar.quarkusforge.api.PlatformStream(
+                    "io.quarkus.platform:3.31", "3.31", true, java.util.List.of("21"))));
+
+    assertThat(invokeResolvePresetStreamKey("io.quarkus.platform:current", metadata))
+        .isEqualTo("io.quarkus.platform:current");
+    assertThat(invokeResolvePresetStreamKey("", metadata)).isEqualTo("io.quarkus.platform:3.31");
+    assertThat(invokeResolvePresetStreamKey("", null)).isEmpty();
   }
 
   @Test
@@ -200,6 +223,22 @@ class TuiBootstrapServiceTest {
             "isBackendPreferenceExplicitlyConfigured", String.class, String.class);
     method.setAccessible(true);
     return (boolean) method.invoke(null, propertyValue, envValue);
+  }
+
+  private static String invokeDefaultBackendPreference(String osName) throws Exception {
+    Method method =
+        TuiBootstrapService.class.getDeclaredMethod("defaultBackendPreference", String.class);
+    method.setAccessible(true);
+    return (String) method.invoke(null, osName);
+  }
+
+  private static String invokeResolvePresetStreamKey(
+      String currentStreamKey, dev.ayagmar.quarkusforge.api.MetadataDto metadata) throws Exception {
+    Method method =
+        TuiBootstrapService.class.getDeclaredMethod(
+            "resolvePresetStreamKey", String.class, dev.ayagmar.quarkusforge.api.MetadataDto.class);
+    method.setAccessible(true);
+    return (String) method.invoke(null, currentStreamKey, metadata);
   }
 
   private static void invokeRestoreTerminalBackendPreference(String previousBackendPreference)
