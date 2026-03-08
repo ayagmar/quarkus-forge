@@ -189,6 +189,23 @@ sha256sum -c quarkus-forge-headless.jar.sha256
 sha256sum -c quarkus-forge-headless-linux-x86_64.sha256
 ----
 
+On macOS, use:
+
+[source,bash]
+----
+shasum -a 256 -c quarkus-forge-headless.jar.sha256
+shasum -a 256 -c quarkus-forge-headless-macos-aarch64.sha256
+----
+
+On Windows PowerShell:
+
+[source,powershell]
+----
+$expected = (Get-Content .\quarkus-forge-headless-windows-x86_64.exe.sha256).Split(' ')[0].ToLower()
+$actual = (Get-FileHash .\quarkus-forge-headless-windows-x86_64.exe -Algorithm SHA256).Hash.ToLower()
+$actual -eq $expected
+----
+
 Generate checksum files for locally built release artifacts:
 
 [source,bash]
