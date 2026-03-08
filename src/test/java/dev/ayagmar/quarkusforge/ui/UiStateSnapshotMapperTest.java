@@ -18,14 +18,13 @@ import org.junit.jupiter.api.Test;
 class UiStateSnapshotMapperTest {
 
   @Test
-  void snapshotContainsCurrentControllerReadModel() {
+  void controllerUiStateExposesReducerOwnedSlicesOnly() {
     CoreTuiController controller = UiControllerTestHarness.controller();
 
     UiState state = controller.uiState();
 
     assertThat(state.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
     assertThat(state.statusMessage()).isEqualTo("Ready");
-    assertThat(state.generation().state()).isEqualTo(GenerationState.IDLE);
     assertThat(state.catalogLoad().loading()).isFalse();
     assertThat(state.catalogLoad().sourceLabel()).isEqualTo("snapshot");
     assertThat(state.overlays().commandPaletteVisible()).isFalse();
@@ -35,7 +34,7 @@ class UiStateSnapshotMapperTest {
   }
 
   @Test
-  void snapshotTracksGenerationCatalogAndPostGenerationSlices() {
+  void controllerRenderModelTracksGenerationCatalogAndPostGenerationSlices() {
     UiControllerTestHarness.QueueingScheduler scheduler =
         new UiControllerTestHarness.QueueingScheduler();
     UiControllerTestHarness.ControlledGenerationRunner generationRunner =
@@ -50,29 +49,29 @@ class UiStateSnapshotMapperTest {
     generationRunner.complete(Path.of("build/generated-project"));
     scheduler.runAll();
 
-    UiState loadingSnapshot = controller.uiState();
-    assertThat(loadingSnapshot.generation().state()).isEqualTo(GenerationState.SUCCESS);
-    assertThat(loadingSnapshot.catalogLoad().loading()).isTrue();
-    assertThat(loadingSnapshot.overlays().startupOverlayVisible()).isTrue();
-    assertThat(loadingSnapshot.postGeneration().visible()).isTrue();
-    assertThat(loadingSnapshot.postGeneration().actionLabels()).isNotEmpty();
-    assertThat(loadingSnapshot.postGeneration().successHint()).contains("cd ");
+    UiRenderModel loadingRenderModel = controller.renderModel();
+    assertThat(loadingRenderModel.generation().state()).isEqualTo(GenerationState.SUCCESS);
+    assertThat(loadingRenderModel.reducerState().catalogLoad().loading()).isTrue();
+    assertThat(loadingRenderModel.reducerState().overlays().startupOverlayVisible()).isTrue();
+    assertThat(loadingRenderModel.reducerState().postGeneration().visible()).isTrue();
+    assertThat(loadingRenderModel.reducerState().postGeneration().actionLabels()).isNotEmpty();
+    assertThat(loadingRenderModel.reducerState().postGeneration().successHint()).contains("cd ");
 
     loadFuture.complete(
         ExtensionCatalogLoadResult.live(
             List.of(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "rest"))));
     scheduler.runAll();
 
-    UiState loadedSnapshot = controller.uiState();
-    assertThat(loadedSnapshot.catalogLoad().loading()).isFalse();
-    assertThat(loadedSnapshot.catalogLoad().sourceLabel()).isEqualTo("live");
-    assertThat(loadedSnapshot.extensions().filteredCount()).isEqualTo(1);
-    assertThat(loadedSnapshot.startupOverlay().statusLines()).isNotEmpty();
+    UiRenderModel loadedRenderModel = controller.renderModel();
+    assertThat(loadedRenderModel.reducerState().catalogLoad().loading()).isFalse();
+    assertThat(loadedRenderModel.reducerState().catalogLoad().sourceLabel()).isEqualTo("live");
+    assertThat(loadedRenderModel.reducerState().extensions().filteredCount()).isEqualTo(1);
+    assertThat(loadedRenderModel.startupOverlay().statusLines()).isNotEmpty();
   }
 
   @Test
-  void postGenerationActionLabelsAreExposedAsImmutableSnapshot() {
-    UiState state =
+  void reducerAndRenderSnapshotsExposeImmutableLists() {
+    UiState reducerState =
         new UiStateFixtureBuilder()
             .withPostGenerationView(
                 new UiState.PostGenerationView(
@@ -88,17 +87,19 @@ class UiStateSnapshotMapperTest {
                     null,
                     "",
                     null))
-            .withStartupOverlayView(new UiState.StartupOverlayView(false, List.of("line")))
-            .build();
+            .withStartupOverlayVisible(true)
+            .buildReducerState();
+    UiRenderModel renderModel =
+        new UiStateFixtureBuilder().withStartupOverlayVisible(true).renderModel();
 
-    assertThatThrownBy(() -> state.postGeneration().actionLabels().add("new"))
+    assertThatThrownBy(() -> reducerState.postGeneration().actionLabels().add("new"))
         .isInstanceOf(UnsupportedOperationException.class);
-    assertThatThrownBy(() -> state.startupOverlay().statusLines().add("new"))
+    assertThatThrownBy(() -> renderModel.startupOverlay().statusLines().add("new"))
         .isInstanceOf(UnsupportedOperationException.class);
   }
 
   @Test
-  void mapperKeepsReducerOwnedRuntimeSlicesAndOnlyOverlaysRenderPanels() {
+  void renderModelKeepsReducerOwnedSlicesAndOverlaysRenderPanels() {
     FooterSnapshot footerSnapshot =
         new FooterSnapshot(
             true,
@@ -115,23 +116,26 @@ class UiStateSnapshotMapperTest {
             "",
             "",
             "");
-    UiState state =
+    UiStateFixtureBuilder fixture =
         new UiStateFixtureBuilder()
-            .withStartupOverlayView(new UiState.StartupOverlayView(true, List.of("runtime line")))
+            .withStartupOverlayVisible(true)
+            .withStartupOverlayStatusLines(List.of("runtime line"))
             .withPanelState(
                 new UiStateSnapshotMapper.PanelState(
                     new ExtensionsPanelSnapshot(
                         true, true, false, false, false, "", "live", false, false, false, 0, "", "",
                         0, 0, 0, List.of(), List.of(), "", ""),
-                    footerSnapshot))
-            .build();
+                    footerSnapshot));
 
-    assertThat(state.startupOverlay().visible()).isTrue();
-    assertThat(state.startupOverlay().statusLines()).containsExactly("runtime line");
-    assertThat(state.generation().state()).isEqualTo(GenerationState.IDLE);
-    assertThat(state.extensions().searchQuery()).isEmpty();
-    assertThat(state.footer()).isEqualTo(footerSnapshot);
-    assertThat(state.statusMessage()).isEqualTo("Ready");
+    UiRenderModel renderModel = fixture.renderModel();
+
+    assertThat(renderModel.reducerState().overlays().startupOverlayVisible()).isTrue();
+    assertThat(renderModel.startupOverlay().visible()).isTrue();
+    assertThat(renderModel.startupOverlay().statusLines()).containsExactly("runtime line");
+    assertThat(renderModel.generation().state()).isEqualTo(GenerationState.IDLE);
+    assertThat(renderModel.reducerState().extensions().searchQuery()).isEmpty();
+    assertThat(renderModel.footer()).isEqualTo(footerSnapshot);
+    assertThat(renderModel.reducerState().statusMessage()).isEqualTo("Ready");
   }
 
   @Test
@@ -164,18 +168,17 @@ class UiStateSnapshotMapperTest {
     UiRenderModel renderModel = fixture.renderModel();
 
     assertThat(renderModel.reducerState().statusMessage()).isEqualTo("Ready");
-    assertThat(renderModel.metadataPanel()).isEqualTo(fixture.reducerState().metadataPanel());
+    assertThat(renderModel.metadataPanel()).isEqualTo(fixture.metadataPanel());
     assertThat(renderModel.extensionsPanel()).isEqualTo(fixture.panelState().extensionsPanel());
     assertThat(renderModel.footer()).isEqualTo(footerSnapshot);
-    assertThat(renderModel.generation()).isEqualTo(fixture.reducerState().generation());
-    assertThat(renderModel.startupOverlay()).isEqualTo(fixture.reducerState().startupOverlay());
-    assertThat(renderModel.snapshotState().footer()).isEqualTo(footerSnapshot);
+    assertThat(renderModel.generation()).isEqualTo(fixture.generation());
+    assertThat(renderModel.startupOverlay()).isEqualTo(fixture.startupOverlay());
   }
 
   private static final class UiStateFixtureBuilder {
     private final UiStateSnapshotMapper mapper = new UiStateSnapshotMapper();
     private final ForgeUiState initialState = UiTestFixtureFactory.defaultForgeUiState();
-    private final MetadataPanelSnapshot metadataPanelSnapshot =
+    private final MetadataPanelSnapshot metadataPanel =
         new MetadataPanelSnapshot(
             "",
             false,
@@ -188,13 +191,12 @@ class UiStateSnapshotMapperTest {
             "",
             "",
             "",
-            new MetadataPanelSnapshot.SelectorInfo(0, 0),
-            new MetadataPanelSnapshot.SelectorInfo(0, 0),
-            new MetadataPanelSnapshot.SelectorInfo(0, 0));
+            MetadataPanelSnapshot.SelectorInfo.EMPTY,
+            MetadataPanelSnapshot.SelectorInfo.EMPTY,
+            MetadataPanelSnapshot.SelectorInfo.EMPTY);
 
     private ProjectRequest request = initialState.request();
     private ValidationReport validation = initialState.validation();
-
     private UiStateSnapshotMapper.PanelState panelState =
         new UiStateSnapshotMapper.PanelState(
             new ExtensionsPanelSnapshot(
@@ -246,23 +248,17 @@ class UiStateSnapshotMapperTest {
             false,
             false,
             0,
-            metadataPanelSnapshot,
-            panelState.extensionsPanel(),
-            panelState.footer(),
             new UiState.OverlayState(false, false, false, false, false),
-            new UiState.GenerationView(GenerationState.IDLE, 0.0, "", false),
             new UiState.CatalogLoadView(CatalogLoadState.initial()),
             new UiState.PostGenerationView(false, false, 0, 0, List.of(), null, "", null),
-            new UiState.StartupOverlayView(false, List.of()),
             new UiState.ExtensionView(0, 0, 0, false, false, "", "", "", ""));
+    private UiState.GenerationView generation =
+        new UiState.GenerationView(GenerationState.IDLE, 0.0, "", false);
+    private UiState.StartupOverlayView startupOverlay =
+        new UiState.StartupOverlayView(false, List.of());
 
     UiStateFixtureBuilder withPostGenerationView(UiState.PostGenerationView postGenerationView) {
       reducerState = reducerState.withPostGeneration(postGenerationView);
-      return this;
-    }
-
-    UiStateFixtureBuilder withStartupOverlayView(UiState.StartupOverlayView startupOverlayView) {
-      reducerState = reducerState.withStartupOverlay(startupOverlayView);
       return this;
     }
 
@@ -271,20 +267,45 @@ class UiStateSnapshotMapperTest {
       return this;
     }
 
-    UiState build() {
-      return mapper.map(reducerState, reducerState.statusMessage(), panelState);
+    UiStateFixtureBuilder withStartupOverlayVisible(boolean visible) {
+      reducerState = reducerState.withStartupOverlayVisibility(visible);
+      startupOverlay = new UiState.StartupOverlayView(visible, startupOverlay.statusLines());
+      return this;
+    }
+
+    UiStateFixtureBuilder withStartupOverlayStatusLines(List<String> statusLines) {
+      startupOverlay = new UiState.StartupOverlayView(startupOverlay.visible(), statusLines);
+      return this;
+    }
+
+    UiState buildReducerState() {
+      return reducerState;
     }
 
     UiRenderModel renderModel() {
-      return mapper.renderModel(reducerState, reducerState.statusMessage(), panelState);
+      return mapper.renderModel(
+          reducerState,
+          reducerState.statusMessage(),
+          metadataPanel,
+          panelState,
+          generation,
+          startupOverlay);
     }
 
-    UiState reducerState() {
-      return reducerState;
+    MetadataPanelSnapshot metadataPanel() {
+      return metadataPanel;
     }
 
     UiStateSnapshotMapper.PanelState panelState() {
       return panelState;
+    }
+
+    UiState.GenerationView generation() {
+      return generation;
+    }
+
+    UiState.StartupOverlayView startupOverlay() {
+      return startupOverlay;
     }
   }
 }

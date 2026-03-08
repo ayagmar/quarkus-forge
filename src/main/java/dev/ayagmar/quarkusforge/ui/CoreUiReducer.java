@@ -23,8 +23,7 @@ final class CoreUiReducer implements UiReducer {
           new ReduceResult(
               state.withCatalogLoad(
                   new UiState.CatalogLoadView(startedIntent.nextState()),
-                  new UiState.StartupOverlayView(
-                      startedIntent.startupOverlayVisible(), state.startupOverlay().statusLines()),
+                  startedIntent.startupOverlayVisible(),
                   "Loading extension catalog...",
                   state.errorMessage(),
                   state.verboseErrorDetails(),
@@ -35,9 +34,7 @@ final class CoreUiReducer implements UiReducer {
           new ReduceResult(
               state.withCatalogLoad(
                   new UiState.CatalogLoadView(cancelledIntent.nextState()),
-                  new UiState.StartupOverlayView(
-                      cancelledIntent.startupOverlayVisible(),
-                      state.startupOverlay().statusLines()),
+                  cancelledIntent.startupOverlayVisible(),
                   state.statusMessage(),
                   state.errorMessage(),
                   state.verboseErrorDetails(),
@@ -53,9 +50,7 @@ final class CoreUiReducer implements UiReducer {
           new ReduceResult(
               state.withCatalogLoad(
                   new UiState.CatalogLoadView(succeededIntent.success().nextState()),
-                  new UiState.StartupOverlayView(
-                      succeededIntent.startupOverlayVisible(),
-                      state.startupOverlay().statusLines()),
+                  succeededIntent.startupOverlayVisible(),
                   succeededIntent.success().statusMessage(),
                   "",
                   "",
@@ -68,8 +63,7 @@ final class CoreUiReducer implements UiReducer {
           new ReduceResult(
               state.withCatalogLoad(
                   new UiState.CatalogLoadView(failedIntent.failure().nextState()),
-                  new UiState.StartupOverlayView(
-                      failedIntent.startupOverlayVisible(), state.startupOverlay().statusLines()),
+                  failedIntent.startupOverlayVisible(),
                   failedIntent.failure().statusMessage(),
                   failedIntent.failure().errorMessage(),
                   failedIntent.failure().errorMessage(),
@@ -78,9 +72,7 @@ final class CoreUiReducer implements UiReducer {
               UiAction.handled(false));
       case UiIntent.StartupOverlayVisibilityIntent visibilityIntent ->
           new ReduceResult(
-              state.withStartupOverlay(
-                  new UiState.StartupOverlayView(
-                      visibilityIntent.visible(), state.startupOverlay().statusLines())),
+              state.withStartupOverlayVisibility(visibilityIntent.visible()),
               List.of(),
               UiAction.handled(false));
       case UiIntent.SubmitRequestedIntent submitIntent ->
@@ -198,7 +190,7 @@ final class CoreUiReducer implements UiReducer {
       case UiIntent.FocusNavigationIntent navigationIntent ->
           reduceFocusNavigation(state, navigationIntent.keyEvent());
       case UiIntent.MetadataInputIntent metadataIntent ->
-          reduceMetadataInput(state, metadataIntent.keyEvent());
+          reduceMetadataInput(state, metadataIntent);
       case UiIntent.TextInputIntent textInputIntent ->
           reduceTextInput(state, textInputIntent.keyEvent());
       case UiIntent.ToggleErrorDetailsIntent _ ->
@@ -662,30 +654,32 @@ final class CoreUiReducer implements UiReducer {
         || UiKeyMatchers.isVimEndKey(keyEvent);
   }
 
-  private static ReduceResult reduceMetadataInput(UiState state, KeyEvent keyEvent) {
+  private static ReduceResult reduceMetadataInput(
+      UiState state, UiIntent.MetadataInputIntent metadataIntent) {
+    KeyEvent keyEvent = metadataIntent.keyEvent();
     FocusTarget focusTarget = state.focusTarget();
     if (!MetadataSelectorManager.isSelectorFocus(focusTarget)) {
       return new ReduceResult(state, List.of(), UiAction.ignored());
     }
-    if (!hasSelectorOptions(state, focusTarget)) {
+    if (!keyEvent.isLeft()
+        && !UiKeyMatchers.isVimLeftKey(keyEvent)
+        && !keyEvent.isUp()
+        && !UiKeyMatchers.isVimUpKey(keyEvent)
+        && !keyEvent.isRight()
+        && !UiKeyMatchers.isVimRightKey(keyEvent)
+        && !keyEvent.isDown()
+        && !UiKeyMatchers.isVimDownKey(keyEvent)
+        && !keyEvent.isHome()
+        && !keyEvent.isEnd()) {
       return new ReduceResult(state, List.of(), UiAction.ignored());
     }
-    if (keyEvent.isLeft()
-        || UiKeyMatchers.isVimLeftKey(keyEvent)
-        || keyEvent.isUp()
-        || UiKeyMatchers.isVimUpKey(keyEvent)
-        || keyEvent.isRight()
-        || UiKeyMatchers.isVimRightKey(keyEvent)
-        || keyEvent.isDown()
-        || UiKeyMatchers.isVimDownKey(keyEvent)
-        || keyEvent.isHome()
-        || keyEvent.isEnd()) {
-      return new ReduceResult(
-          state,
-          List.of(new UiEffect.ApplyMetadataSelectorKey(focusTarget, keyEvent)),
-          UiAction.handled(false));
+    if (!metadataIntent.optionsAvailable()) {
+      return new ReduceResult(state, List.of(), UiAction.ignored());
     }
-    return new ReduceResult(state, List.of(), UiAction.ignored());
+    return new ReduceResult(
+        state,
+        List.of(new UiEffect.ApplyMetadataSelectorKey(focusTarget, keyEvent)),
+        UiAction.handled(false));
   }
 
   private static ReduceResult reduceTextInput(UiState state, KeyEvent keyEvent) {
@@ -779,17 +773,6 @@ final class CoreUiReducer implements UiReducer {
 
   private static boolean hasActiveError(UiState state) {
     return !state.errorMessage().isBlank() || !state.catalogLoad().state().errorMessage().isBlank();
-  }
-
-  private static boolean hasSelectorOptions(UiState state, FocusTarget focusTarget) {
-    MetadataPanelSnapshot.SelectorInfo selectorInfo =
-        switch (focusTarget) {
-          case PLATFORM_STREAM -> state.metadataPanel().platformStreamInfo();
-          case BUILD_TOOL -> state.metadataPanel().buildToolInfo();
-          case JAVA_VERSION -> state.metadataPanel().javaVersionInfo();
-          default -> MetadataPanelSnapshot.SelectorInfo.EMPTY;
-        };
-    return selectorInfo.totalOptions() > 0;
   }
 
   private static UiState.PostGenerationView withActionSelection(

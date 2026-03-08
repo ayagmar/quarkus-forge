@@ -5,11 +5,7 @@ import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import java.nio.file.Path;
 import java.util.List;
 
-/**
- * Immutable UI read-model snapshot used by reducer logic and renderer orchestration.
- *
- * <p>Contains only serializable/view-model state and avoids direct mutable widget ownership.
- */
+/** Immutable reducer-owned UI state. */
 record UiState(
     ProjectRequest request,
     ValidationReport validation,
@@ -22,14 +18,9 @@ record UiState(
     boolean submitBlockedByValidation,
     boolean submitBlockedByTargetConflict,
     int commandPaletteSelection,
-    MetadataPanelSnapshot metadataPanel,
-    ExtensionsPanelSnapshot extensionsPanel,
-    FooterSnapshot footer,
     OverlayState overlays,
-    GenerationView generation,
     CatalogLoadView catalogLoad,
     PostGenerationView postGeneration,
-    StartupOverlayView startupOverlay,
     ExtensionView extensions) {
 
   UiState withStatusAndError(String nextStatusMessage, String nextErrorMessage) {
@@ -53,14 +44,9 @@ record UiState(
         submitBlockedByValidation,
         submitBlockedByTargetConflict,
         commandPaletteSelection,
-        metadataPanel,
-        extensionsPanel,
-        footer,
         overlays,
-        generation,
         catalogLoad,
         postGeneration,
-        startupOverlay,
         extensions);
   }
 
@@ -81,14 +67,9 @@ record UiState(
         submitBlockedByValidation,
         submitBlockedByTargetConflict,
         commandPaletteSelection,
-        metadataPanel,
-        extensionsPanel,
-        footer,
         overlays,
-        generation,
         catalogLoad,
         postGeneration,
-        startupOverlay,
         extensions);
   }
 
@@ -105,14 +86,9 @@ record UiState(
         false,
         submitBlockedByTargetConflict,
         commandPaletteSelection,
-        metadataPanel,
-        extensionsPanel,
-        footer,
         overlays,
-        generation,
         catalogLoad,
         postGeneration,
-        startupOverlay,
         extensions);
   }
 
@@ -129,65 +105,9 @@ record UiState(
         submitBlockedByValidation,
         submitBlockedByTargetConflict,
         commandPaletteSelection,
-        metadataPanel,
-        extensionsPanel,
-        footer,
         overlays,
-        generation,
         catalogLoad,
         postGeneration,
-        startupOverlay,
-        extensions);
-  }
-
-  UiState withMetadataPanel(MetadataPanelSnapshot nextMetadataPanel) {
-    return new UiState(
-        request,
-        validation,
-        focusTarget,
-        statusMessage,
-        errorMessage,
-        verboseErrorDetails,
-        showErrorDetails,
-        submitRequested,
-        submitBlockedByValidation,
-        submitBlockedByTargetConflict,
-        commandPaletteSelection,
-        nextMetadataPanel,
-        extensionsPanel,
-        footer,
-        overlays,
-        generation,
-        catalogLoad,
-        postGeneration,
-        startupOverlay,
-        extensions);
-  }
-
-  UiState withRenderSnapshot(
-      String nextStatusMessage,
-      ExtensionsPanelSnapshot nextExtensionsPanel,
-      FooterSnapshot nextFooter) {
-    return new UiState(
-        request,
-        validation,
-        focusTarget,
-        nextStatusMessage,
-        errorMessage,
-        verboseErrorDetails,
-        showErrorDetails,
-        submitRequested,
-        submitBlockedByValidation,
-        submitBlockedByTargetConflict,
-        commandPaletteSelection,
-        metadataPanel,
-        nextExtensionsPanel,
-        nextFooter,
-        overlays,
-        generation,
-        catalogLoad,
-        postGeneration,
-        startupOverlay,
         extensions);
   }
 
@@ -209,14 +129,9 @@ record UiState(
         nextSubmitBlockedByValidation,
         nextSubmitBlockedByTargetConflict,
         commandPaletteSelection,
-        metadataPanel,
-        extensionsPanel,
-        footer,
         overlays,
-        generation,
         catalogLoad,
         postGeneration,
-        startupOverlay,
         extensions);
   }
 
@@ -240,14 +155,9 @@ record UiState(
         nextSubmitBlockedByValidation,
         nextSubmitBlockedByTargetConflict,
         commandPaletteSelection,
-        metadataPanel,
-        extensionsPanel,
-        footer,
         overlays,
-        generation,
         catalogLoad,
         postGeneration,
-        startupOverlay,
         extensions);
   }
 
@@ -264,14 +174,9 @@ record UiState(
         submitBlockedByValidation,
         submitBlockedByTargetConflict,
         commandPaletteSelection,
-        metadataPanel,
-        extensionsPanel,
-        footer,
         overlays,
-        generation,
         catalogLoad,
         postGeneration,
-        startupOverlay,
         extensions);
   }
 
@@ -288,25 +193,15 @@ record UiState(
         submitBlockedByValidation,
         submitBlockedByTargetConflict,
         commandPaletteSelection,
-        metadataPanel,
-        extensionsPanel,
-        footer,
-        new OverlayState(
-            overlays.generationVisible(),
-            overlays.commandPaletteVisible(),
-            overlays.helpOverlayVisible(),
-            nextPostGeneration.visible(),
-            overlays.startupOverlayVisible()),
-        generation,
+        overlays.withPostGenerationVisible(nextPostGeneration.visible()),
         catalogLoad,
         nextPostGeneration,
-        startupOverlay,
         extensions);
   }
 
   UiState withCatalogLoad(
       CatalogLoadView nextCatalogLoad,
-      StartupOverlayView nextStartupOverlay,
+      boolean nextStartupOverlayVisible,
       String nextStatusMessage,
       String nextErrorMessage,
       String nextVerboseErrorDetails,
@@ -323,27 +218,13 @@ record UiState(
         submitBlockedByValidation,
         submitBlockedByTargetConflict,
         commandPaletteSelection,
-        metadataPanel,
-        extensionsPanel,
-        footer,
-        new OverlayState(
-            overlays.generationVisible(),
-            overlays.commandPaletteVisible(),
-            overlays.helpOverlayVisible(),
-            overlays.postGenerationVisible(),
-            nextStartupOverlay.visible()),
-        generation,
+        overlays.withStartupOverlayVisible(nextStartupOverlayVisible),
         nextCatalogLoad,
         postGeneration,
-        nextStartupOverlay,
         extensions);
   }
 
-  UiState withStartupOverlayStatusLines(List<String> nextStatusLines) {
-    return withStartupOverlay(new StartupOverlayView(startupOverlay.visible(), nextStatusLines));
-  }
-
-  UiState withStartupOverlay(StartupOverlayView nextStartupOverlay) {
+  UiState withStartupOverlayVisibility(boolean nextStartupOverlayVisible) {
     return new UiState(
         request,
         validation,
@@ -356,19 +237,9 @@ record UiState(
         submitBlockedByValidation,
         submitBlockedByTargetConflict,
         commandPaletteSelection,
-        metadataPanel,
-        extensionsPanel,
-        footer,
-        new OverlayState(
-            overlays.generationVisible(),
-            overlays.commandPaletteVisible(),
-            overlays.helpOverlayVisible(),
-            overlays.postGenerationVisible(),
-            nextStartupOverlay.visible()),
-        generation,
+        overlays.withStartupOverlayVisible(nextStartupOverlayVisible),
         catalogLoad,
         postGeneration,
-        nextStartupOverlay,
         extensions);
   }
 
@@ -389,23 +260,13 @@ record UiState(
         submitBlockedByValidation,
         submitBlockedByTargetConflict,
         nextCommandPaletteSelection,
-        metadataPanel,
-        extensionsPanel,
-        footer,
-        new OverlayState(
-            overlays.generationVisible(),
-            nextCommandPaletteVisible,
-            nextHelpOverlayVisible,
-            overlays.postGenerationVisible(),
-            overlays.startupOverlayVisible()),
-        generation,
+        overlays.withCommandPaletteAndHelp(nextCommandPaletteVisible, nextHelpOverlayVisible),
         catalogLoad,
         postGeneration,
-        startupOverlay,
         extensions);
   }
 
-  UiState withGeneration(GenerationView nextGeneration) {
+  UiState withGenerationOverlayVisible(boolean nextGenerationVisible) {
     return new UiState(
         request,
         validation,
@@ -418,19 +279,9 @@ record UiState(
         submitBlockedByValidation,
         submitBlockedByTargetConflict,
         commandPaletteSelection,
-        metadataPanel,
-        extensionsPanel,
-        footer,
-        new OverlayState(
-            isGenerationVisible(nextGeneration),
-            overlays.commandPaletteVisible(),
-            overlays.helpOverlayVisible(),
-            overlays.postGenerationVisible(),
-            overlays.startupOverlayVisible()),
-        nextGeneration,
+        overlays.withGenerationVisible(nextGenerationVisible),
         catalogLoad,
         postGeneration,
-        startupOverlay,
         extensions);
   }
 
@@ -447,20 +298,10 @@ record UiState(
         submitBlockedByValidation,
         submitBlockedByTargetConflict,
         commandPaletteSelection,
-        metadataPanel,
-        extensionsPanel,
-        footer,
         overlays,
-        generation,
         catalogLoad,
         postGeneration,
-        startupOverlay,
         nextExtensions);
-  }
-
-  private static boolean isGenerationVisible(GenerationView generationView) {
-    return generationView.state() == GenerationState.VALIDATING
-        || generationView.state() == GenerationState.LOADING;
   }
 
   record OverlayState(
@@ -468,7 +309,45 @@ record UiState(
       boolean commandPaletteVisible,
       boolean helpOverlayVisible,
       boolean postGenerationVisible,
-      boolean startupOverlayVisible) {}
+      boolean startupOverlayVisible) {
+
+    OverlayState withGenerationVisible(boolean nextGenerationVisible) {
+      return new OverlayState(
+          nextGenerationVisible,
+          commandPaletteVisible,
+          helpOverlayVisible,
+          postGenerationVisible,
+          startupOverlayVisible);
+    }
+
+    OverlayState withCommandPaletteAndHelp(
+        boolean nextCommandPaletteVisible, boolean nextHelpOverlayVisible) {
+      return new OverlayState(
+          generationVisible,
+          nextCommandPaletteVisible,
+          nextHelpOverlayVisible,
+          postGenerationVisible,
+          startupOverlayVisible);
+    }
+
+    OverlayState withPostGenerationVisible(boolean nextPostGenerationVisible) {
+      return new OverlayState(
+          generationVisible,
+          commandPaletteVisible,
+          helpOverlayVisible,
+          nextPostGenerationVisible,
+          startupOverlayVisible);
+    }
+
+    OverlayState withStartupOverlayVisible(boolean nextStartupOverlayVisible) {
+      return new OverlayState(
+          generationVisible,
+          commandPaletteVisible,
+          helpOverlayVisible,
+          postGenerationVisible,
+          nextStartupOverlayVisible);
+    }
+  }
 
   record GenerationView(
       GenerationState state,

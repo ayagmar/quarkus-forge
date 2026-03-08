@@ -5,18 +5,20 @@ final class UiStateSnapshotMapper {
 
   record PanelState(ExtensionsPanelSnapshot extensionsPanel, FooterSnapshot footer) {}
 
-  UiRenderModel renderModel(UiState reducerState, String statusMessage, PanelState panelState) {
+  UiRenderModel renderModel(
+      UiState reducerState,
+      String statusMessage,
+      MetadataPanelSnapshot metadataPanel,
+      PanelState panelState,
+      UiState.GenerationView generation,
+      UiState.StartupOverlayView startupOverlay) {
     UiState synchronizedState = reducerState.withStatusMessage(statusMessage);
     return new UiRenderModel(
         synchronizedState,
-        synchronizedState.metadataPanel(),
+        metadataPanel,
         panelState.extensionsPanel(),
         panelState.footer(),
-        synchronizedState.generation(),
-        synchronizedState.startupOverlay());
-  }
-
-  UiState map(UiState reducerState, String statusMessage, PanelState panelState) {
-    return renderModel(reducerState, statusMessage, panelState).snapshotState();
+        generation,
+        startupOverlay);
   }
 }

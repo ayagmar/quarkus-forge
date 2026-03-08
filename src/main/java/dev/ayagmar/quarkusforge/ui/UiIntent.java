@@ -84,7 +84,8 @@ sealed interface UiIntent {
   record FocusNavigationIntent(dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget)
       implements UiIntent {}
 
-  record MetadataInputIntent(dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget)
+  record MetadataInputIntent(
+      dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget, boolean optionsAvailable)
       implements UiIntent {}
 
   record TextInputIntent(dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget)

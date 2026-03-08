@@ -184,7 +184,7 @@ class CoreUiReducerTest {
 
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
     assertThat(result.nextState().catalogLoad().sourceLabel()).isEqualTo("live");
-    assertThat(result.nextState().startupOverlay().visible()).isTrue();
+    assertThat(result.nextState().overlays().startupOverlayVisible()).isTrue();
     assertThat(result.nextState().errorMessage()).isEmpty();
     assertThat(result.effects())
         .containsExactly(
@@ -668,48 +668,13 @@ class CoreUiReducerTest {
 
   @Test
   void metadataIntentIsIgnoredWhenSelectorHasNoOptions() {
-    UiState currentState = baseState();
-    UiState noOptionsState =
-        new UiState(
-            currentState.request(),
-            currentState.validation(),
-            FocusTarget.BUILD_TOOL,
-            currentState.statusMessage(),
-            currentState.errorMessage(),
-            currentState.verboseErrorDetails(),
-            currentState.showErrorDetails(),
-            currentState.submitRequested(),
-            currentState.submitBlockedByValidation(),
-            currentState.submitBlockedByTargetConflict(),
-            currentState.commandPaletteSelection(),
-            new MetadataPanelSnapshot(
-                currentState.metadataPanel().title(),
-                currentState.metadataPanel().focused(),
-                currentState.metadataPanel().invalid(),
-                currentState.metadataPanel().groupId(),
-                currentState.metadataPanel().artifactId(),
-                currentState.metadataPanel().version(),
-                currentState.metadataPanel().packageName(),
-                currentState.metadataPanel().outputDir(),
-                currentState.metadataPanel().platformStream(),
-                currentState.metadataPanel().buildTool(),
-                currentState.metadataPanel().javaVersion(),
-                currentState.metadataPanel().platformStreamInfo(),
-                MetadataPanelSnapshot.SelectorInfo.EMPTY,
-                currentState.metadataPanel().javaVersionInfo()),
-            currentState.extensionsPanel(),
-            currentState.footer(),
-            currentState.overlays(),
-            currentState.generation(),
-            currentState.catalogLoad(),
-            currentState.postGeneration(),
-            currentState.startupOverlay(),
-            currentState.extensions());
+    UiState noOptionsState = stateWithFocus(baseState(), FocusTarget.BUILD_TOOL);
 
     ReduceResult result =
         reducer.reduce(
             noOptionsState,
-            new UiIntent.MetadataInputIntent(KeyEvent.ofKey(KeyCode.LEFT), FocusTarget.BUILD_TOOL));
+            new UiIntent.MetadataInputIntent(
+                KeyEvent.ofKey(KeyCode.LEFT), FocusTarget.BUILD_TOOL, false));
 
     assertThat(result.action()).isEqualTo(UiAction.ignored());
     assertThat(result.effects()).isEmpty();
@@ -720,7 +685,8 @@ class CoreUiReducerTest {
     ReduceResult result =
         reducer.reduce(
             stateWithFocus(baseState(), FocusTarget.BUILD_TOOL),
-            new UiIntent.MetadataInputIntent(KeyEvent.ofKey(KeyCode.LEFT), FocusTarget.BUILD_TOOL));
+            new UiIntent.MetadataInputIntent(
+                KeyEvent.ofKey(KeyCode.LEFT), FocusTarget.BUILD_TOOL, true));
 
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
     assertThat(result.effects()).hasSize(1);
@@ -746,7 +712,7 @@ class CoreUiReducerTest {
     ReduceResult result =
         reducer.reduce(
             stateWithFocus(baseState(), FocusTarget.BUILD_TOOL),
-            new UiIntent.MetadataInputIntent(keyEvent, FocusTarget.JAVA_VERSION));
+            new UiIntent.MetadataInputIntent(keyEvent, FocusTarget.JAVA_VERSION, true));
 
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
     assertThat(result.effects())
@@ -851,7 +817,7 @@ class CoreUiReducerTest {
     ReduceResult result =
         reducer.reduce(
             baseState(),
-            new UiIntent.MetadataInputIntent(KeyEvent.ofChar('x'), FocusTarget.SUBMIT));
+            new UiIntent.MetadataInputIntent(KeyEvent.ofChar('x'), FocusTarget.SUBMIT, false));
 
     assertThat(result.action()).isEqualTo(UiAction.ignored());
     assertThat(result.effects()).isEmpty();
@@ -890,50 +856,21 @@ class CoreUiReducerTest {
   }
 
   private static UiState stateWithFocus(UiState state, FocusTarget focusTarget) {
-    return new UiState(
-        state.request(),
-        state.validation(),
+    return copyState(
+        state,
         focusTarget,
-        state.statusMessage(),
-        state.errorMessage(),
-        state.verboseErrorDetails(),
-        state.showErrorDetails(),
-        state.submitRequested(),
-        state.submitBlockedByValidation(),
-        state.submitBlockedByTargetConflict(),
-        state.commandPaletteSelection(),
-        state.metadataPanel(),
-        state.extensionsPanel(),
-        state.footer(),
+        state.validation(),
+        state.extensions(),
         state.overlays(),
-        state.generation(),
-        state.catalogLoad(),
-        state.postGeneration(),
-        state.startupOverlay(),
-        state.extensions());
+        state.commandPaletteSelection(),
+        state.statusMessage());
   }
 
   private static UiState stateWithSelectedCount(UiState state, int selectedExtensionCount) {
-    return new UiState(
-        state.request(),
-        state.validation(),
+    return copyState(
+        state,
         state.focusTarget(),
-        state.statusMessage(),
-        state.errorMessage(),
-        state.verboseErrorDetails(),
-        state.showErrorDetails(),
-        state.submitRequested(),
-        state.submitBlockedByValidation(),
-        state.submitBlockedByTargetConflict(),
-        state.commandPaletteSelection(),
-        state.metadataPanel(),
-        state.extensionsPanel(),
-        state.footer(),
-        state.overlays(),
-        state.generation(),
-        state.catalogLoad(),
-        state.postGeneration(),
-        state.startupOverlay(),
+        state.validation(),
         new UiState.ExtensionView(
             state.extensions().filteredCount(),
             state.extensions().totalCount(),
@@ -943,56 +880,33 @@ class CoreUiReducerTest {
             state.extensions().activePresetFilterName(),
             state.extensions().activeCategoryFilterTitle(),
             state.extensions().searchQuery(),
-            state.extensions().focusedExtensionId()));
+            state.extensions().focusedExtensionId()),
+        state.overlays(),
+        state.commandPaletteSelection(),
+        state.statusMessage());
   }
 
   private static UiState stateWithValidation(
       UiState state, dev.ayagmar.quarkusforge.domain.ValidationReport validation) {
-    return new UiState(
-        state.request(),
-        validation,
+    return copyState(
+        state,
         state.focusTarget(),
-        state.statusMessage(),
-        state.errorMessage(),
-        state.verboseErrorDetails(),
-        state.showErrorDetails(),
-        state.submitRequested(),
-        state.submitBlockedByValidation(),
-        state.submitBlockedByTargetConflict(),
-        state.commandPaletteSelection(),
-        state.metadataPanel(),
-        state.extensionsPanel(),
-        state.footer(),
+        validation,
+        state.extensions(),
         state.overlays(),
-        state.generation(),
-        state.catalogLoad(),
-        state.postGeneration(),
-        state.startupOverlay(),
-        state.extensions());
+        state.commandPaletteSelection(),
+        state.statusMessage());
   }
 
   private static UiState stateWithExtensionView(UiState state, UiState.ExtensionView extensions) {
-    return new UiState(
-        state.request(),
-        state.validation(),
+    return copyState(
+        state,
         state.focusTarget(),
-        state.statusMessage(),
-        state.errorMessage(),
-        state.verboseErrorDetails(),
-        state.showErrorDetails(),
-        state.submitRequested(),
-        state.submitBlockedByValidation(),
-        state.submitBlockedByTargetConflict(),
-        state.commandPaletteSelection(),
-        state.metadataPanel(),
-        state.extensionsPanel(),
-        state.footer(),
+        state.validation(),
+        extensions,
         state.overlays(),
-        state.generation(),
-        state.catalogLoad(),
-        state.postGeneration(),
-        state.startupOverlay(),
-        extensions);
+        state.commandPaletteSelection(),
+        state.statusMessage());
   }
 
   private static UiState postGenerationVisibleState() {
@@ -1021,10 +935,28 @@ class CoreUiReducerTest {
       UiState.OverlayState overlays,
       int commandPaletteSelection,
       String statusMessage) {
+    return copyState(
+        state,
+        state.focusTarget(),
+        state.validation(),
+        state.extensions(),
+        overlays,
+        commandPaletteSelection,
+        statusMessage);
+  }
+
+  private static UiState copyState(
+      UiState state,
+      FocusTarget focusTarget,
+      dev.ayagmar.quarkusforge.domain.ValidationReport validation,
+      UiState.ExtensionView extensions,
+      UiState.OverlayState overlays,
+      int commandPaletteSelection,
+      String statusMessage) {
     return new UiState(
         state.request(),
-        state.validation(),
-        state.focusTarget(),
+        validation,
+        focusTarget,
         statusMessage,
         state.errorMessage(),
         state.verboseErrorDetails(),
@@ -1033,14 +965,9 @@ class CoreUiReducerTest {
         state.submitBlockedByValidation(),
         state.submitBlockedByTargetConflict(),
         commandPaletteSelection,
-        state.metadataPanel(),
-        state.extensionsPanel(),
-        state.footer(),
         overlays,
-        state.generation(),
         state.catalogLoad(),
         state.postGeneration(),
-        state.startupOverlay(),
-        state.extensions());
+        extensions);
   }
 }
