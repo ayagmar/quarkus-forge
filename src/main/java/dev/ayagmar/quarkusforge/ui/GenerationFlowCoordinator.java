@@ -31,7 +31,7 @@ final class GenerationFlowCoordinator {
     callbacks.beforeGenerationStart();
     generationCancelRequested = false;
     long token = ++generationToken;
-    if (!callbacks.transitionTo(CoreTuiController.GenerationState.LOADING)) {
+    if (!callbacks.transitionTo(GenerationState.LOADING)) {
       callbacks.onSubmitIgnored(callbacks.generationStateLabel());
       return;
     }
@@ -75,8 +75,7 @@ final class GenerationFlowCoordinator {
   }
 
   void reconcileCompletionIfDone(GenerationFlowCallbacks callbacks) {
-    if (callbacks.currentState() != CoreTuiController.GenerationState.LOADING
-        || generationFuture == null) {
+    if (callbacks.currentState() != GenerationState.LOADING || generationFuture == null) {
       return;
     }
     if (!generationFuture.isDone()) {
@@ -94,7 +93,7 @@ final class GenerationFlowCoordinator {
   }
 
   void requestCancellation(GenerationFlowCallbacks callbacks) {
-    if (callbacks.currentState() != CoreTuiController.GenerationState.LOADING) {
+    if (callbacks.currentState() != GenerationState.LOADING) {
       return;
     }
     if (generationFuture != null && generationFuture.isDone()) {
@@ -119,8 +118,7 @@ final class GenerationFlowCoordinator {
 
   private void onProgress(
       long token, GenerationProgressUpdate progressUpdate, GenerationFlowCallbacks callbacks) {
-    if (token != generationToken
-        || callbacks.currentState() != CoreTuiController.GenerationState.LOADING) {
+    if (token != generationToken || callbacks.currentState() != GenerationState.LOADING) {
       return;
     }
     callbacks.onProgress(progressUpdate);
@@ -128,15 +126,14 @@ final class GenerationFlowCoordinator {
 
   private void onCompleted(
       long token, Path generatedPath, Throwable throwable, GenerationFlowCallbacks callbacks) {
-    if (token != generationToken
-        || callbacks.currentState() != CoreTuiController.GenerationState.LOADING) {
+    if (token != generationToken || callbacks.currentState() != GenerationState.LOADING) {
       return;
     }
     generationFuture = null;
 
     Throwable cause = ThrowableUnwrapper.unwrapCompletionCause(throwable);
     if (cause == null && generatedPath != null) {
-      callbacks.transitionTo(CoreTuiController.GenerationState.SUCCESS);
+      callbacks.transitionTo(GenerationState.SUCCESS);
       callbacks.onGenerationSuccess(generatedPath.toAbsolutePath().normalize());
       return;
     }
@@ -146,12 +143,12 @@ final class GenerationFlowCoordinator {
     }
 
     if (cause instanceof CancellationException || generationCancelRequested) {
-      callbacks.transitionTo(CoreTuiController.GenerationState.CANCELLED);
+      callbacks.transitionTo(GenerationState.CANCELLED);
       callbacks.onGenerationCancelled();
       return;
     }
 
-    callbacks.transitionTo(CoreTuiController.GenerationState.ERROR);
+    callbacks.transitionTo(GenerationState.ERROR);
     callbacks.onGenerationFailed(cause);
   }
 }

@@ -42,8 +42,7 @@ class UiEffectsRunnerTest {
                     new UiEffect.ApplyExtensionNavigationKey(KeyEvent.ofChar('j')),
                     new UiEffect.ApplyCatalogLoadSuccess(success),
                     new UiEffect.StartGeneration(),
-                    new UiEffect.TransitionGenerationState(
-                        CoreTuiController.GenerationState.LOADING),
+                    new UiEffect.TransitionGenerationState(GenerationState.LOADING),
                     new UiEffect.RequestGenerationCancellation(),
                     new UiEffect.RequestAsyncRepaint(),
                     new UiEffect.MoveTextInputCursorToEnd(FocusTarget.EXTENSION_SEARCH),
@@ -83,7 +82,7 @@ class UiEffectsRunnerTest {
     assertThat(port.extensionCommand).isEqualTo(extensionCommand);
     assertThat(port.extensionNavigationKeyEvent).isEqualTo(KeyEvent.ofChar('j'));
     assertThat(port.success).isEqualTo(success);
-    assertThat(port.targetState).isEqualTo(CoreTuiController.GenerationState.LOADING);
+    assertThat(port.targetState).isEqualTo(GenerationState.LOADING);
     assertThat(port.cursorFocusTarget).isEqualTo(FocusTarget.EXTENSION_SEARCH);
     assertThat(port.metadataFocusTarget).isEqualTo(FocusTarget.BUILD_TOOL);
     assertThat(port.metadataKeyEvent).isEqualTo(selectorKey);
@@ -97,7 +96,7 @@ class UiEffectsRunnerTest {
     private UiIntent.ExtensionCommand extensionCommand;
     private KeyEvent extensionNavigationKeyEvent;
     private CatalogLoadSuccess success;
-    private CoreTuiController.GenerationState targetState;
+    private GenerationState targetState;
     private FocusTarget cursorFocusTarget;
     private FocusTarget metadataFocusTarget;
     private KeyEvent metadataKeyEvent;
@@ -164,7 +163,7 @@ class UiEffectsRunnerTest {
     }
 
     @Override
-    public void transitionGenerationState(CoreTuiController.GenerationState targetState) {
+    public void transitionGenerationState(GenerationState targetState) {
       calls.add("transitionGenerationState");
       this.targetState = targetState;
     }

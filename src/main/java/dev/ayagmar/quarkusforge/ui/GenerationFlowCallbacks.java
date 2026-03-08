@@ -5,9 +5,9 @@ import java.nio.file.Path;
 interface GenerationFlowCallbacks {
   void beforeGenerationStart();
 
-  boolean transitionTo(CoreTuiController.GenerationState targetState);
+  boolean transitionTo(GenerationState targetState);
 
-  CoreTuiController.GenerationState currentState();
+  GenerationState currentState();
 
   String generationStateLabel();
 

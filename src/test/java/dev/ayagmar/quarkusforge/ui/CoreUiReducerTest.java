@@ -23,7 +23,7 @@ class CoreUiReducerTest {
     assertThat(result.effects())
         .containsExactly(
             new UiEffect.PrepareForGeneration(),
-            new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.VALIDATING),
+            new UiEffect.TransitionGenerationState(GenerationState.VALIDATING),
             new UiEffect.StartGeneration());
     assertThat(result.nextState().statusMessage())
         .isEqualTo("Submit requested with 2 extension(s)");
@@ -43,8 +43,8 @@ class CoreUiReducerTest {
     assertThat(result.effects())
         .containsExactly(
             new UiEffect.PrepareForGeneration(),
-            new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.VALIDATING),
-            new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.ERROR));
+            new UiEffect.TransitionGenerationState(GenerationState.VALIDATING),
+            new UiEffect.TransitionGenerationState(GenerationState.ERROR));
     assertThat(result.nextState().focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
     assertThat(result.nextState().statusMessage())
         .isEqualTo("Submit blocked: fix groupId (1 issue)");
@@ -66,8 +66,8 @@ class CoreUiReducerTest {
     assertThat(result.effects())
         .containsExactly(
             new UiEffect.PrepareForGeneration(),
-            new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.VALIDATING),
-            new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.ERROR));
+            new UiEffect.TransitionGenerationState(GenerationState.VALIDATING),
+            new UiEffect.TransitionGenerationState(GenerationState.ERROR));
     assertThat(result.nextState().focusTarget()).isEqualTo(FocusTarget.OUTPUT_DIR);
     assertThat(result.nextState().statusMessage())
         .isEqualTo("Submit blocked: target folder exists (change output/artifact)");
@@ -87,8 +87,8 @@ class CoreUiReducerTest {
     assertThat(result.effects())
         .containsExactly(
             new UiEffect.PrepareForGeneration(),
-            new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.VALIDATING),
-            new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.IDLE));
+            new UiEffect.TransitionGenerationState(GenerationState.VALIDATING),
+            new UiEffect.TransitionGenerationState(GenerationState.IDLE));
     assertThat(result.nextState().statusMessage())
         .isEqualTo(
             "Submit requested with 3 extension(s), but generation service is not configured.");

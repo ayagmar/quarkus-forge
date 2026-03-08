@@ -23,8 +23,7 @@ class GenerationFlowCoordinatorTest {
     runner.complete(Path.of("./output/../output/demo"));
 
     assertThat(callbacks.transitions)
-        .containsExactly(
-            CoreTuiController.GenerationState.LOADING, CoreTuiController.GenerationState.SUCCESS);
+        .containsExactly(GenerationState.LOADING, GenerationState.SUCCESS);
     assertThat(callbacks.successPaths).containsExactly(Path.of("output/demo").toAbsolutePath());
     assertThat(callbacks.failedCauses).isEmpty();
     assertThat(callbacks.cancelledCount).isZero();
@@ -42,8 +41,7 @@ class GenerationFlowCoordinatorTest {
     runner.fail(new RuntimeException("late failure"));
 
     assertThat(callbacks.transitions)
-        .containsExactly(
-            CoreTuiController.GenerationState.LOADING, CoreTuiController.GenerationState.CANCELLED);
+        .containsExactly(GenerationState.LOADING, GenerationState.CANCELLED);
     assertThat(callbacks.cancelledCount).isEqualTo(1);
     assertThat(callbacks.failedCauses).isEmpty();
   }
@@ -95,8 +93,7 @@ class GenerationFlowCoordinatorTest {
     coordinator.reconcileCompletionIfDone(callbacks);
 
     assertThat(callbacks.transitions)
-        .containsExactly(
-            CoreTuiController.GenerationState.LOADING, CoreTuiController.GenerationState.SUCCESS);
+        .containsExactly(GenerationState.LOADING, GenerationState.SUCCESS);
     assertThat(callbacks.successPaths).containsExactly(Path.of("output/demo").toAbsolutePath());
   }
 
@@ -130,11 +127,11 @@ class GenerationFlowCoordinatorTest {
   }
 
   private static final class TestCallbacks implements GenerationFlowCallbacks {
-    private final List<CoreTuiController.GenerationState> transitions = new ArrayList<>();
+    private final List<GenerationState> transitions = new ArrayList<>();
     private final List<Path> successPaths = new ArrayList<>();
     private final List<Throwable> failedCauses = new ArrayList<>();
     private final List<String> submitIgnoredStates = new ArrayList<>();
-    private CoreTuiController.GenerationState currentState = CoreTuiController.GenerationState.IDLE;
+    private GenerationState currentState = GenerationState.IDLE;
     private boolean transitionAllowed;
     private boolean dropScheduledTasks;
     private int cancelledCount;
@@ -143,8 +140,8 @@ class GenerationFlowCoordinatorTest {
     public void beforeGenerationStart() {}
 
     @Override
-    public boolean transitionTo(CoreTuiController.GenerationState targetState) {
-      if (!transitionAllowed && targetState == CoreTuiController.GenerationState.LOADING) {
+    public boolean transitionTo(GenerationState targetState) {
+      if (!transitionAllowed && targetState == GenerationState.LOADING) {
         return false;
       }
       currentState = targetState;
@@ -153,7 +150,7 @@ class GenerationFlowCoordinatorTest {
     }
 
     @Override
-    public CoreTuiController.GenerationState currentState() {
+    public GenerationState currentState() {
       return currentState;
     }
 

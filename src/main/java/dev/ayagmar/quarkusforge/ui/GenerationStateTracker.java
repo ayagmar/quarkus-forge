@@ -3,45 +3,44 @@ package dev.ayagmar.quarkusforge.ui;
 final class GenerationStateTracker {
   private static final String[] WAITING_FRAMES = {".", "..", "...", "...."};
 
-  private CoreTuiController.GenerationState currentState;
+  private GenerationState currentState;
   private GenerationProgressStep currentStep;
   private double progressRatio;
   private String progressPhase;
   private long waitingTick;
 
   GenerationStateTracker() {
-    currentState = CoreTuiController.GenerationState.IDLE;
+    currentState = GenerationState.IDLE;
     currentStep = GenerationProgressStep.REQUESTING_ARCHIVE;
     progressRatio = 0.0;
     progressPhase = "";
     waitingTick = 0L;
   }
 
-  CoreTuiController.GenerationState currentState() {
+  GenerationState currentState() {
     return currentState;
   }
 
-  boolean transitionTo(CoreTuiController.GenerationState targetState) {
+  boolean transitionTo(GenerationState targetState) {
     if (!isValidTransition(currentState, targetState)) {
       return false;
     }
     currentState = targetState;
-    if (targetState == CoreTuiController.GenerationState.VALIDATING) {
+    if (targetState == GenerationState.VALIDATING) {
       progressRatio = 0.05;
       progressPhase = "Validating input...";
-    } else if (targetState == CoreTuiController.GenerationState.LOADING) {
+    } else if (targetState == GenerationState.LOADING) {
       progressRatio = 0.1;
       progressPhase = "Starting generation...";
       currentStep = GenerationProgressStep.REQUESTING_ARCHIVE;
       waitingTick = 0L;
-    } else if (targetState == CoreTuiController.GenerationState.SUCCESS) {
+    } else if (targetState == GenerationState.SUCCESS) {
       progressRatio = 1.0;
       progressPhase = "Done!";
       currentStep = GenerationProgressStep.FINALIZING;
-    } else if (targetState == CoreTuiController.GenerationState.ERROR
-        || targetState == CoreTuiController.GenerationState.CANCELLED) {
+    } else if (targetState == GenerationState.ERROR || targetState == GenerationState.CANCELLED) {
       progressPhase = "";
-    } else if (targetState == CoreTuiController.GenerationState.IDLE) {
+    } else if (targetState == GenerationState.IDLE) {
       currentStep = GenerationProgressStep.REQUESTING_ARCHIVE;
       progressRatio = 0.0;
       progressPhase = "";
@@ -61,7 +60,7 @@ final class GenerationStateTracker {
   }
 
   void tick(long elapsedMillis) {
-    if (currentState != CoreTuiController.GenerationState.LOADING) {
+    if (currentState != GenerationState.LOADING) {
       return;
     }
     if (currentStep != GenerationProgressStep.REQUESTING_ARCHIVE) {
@@ -83,15 +82,15 @@ final class GenerationStateTracker {
   }
 
   void resetAfterTerminalOutcome() {
-    if (currentState == CoreTuiController.GenerationState.SUCCESS
-        || currentState == CoreTuiController.GenerationState.ERROR
-        || currentState == CoreTuiController.GenerationState.CANCELLED) {
-      transitionTo(CoreTuiController.GenerationState.IDLE);
+    if (currentState == GenerationState.SUCCESS
+        || currentState == GenerationState.ERROR
+        || currentState == GenerationState.CANCELLED) {
+      transitionTo(GenerationState.IDLE);
     }
   }
 
   boolean isInProgress() {
-    return currentState == CoreTuiController.GenerationState.LOADING;
+    return currentState == GenerationState.LOADING;
   }
 
   String stateLabel() {
@@ -116,23 +115,21 @@ final class GenerationStateTracker {
     };
   }
 
-  static boolean isValidTransition(
-      CoreTuiController.GenerationState currentState,
-      CoreTuiController.GenerationState targetState) {
+  static boolean isValidTransition(GenerationState currentState, GenerationState targetState) {
     if (currentState == targetState) {
       return false;
     }
     return switch (currentState) {
-      case IDLE -> targetState == CoreTuiController.GenerationState.VALIDATING;
+      case IDLE -> targetState == GenerationState.VALIDATING;
       case VALIDATING ->
-          targetState == CoreTuiController.GenerationState.LOADING
-              || targetState == CoreTuiController.GenerationState.ERROR
-              || targetState == CoreTuiController.GenerationState.IDLE;
+          targetState == GenerationState.LOADING
+              || targetState == GenerationState.ERROR
+              || targetState == GenerationState.IDLE;
       case LOADING ->
-          targetState == CoreTuiController.GenerationState.SUCCESS
-              || targetState == CoreTuiController.GenerationState.ERROR
-              || targetState == CoreTuiController.GenerationState.CANCELLED;
-      case SUCCESS, ERROR, CANCELLED -> targetState == CoreTuiController.GenerationState.IDLE;
+          targetState == GenerationState.SUCCESS
+              || targetState == GenerationState.ERROR
+              || targetState == GenerationState.CANCELLED;
+      case SUCCESS, ERROR, CANCELLED -> targetState == GenerationState.IDLE;
     };
   }
 

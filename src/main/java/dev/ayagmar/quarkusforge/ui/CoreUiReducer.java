@@ -235,8 +235,8 @@ final class CoreUiReducer implements UiReducer {
               nextFocusTarget, statusMessage, firstValidationError, true, false),
           List.of(
               new UiEffect.PrepareForGeneration(),
-              new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.VALIDATING),
-              new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.ERROR)),
+              new UiEffect.TransitionGenerationState(GenerationState.VALIDATING),
+              new UiEffect.TransitionGenerationState(GenerationState.ERROR)),
           UiAction.handled(false));
     }
     if (context.hasTargetConflict()) {
@@ -249,8 +249,8 @@ final class CoreUiReducer implements UiReducer {
               true),
           List.of(
               new UiEffect.PrepareForGeneration(),
-              new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.VALIDATING),
-              new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.ERROR)),
+              new UiEffect.TransitionGenerationState(GenerationState.VALIDATING),
+              new UiEffect.TransitionGenerationState(GenerationState.ERROR)),
           UiAction.handled(false));
     }
     if (!context.generationConfigured()) {
@@ -267,8 +267,8 @@ final class CoreUiReducer implements UiReducer {
               false),
           List.of(
               new UiEffect.PrepareForGeneration(),
-              new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.VALIDATING),
-              new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.IDLE)),
+              new UiEffect.TransitionGenerationState(GenerationState.VALIDATING),
+              new UiEffect.TransitionGenerationState(GenerationState.IDLE)),
           UiAction.handled(false));
     }
     return new ReduceResult(
@@ -282,7 +282,7 @@ final class CoreUiReducer implements UiReducer {
             false),
         List.of(
             new UiEffect.PrepareForGeneration(),
-            new UiEffect.TransitionGenerationState(CoreTuiController.GenerationState.VALIDATING),
+            new UiEffect.TransitionGenerationState(GenerationState.VALIDATING),
             new UiEffect.StartGeneration()),
         UiAction.handled(false));
   }

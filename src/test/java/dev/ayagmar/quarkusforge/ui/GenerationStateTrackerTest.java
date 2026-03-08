@@ -10,7 +10,7 @@ class GenerationStateTrackerTest {
   void initialStateIsIdle() {
     GenerationStateTracker tracker = new GenerationStateTracker();
 
-    assertThat(tracker.currentState()).isEqualTo(CoreTuiController.GenerationState.IDLE);
+    assertThat(tracker.currentState()).isEqualTo(GenerationState.IDLE);
     assertThat(tracker.progressRatio()).isEqualTo(0.0);
     assertThat(tracker.progressPhase()).isEmpty();
     assertThat(tracker.isInProgress()).isFalse();
@@ -22,7 +22,7 @@ class GenerationStateTrackerTest {
   void transitionIdleToValidating() {
     GenerationStateTracker tracker = new GenerationStateTracker();
 
-    boolean result = tracker.transitionTo(CoreTuiController.GenerationState.VALIDATING);
+    boolean result = tracker.transitionTo(GenerationState.VALIDATING);
 
     assertThat(result).isTrue();
     assertThat(tracker.progressRatio()).isEqualTo(0.05);
@@ -34,9 +34,9 @@ class GenerationStateTrackerTest {
   @Test
   void transitionValidatingToLoading() {
     GenerationStateTracker tracker = new GenerationStateTracker();
-    tracker.transitionTo(CoreTuiController.GenerationState.VALIDATING);
+    tracker.transitionTo(GenerationState.VALIDATING);
 
-    boolean result = tracker.transitionTo(CoreTuiController.GenerationState.LOADING);
+    boolean result = tracker.transitionTo(GenerationState.LOADING);
 
     assertThat(result).isTrue();
     assertThat(tracker.progressRatio()).isEqualTo(0.1);
@@ -50,7 +50,7 @@ class GenerationStateTrackerTest {
   void transitionLoadingToSuccess() {
     GenerationStateTracker tracker = trackerInLoadingState();
 
-    boolean result = tracker.transitionTo(CoreTuiController.GenerationState.SUCCESS);
+    boolean result = tracker.transitionTo(GenerationState.SUCCESS);
 
     assertThat(result).isTrue();
     assertThat(tracker.progressRatio()).isEqualTo(1.0);
@@ -63,7 +63,7 @@ class GenerationStateTrackerTest {
   void transitionLoadingToError() {
     GenerationStateTracker tracker = trackerInLoadingState();
 
-    boolean result = tracker.transitionTo(CoreTuiController.GenerationState.ERROR);
+    boolean result = tracker.transitionTo(GenerationState.ERROR);
 
     assertThat(result).isTrue();
     assertThat(tracker.progressPhase()).isEmpty();
@@ -75,7 +75,7 @@ class GenerationStateTrackerTest {
   void transitionLoadingToCancelled() {
     GenerationStateTracker tracker = trackerInLoadingState();
 
-    boolean result = tracker.transitionTo(CoreTuiController.GenerationState.CANCELLED);
+    boolean result = tracker.transitionTo(GenerationState.CANCELLED);
 
     assertThat(result).isTrue();
     assertThat(tracker.stateLabel()).isEqualTo("cancelled");
@@ -86,17 +86,17 @@ class GenerationStateTrackerTest {
   void invalidTransitionReturnsFalse() {
     GenerationStateTracker tracker = new GenerationStateTracker();
 
-    boolean result = tracker.transitionTo(CoreTuiController.GenerationState.LOADING);
+    boolean result = tracker.transitionTo(GenerationState.LOADING);
 
     assertThat(result).isFalse();
-    assertThat(tracker.currentState()).isEqualTo(CoreTuiController.GenerationState.IDLE);
+    assertThat(tracker.currentState()).isEqualTo(GenerationState.IDLE);
   }
 
   @Test
   void sameStateTransitionReturnsFalse() {
     GenerationStateTracker tracker = new GenerationStateTracker();
 
-    boolean result = tracker.transitionTo(CoreTuiController.GenerationState.IDLE);
+    boolean result = tracker.transitionTo(GenerationState.IDLE);
 
     assertThat(result).isFalse();
   }
@@ -155,31 +155,31 @@ class GenerationStateTrackerTest {
   @Test
   void resetAfterTerminalOutcomeResetsSuccessToIdle() {
     GenerationStateTracker tracker = trackerInLoadingState();
-    tracker.transitionTo(CoreTuiController.GenerationState.SUCCESS);
+    tracker.transitionTo(GenerationState.SUCCESS);
 
     tracker.resetAfterTerminalOutcome();
 
-    assertThat(tracker.currentState()).isEqualTo(CoreTuiController.GenerationState.IDLE);
+    assertThat(tracker.currentState()).isEqualTo(GenerationState.IDLE);
   }
 
   @Test
   void resetAfterTerminalOutcomeResetsErrorToIdle() {
     GenerationStateTracker tracker = trackerInLoadingState();
-    tracker.transitionTo(CoreTuiController.GenerationState.ERROR);
+    tracker.transitionTo(GenerationState.ERROR);
 
     tracker.resetAfterTerminalOutcome();
 
-    assertThat(tracker.currentState()).isEqualTo(CoreTuiController.GenerationState.IDLE);
+    assertThat(tracker.currentState()).isEqualTo(GenerationState.IDLE);
   }
 
   @Test
   void resetAfterTerminalOutcomeResetsCancelledToIdle() {
     GenerationStateTracker tracker = trackerInLoadingState();
-    tracker.transitionTo(CoreTuiController.GenerationState.CANCELLED);
+    tracker.transitionTo(GenerationState.CANCELLED);
 
     tracker.resetAfterTerminalOutcome();
 
-    assertThat(tracker.currentState()).isEqualTo(CoreTuiController.GenerationState.IDLE);
+    assertThat(tracker.currentState()).isEqualTo(GenerationState.IDLE);
   }
 
   @Test
@@ -188,15 +188,14 @@ class GenerationStateTrackerTest {
 
     tracker.resetAfterTerminalOutcome();
 
-    assertThat(tracker.currentState()).isEqualTo(CoreTuiController.GenerationState.IDLE);
+    assertThat(tracker.currentState()).isEqualTo(GenerationState.IDLE);
   }
 
   @Test
   void validTransitionFromValidatingToError() {
     assertThat(
             GenerationStateTracker.isValidTransition(
-                CoreTuiController.GenerationState.VALIDATING,
-                CoreTuiController.GenerationState.ERROR))
+                GenerationState.VALIDATING, GenerationState.ERROR))
         .isTrue();
   }
 
@@ -204,8 +203,7 @@ class GenerationStateTrackerTest {
   void validTransitionFromValidatingToIdle() {
     assertThat(
             GenerationStateTracker.isValidTransition(
-                CoreTuiController.GenerationState.VALIDATING,
-                CoreTuiController.GenerationState.IDLE))
+                GenerationState.VALIDATING, GenerationState.IDLE))
         .isTrue();
   }
 
@@ -213,7 +211,7 @@ class GenerationStateTrackerTest {
   void invalidTransitionFromErrorToLoading() {
     assertThat(
             GenerationStateTracker.isValidTransition(
-                CoreTuiController.GenerationState.ERROR, CoreTuiController.GenerationState.LOADING))
+                GenerationState.ERROR, GenerationState.LOADING))
         .isFalse();
   }
 
@@ -239,8 +237,8 @@ class GenerationStateTrackerTest {
 
   private static GenerationStateTracker trackerInLoadingState() {
     GenerationStateTracker tracker = new GenerationStateTracker();
-    tracker.transitionTo(CoreTuiController.GenerationState.VALIDATING);
-    tracker.transitionTo(CoreTuiController.GenerationState.LOADING);
+    tracker.transitionTo(GenerationState.VALIDATING);
+    tracker.transitionTo(GenerationState.LOADING);
     return tracker;
   }
 }

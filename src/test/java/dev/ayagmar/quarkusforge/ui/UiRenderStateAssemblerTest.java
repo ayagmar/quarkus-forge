@@ -140,7 +140,7 @@ class UiRenderStateAssemblerTest {
         EMPTY_EXTENSIONS_PANEL,
         EMPTY_FOOTER,
         new UiState.OverlayState(false, false, false, false, false),
-        new UiState.GenerationView(CoreTuiController.GenerationState.IDLE, 0.0, "", false),
+        new UiState.GenerationView(GenerationState.IDLE, 0.0, "", false),
         new UiState.CatalogLoadView(CatalogLoadState.initial()),
         new UiState.PostGenerationView(false, false, 0, 0, List.of(), null, "", null),
         new UiState.StartupOverlayView(false, List.of()),

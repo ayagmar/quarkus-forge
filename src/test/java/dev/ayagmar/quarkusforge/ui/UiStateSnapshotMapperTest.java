@@ -25,7 +25,7 @@ class UiStateSnapshotMapperTest {
 
     assertThat(state.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
     assertThat(state.statusMessage()).isEqualTo("Ready");
-    assertThat(state.generation().state()).isEqualTo(CoreTuiController.GenerationState.IDLE);
+    assertThat(state.generation().state()).isEqualTo(GenerationState.IDLE);
     assertThat(state.catalogLoad().loading()).isFalse();
     assertThat(state.catalogLoad().sourceLabel()).isEqualTo("snapshot");
     assertThat(state.overlays().commandPaletteVisible()).isFalse();
@@ -51,8 +51,7 @@ class UiStateSnapshotMapperTest {
     scheduler.runAll();
 
     UiState loadingSnapshot = controller.uiState();
-    assertThat(loadingSnapshot.generation().state())
-        .isEqualTo(CoreTuiController.GenerationState.SUCCESS);
+    assertThat(loadingSnapshot.generation().state()).isEqualTo(GenerationState.SUCCESS);
     assertThat(loadingSnapshot.catalogLoad().loading()).isTrue();
     assertThat(loadingSnapshot.overlays().startupOverlayVisible()).isTrue();
     assertThat(loadingSnapshot.postGeneration().visible()).isTrue();
@@ -129,7 +128,7 @@ class UiStateSnapshotMapperTest {
 
     assertThat(state.startupOverlay().visible()).isTrue();
     assertThat(state.startupOverlay().statusLines()).containsExactly("runtime line");
-    assertThat(state.generation().state()).isEqualTo(CoreTuiController.GenerationState.IDLE);
+    assertThat(state.generation().state()).isEqualTo(GenerationState.IDLE);
     assertThat(state.extensions().searchQuery()).isEmpty();
     assertThat(state.footer()).isEqualTo(footerSnapshot);
     assertThat(state.statusMessage()).isEqualTo("Ready");
@@ -213,7 +212,7 @@ class UiStateSnapshotMapperTest {
             panelState.extensionsPanel(),
             panelState.footer(),
             new UiState.OverlayState(false, false, false, false, false),
-            new UiState.GenerationView(CoreTuiController.GenerationState.IDLE, 0.0, "", false),
+            new UiState.GenerationView(GenerationState.IDLE, 0.0, "", false),
             new UiState.CatalogLoadView(CatalogLoadState.initial()),
             new UiState.PostGenerationView(false, false, 0, 0, List.of(), null, "", null),
             new UiState.StartupOverlayView(false, List.of()),
