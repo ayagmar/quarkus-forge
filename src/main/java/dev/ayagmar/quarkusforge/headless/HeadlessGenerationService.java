@@ -27,32 +27,35 @@ public final class HeadlessGenerationService implements AutoCloseable {
   private final HeadlessGenerationExecutionService generationExecutionService;
   private final AutoCloseable closeOwner;
 
-  HeadlessGenerationService(
-      HeadlessCatalogLoader catalogLoader,
-      HeadlessProjectGenerator projectGenerator,
-      ExtensionFavoritesStore favoritesStore) {
-    this(
-        catalogLoader,
-        new HeadlessExtensionResolutionService(catalogLoader, favoritesStore),
-        new HeadlessForgefilePersistenceService(),
-        new HeadlessGenerationExecutionService(projectGenerator),
-        catalogLoader);
+  static HeadlessGenerationService create(
+      HeadlessCatalogOperations catalogOperations, ExtensionFavoritesStore favoritesStore) {
+    return create(catalogOperations, favoritesStore, catalogOperations);
   }
 
-  HeadlessGenerationService(
-      HeadlessCatalogLoader catalogLoader,
-      HeadlessProjectGenerator projectGenerator,
+  public static HeadlessGenerationService create(
+      QuarkusApiClient apiClient,
+      CatalogDataService catalogDataService,
+      ProjectArchiveService projectArchiveService,
       ExtensionFavoritesStore favoritesStore,
       AutoCloseable closeOwner) {
-    this(
-        catalogLoader,
-        new HeadlessExtensionResolutionService(catalogLoader, favoritesStore),
+    HeadlessCatalogClient catalogClient =
+        new HeadlessCatalogClient(apiClient, catalogDataService, projectArchiveService);
+    return create(catalogClient, favoritesStore, closeOwner == null ? catalogClient : closeOwner);
+  }
+
+  static HeadlessGenerationService create(
+      HeadlessCatalogOperations catalogOperations,
+      ExtensionFavoritesStore favoritesStore,
+      AutoCloseable closeOwner) {
+    return new HeadlessGenerationService(
+        catalogOperations,
+        new HeadlessExtensionResolutionService(catalogOperations, favoritesStore),
         new HeadlessForgefilePersistenceService(),
-        new HeadlessGenerationExecutionService(projectGenerator),
+        new HeadlessGenerationExecutionService(catalogOperations),
         closeOwner);
   }
 
-  HeadlessGenerationService(
+  private HeadlessGenerationService(
       HeadlessCatalogLoader catalogLoader,
       HeadlessExtensionResolutionService extensionResolutionService,
       HeadlessForgefilePersistenceService forgefilePersistenceService,
@@ -63,30 +66,6 @@ public final class HeadlessGenerationService implements AutoCloseable {
     this.forgefilePersistenceService = Objects.requireNonNull(forgefilePersistenceService);
     this.generationExecutionService = Objects.requireNonNull(generationExecutionService);
     this.closeOwner = Objects.requireNonNull(closeOwner);
-  }
-
-  public static HeadlessGenerationService create(
-      QuarkusApiClient apiClient,
-      CatalogDataService catalogDataService,
-      ProjectArchiveService projectArchiveService,
-      ExtensionFavoritesStore favoritesStore) {
-    return create(apiClient, catalogDataService, projectArchiveService, favoritesStore, null);
-  }
-
-  public static HeadlessGenerationService create(
-      QuarkusApiClient apiClient,
-      CatalogDataService catalogDataService,
-      ProjectArchiveService projectArchiveService,
-      ExtensionFavoritesStore favoritesStore,
-      AutoCloseable closeOwner) {
-    HeadlessCatalogClient client =
-        new HeadlessCatalogClient(apiClient, catalogDataService, projectArchiveService);
-    return new HeadlessGenerationService(
-        client,
-        new HeadlessExtensionResolutionService(client, favoritesStore),
-        new HeadlessForgefilePersistenceService(),
-        new HeadlessGenerationExecutionService(client),
-        closeOwner == null ? client : closeOwner);
   }
 
   @Override

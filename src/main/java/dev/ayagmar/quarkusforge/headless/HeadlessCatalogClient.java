@@ -22,7 +22,7 @@ import java.util.function.Consumer;
  * single {@link QuarkusApiClient} across all calls within one generation session. Must be closed
  * after use to release transport resources.
  */
-final class HeadlessCatalogClient implements HeadlessCatalogLoader, HeadlessProjectGenerator {
+final class HeadlessCatalogClient implements HeadlessCatalogOperations {
   private final QuarkusApiClient apiClient;
   private final CatalogDataService catalogDataService;
   private final ProjectArchiveService projectArchiveService;

@@ -26,4 +26,5 @@ Before merging refactors that touch CLI/bootstrap classes:
 
 * Run the default test suite (`./mvnw -q verify`) so ArchUnit guardrails are evaluated.
 * Run headless compile (`./mvnw -q clean compile -Pheadless`) to confirm profile scope still compiles.
+* Keep catalog loading and generation start behind the `HeadlessCatalogOperations` seam; do not re-split the same authority across parallel loader/generator wiring paths.
 * If you add a new headless orchestration class, include it in the ArchUnit rule scope.
