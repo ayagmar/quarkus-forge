@@ -80,8 +80,7 @@ sealed interface UiIntent {
 
   record ExtensionStateUpdatedIntent(UiState.ExtensionView extensions) implements UiIntent {}
 
-  record ExtensionNavigationIntent(dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget)
-      implements UiIntent {}
+  record ExtensionInteractionIntent(dev.tamboui.tui.event.KeyEvent keyEvent) implements UiIntent {}
 
   record FocusNavigationIntent(dev.tamboui.tui.event.KeyEvent keyEvent, FocusTarget focusTarget)
       implements UiIntent {}

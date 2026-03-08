@@ -96,7 +96,11 @@ public final class TuiBootstrapService {
   }
 
   private static boolean isWindowsOsName(String osName) {
-    return osName != null && osName.toLowerCase(Locale.ROOT).contains("win");
+    if (osName == null) {
+      return false;
+    }
+    String normalized = osName.strip().toLowerCase(Locale.ROOT);
+    return normalized.startsWith("windows");
   }
 
   public static void runHeadlessSmoke(RuntimeConfig runtimeConfig, DiagnosticLogger diagnostics) {

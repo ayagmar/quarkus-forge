@@ -39,6 +39,12 @@ class TuiBootstrapServiceTest {
   }
 
   @Test
+  void defaultBackendPreferenceDoesNotTreatDarwinAsWindows() {
+    systemProperties.set("os.name", "Darwin");
+    assertThat(TuiBootstrapService.defaultBackendPreference()).isEqualTo("panama");
+  }
+
+  @Test
   void defaultBackendPreferenceUsesJlineOnWindows() {
     systemProperties.set("os.name", "Windows 11");
     assertThat(TuiBootstrapService.defaultBackendPreference()).isEqualTo("jline3");
