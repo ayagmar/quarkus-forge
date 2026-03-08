@@ -580,8 +580,7 @@ class HeadlessGenerationServiceTest {
     StubCatalogOperations client = new StubCatalogOperations();
     TrackingCloseable closeOwner = new TrackingCloseable();
     HeadlessGenerationService service =
-        new HeadlessGenerationService(
-            client, client, ExtensionFavoritesStore.inMemory(), closeOwner);
+        HeadlessGenerationService.create(client, ExtensionFavoritesStore.inMemory(), closeOwner);
 
     service.close();
 
@@ -610,11 +609,10 @@ class HeadlessGenerationServiceTest {
 
   private static HeadlessGenerationService serviceWith(
       StubCatalogOperations client, ExtensionFavoritesStore favoritesStore) {
-    return new HeadlessGenerationService(client, client, favoritesStore);
+    return HeadlessGenerationService.create(client, favoritesStore);
   }
 
-  private static final class StubCatalogOperations
-      implements HeadlessCatalogLoader, HeadlessProjectGenerator {
+  private static final class StubCatalogOperations implements HeadlessCatalogOperations {
     TimeoutException catalogLoadTimeout;
     java.util.concurrent.CancellationException catalogLoadCancellation;
     TimeoutException presetLoadTimeout;
