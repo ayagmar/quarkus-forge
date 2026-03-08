@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge.util;
 
+import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import java.nio.file.Path;
 import java.util.regex.Pattern;
 
@@ -20,6 +21,11 @@ public final class OutputPathResolver {
     } catch (RuntimeException pathError) {
       return outputDirectory == null ? "" : outputDirectory;
     }
+  }
+
+  public static Path resolveGeneratedProjectDirectory(ProjectRequest request) {
+    Path outputRoot = resolveOutputRoot(request.outputDirectory());
+    return outputRoot.resolve(request.artifactId()).normalize();
   }
 
   private static String expandHomePrefix(String outputDirectory) {

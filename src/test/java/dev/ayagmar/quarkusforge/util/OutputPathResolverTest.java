@@ -3,6 +3,7 @@ package dev.ayagmar.quarkusforge.util;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.ayagmar.quarkusforge.SystemPropertyExtension;
+import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -58,5 +59,22 @@ class OutputPathResolverTest {
   void absoluteDisplayPathResolvesNullInputToCurrentWorkingDirectory() {
     assertThat(OutputPathResolver.absoluteDisplayPath(null))
         .isEqualTo(Path.of("").toAbsolutePath().normalize().toString());
+  }
+
+  @Test
+  void resolvesGeneratedProjectDirectoryFromRequest() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "org.acme",
+            "demo",
+            "1.0.0-SNAPSHOT",
+            "org.acme.demo",
+            "./output",
+            "3.20",
+            "maven",
+            "21");
+
+    assertThat(OutputPathResolver.resolveGeneratedProjectDirectory(request))
+        .isEqualTo(Path.of("./output").toAbsolutePath().normalize().resolve("demo"));
   }
 }
