@@ -6,7 +6,6 @@ import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.ayagmar.quarkusforge.util.OutputPathResolver;
 import dev.tamboui.widgets.input.TextInputState;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -214,7 +213,7 @@ final class UiRenderStateAssembler {
       return "";
     }
     try {
-      return resolveGeneratedProjectDirectory(reducerState.request()).toString();
+      return OutputPathResolver.resolveGeneratedProjectDirectory(reducerState.request()).toString();
     } catch (RuntimeException pathError) {
       return "";
     }
@@ -277,7 +276,7 @@ final class UiRenderStateAssembler {
     ProjectRequest request = reducerState.request();
     String targetPathDisplay;
     try {
-      targetPathDisplay = resolveGeneratedProjectDirectory(request).toString();
+      targetPathDisplay = OutputPathResolver.resolveGeneratedProjectDirectory(request).toString();
     } catch (RuntimeException pathError) {
       targetPathDisplay = request.outputDirectory() + "/" + request.artifactId();
     }
@@ -343,10 +342,5 @@ final class UiRenderStateAssembler {
           MetadataSelectorManager.optionDisplayLabel(target, option, metadataSnapshot));
     }
     return List.copyOf(displayOptions);
-  }
-
-  private static Path resolveGeneratedProjectDirectory(ProjectRequest request) {
-    Path outputRoot = OutputPathResolver.resolveOutputRoot(request.outputDirectory());
-    return outputRoot.resolve(request.artifactId()).normalize();
   }
 }

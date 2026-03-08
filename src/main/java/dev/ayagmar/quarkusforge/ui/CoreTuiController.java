@@ -78,7 +78,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   private final ExtensionCatalogPreferences extensionCatalogPreferences;
   private final ExtensionCatalogNavigation extensionCatalogNavigation;
   private final ExtensionCatalogProjection extensionCatalogProjection;
-  private final ExtensionInteractionHandler extensionInteraction;
+  private final ExtensionEffects extensionEffects;
   private final ProjectGenerationRunner projectGenerationRunner;
   private final MetadataSelectorManager metadataSelectors = new MetadataSelectorManager();
 
@@ -157,12 +157,12 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
           @Override
           public List<UiIntent> executeExtensionCommand(UiIntent.ExtensionCommand command) {
-            return executeExtensionCommandEffect(command);
+            return extensionEffects.executeCommand(command);
           }
 
           @Override
           public List<UiIntent> applyExtensionNavigationKey(KeyEvent keyEvent) {
-            return applyExtensionNavigationKeyEffect(keyEvent);
+            return extensionEffects.applyNavigationKey(keyEvent);
           }
 
           @Override
@@ -294,9 +294,32 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
                 return CoreTuiController.this.validateRequest(request);
               }
             });
-    extensionInteraction =
-        new ExtensionInteractionHandler(
-            extensionCatalogPreferences, extensionCatalogNavigation, extensionCatalogProjection);
+    extensionEffects =
+        new ExtensionEffects(
+            catalogEffects,
+            new ExtensionInteractionHandler(
+                extensionCatalogPreferences,
+                extensionCatalogNavigation,
+                extensionCatalogProjection),
+            extensionCatalogPreferences,
+            extensionCatalogNavigation,
+            extensionCatalogProjection,
+            new ExtensionEffects.Callbacks() {
+              @Override
+              public UiIntent.ExtensionStateUpdatedIntent extensionStateUpdatedIntent() {
+                return CoreTuiController.this.extensionStateUpdatedIntent();
+              }
+
+              @Override
+              public TextInputState extensionSearchState() {
+                return inputStates.get(FocusTarget.EXTENSION_SEARCH);
+              }
+
+              @Override
+              public String currentStatusMessage() {
+                return reducerState.statusMessage();
+              }
+            });
     uiRenderStateAssembler =
         new UiRenderStateAssembler(
             inputStates,
@@ -800,27 +823,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     return List.copyOf(intents);
   }
 
-  private String toggleExtensionSelectionAtCursor() {
-    Integer selectedRow = extensionCatalogNavigation.selectedRow();
-    if (selectedRow == null) {
-      return "No extension selected to toggle";
-    }
-    ExtensionCatalogItem extension = extensionCatalogProjection.itemAtRow(selectedRow);
-    if (extension == null) {
-      return "No extension selected to toggle";
-    }
-    if (extensionCatalogNavigation.select(extension.id())) {
-      extensionCatalogPreferences.recordRecentSelection(extension.id());
-      extensionCatalogProjection.refreshRows(
-          extension.id(), extensionCatalogNavigation, extensionCatalogPreferences);
-    } else {
-      extensionCatalogNavigation.deselect(extension.id());
-      extensionCatalogProjection.reapplyAfterSelectionMutation(
-          extensionCatalogNavigation, extensionCatalogPreferences);
-    }
-    return "Toggled extension: " + extension.name();
-  }
-
   @Override
   public UiAction handleCommandPaletteKey(KeyEvent keyEvent) {
     if (!commandPaletteVisible()) {
@@ -956,67 +958,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     } catch (RuntimeException runtimeException) {
       return "Failed to export Forgefile: " + runtimeException.getMessage();
     }
-  }
-
-  private List<UiIntent> executeExtensionCommandEffect(UiIntent.ExtensionCommand command) {
-    return switch (command) {
-      case CLEAR_SEARCH -> clearExtensionSearchFilter();
-      case DISABLE_FAVORITES_FILTER ->
-          extensionUpdateIntents(
-              reducerState.extensions().favoritesOnlyEnabled()
-                  ? extensionInteraction.toggleFavoritesOnlyFilter(ignored -> {})
-                  : "Favorites filter disabled");
-      case DISABLE_SELECTED_FILTER ->
-          extensionUpdateIntents(
-              reducerState.extensions().selectedOnlyEnabled()
-                  ? extensionInteraction.toggleSelectedOnlyFilter(ignored -> {})
-                  : "Selected-only view disabled");
-      case CLEAR_PRESET_FILTER ->
-          extensionUpdateIntents(extensionInteraction.clearPresetFilter(ignored -> {}));
-      case CLEAR_CATEGORY_FILTER -> {
-        String statusMessage = extensionInteraction.clearCategoryFilter(ignored -> {});
-        yield extensionUpdateIntents(
-            statusMessage == null ? "Category filter cleared" : statusMessage);
-      }
-      case TOGGLE_FAVORITE_AT_SELECTION ->
-          extensionUpdateIntents(extensionInteraction.toggleFavoriteAtSelection(ignored -> {}));
-      case CLEAR_SELECTED_EXTENSIONS ->
-          extensionUpdateIntents(extensionInteraction.clearSelectedExtensions());
-      case TOGGLE_CATEGORY_AT_SELECTION ->
-          extensionUpdateIntents(extensionInteraction.toggleCategoryCollapseAtSelection());
-      case OPEN_ALL_CATEGORIES ->
-          extensionUpdateIntents(extensionInteraction.expandAllCategories());
-      case JUMP_TO_NEXT_CATEGORY ->
-          extensionUpdateIntents(extensionInteraction.jumpToAdjacentSection(true));
-      case JUMP_TO_PREVIOUS_CATEGORY ->
-          extensionUpdateIntents(extensionInteraction.jumpToAdjacentSection(false));
-      case HIERARCHY_LEFT -> {
-        String statusMessage = extensionInteraction.handleHierarchyLeft();
-        yield extensionUpdateIntents(
-            statusMessage == null ? reducerState.statusMessage() : statusMessage);
-      }
-      case HIERARCHY_RIGHT -> {
-        String statusMessage = extensionInteraction.handleHierarchyRight();
-        yield extensionUpdateIntents(
-            statusMessage == null ? reducerState.statusMessage() : statusMessage);
-      }
-      case TOGGLE_SELECTION_AT_CURSOR -> extensionUpdateIntents(toggleExtensionSelectionAtCursor());
-      case TOGGLE_FAVORITES_FILTER ->
-          extensionUpdateIntents(extensionInteraction.toggleFavoritesOnlyFilter(ignored -> {}));
-      case TOGGLE_SELECTED_FILTER ->
-          extensionUpdateIntents(extensionInteraction.toggleSelectedOnlyFilter(ignored -> {}));
-      case CYCLE_PRESET_FILTER ->
-          extensionUpdateIntents(extensionInteraction.cyclePresetFilter(ignored -> {}));
-      case JUMP_TO_FAVORITE -> extensionUpdateIntents(extensionInteraction.jumpToFavorite());
-      case CYCLE_CATEGORY_FILTER ->
-          extensionUpdateIntents(extensionInteraction.cycleCategoryFilter(ignored -> {}));
-    };
-  }
-
-  private List<UiIntent> applyExtensionNavigationKeyEffect(KeyEvent keyEvent) {
-    boolean handled =
-        extensionCatalogNavigation.handleNavigationKey(extensionCatalogProjection.rows(), keyEvent);
-    return handled ? List.of(extensionStateUpdatedIntent()) : List.of();
   }
 
   @Override
@@ -1190,8 +1131,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
   }
 
   private Path resolveGeneratedProjectDirectory(ProjectRequest request) {
-    Path outputRoot = OutputPathResolver.resolveOutputRoot(request.outputDirectory());
-    return outputRoot.resolve(request.artifactId()).normalize();
+    return OutputPathResolver.resolveGeneratedProjectDirectory(request);
   }
 
   private void prepareForGenerationEffect() {
@@ -1401,11 +1341,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
 
   private UiAction routeExtensionCommand(UiIntent.ExtensionCommand command) {
     return routeIntent(new UiIntent.ExtensionCommandIntent(command));
-  }
-
-  private List<UiIntent> clearExtensionSearchFilter() {
-    return extensionUpdateIntents(
-        catalogEffects.clearSearchFilter(inputStates.get(FocusTarget.EXTENSION_SEARCH)));
   }
 
   static String catalogLoadedStatusMessage(CatalogSource source, boolean stale) {

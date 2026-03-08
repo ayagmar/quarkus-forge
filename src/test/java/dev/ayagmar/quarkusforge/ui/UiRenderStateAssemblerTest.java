@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
 import dev.ayagmar.quarkusforge.persistence.ExtensionFavoritesStore;
 import dev.tamboui.widgets.input.TextInputState;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.EnumMap;
 import java.util.List;
@@ -69,6 +70,23 @@ class UiRenderStateAssemblerTest {
     assertThat(context.metadataFields().selectorOptions(FocusTarget.BUILD_TOOL)).contains("maven");
     assertThat(context.selectedLookup().matches("io.quarkus:quarkus-rest")).isTrue();
     assertThat(context.favoriteLookup().matches("io.quarkus:quarkus-rest")).isTrue();
+  }
+
+  @Test
+  void footerSuppressesTargetPathAndPlanWhilePostGenerationMenuIsVisible() {
+    ForgeUiState initialState = UiTestFixtureFactory.defaultForgeUiState();
+    RenderFixture fixture = RenderFixture.create(initialState);
+    UiState reducerState =
+        fixture.reducerState.withPostGeneration(
+            new UiState.PostGenerationView(
+                true, false, 0, 0, List.of(), Path.of("output/forge-app"), "", null));
+
+    UiState snapshot =
+        fixture.assembler.uiState(
+            reducerState, "Ready", initialState.metadataCompatibility(), false);
+
+    assertThat(snapshot.footer().resolvedTargetPath()).isEmpty();
+    assertThat(snapshot.footer().preGeneratePlan()).isEmpty();
   }
 
   private record RenderFixture(
