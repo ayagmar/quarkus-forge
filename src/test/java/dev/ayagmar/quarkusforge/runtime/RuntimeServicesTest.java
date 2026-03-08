@@ -2,6 +2,8 @@ package dev.ayagmar.quarkusforge.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.ayagmar.quarkusforge.domain.ProjectRequest;
+import dev.ayagmar.quarkusforge.headless.HeadlessGenerationService;
 import java.net.URI;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
@@ -38,5 +40,41 @@ class RuntimeServicesTest {
             tempDir.resolve("preferences.json"));
 
     assertThat(RuntimeServices.userPreferencesStore(runtimeConfig).loadLastRequest()).isNull();
+  }
+
+  @Test
+  void loadAndSaveStoredCliPrefillRoundTripThroughConfiguredPreferencesFile() {
+    RuntimeConfig runtimeConfig =
+        new RuntimeConfig(
+            URI.create("http://localhost:18080"),
+            tempDir.resolve("catalog-cache.json"),
+            tempDir.resolve("favorites.json"),
+            tempDir.resolve("preferences.json"));
+
+    RuntimeServices.saveLastRequest(
+        runtimeConfig,
+        new ProjectRequest(
+            "com.example", "demo-app", "1.0.0", "com.example.demo", ".", "maven", "21"));
+
+    assertThat(RuntimeServices.loadStoredCliPrefill(runtimeConfig)).isNotNull();
+    assertThat(RuntimeServices.loadStoredCliPrefill(runtimeConfig).groupId())
+        .isEqualTo("com.example");
+    assertThat(RuntimeServices.loadStoredCliPrefill(runtimeConfig).artifactId())
+        .isEqualTo("demo-app");
+  }
+
+  @Test
+  void openHeadlessGenerationServiceBuildsCloseableService() {
+    RuntimeConfig runtimeConfig =
+        new RuntimeConfig(
+            URI.create("http://localhost:18080"),
+            tempDir.resolve("catalog-cache.json"),
+            tempDir.resolve("favorites.json"),
+            tempDir.resolve("preferences.json"));
+
+    try (HeadlessGenerationService service =
+        RuntimeServices.openHeadlessGenerationService(runtimeConfig)) {
+      assertThat(service).isNotNull();
+    }
   }
 }

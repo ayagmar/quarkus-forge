@@ -43,14 +43,24 @@ public final class HeadlessGenerationService implements AutoCloseable {
   private final HeadlessCatalogLoader catalogLoader;
   private final HeadlessProjectGenerator projectGenerator;
   private final ExtensionFavoritesStore favoritesStore;
+  private final AutoCloseable closeOwner;
 
   HeadlessGenerationService(
       HeadlessCatalogLoader catalogLoader,
       HeadlessProjectGenerator projectGenerator,
       ExtensionFavoritesStore favoritesStore) {
+    this(catalogLoader, projectGenerator, favoritesStore, catalogLoader);
+  }
+
+  HeadlessGenerationService(
+      HeadlessCatalogLoader catalogLoader,
+      HeadlessProjectGenerator projectGenerator,
+      ExtensionFavoritesStore favoritesStore,
+      AutoCloseable closeOwner) {
     this.catalogLoader = Objects.requireNonNull(catalogLoader);
     this.projectGenerator = Objects.requireNonNull(projectGenerator);
     this.favoritesStore = Objects.requireNonNull(favoritesStore);
+    this.closeOwner = Objects.requireNonNull(closeOwner);
   }
 
   public static HeadlessGenerationService create(
@@ -58,14 +68,30 @@ public final class HeadlessGenerationService implements AutoCloseable {
       CatalogDataService catalogDataService,
       ProjectArchiveService projectArchiveService,
       ExtensionFavoritesStore favoritesStore) {
+    return create(apiClient, catalogDataService, projectArchiveService, favoritesStore, null);
+  }
+
+  public static HeadlessGenerationService create(
+      QuarkusApiClient apiClient,
+      CatalogDataService catalogDataService,
+      ProjectArchiveService projectArchiveService,
+      ExtensionFavoritesStore favoritesStore,
+      AutoCloseable closeOwner) {
     HeadlessCatalogClient client =
         new HeadlessCatalogClient(apiClient, catalogDataService, projectArchiveService);
-    return new HeadlessGenerationService(client, client, favoritesStore);
+    return new HeadlessGenerationService(
+        client, client, favoritesStore, closeOwner == null ? client : closeOwner);
   }
 
   @Override
   public void close() {
-    catalogLoader.close();
+    try {
+      closeOwner.close();
+    } catch (RuntimeException runtimeException) {
+      throw runtimeException;
+    } catch (Exception exception) {
+      throw new IllegalStateException("Failed to close headless generation resources", exception);
+    }
   }
 
   public int run(GenerateCommand command, boolean globalDryRun, boolean verbose) {

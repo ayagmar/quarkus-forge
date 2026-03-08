@@ -559,6 +559,20 @@ class HeadlessGenerationServiceTest {
     assertThat(exitCode).isEqualTo(ExitCodes.INTERNAL);
   }
 
+  @Test
+  void closeUsesExplicitOwnerWhenProvided() {
+    StubCatalogOperations client = new StubCatalogOperations();
+    TrackingCloseable closeOwner = new TrackingCloseable();
+    HeadlessGenerationService service =
+        new HeadlessGenerationService(
+            client, client, ExtensionFavoritesStore.inMemory(), closeOwner);
+
+    service.close();
+
+    assertThat(closeOwner.closeCalls).isEqualTo(1);
+    assertThat(client.closeCalls).isZero();
+  }
+
   private GenerateCommand commandWithOutput() {
     GenerateCommand cmd = new GenerateCommand();
     cmd.setCliPrefill(
@@ -592,6 +606,7 @@ class HeadlessGenerationServiceTest {
         CompletableFuture.completedFuture(Path.of("output/demo-app"));
     RuntimeException startGenerationFailure;
     int startGenerationCalls;
+    int closeCalls;
     String lastPresetPlatformStream;
     Path lastOutputPath;
 
@@ -631,6 +646,17 @@ class HeadlessGenerationServiceTest {
     }
 
     @Override
-    public void close() {}
+    public void close() {
+      closeCalls++;
+    }
+  }
+
+  private static final class TrackingCloseable implements AutoCloseable {
+    int closeCalls;
+
+    @Override
+    public void close() {
+      closeCalls++;
+    }
   }
 }
