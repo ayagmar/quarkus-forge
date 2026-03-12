@@ -128,7 +128,7 @@ CoreTuiController (Orchestration Shell)
     │       ├── Focus navigation
     │       └── Input handling
     │
-    ├── UiStateSnapshotMapper    Layers render-only panel/footer snapshots onto synchronized UiState
+    ├── UiRenderStateAssembler   Assembles immutable render models from reducer state and runtime-only render context
     │
     ├── CoreUiReducer            Pure transition logic for migrated slices
     │       ├── post-generation intent handling
@@ -303,7 +303,7 @@ Before merging architecture-sensitive changes, re-check the contracts below inst
 
 === Native Release Changes
 
-* Preserve CI native-size gating in `.github/workflows/ci.yml` for both `headless-native` and full `native`.
+* Preserve CI native-size gating in `.github/workflows/ci.yml` for both `-Pheadless,native` and full `-Pnative` builds.
 * Update `scripts/CheckNativeSize.java` tests when native report parsing or summary output changes, especially for malformed reports and size-budget failures.
 * Re-run the documented serial verification commands before merging native/release workflow changes.
 
@@ -469,7 +469,7 @@ graph TD
 | `successHint` is computed from reducer-owned `UiState.PostGenerationView` rather than stored as a separate controller field.
 
 | *Single Source of Truth*
-| Reducer-visible TUI semantics are synchronized onto `reducerState` before reduce/render; `UiStateSnapshotMapper` only overlays render-only panel/footer snapshots instead of rebuilding reducer-adjacent view slices.
+| Reducer-visible TUI semantics are synchronized onto `reducerState` before reduce/render; `UiRenderStateAssembler` overlays render-only panel/footer snapshots while keeping reducer-owned slices intact.
 
 | *Encapsulation*
 | `CatalogLoadCoordinator` and `MetadataSelectorManager` own their state; `PostGenerationMenuState` only translates keys against reducer-owned post-generation data.

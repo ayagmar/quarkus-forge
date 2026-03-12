@@ -149,8 +149,7 @@ class UiRenderStateAssemblerTest {
               preferences,
               navigation,
               projection,
-              new GenerationStateTracker(),
-              new UiStateSnapshotMapper());
+              new GenerationStateTracker());
       return new RenderFixture(
           assembler, initialReducerState(initialState), inputStates, navigation, preferences);
     }

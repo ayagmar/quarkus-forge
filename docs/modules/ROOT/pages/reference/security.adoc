@@ -1,0 +1,88 @@
+= Security
+
+This page summarizes the current security posture of Quarkus Forge.
+It describes protections implemented in this repository and the main operational limits that remain relevant.
+
+== Security posture at a glance
+
+* Quarkus Forge talks to `https://code.quarkus.io` over HTTPS for live metadata and project archive downloads.
+* Runtime API configuration rejects non-HTTPS remote origins; plain HTTP is only accepted for localhost / loopback test endpoints.
+* HTTP requests disable redirect following, caches, and user-interaction prompts at the transport layer.
+* Downloaded archives are extracted through `SafeZipExtractor`, which rejects Zip-Slip, Zip-Bomb, symlink, repeated-entry, suspicious compression-ratio, and suspicious Unix-mode cases.
+* Machine-local state under `~/.quarkus-forge/` is hardened to owner-only permissions on POSIX systems (`0700` directories, `0600` files).
+* Temporary downloaded archives and extraction staging directories are also created owner-only on POSIX systems.
+* CI includes dependency review, vulnerability scanning, npm audit for the docs toolchain, and CodeQL analysis.
+* Weekly Dependabot updates are enabled for Maven, npm, and GitHub Actions.
+
+== Network and remote content
+
+Quarkus Forge is not a fully offline generator by default. It fetches:
+
+* metadata from `code.quarkus.io`
+* extension catalogs from `code.quarkus.io`
+* generated project archives from `code.quarkus.io`
+
+When live endpoints are unavailable, Forge falls back to the local catalog snapshot described in xref:reference/forge-files-and-state.adoc[Forge Files and State].
+
+The runtime configuration now rejects insecure remote API origins. That keeps production usage on HTTPS while still allowing plain-HTTP loopback endpoints for local tests.
+
+== Archive extraction and local filesystem safety
+
+Project archives are not unpacked with a naive ZIP extraction path.
+Quarkus Forge validates archive metadata before extraction and blocks:
+
+* path traversal / Zip-Slip entries
+* suspicious compression ratios and oversized total extraction payloads
+* symlink entries
+* repeated payload entries not matching the ZIP central directory
+* suspicious Unix permission metadata
+
+Extraction happens through a staging directory and then moves into place only after validation succeeds.
+That reduces the chance of leaving behind a partially extracted project tree.
+
+For machine-local Forge state and temporary archive files, Quarkus Forge applies owner-only POSIX permissions when the underlying filesystem supports them.
+On non-POSIX platforms such as Windows, the operating system's default ACL handling applies.
+
+== Secrets and credential handling
+
+Normal Quarkus Forge usage does not require an API token for `code.quarkus.io`, and the application does not persist service credentials in `~/.quarkus-forge/`.
+
+Post-generation GitHub publishing uses the locally installed `git` and `gh` CLIs and therefore relies on whatever credentials are already configured in those tools.
+Quarkus Forge does not manage or store those credentials itself.
+
+Diagnostic logging also redacts post-generation hook command contents instead of printing the raw hook string.
+
+== CI security checks
+
+The repository currently runs the following automated security checks:
+
+* `actions/dependency-review-action` on pull requests to catch newly introduced vulnerable dependencies.
+* `npm audit` against `site/package-lock.json` for the docs toolchain.
+* Trivy filesystem vulnerability scanning for tracked dependencies.
+* CodeQL analysis on pull requests, pushes to `master`, and a weekly schedule.
+* Dependabot update PRs for Maven, npm, and GitHub Actions.
+
+These checks are additive to the regular build, test, formatting, and docs verification jobs documented elsewhere in this site.
+
+== Release integrity
+
+GitHub releases publish SHA-256 checksum files for each distributed artifact.
+Use xref:getting-started.adoc#release-checksums[release checksum verification] before running downloaded release binaries or jars.
+
+== Important limitations
+
+Quarkus Forge improves transport, archive handling, and CI scanning posture, but it is not a sandboxed execution environment.
+
+Notable limits to keep in mind:
+
+* `--post-generate-hook` executes a shell command exactly as provided.
+* `QUARKUS_FORGE_IDE_COMMAND` is also executed via the local shell.
+* Generated project contents are validated structurally during download/extraction, but they are not additionally signed by Quarkus Forge.
+* Owner-only permission hardening is best-effort and POSIX-specific; Windows ACLs are not rewritten by the application.
+
+If you run Forge in a high-trust or multi-user environment, treat post-generation shell features as privileged operations and review generated project contents before executing them.
+
+== Reporting security issues
+
+For vulnerability reporting, see the repository security policy: https://github.com/ayagmar/quarkus-forge/security/policy[SECURITY.md / GitHub security policy].
+Do not open public issues for undisclosed vulnerabilities.

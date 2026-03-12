@@ -14,7 +14,7 @@ final class HeadlessCliTest {
   @Test
   void noSubcommandPrintsUsageAndExitsOk() {
     RuntimeConfig config =
-        CliCommandTestSupport.runtimeConfig(tempDir, URI.create("http://unused"));
+        CliCommandTestSupport.runtimeConfig(tempDir, URI.create("https://unused"));
     CliCommandTestSupport.CommandResult result = CliCommandTestSupport.runHeadlessCommand(config);
 
     assertThat(result.exitCode()).isEqualTo(ExitCodes.OK);
@@ -24,7 +24,7 @@ final class HeadlessCliTest {
   @Test
   void helpFlagExitsCleanly() {
     RuntimeConfig config =
-        CliCommandTestSupport.runtimeConfig(tempDir, URI.create("http://unused"));
+        CliCommandTestSupport.runtimeConfig(tempDir, URI.create("https://unused"));
     CliCommandTestSupport.CommandResult result =
         CliCommandTestSupport.runHeadlessCommand(config, "--help");
 
@@ -36,7 +36,7 @@ final class HeadlessCliTest {
   @Test
   void versionFlagExitsCleanly() {
     RuntimeConfig config =
-        CliCommandTestSupport.runtimeConfig(tempDir, URI.create("http://unused"));
+        CliCommandTestSupport.runtimeConfig(tempDir, URI.create("https://unused"));
     CliCommandTestSupport.CommandResult result =
         CliCommandTestSupport.runHeadlessCommand(config, "--version");
 
@@ -47,7 +47,7 @@ final class HeadlessCliTest {
   @Test
   void generateHelpFlagExitsCleanly() {
     RuntimeConfig config =
-        CliCommandTestSupport.runtimeConfig(tempDir, URI.create("http://unused"));
+        CliCommandTestSupport.runtimeConfig(tempDir, URI.create("https://unused"));
     CliCommandTestSupport.CommandResult result =
         CliCommandTestSupport.runHeadlessCommand(config, "generate", "--help");
 
@@ -58,7 +58,7 @@ final class HeadlessCliTest {
   @Test
   void unknownOptionReturnsUsageError() {
     RuntimeConfig config =
-        CliCommandTestSupport.runtimeConfig(tempDir, URI.create("http://unused"));
+        CliCommandTestSupport.runtimeConfig(tempDir, URI.create("https://unused"));
     CliCommandTestSupport.CommandResult result =
         CliCommandTestSupport.runHeadlessCommand(config, "--nonexistent-flag");
 

@@ -75,19 +75,19 @@ jobs:
           - os: ubuntu-latest
             platform: linux-x86_64
             ext: ''
-            profiles: -Pheadless,headless-native
+            profiles: -Pheadless,native
             binary_name: quarkus-forge-headless
             smoke_mode: headless
           - os: macos-latest
             platform: macos-aarch64
             ext: ''
-            profiles: -Pheadless,headless-native
+            profiles: -Pheadless,native
             binary_name: quarkus-forge-headless
             smoke_mode: headless
           - os: windows-latest
             platform: windows-x86_64
             ext: '.exe'
-            profiles: -Pheadless,headless-native
+            profiles: -Pheadless,native
             binary_name: quarkus-forge-headless
             smoke_mode: headless
     runs-on: ${{ matrix.os }}

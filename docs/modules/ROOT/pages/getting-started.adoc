@@ -1,5 +1,8 @@
 = Getting Started
 
+This guide covers the shortest path from clone or download to a working Quarkus Forge setup.
+For deployment and adoption considerations, see xref:reference/security.adoc[Security].
+
 == Requirements
 
 * Java 25
@@ -199,6 +202,7 @@ sha256sum -c target/quarkus-forge-headless.jar.sha256
 * xref:usage/tui.adoc[TUI usage guide]
 * xref:cli/headless-mode.adoc[CLI headless guide]
 * xref:reference/forge-files-and-state.adoc[Forge files and state]
+* xref:reference/security.adoc[Security]
 * xref:ui/keybindings.adoc[Keybindings]
 * xref:ui/theming.adoc[Theming]
 * xref:troubleshooting.adoc[Troubleshooting]

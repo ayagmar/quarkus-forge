@@ -59,7 +59,7 @@ coverage:
 format:
     {{mvn}} spotless:apply
 
-# Check formatting without modifying files (used in CI)
+# Check formatting and Java style without modifying files (used in CI)
 format-check:
     scripts/verify/format-check.sh
 

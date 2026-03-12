@@ -18,11 +18,11 @@ record ExtensionCatalogItem(
     description = description == null ? "" : description.trim();
   }
 
-  public ExtensionCatalogItem(String id, String name, String shortName) {
+  ExtensionCatalogItem(String id, String name, String shortName) {
     this(id, name, shortName, "Other", null, "");
   }
 
-  public ExtensionCatalogItem(
+  ExtensionCatalogItem(
       String id, String name, String shortName, String category, Integer apiOrder) {
     this(id, name, shortName, category, apiOrder, "");
   }

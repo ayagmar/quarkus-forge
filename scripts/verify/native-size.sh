@@ -18,7 +18,7 @@ case "$mode" in
   headless)
     ./mvnw clean
     mkdir -p target/native-size
-    ./mvnw package -Pheadless-native -DskipTests -Djacoco.skip=true | tee target/native-size/headless-native.log
+    ./mvnw package -Pheadless,native -DskipTests -Djacoco.skip=true | tee target/native-size/headless-native.log
     run_size_check \
       --label headless-native \
       --binary target/quarkus-forge-headless \

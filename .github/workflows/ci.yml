@@ -156,6 +156,47 @@ jobs:
           fail_ci_if_error: false
           verbose: false
 
+  security:
+    name: Security
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Dependency review
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        with:
+          fail-on-severity: high
+
+      - name: Set up Node 24
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Audit docs dependencies
+        run: npm audit --prefix site --audit-level=high --package-lock-only
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          vuln-type: library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          format: table
+          skip-dirs: .git,target,site/node_modules
+
   native-size:
     name: Native Size
     needs: quality
@@ -199,13 +240,13 @@ jobs:
   ci-status:
     name: CI Status
     if: always()
-    needs: [quality, tests, coverage, native-size]
+    needs: [quality, tests, coverage, security, native-size]
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
       - name: Check CI results
         run: |
-          if [[ "${{ needs.quality.result }}" != "success" || "${{ needs.tests.result }}" != "success" || "${{ needs.coverage.result }}" != "success" || "${{ needs.native-size.result }}" != "success" ]]; then
+          if [[ "${{ needs.quality.result }}" != "success" || "${{ needs.tests.result }}" != "success" || "${{ needs.coverage.result }}" != "success" || "${{ needs.security.result }}" != "success" || "${{ needs.native-size.result }}" != "success" ]]; then
             echo "CI failed — see individual job logs above."
             exit 1
           fi

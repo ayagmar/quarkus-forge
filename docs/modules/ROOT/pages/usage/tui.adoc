@@ -1,5 +1,7 @@
 = TUI Usage
 
+The TUI is optimized for interactive project setup, extension discovery, and fast keyboard-driven generation.
+
 == Start the TUI
 
 [source,bash]
@@ -56,6 +58,12 @@ NOTE: `--enable-native-access=ALL-UNNAMED` suppresses Panama FFM warnings from t
 ** Open a terminal shell in the generated project.
 * `Esc`: clear active search/filter context first, then exit.
 * `Ctrl+C`: quit immediately.
++
+[NOTE]
+====
+Post-generation actions are convenience handoffs after scaffold creation.
+Shell-based actions still run as local commands on the host machine.
+====
 
 == Session Persistence
 
@@ -96,5 +104,11 @@ To override auto-detection, set the `QUARKUS_FORGE_IDE_COMMAND` environment vari
 ----
 export QUARKUS_FORGE_IDE_COMMAND="code-insiders ."
 ----
+
+[WARNING]
+====
+`QUARKUS_FORGE_IDE_COMMAND` is executed through the local shell.
+Use only trusted command strings.
+====
 
 The custom command appears first in the menu as "Custom (code-insiders .)".

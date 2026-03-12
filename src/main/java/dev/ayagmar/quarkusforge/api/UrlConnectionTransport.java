@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge.api;
 
+import dev.ayagmar.quarkusforge.util.FilePermissionSupport;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -121,6 +122,9 @@ final class UrlConnectionTransport implements ApiTransport {
       }
       connection.setRequestMethod("GET");
       connection.setRequestProperty("Accept", request.acceptHeader());
+      connection.setAllowUserInteraction(false);
+      connection.setUseCaches(false);
+      connection.setInstanceFollowRedirects(false);
       long timeoutMillisLong = Math.max(1L, request.timeout().toMillis());
       int timeoutMillis = Math.toIntExact(Math.min(Integer.MAX_VALUE, timeoutMillisLong));
       connection.setConnectTimeout(timeoutMillis);
@@ -160,6 +164,7 @@ final class UrlConnectionTransport implements ApiTransport {
   private static Path writeFileBody(InputStream inputStream, Path destinationFile)
       throws IOException {
     Files.copy(inputStream, destinationFile, StandardCopyOption.REPLACE_EXISTING);
+    FilePermissionSupport.ensureOwnerOnlyFile(destinationFile);
     return destinationFile;
   }
 

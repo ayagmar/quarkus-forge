@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge.api;
 
+import dev.ayagmar.quarkusforge.util.FilePermissionSupport;
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
@@ -26,13 +27,15 @@ public final class AtomicFileStore {
     Objects.requireNonNull(tempFilePrefix);
     Objects.requireNonNull(moveOperation);
 
-    Path parent = resolvedParentDirectory(targetFile);
-    Files.createDirectories(parent);
-    Path tempFile = Files.createTempFile(parent, tempFilePrefix, ".tmp");
+    Path normalizedTarget = targetFile.toAbsolutePath().normalize();
+    Path parent = resolvedParentDirectory(normalizedTarget);
+    ForgeDataPaths.ensureManagedDirectoryHierarchy(parent);
+    Path tempFile = FilePermissionSupport.createOwnerOnlyTempFile(parent, tempFilePrefix, ".tmp");
     try {
       Files.write(
           tempFile, payload, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
-      moveAtomicallyWithFallback(tempFile, targetFile, moveOperation);
+      moveAtomicallyWithFallback(tempFile, normalizedTarget, moveOperation);
+      hardenManagedTargetIfNeeded(normalizedTarget);
     } finally {
       Files.deleteIfExists(tempFile);
     }
@@ -48,8 +51,14 @@ public final class AtomicFileStore {
     }
   }
 
+  private static void hardenManagedTargetIfNeeded(Path targetFile) {
+    if (ForgeDataPaths.isManagedPath(targetFile)) {
+      FilePermissionSupport.ensureOwnerOnlyFile(targetFile);
+    }
+  }
+
   private static Path resolvedParentDirectory(Path targetFile) throws IOException {
-    Path parent = targetFile.toAbsolutePath().normalize().getParent();
+    Path parent = targetFile.getParent();
     if (parent == null) {
       throw new IOException("Path has no parent directory: " + targetFile);
     }

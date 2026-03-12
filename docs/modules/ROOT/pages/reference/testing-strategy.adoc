@@ -55,7 +55,7 @@ Before and during the UI state-machine migration, these semantic contracts must 
 | 8
 | Duration tracking, visibility state, timing edge cases
 
-| `CoreUiReducer` + `UiStateSnapshotMapper`
+| `CoreUiReducer` + `UiRenderStateAssembler`
 | contract-focused
 | Reducer intent/effect outcomes and immutable state snapshot mapping contracts
 |===

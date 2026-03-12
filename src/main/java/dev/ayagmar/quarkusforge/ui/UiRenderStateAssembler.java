@@ -12,13 +12,14 @@ import java.util.List;
 import java.util.Objects;
 
 final class UiRenderStateAssembler {
+  record PanelState(ExtensionsPanelSnapshot extensionsPanel, FooterSnapshot footer) {}
+
   private final EnumMap<FocusTarget, TextInputState> inputStates;
   private final MetadataSelectorManager metadataSelectors;
   private final ExtensionCatalogPreferences extensionCatalogPreferences;
   private final ExtensionCatalogNavigation extensionCatalogNavigation;
   private final ExtensionCatalogProjection extensionCatalogProjection;
   private final GenerationStateTracker generationStateTracker;
-  private final UiStateSnapshotMapper uiStateSnapshotMapper;
 
   UiRenderStateAssembler(
       EnumMap<FocusTarget, TextInputState> inputStates,
@@ -26,8 +27,7 @@ final class UiRenderStateAssembler {
       ExtensionCatalogPreferences extensionCatalogPreferences,
       ExtensionCatalogNavigation extensionCatalogNavigation,
       ExtensionCatalogProjection extensionCatalogProjection,
-      GenerationStateTracker generationStateTracker,
-      UiStateSnapshotMapper uiStateSnapshotMapper) {
+      GenerationStateTracker generationStateTracker) {
     this.inputStates = Objects.requireNonNull(inputStates);
     requireInputState(inputStates, FocusTarget.GROUP_ID);
     requireInputState(inputStates, FocusTarget.ARTIFACT_ID);
@@ -40,7 +40,6 @@ final class UiRenderStateAssembler {
     this.extensionCatalogNavigation = Objects.requireNonNull(extensionCatalogNavigation);
     this.extensionCatalogProjection = Objects.requireNonNull(extensionCatalogProjection);
     this.generationStateTracker = Objects.requireNonNull(generationStateTracker);
-    this.uiStateSnapshotMapper = Objects.requireNonNull(uiStateSnapshotMapper);
   }
 
   private static void requireInputState(
@@ -70,13 +69,13 @@ final class UiRenderStateAssembler {
     Objects.requireNonNull(reducerState);
     Objects.requireNonNull(statusMessage);
     Objects.requireNonNull(metadataCompatibility);
-    return uiStateSnapshotMapper.renderModel(
-        reducerState,
-        statusMessage,
+    UiState synchronizedState = reducerState.withStatusMessage(statusMessage);
+    return new UiRenderModel(
+        synchronizedState,
         submitAlertSnapshot(reducerState),
         metadataPanelSnapshot(reducerState, metadataCompatibility),
-        new UiStateSnapshotMapper.PanelState(
-            extensionsPanelSnapshot(reducerState), footerSnapshot(reducerState, statusMessage)),
+        extensionsPanelSnapshot(reducerState),
+        footerSnapshot(reducerState, statusMessage),
         reducerState.postGeneration(),
         generationView(generationCancellationRequested),
         startupOverlayView(reducerState, metadataCompatibility));
