@@ -65,6 +65,9 @@ public record RuntimeConfig(
 
   private static boolean isLoopbackHost(String host) {
     String normalizedHost = host.toLowerCase(Locale.ROOT);
+    if (normalizedHost.startsWith("[") && normalizedHost.endsWith("]")) {
+      normalizedHost = normalizedHost.substring(1, normalizedHost.length() - 1);
+    }
     return normalizedHost.equals("localhost")
         || normalizedHost.equals("::1")
         || normalizedHost.startsWith("127.");

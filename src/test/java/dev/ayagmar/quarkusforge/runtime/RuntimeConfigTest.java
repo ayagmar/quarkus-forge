@@ -49,6 +49,25 @@ class RuntimeConfigTest {
   }
 
   @Test
+  void acceptsLocalhostAndIpv6LoopbackHttpApiBaseUriForTests() {
+    RuntimeConfig localhostConfig =
+        new RuntimeConfig(
+            URI.create("http://localhost:8080/api"),
+            tempDir.resolve("catalog-cache.json"),
+            tempDir.resolve("favorites.json"),
+            tempDir.resolve("preferences.json"));
+    RuntimeConfig ipv6LoopbackConfig =
+        new RuntimeConfig(
+            URI.create("http://[::1]:8080/api"),
+            tempDir.resolve("catalog-cache-2.json"),
+            tempDir.resolve("favorites-2.json"),
+            tempDir.resolve("preferences-2.json"));
+
+    assertThat(localhostConfig.apiBaseUri()).isEqualTo(URI.create("http://localhost:8080/api"));
+    assertThat(ipv6LoopbackConfig.apiBaseUri()).isEqualTo(URI.create("http://[::1]:8080/api"));
+  }
+
+  @Test
   void rejectsApiBaseUriWithUserInfo() {
     assertThatThrownBy(
             () ->
@@ -59,5 +78,82 @@ class RuntimeConfigTest {
                     tempDir.resolve("preferences.json")))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("must not contain user info");
+  }
+
+  @Test
+  void rejectsApiBaseUriWithQueryOrFragment() {
+    assertThatThrownBy(
+            () ->
+                new RuntimeConfig(
+                    URI.create("https://code.quarkus.io?draft=true"),
+                    tempDir.resolve("catalog-cache.json"),
+                    tempDir.resolve("favorites.json"),
+                    tempDir.resolve("preferences.json")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must not contain query or fragment data");
+
+    assertThatThrownBy(
+            () ->
+                new RuntimeConfig(
+                    URI.create("https://code.quarkus.io#fragment"),
+                    tempDir.resolve("catalog-cache-2.json"),
+                    tempDir.resolve("favorites-2.json"),
+                    tempDir.resolve("preferences-2.json")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must not contain query or fragment data");
+  }
+
+  @Test
+  void rejectsRelativeOrUnsupportedApiBaseUri() {
+    assertThatThrownBy(
+            () ->
+                new RuntimeConfig(
+                    URI.create("/relative"),
+                    tempDir.resolve("catalog-cache.json"),
+                    tempDir.resolve("favorites.json"),
+                    tempDir.resolve("preferences.json")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be absolute");
+
+    assertThatThrownBy(
+            () ->
+                new RuntimeConfig(
+                    URI.create("ftp://code.quarkus.io"),
+                    tempDir.resolve("catalog-cache-2.json"),
+                    tempDir.resolve("favorites-2.json"),
+                    tempDir.resolve("preferences-2.json")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must use http or https");
+  }
+
+  @Test
+  void rejectsApiBaseUriWithoutHost() {
+    assertThatThrownBy(
+            () ->
+                new RuntimeConfig(
+                    URI.create("https:/missing-host"),
+                    tempDir.resolve("catalog-cache.json"),
+                    tempDir.resolve("favorites.json"),
+                    tempDir.resolve("preferences.json")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must include a host");
+  }
+
+  @Test
+  void normalizesApiBaseUriAndFilePaths() {
+    RuntimeConfig runtimeConfig =
+        new RuntimeConfig(
+            URI.create("https://code.quarkus.io/api/../catalog"),
+            Path.of(".").resolve("target/../catalog-cache.json"),
+            Path.of(".").resolve("target/../favorites.json"),
+            Path.of(".").resolve("target/../preferences.json"));
+
+    assertThat(runtimeConfig.apiBaseUri()).isEqualTo(URI.create("https://code.quarkus.io/catalog"));
+    assertThat(runtimeConfig.catalogCacheFile()).isAbsolute();
+    assertThat(runtimeConfig.catalogCacheFile().getFileName()).hasToString("catalog-cache.json");
+    assertThat(runtimeConfig.favoritesFile()).isAbsolute();
+    assertThat(runtimeConfig.favoritesFile().getFileName()).hasToString("favorites.json");
+    assertThat(runtimeConfig.preferencesFile()).isAbsolute();
+    assertThat(runtimeConfig.preferencesFile().getFileName()).hasToString("preferences.json");
   }
 }
