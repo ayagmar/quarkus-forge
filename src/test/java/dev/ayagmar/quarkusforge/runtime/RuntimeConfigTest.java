@@ -76,9 +76,17 @@ class RuntimeConfigTest {
             tempDir.resolve("catalog-cache-2.json"),
             tempDir.resolve("favorites-2.json"),
             tempDir.resolve("preferences-2.json"));
+    RuntimeConfig expandedIpv6LoopbackConfig =
+        new RuntimeConfig(
+            URI.create("http://[0:0:0:0:0:0:0:1]:8080/api"),
+            tempDir.resolve("catalog-cache-3.json"),
+            tempDir.resolve("favorites-3.json"),
+            tempDir.resolve("preferences-3.json"));
 
     assertThat(localhostConfig.apiBaseUri()).isEqualTo(URI.create("http://localhost:8080/api"));
     assertThat(ipv6LoopbackConfig.apiBaseUri()).isEqualTo(URI.create("http://[::1]:8080/api"));
+    assertThat(expandedIpv6LoopbackConfig.apiBaseUri())
+        .isEqualTo(URI.create("http://[0:0:0:0:0:0:0:1]:8080/api"));
   }
 
   @Test
@@ -158,6 +166,8 @@ class RuntimeConfigTest {
     assertThat(invokeBooleanHelper("isLoopbackHost", "127.0.0.1")).isTrue();
     assertThat(invokeBooleanHelper("isLoopbackHost", "127.example.com")).isFalse();
     assertThat(invokeBooleanHelper("isLoopbackHost", "[::1]")).isTrue();
+    assertThat(invokeBooleanHelper("isLoopbackHost", "0:0:0:0:0:0:0:1")).isTrue();
+    assertThat(invokeBooleanHelper("isLoopbackHost", "[0:0:0:0:0:0:0:1]")).isTrue();
     assertThat(invokeBooleanHelper("isLoopbackHost", "[::1")).isFalse();
     assertThat(invokeBooleanHelper("isIpv4LoopbackHost", "127.255.255.255")).isTrue();
     assertThat(invokeBooleanHelper("isIpv4LoopbackHost", "126.0.0.1")).isFalse();

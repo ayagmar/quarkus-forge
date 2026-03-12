@@ -29,13 +29,19 @@ public final class AtomicFileStore {
 
     Path normalizedTarget = targetFile.toAbsolutePath().normalize();
     Path parent = resolvedParentDirectory(normalizedTarget);
+    boolean managedTarget = ForgeDataPaths.isManagedPath(normalizedTarget);
     ForgeDataPaths.ensureManagedDirectoryHierarchy(parent);
-    Path tempFile = FilePermissionSupport.createOwnerOnlyTempFile(parent, tempFilePrefix, ".tmp");
+    Path tempFile =
+        managedTarget
+            ? FilePermissionSupport.createOwnerOnlyTempFile(parent, tempFilePrefix, ".tmp")
+            : FilePermissionSupport.createDefaultTempFile(parent, tempFilePrefix, ".tmp");
     try {
       Files.write(
           tempFile, payload, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
       moveAtomicallyWithFallback(tempFile, normalizedTarget, moveOperation);
-      hardenManagedTargetIfNeeded(normalizedTarget);
+      if (managedTarget) {
+        FilePermissionSupport.ensureOwnerOnlyFile(normalizedTarget);
+      }
     } finally {
       Files.deleteIfExists(tempFile);
     }
@@ -48,12 +54,6 @@ public final class AtomicFileStore {
           source, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
     } catch (AtomicMoveNotSupportedException unsupportedException) {
       moveOperation.move(source, target, StandardCopyOption.REPLACE_EXISTING);
-    }
-  }
-
-  private static void hardenManagedTargetIfNeeded(Path targetFile) {
-    if (ForgeDataPaths.isManagedPath(targetFile)) {
-      FilePermissionSupport.ensureOwnerOnlyFile(targetFile);
     }
   }
 

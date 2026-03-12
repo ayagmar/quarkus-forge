@@ -1,12 +1,14 @@
 package dev.ayagmar.quarkusforge.util;
 
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 public final class FilePermissionSupport {
@@ -41,6 +43,18 @@ public final class FilePermissionSupport {
         () -> Files.createTempDirectory(directory, prefix, ownerOnlyDirectoryAttribute()),
         () -> Files.createTempDirectory(directory, prefix),
         FilePermissionSupport::ensureOwnerOnlyDirectory);
+  }
+
+  public static Path createDefaultTempFile(Path directory, String prefix, String suffix)
+      throws IOException {
+    for (int attempt = 0; attempt < 10; attempt++) {
+      try {
+        return Files.createFile(directory.resolve(prefix + UUID.randomUUID() + suffix));
+      } catch (FileAlreadyExistsException ignored) {
+        // Retry with a new random name.
+      }
+    }
+    throw new IOException("Failed to create default temp file in " + directory);
   }
 
   public static void ensureOwnerOnlyFile(Path file) {

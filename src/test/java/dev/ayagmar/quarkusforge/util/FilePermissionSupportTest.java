@@ -20,10 +20,17 @@ class FilePermissionSupportTest {
 
   @Test
   void createOwnerOnlyTempFileCreatesFile() throws Exception {
-    Path tempFile = FilePermissionSupport.createOwnerOnlyTempFile("forge-test-", ".tmp");
+    Path tempFile = null;
+    try {
+      tempFile = FilePermissionSupport.createOwnerOnlyTempFile("forge-test-", ".tmp");
 
-    assertThat(tempFile).exists().isRegularFile();
-    assertOwnerOnlyFilePermissions(tempFile);
+      assertThat(tempFile).exists().isRegularFile();
+      assertOwnerOnlyFilePermissions(tempFile);
+    } finally {
+      if (tempFile != null) {
+        Files.deleteIfExists(tempFile);
+      }
+    }
   }
 
   @Test

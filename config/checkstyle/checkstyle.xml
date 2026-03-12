@@ -20,5 +20,20 @@
       <property name="illegalClasses" value="sun.misc.Unsafe"/>
       <property name="illegalPkgs" value="jdk.internal,com.sun"/>
     </module>
+    <module name="RegexpSinglelineJava">
+      <property name="format" value="\bsun\.misc\.Unsafe\b"/>
+      <property name="message" value="Use of sun.misc.Unsafe is forbidden"/>
+      <property name="ignoreComments" value="true"/>
+    </module>
+    <module name="RegexpSinglelineJava">
+      <property name="format" value="\bjdk\.internal\.[A-Za-z0-9_$.]+\b"/>
+      <property name="message" value="Use of jdk.internal.* is forbidden"/>
+      <property name="ignoreComments" value="true"/>
+    </module>
+    <module name="RegexpSinglelineJava">
+      <property name="format" value="\bcom\.sun\.[A-Za-z0-9_$.]+\b"/>
+      <property name="message" value="Use of com.sun.* is forbidden"/>
+      <property name="ignoreComments" value="true"/>
+    </module>
   </module>
 </module>
