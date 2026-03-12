@@ -39,6 +39,8 @@
     <maven.failsafe.plugin.version>3.5.5</maven.failsafe.plugin.version>
     <maven.shade.plugin.version>3.6.2</maven.shade.plugin.version>
     <spotless.plugin.version>3.3.0</spotless.plugin.version>
+    <maven.checkstyle.plugin.version>3.6.0</maven.checkstyle.plugin.version>
+    <checkstyle.version>12.3.1</checkstyle.version>
     <graalvm.native.plugin.version>0.11.5</graalvm.native.plugin.version>
     <jacoco.plugin.version>0.8.14</jacoco.plugin.version>
     <native.skip>true</native.skip>
@@ -255,7 +257,28 @@
             <googleJavaFormat>
               <version>1.28.0</version>
             </googleJavaFormat>
+            <removeUnusedImports/>
+            <formatAnnotations/>
           </java>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <version>${maven.checkstyle.plugin.version}</version>
+        <dependencies>
+          <dependency>
+            <groupId>com.puppycrawl.tools</groupId>
+            <artifactId>checkstyle</artifactId>
+            <version>${checkstyle.version}</version>
+          </dependency>
+        </dependencies>
+        <configuration>
+          <configLocation>config/checkstyle/checkstyle.xml</configLocation>
+          <includeTestSourceDirectory>true</includeTestSourceDirectory>
+          <consoleOutput>true</consoleOutput>
+          <failsOnError>true</failsOnError>
         </configuration>
       </plugin>
 
@@ -432,7 +455,6 @@
               <excludes>
                 <exclude>dev/ayagmar/quarkusforge/cli/QuarkusForgeCli.java</exclude>
                 <exclude>dev/ayagmar/quarkusforge/runtime/TuiBootstrapService.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/runtime/TuiSessionSummary.java</exclude>
                 <exclude>dev/ayagmar/quarkusforge/runtime/AppBindingsProfile.java</exclude>
                 <exclude>dev/ayagmar/quarkusforge/runtime/CatalogLoadDiagnostics.java</exclude>
                 <exclude>dev/ayagmar/quarkusforge/postgen/**</exclude>
@@ -445,78 +467,6 @@
       </build>
     </profile>
 
-    <profile>
-      <id>headless-native</id>
-      <properties>
-        <native.skip>false</native.skip>
-        <forge.main.class>${forge.headless.main.class}</forge.main.class>
-        <forge.jar.name>quarkus-forge-headless</forge.jar.name>
-        <maven.test.skip>true</maven.test.skip>
-        <native.ui.resource.pattern>(?!)</native.ui.resource.pattern>
-        <native.tui.bindings.resource.pattern>(?!)</native.tui.bindings.resource.pattern>
-      </properties>
-      <dependencies>
-        <dependency>
-          <groupId>dev.tamboui</groupId>
-          <artifactId>tamboui-tui</artifactId>
-          <version>${tamboui.tui.version}</version>
-          <scope>provided</scope>
-        </dependency>
-        <dependency>
-          <groupId>dev.tamboui</groupId>
-          <artifactId>tamboui-panama-backend</artifactId>
-          <version>${tamboui.panama-backend.version}</version>
-          <scope>provided</scope>
-        </dependency>
-      </dependencies>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-compiler-plugin</artifactId>
-            <version>${maven.compiler.plugin.version}</version>
-            <configuration>
-              <excludes>
-                <exclude>dev/ayagmar/quarkusforge/cli/QuarkusForgeCli.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/runtime/TuiBootstrapService.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/runtime/TuiSessionSummary.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/runtime/AppBindingsProfile.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/runtime/CatalogLoadDiagnostics.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/postgen/**</exclude>
-                <exclude>dev/ayagmar/quarkusforge/application/StartupMetadataSelection.java</exclude>
-                <exclude>dev/ayagmar/quarkusforge/ui/**</exclude>
-              </excludes>
-            </configuration>
-          </plugin>
-          <plugin>
-            <groupId>org.graalvm.buildtools</groupId>
-            <artifactId>native-maven-plugin</artifactId>
-            <version>${graalvm.native.plugin.version}</version>
-            <extensions>true</extensions>
-            <executions>
-              <execution>
-                <id>build-native-image</id>
-                <phase>package</phase>
-                <goals>
-                  <goal>compile-no-fork</goal>
-                </goals>
-              </execution>
-            </executions>
-            <configuration>
-              <skip>${native.skip}</skip>
-              <imageName>${forge.jar.name}</imageName>
-              <mainClass>${forge.main.class}</mainClass>
-              <buildArgs>
-                <buildArg>--no-fallback</buildArg>
-                <buildArg>-Os</buildArg>
-                <buildArg>--emit build-report</buildArg>
-                <buildArg>-H:+ReportExceptionStackTraces</buildArg>
-                <buildArg>--enable-url-protocols=http,https</buildArg>
-              </buildArgs>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
+
   </profiles>
 </project>

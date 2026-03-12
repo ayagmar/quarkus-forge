@@ -2,4 +2,4 @@
 set -euo pipefail
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/_lib.sh"
 
-./mvnw -q spotless:check
+./mvnw -q spotless:check checkstyle:check

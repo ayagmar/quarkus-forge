@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import javax.xml.XMLConstants;
@@ -35,17 +36,20 @@ class NativeBuildConfigurationTest {
   }
 
   @Test
-  void headlessProfilesDisableTuiOnlyNativeResourcePatterns() throws Exception {
+  void headlessProfileDisablesTuiOnlyNativeResourcePatterns() throws Exception {
     Document document = parsePom(Path.of("pom.xml"));
 
     assertThat(profileProperty(document, "headless", "native.ui.resource.pattern"))
         .isEqualTo("(?!)");
     assertThat(profileProperty(document, "headless", "native.tui.bindings.resource.pattern"))
         .isEqualTo("(?!)");
-    assertThat(profileProperty(document, "headless-native", "native.ui.resource.pattern"))
-        .isEqualTo("(?!)");
-    assertThat(profileProperty(document, "headless-native", "native.tui.bindings.resource.pattern"))
-        .isEqualTo("(?!)");
+  }
+
+  @Test
+  void pomNoLongerDefinesSeparateHeadlessNativeProfile() throws Exception {
+    String pom = Files.readString(Path.of("pom.xml"), StandardCharsets.UTF_8);
+
+    assertThat(pom).doesNotContain("<id>headless-native</id>");
   }
 
   private static Document parsePom(Path pomPath) throws Exception {

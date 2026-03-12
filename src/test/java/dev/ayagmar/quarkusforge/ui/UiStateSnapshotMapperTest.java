@@ -122,7 +122,7 @@ class UiStateSnapshotMapperTest {
             .withStartupOverlayVisible(true)
             .withStartupOverlayStatusLines(List.of("runtime line"))
             .withPanelState(
-                new UiStateSnapshotMapper.PanelState(
+                new UiRenderStateAssembler.PanelState(
                     new ExtensionsPanelSnapshot(
                         true, true, false, false, false, "", "live", false, false, false, 0, "", "",
                         0, 0, 0, List.of(), List.of(), "", ""),
@@ -160,7 +160,7 @@ class UiStateSnapshotMapperTest {
     UiStateFixtureBuilder fixture =
         new UiStateFixtureBuilder()
             .withPanelState(
-                new UiStateSnapshotMapper.PanelState(
+                new UiRenderStateAssembler.PanelState(
                     new ExtensionsPanelSnapshot(
                         true, true, false, false, false, "", "live", false, false, false, 0, "", "",
                         0, 0, 0, List.of(), List.of(), "", ""),
@@ -177,7 +177,6 @@ class UiStateSnapshotMapperTest {
   }
 
   private static final class UiStateFixtureBuilder {
-    private final UiStateSnapshotMapper mapper = new UiStateSnapshotMapper();
     private final ForgeUiState initialState = UiTestFixtureFactory.defaultForgeUiState();
     private final MetadataPanelSnapshot metadataPanel =
         new MetadataPanelSnapshot(
@@ -199,8 +198,8 @@ class UiStateSnapshotMapperTest {
 
     private ProjectRequest request = initialState.request();
     private ValidationReport validation = initialState.validation();
-    private UiStateSnapshotMapper.PanelState panelState =
-        new UiStateSnapshotMapper.PanelState(
+    private UiRenderStateAssembler.PanelState panelState =
+        new UiRenderStateAssembler.PanelState(
             new ExtensionsPanelSnapshot(
                 false,
                 false,
@@ -264,7 +263,7 @@ class UiStateSnapshotMapperTest {
       return this;
     }
 
-    UiStateFixtureBuilder withPanelState(UiStateSnapshotMapper.PanelState nextPanelState) {
+    UiStateFixtureBuilder withPanelState(UiRenderStateAssembler.PanelState nextPanelState) {
       panelState = nextPanelState;
       return this;
     }
@@ -285,12 +284,12 @@ class UiStateSnapshotMapperTest {
     }
 
     UiRenderModel renderModel() {
-      return mapper.renderModel(
-          reducerState,
-          reducerState.statusMessage(),
+      return new UiRenderModel(
+          reducerState.withStatusMessage(reducerState.statusMessage()),
           SubmitAlertSnapshot.HIDDEN,
           metadataPanel,
-          panelState,
+          panelState.extensionsPanel(),
+          panelState.footer(),
           reducerState.postGeneration(),
           generation,
           startupOverlay);
@@ -300,7 +299,7 @@ class UiStateSnapshotMapperTest {
       return metadataPanel;
     }
 
-    UiStateSnapshotMapper.PanelState panelState() {
+    UiRenderStateAssembler.PanelState panelState() {
       return panelState;
     }
 

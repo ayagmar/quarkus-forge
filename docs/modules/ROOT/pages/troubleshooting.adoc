@@ -94,6 +94,12 @@ java --enable-native-access=ALL-UNNAMED -jar target/quarkus-forge.jar \
   --post-generate-hook="git init && git add . && git commit -m 'chore: init'"
 ----
 . Check exit code: the hook runs via your system shell. Any non-zero exit is reported as a failure.
++
+[WARNING]
+====
+`--post-generate-hook` executes exactly what you pass through the local shell in the generated project directory.
+Treat it as a privileged local automation feature and only use trusted command strings.
+====
 
 [id="native-startup"]
 == Native image fails to start

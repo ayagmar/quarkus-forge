@@ -348,8 +348,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
             extensionCatalogPreferences,
             extensionCatalogNavigation,
             extensionCatalogProjection,
-            generationStateTracker,
-            new UiStateSnapshotMapper());
+            generationStateTracker);
 
     ProjectRequest synchronizedRequest = syncMetadataSelectors(initialRequest);
     ValidationReport synchronizedValidation = validateRequest(synchronizedRequest);
@@ -847,10 +846,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
     return routeIntent(new UiIntent.PostGenerationIntent(command));
   }
 
-  private void storeReducerState(UiState reducedState) {
-    reducerState = reducedState;
-  }
-
   private ReduceResult dispatchIntent(UiIntent intent) {
     syncReducerRuntimeState();
     ArrayDeque<UiIntent> pendingIntents = new ArrayDeque<>();
@@ -862,7 +857,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
       if (firstResult == null) {
         firstResult = reduceResult;
       }
-      storeReducerState(reduceResult.nextState());
+      reducerState = reduceResult.nextState();
       pendingIntents.addAll(uiEffectsRunner.run(reduceResult.effects(), uiEffectsPort));
     }
     return firstResult == null

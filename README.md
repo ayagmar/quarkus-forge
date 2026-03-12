@@ -6,20 +6,20 @@
 [![Java](https://img.shields.io/badge/Java-25-blue)](https://openjdk.org/projects/jdk/25/)
 [![JBang](https://img.shields.io/badge/JBang-quarkus--forge%40ayagmar-orange)](https://www.jbang.dev/)
 
-> **[Documentation & Landing Page](https://ayagmar.github.io/quarkus-forge/)** · **[Getting Started](https://ayagmar.github.io/quarkus-forge/docs/getting-started/)**
+> **[Documentation & Landing Page](https://ayagmar.github.io/quarkus-forge/)** · **[Getting Started](https://ayagmar.github.io/quarkus-forge/docs/getting-started/)** · **[Security](https://ayagmar.github.io/quarkus-forge/docs/reference/security/)**
 
-Quarkus Forge is a keyboard-first terminal UI (TUI) and headless CLI for generating and scaffolding Quarkus projects. It acts as a fast, offline-capable alternative to `quarkus create`, deeply integrated with `code.quarkus.io`'s remote metadata but built for terminal power users.
+Quarkus Forge is a keyboard-first terminal UI (TUI) and headless CLI for generating Quarkus projects. It provides a faster, more repeatable terminal workflow than `quarkus create` while staying aligned with `code.quarkus.io` metadata and generation behavior.
 
 ![Quarkus Forge TUI](docs/images/tui-screenshot.png)
 
 ## Why use Quarkus Forge?
 
-- **Keyboard-First TUI:** Zero-mouse, Vim-like bindings for navigating catalogs, toggling extensions, and validating inputs. Fuzzy search highlighting, chip-style selected extensions, Tamboui selector/input widgets with visible caret, and animated progress feedback.
-- **Speed & Caching:** Background loading and local snapshot caching mean you don't wait for the network to start configuring your project.
-- **Headless & CI-Ready:** Powerful non-interactive modes for generating applications identically across local environments and CI pipelines.
-- **Deterministic State:** Supports `Forgefile` with an optional `locked` section for exact reproduction of generated applications, much like standard dependency managers.
-- **Customizable:** Theming via `.tcss` files, IDE auto-detection with `QUARKUS_FORGE_IDE_COMMAND` override, post-generation hooks.
-- **Workflow Enhancers:** Post-generation handoffs let you open in your auto-detected IDE, drop into a shell, or publish to GitHub — all from the keyboard.
+- **Fast terminal workflow:** Browse extensions, adjust metadata, and generate a project without leaving the keyboard.
+- **Works well online and offline:** Live metadata is preferred, but cached and snapshot data keep the tool usable when the network is unreliable.
+- **Good fit for CI:** The headless artifact keeps scripted generation small, predictable, and easy to wire into pipelines.
+- **Deterministic project templates:** `Forgefile` plus the optional `locked` section gives teams a simple way to make generation reproducible.
+- **Thoughtful post-generation flow:** Open the project in your IDE, hand off to a shell, or publish to GitHub without retyping context.
+- **Customizable but explicit:** Theme overrides, IDE command overrides, and post-generation hooks are supported and documented clearly.
 
 ## Quarkus Forge vs `quarkus create`
 
@@ -148,8 +148,16 @@ Output: `target/quarkus-forge-headless.jar` — ~40% smaller, no TUI or terminal
 
 Output: `target/quarkus-forge` — standalone binary, no JVM required at runtime.
 
+For a headless native build, use:
+
+```bash
+./mvnw clean package -Pheadless,native
+```
+
+Output: `target/quarkus-forge-headless`
+
 > **Note:** Native image requires GraalVM or a compatible toolchain. Set `GRAALVM_HOME` before building.
-> CI also enforces native binary size budgets for `headless-native` and `native` using produced binary file size; the build report and native-image log are included for diagnostics.
+> CI enforces native binary size budgets for both the interactive (`-Pnative`) and headless (`-Pheadless,native`) builds, and keeps the build report and native-image log for diagnostics.
 
 ### Bash Completion
 Generate completion scripts after building the jars:
@@ -240,6 +248,8 @@ java -jar target/quarkus-forge.jar \
   --post-generate-hook="git init && git add . && git commit -m 'Initial commit'"
 ```
 
+> **Warning:** `--post-generate-hook` is executed by your local shell in the generated project directory. Only use trusted command strings.
+
 ### Deterministic Replay
 ```bash
 # Generate from a Forgefile template
@@ -279,9 +289,11 @@ After generating a project, Quarkus Forge auto-detects installed IDEs (IntelliJ 
 
 To override auto-detection, set `QUARKUS_FORGE_IDE_COMMAND`:
 ```bash
-export QUARKUS_FORGE_IDE_COMMAND="idea ."        # Force IntelliJ
+export QUARKUS_FORGE_IDE_COMMAND="idea ."           # Force IntelliJ
 export QUARKUS_FORGE_IDE_COMMAND="code-insiders ."  # VS Code Insiders
 ```
+
+> **Warning:** `QUARKUS_FORGE_IDE_COMMAND` is executed through the local shell. Use only trusted command strings.
 
 ## Where Files Live
 
@@ -317,19 +329,22 @@ The codebase is organized into focused modules that follow SOLID principles and 
 - **`ExtensionFavoritesStore`** — Owns favorites/recents storage for TUI filters and headless `favorites` preset expansion.
 
 ### UI Layer (`ui/`)
-- **`CoreTuiController`** — TUI orchestration shell and callback sink, rendering from immutable state snapshots.
+- **`CoreTuiController`** — TUI orchestration shell and callback sink.
 - **`CatalogLoadCoordinator`** / **`GenerationFlowCoordinator`** — Dedicated async workflow coordinators for catalog loading and generation.
-- **`CoreUiReducer`** — Pure reducer for migrated UI intents and effects.
-- **`UiStateSnapshotMapper`** — Builds immutable `UiState` snapshots from controller-managed state slices.
+- **`CoreUiReducer`** — Pure reducer for UI intents and effects.
+- **`UiRenderStateAssembler`** — Builds immutable render models from reducer state plus runtime-only render context.
+- **`ExtensionCatalogProjection`** / **`ExtensionCatalogNavigation`** / **`ExtensionCatalogPreferences`** — The extension browsing stack for filtering, selection, favorites, and projection updates.
 - **`OverlayRenderer`** — Stateless overlay rendering (command palette, help, progress, post-generation menus).
 - **`MetadataSelectorManager`** — Metadata selector state (platform stream, build tool, Java version cycling and label generation).
-- **`UiTextConstants`** — UI text content (help lines, splash art, action labels).
-- **`ExtensionCatalogState`** — Extension catalog search, filtering, favorites, presets, and category navigation.
 - **`BodyPanelRenderer`** / **`FooterLinesComposer`** — Layout rendering helpers.
 
 ### Runtime Layer (`runtime/`)
-- **`RuntimeWiring`** — Central composition owner for persistence-backed stores, headless generation wiring, and shared API/archive service assembly.
+- **`RuntimeServices`** — Shared runtime composition for API, catalog, archive, and persistence services.
 - **`TuiBootstrapService`** — Runtime wiring for TUI startup, catalog bootstrap, Tamboui backend preference, and session execution.
+
+### Post-Generation Layer (`postgen/`)
+- **`PostTuiActionExecutor`** — Post-generation shell actions (IDE open, GitHub publish, terminal handoff).
+- **`IdeDetector`** — Cross-platform IDE auto-detection (macOS, Linux, Windows).
 - **`TuiSessionSummary`** — Immutable summary of the final request and post-generation exit plan.
 
 ### Application Layer (`application/`)
@@ -354,10 +369,6 @@ Shared timeout/cancellation/failure classification is provided by `dev.ayagmar.q
 - **`ForgefileStore`** — Forgefile persistence with omission-preserving top-level template fields.
 - **`Forgefile`** / **`ForgefileLock`** — Shareable intent template plus explicit deterministic lock data.
 
-### Post-Generation Layer (`postgen/`)
-- **`PostTuiActionExecutor`** — Post-generation shell actions (IDE open, GitHub publish, terminal handoff).
-- **`IdeDetector`** — Cross-platform IDE auto-detection (macOS, Linux, Windows).
-
 ### Archive Layer (`archive/`)
 - **`SafeZipExtractor`** — Hardened ZIP extraction with Zip-Bomb and Zip-Slip protections.
 - **`ProjectArchiveService`** — Orchestrates download, extraction, and progress reporting.
@@ -366,20 +377,20 @@ For a complete overview of the internal design, see the [Architecture & Internal
 
 ## Docs
 
-Full documentation is available at **[ayagmar.github.io/quarkus-forge](https://ayagmar.github.io/quarkus-forge/docs/)**.
+Public documentation: **[ayagmar.github.io/quarkus-forge/docs](https://ayagmar.github.io/quarkus-forge/docs/)**.
+Security details are documented separately in [Security](docs/modules/ROOT/pages/reference/security.adoc).
 
-Source pages (AsciiDoc):
+Useful entry points:
 
 - [Getting Started](docs/modules/ROOT/pages/getting-started.adoc)
 - [TUI Usage](docs/modules/ROOT/pages/usage/tui.adoc)
-- [Keybindings](docs/modules/ROOT/pages/ui/keybindings.adoc)
 - [Headless CLI](docs/modules/ROOT/pages/cli/headless-mode.adoc)
 - [Forge Files & State](docs/modules/ROOT/pages/reference/forge-files-and-state.adoc)
-- [Theming](docs/modules/ROOT/pages/ui/theming.adoc)
-- [Architecture](docs/modules/ROOT/pages/architecture.adoc)
+- [Security](docs/modules/ROOT/pages/reference/security.adoc)
 - [Troubleshooting](docs/modules/ROOT/pages/troubleshooting.adoc)
+- [Architecture](docs/modules/ROOT/pages/architecture.adoc)
 
-Antora docs source: `docs/` · Site build scripts: `site/` · Local site guide: `site/README.md`
+Antora source lives in `docs/`. The site build lives in `site/`. For local docs work, see `site/README.md`.
 
 ## Contributing
 

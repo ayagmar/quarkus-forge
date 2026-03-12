@@ -11,6 +11,7 @@
 * xref:ui/theming.adoc[Theming]
 
 .Operations
+* xref:reference/security.adoc[Security]
 * xref:troubleshooting.adoc[Troubleshooting]
 
 .Reference

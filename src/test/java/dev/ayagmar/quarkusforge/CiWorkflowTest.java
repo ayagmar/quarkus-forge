@@ -22,11 +22,15 @@ class CiWorkflowTest {
         .contains("scripts/verify/coverage.sh")
         .contains("scripts/verify/native-size.sh headless")
         .contains("scripts/verify/native-size.sh interactive")
+        .contains("uses: actions/dependency-review-action@")
+        .contains("npm audit --prefix site --audit-level=high --package-lock-only")
+        .contains("uses: aquasecurity/trivy-action@")
         .contains("name: native-size-reports")
         .contains("target/quarkus-forge-build-report.html")
         .contains("target/quarkus-forge-headless-build-report.html")
         .contains("ci-status:\n    name: CI Status\n    if: always()")
-        .contains("needs: [quality, tests, coverage, native-size]")
+        .contains("needs: [quality, tests, coverage, security, native-size]")
+        .contains("needs.security.result")
         .contains("needs.native-size.result");
   }
 

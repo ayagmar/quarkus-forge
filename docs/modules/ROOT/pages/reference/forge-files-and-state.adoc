@@ -1,6 +1,7 @@
 = Forge Files and State
 
-Quarkus Forge uses two storage scopes with different purposes.
+Quarkus Forge keeps machine-local state separate from project-local reproducibility files.
+Local convenience data stays out of the repository, while team-facing generation inputs can be checked in.
 
 == 1) Machine-Local App Data (`~/.quarkus-forge/`)
 
@@ -12,6 +13,8 @@ This directory stores user-specific runtime data:
 * `recipes/`: shareable Forgefile templates for cross-project reuse.
 
 These files are machine-local and should not be committed to project repositories.
+On POSIX filesystems, Quarkus Forge hardens this directory tree to owner-only permissions (`0700` directories, `0600` files).
+See xref:reference/security.adoc[Security] for the current security posture summary.
 
 == 2) The Forgefile
 

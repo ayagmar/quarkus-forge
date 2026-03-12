@@ -1,5 +1,7 @@
 = CLI Headless Mode
 
+Headless mode is designed for repeatable generation in CI, scripts, build agents, and containers.
+
 == Overview
 
 Quarkus Forge supports two entry points:
@@ -123,7 +125,7 @@ Reuse that template later by name:
 java -jar target/quarkus-forge-headless.jar generate --from starter.json
 ----
 
-NOTE: All examples above also work with the full jar (`quarkus-forge.jar`). The headless jar is preferred for CI/containers as it has no TUI or terminal dependencies.
+NOTE: All examples above also work with the full jar (`quarkus-forge.jar`). The headless jar is the better default for CI and containers because it avoids TUI and terminal dependencies entirely.
 
 == Key Flags
 

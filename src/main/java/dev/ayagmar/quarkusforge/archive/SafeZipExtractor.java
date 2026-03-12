@@ -1,5 +1,6 @@
 package dev.ayagmar.quarkusforge.archive;
 
+import dev.ayagmar.quarkusforge.util.FilePermissionSupport;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.AtomicMoveNotSupportedException;
@@ -335,7 +336,7 @@ public final class SafeZipExtractor {
 
   private static Path createTempDirectory(Path parent, String prefix) {
     try {
-      return Files.createTempDirectory(parent, prefix);
+      return FilePermissionSupport.createOwnerOnlyTempDirectory(parent, prefix);
     } catch (IOException ioException) {
       throw new ArchiveException("Failed to create temporary extraction directory", ioException);
     }

@@ -2,17 +2,23 @@ package dev.ayagmar.quarkusforge.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.ayagmar.quarkusforge.SystemPropertyExtension;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
 
 class AtomicFileStoreTest {
   @TempDir Path tempDir;
+
+  @RegisterExtension final SystemPropertyExtension systemProperties = new SystemPropertyExtension();
 
   @Test
   void writeBytesPersistsPayload() throws Exception {
@@ -41,5 +47,22 @@ class AtomicFileStoreTest {
 
     assertThat(Files.readString(target)).isEqualTo("{\"fallback\":true}");
     assertThat(moveCalls.get()).isEqualTo(2);
+  }
+
+  @Test
+  void writeBytesHardensManagedAppDataFilesOnPosixFileSystems() throws Exception {
+    systemProperties.set("user.home", tempDir);
+    Path target = ForgeDataPaths.preferencesFile();
+
+    AtomicFileStore.writeBytes(target, "{\"ok\":true}".getBytes(), "atomic-test-");
+
+    Assumptions.assumeTrue(Files.getFileStore(target).supportsFileAttributeView("posix"));
+    assertThat(Files.getPosixFilePermissions(target))
+        .containsExactlyInAnyOrder(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
+    assertThat(Files.getPosixFilePermissions(target.getParent()))
+        .containsExactlyInAnyOrder(
+            PosixFilePermission.OWNER_READ,
+            PosixFilePermission.OWNER_WRITE,
+            PosixFilePermission.OWNER_EXECUTE);
   }
 }

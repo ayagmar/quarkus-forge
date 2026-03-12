@@ -4,6 +4,7 @@ import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
 import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
 import java.net.URI;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -18,6 +19,11 @@ public record RuntimeConfig(
     Objects.requireNonNull(catalogCacheFile);
     Objects.requireNonNull(favoritesFile);
     Objects.requireNonNull(preferencesFile);
+
+    apiBaseUri = validatedApiBaseUri(apiBaseUri);
+    catalogCacheFile = catalogCacheFile.toAbsolutePath().normalize();
+    favoritesFile = favoritesFile.toAbsolutePath().normalize();
+    preferencesFile = preferencesFile.toAbsolutePath().normalize();
   }
 
   public static RuntimeConfig defaults() {
@@ -26,5 +32,41 @@ public record RuntimeConfig(
         CatalogSnapshotCache.defaultCacheFile(),
         ForgeDataPaths.favoritesFile(),
         ForgeDataPaths.preferencesFile());
+  }
+
+  private static URI validatedApiBaseUri(URI apiBaseUri) {
+    if (!apiBaseUri.isAbsolute()) {
+      throw new IllegalArgumentException("apiBaseUri must be absolute");
+    }
+    if (apiBaseUri.getRawUserInfo() != null) {
+      throw new IllegalArgumentException("apiBaseUri must not contain user info");
+    }
+    if (apiBaseUri.getRawQuery() != null || apiBaseUri.getRawFragment() != null) {
+      throw new IllegalArgumentException("apiBaseUri must not contain query or fragment data");
+    }
+    String scheme = apiBaseUri.getScheme();
+    if (scheme == null) {
+      throw new IllegalArgumentException("apiBaseUri must include a scheme");
+    }
+    String normalizedScheme = scheme.toLowerCase(Locale.ROOT);
+    if (!normalizedScheme.equals("https") && !normalizedScheme.equals("http")) {
+      throw new IllegalArgumentException("apiBaseUri must use http or https");
+    }
+    String host = apiBaseUri.getHost();
+    if (host == null || host.isBlank()) {
+      throw new IllegalArgumentException("apiBaseUri must include a host");
+    }
+    if (normalizedScheme.equals("http") && !isLoopbackHost(host)) {
+      throw new IllegalArgumentException(
+          "apiBaseUri must use https unless it targets localhost or a loopback address");
+    }
+    return apiBaseUri.normalize();
+  }
+
+  private static boolean isLoopbackHost(String host) {
+    String normalizedHost = host.toLowerCase(Locale.ROOT);
+    return normalizedHost.equals("localhost")
+        || normalizedHost.equals("::1")
+        || normalizedHost.startsWith("127.");
   }
 }

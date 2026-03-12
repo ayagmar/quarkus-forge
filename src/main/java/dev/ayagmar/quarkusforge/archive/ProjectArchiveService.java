@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge.archive;
 
 import dev.ayagmar.quarkusforge.api.GenerationRequest;
 import dev.ayagmar.quarkusforge.api.QuarkusApiClient;
+import dev.ayagmar.quarkusforge.util.FilePermissionSupport;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,7 +24,7 @@ public final class ProjectArchiveService {
     this(
         apiClient,
         zipExtractor,
-        () -> Files.createTempFile("quarkus-forge-", ".zip"),
+        () -> FilePermissionSupport.createOwnerOnlyTempFile("quarkus-forge-", ".zip"),
         ForkJoinPool.commonPool());
   }
 

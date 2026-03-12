@@ -1,7 +1,7 @@
 = Quarkus Forge Docs
-:description: User documentation for Quarkus Forge, a keyboard-first TUI for generating Quarkus projects.
+:description: User documentation for Quarkus Forge, a keyboard-first TUI and headless CLI for generating Quarkus projects.
 
-Quarkus Forge is a keyboard-first terminal UI and headless CLI to generate Quarkus projects quickly — an offline-capable, CI-ready alternative to `quarkus create`.
+Quarkus Forge gives you two ways to generate Quarkus projects well: an interactive terminal UI for local use, and a headless CLI for CI, scripts, and containers.
 
 == Start Here
 
@@ -10,6 +10,7 @@ Quarkus Forge is a keyboard-first terminal UI and headless CLI to generate Quark
 * xref:ui/keybindings.adoc[Keyboard shortcuts]
 * xref:cli/headless-mode.adoc[Generate projects non-interactively]
 * xref:reference/forge-files-and-state.adoc[Forge files, state, and CI integration]
+* xref:reference/security.adoc[Security posture and disclosure]
 * xref:troubleshooting.adoc[Fix common issues]
 
 == Modes at a Glance
@@ -45,11 +46,9 @@ Quarkus Forge is a keyboard-first terminal UI and headless CLI to generate Quark
 
 == Core Capabilities
 
-* Guided TUI with fast extension search, fuzzy highlighting, and chip-style selection badges.
-* Extension descriptions shown inline from the Quarkus API.
-* Headless `generate` command for CI and scripts; identical output to TUI.
+* Interactive TUI with fast extension search, fuzzy highlighting, and clear selected-extension badges.
+* Headless `generate` command for CI and scripts with the same generation model as the TUI.
 * Unified Forgefile format: shareable template + optional `locked` section for deterministic builds.
-* Safe archive extraction with Zip-Bomb and Zip-Slip protection.
-* Configurable theming and IDE command for terminal readability.
-* Session persistence — remembers your last selections across launches.
+* Safe archive extraction with ZIP safety checks built in.
+* Configurable theming, IDE handoff, and machine-local session persistence.
 * JBang catalog integration for zero-install runs.
