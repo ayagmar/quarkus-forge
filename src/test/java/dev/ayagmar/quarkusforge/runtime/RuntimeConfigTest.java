@@ -3,6 +3,7 @@ package dev.ayagmar.quarkusforge.runtime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
@@ -153,6 +154,27 @@ class RuntimeConfigTest {
   }
 
   @Test
+  void loopbackHelpersRecognizeOnlyValidLoopbackHosts() throws Exception {
+    assertThat(invokeBooleanHelper("isLoopbackHost", "127.0.0.1")).isTrue();
+    assertThat(invokeBooleanHelper("isLoopbackHost", "127.example.com")).isFalse();
+    assertThat(invokeBooleanHelper("isLoopbackHost", "[::1]")).isTrue();
+    assertThat(invokeBooleanHelper("isLoopbackHost", "[::1")).isFalse();
+    assertThat(invokeBooleanHelper("isIpv4LoopbackHost", "127.255.255.255")).isTrue();
+    assertThat(invokeBooleanHelper("isIpv4LoopbackHost", "126.0.0.1")).isFalse();
+    assertThat(invokeBooleanHelper("isIpv4LoopbackHost", "127.0.0")).isFalse();
+    assertThat(invokeBooleanHelper("isIpv4LoopbackHost", "127.0.999.1")).isFalse();
+  }
+
+  @Test
+  void ipv4OctetHelperRejectsEmptyNonDigitOutOfRangeAndOverflowValues() throws Exception {
+    assertThat(invokeBooleanHelper("isIpv4Octet", "")).isFalse();
+    assertThat(invokeBooleanHelper("isIpv4Octet", "12a")).isFalse();
+    assertThat(invokeBooleanHelper("isIpv4Octet", "256")).isFalse();
+    assertThat(invokeBooleanHelper("isIpv4Octet", "999999999999999999999")).isFalse();
+    assertThat(invokeBooleanHelper("isIpv4Octet", "42")).isTrue();
+  }
+
+  @Test
   void normalizesApiBaseUriAndFilePaths() {
     RuntimeConfig runtimeConfig =
         new RuntimeConfig(
@@ -168,5 +190,11 @@ class RuntimeConfigTest {
     assertThat(runtimeConfig.favoritesFile().getFileName()).hasToString("favorites.json");
     assertThat(runtimeConfig.preferencesFile()).isAbsolute();
     assertThat(runtimeConfig.preferencesFile().getFileName()).hasToString("preferences.json");
+  }
+
+  private static boolean invokeBooleanHelper(String methodName, String value) throws Exception {
+    Method method = RuntimeConfig.class.getDeclaredMethod(methodName, String.class);
+    method.setAccessible(true);
+    return (boolean) method.invoke(null, value);
   }
 }

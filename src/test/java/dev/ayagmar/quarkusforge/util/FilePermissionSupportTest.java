@@ -3,9 +3,14 @@ package dev.ayagmar.quarkusforge.util;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
+import java.net.URI;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -61,6 +66,40 @@ class FilePermissionSupportTest {
 
     assertOwnerOnlyFilePermissions(file);
     assertOwnerOnlyDirectoryPermissions(directory);
+  }
+
+  @Test
+  void createOwnerOnlyPathFallsBackWhenAttributesAreUnsupported() throws Exception {
+    Path fallbackPath = tempDir.resolve("fallback.json");
+    AtomicBoolean hardenerCalled = new AtomicBoolean();
+
+    Path createdPath =
+        FilePermissionSupport.createOwnerOnlyPath(
+            () -> {
+              throw new UnsupportedOperationException("no posix attrs");
+            },
+            () -> Files.writeString(fallbackPath, "{}"),
+            path -> hardenerCalled.set(true));
+
+    assertThat(createdPath).isEqualTo(fallbackPath);
+    assertThat(createdPath).exists();
+    assertThat(hardenerCalled.get()).isTrue();
+  }
+
+  @Test
+  void ensureOwnerOnlyHelpersSkipNonPosixFileSystems() throws Exception {
+    Path archive = tempDir.resolve("non-posix.zip");
+    URI zipUri = URI.create("jar:" + archive.toUri());
+
+    try (FileSystem zipFileSystem = FileSystems.newFileSystem(zipUri, Map.of("create", "true"))) {
+      Path zipFile = Files.writeString(zipFileSystem.getPath("/prefs.json"), "{}");
+      Path zipDirectory = Files.createDirectory(zipFileSystem.getPath("/recipes"));
+
+      assertThatCode(() -> FilePermissionSupport.ensureOwnerOnlyFile(zipFile))
+          .doesNotThrowAnyException();
+      assertThatCode(() -> FilePermissionSupport.ensureOwnerOnlyDirectory(zipDirectory))
+          .doesNotThrowAnyException();
+    }
   }
 
   private static void assertOwnerOnlyFilePermissions(Path file) throws Exception {
