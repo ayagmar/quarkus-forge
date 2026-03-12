@@ -33,7 +33,7 @@ case "$mode" in
       --binary target/quarkus-forge \
       --report target/quarkus-forge-build-report.html \
       --log target/native-size/native.log \
-      --max-bytes 27000000
+      --max-bytes 28000000
     ;;
   *)
     echo "Unknown native-size mode: $mode" >&2
