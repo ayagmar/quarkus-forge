@@ -456,6 +456,12 @@
           <version>${tamboui.panama-backend.version}</version>
           <scope>provided</scope>
         </dependency>
+        <dependency>
+          <groupId>dev.tamboui</groupId>
+          <artifactId>tamboui-jline3-backend</artifactId>
+          <version>${tamboui.jline3-backend.version}</version>
+          <scope>provided</scope>
+        </dependency>
       </dependencies>
       <build>
         <plugins>
