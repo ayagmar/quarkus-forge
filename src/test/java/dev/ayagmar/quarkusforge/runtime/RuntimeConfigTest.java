@@ -49,6 +49,19 @@ class RuntimeConfigTest {
   }
 
   @Test
+  void rejectsHostsThatOnlyStartWith127ButAreNotLoopbackIpv4Addresses() {
+    assertThatThrownBy(
+            () ->
+                new RuntimeConfig(
+                    URI.create("http://127.example.com:8080"),
+                    tempDir.resolve("catalog-cache.json"),
+                    tempDir.resolve("favorites.json"),
+                    tempDir.resolve("preferences.json")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must use https unless it targets localhost or a loopback address");
+  }
+
+  @Test
   void acceptsLocalhostAndIpv6LoopbackHttpApiBaseUriForTests() {
     RuntimeConfig localhostConfig =
         new RuntimeConfig(

@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
-class UiStateSnapshotMapperTest {
+class UiRenderModelTest {
 
   @Test
   void controllerUiStateExposesReducerOwnedSlicesOnly() {
@@ -285,7 +285,7 @@ class UiStateSnapshotMapperTest {
 
     UiRenderModel renderModel() {
       return new UiRenderModel(
-          reducerState.withStatusMessage(reducerState.statusMessage()),
+          reducerState,
           SubmitAlertSnapshot.HIDDEN,
           metadataPanel,
           panelState.extensionsPanel(),

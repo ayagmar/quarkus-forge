@@ -70,6 +70,36 @@ public record RuntimeConfig(
     }
     return normalizedHost.equals("localhost")
         || normalizedHost.equals("::1")
-        || normalizedHost.startsWith("127.");
+        || isIpv4LoopbackHost(normalizedHost);
+  }
+
+  private static boolean isIpv4LoopbackHost(String host) {
+    String[] octets = host.split("\\.", -1);
+    if (octets.length != 4 || !octets[0].equals("127")) {
+      return false;
+    }
+    for (int index = 1; index < octets.length; index++) {
+      if (!isIpv4Octet(octets[index])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static boolean isIpv4Octet(String value) {
+    if (value.isEmpty()) {
+      return false;
+    }
+    for (int index = 0; index < value.length(); index++) {
+      if (!Character.isDigit(value.charAt(index))) {
+        return false;
+      }
+    }
+    try {
+      int octet = Integer.parseInt(value);
+      return octet >= 0 && octet <= 255;
+    } catch (NumberFormatException ignored) {
+      return false;
+    }
   }
 }
