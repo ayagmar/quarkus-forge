@@ -12,8 +12,6 @@ import java.util.List;
 import java.util.Objects;
 
 final class UiRenderStateAssembler {
-  record PanelState(ExtensionsPanelSnapshot extensionsPanel, FooterSnapshot footer) {}
-
   private final EnumMap<FocusTarget, TextInputState> inputStates;
   private final MetadataSelectorManager metadataSelectors;
   private final ExtensionCatalogPreferences extensionCatalogPreferences;

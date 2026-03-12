@@ -5,8 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.domain.ForgeUiState;
-import dev.ayagmar.quarkusforge.domain.ProjectRequest;
-import dev.ayagmar.quarkusforge.domain.ValidationReport;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import java.nio.file.Path;
@@ -121,12 +119,11 @@ class UiRenderModelTest {
         new UiStateFixtureBuilder()
             .withStartupOverlayVisible(true)
             .withStartupOverlayStatusLines(List.of("runtime line"))
-            .withPanelState(
-                new UiRenderStateAssembler.PanelState(
-                    new ExtensionsPanelSnapshot(
-                        true, true, false, false, false, "", "live", false, false, false, 0, "", "",
-                        0, 0, 0, List.of(), List.of(), "", ""),
-                    footerSnapshot));
+            .withExtensionsPanel(
+                new ExtensionsPanelSnapshot(
+                    true, true, false, false, false, "", "live", false, false, false, 0, "", "", 0,
+                    0, 0, List.of(), List.of(), "", ""))
+            .withFooter(footerSnapshot);
 
     UiRenderModel renderModel = fixture.renderModel();
 
@@ -159,19 +156,18 @@ class UiRenderModelTest {
             "");
     UiStateFixtureBuilder fixture =
         new UiStateFixtureBuilder()
-            .withPanelState(
-                new UiRenderStateAssembler.PanelState(
-                    new ExtensionsPanelSnapshot(
-                        true, true, false, false, false, "", "live", false, false, false, 0, "", "",
-                        0, 0, 0, List.of(), List.of(), "", ""),
-                    footerSnapshot));
+            .withExtensionsPanel(
+                new ExtensionsPanelSnapshot(
+                    true, true, false, false, false, "", "live", false, false, false, 0, "", "", 0,
+                    0, 0, List.of(), List.of(), "", ""))
+            .withFooter(footerSnapshot);
 
     UiRenderModel renderModel = fixture.renderModel();
 
     assertThat(renderModel.reducerState().statusMessage()).isEqualTo("Ready");
     assertThat(renderModel.metadataPanel()).isEqualTo(fixture.metadataPanel());
-    assertThat(renderModel.extensionsPanel()).isEqualTo(fixture.panelState().extensionsPanel());
-    assertThat(renderModel.footer()).isEqualTo(footerSnapshot);
+    assertThat(renderModel.extensionsPanel()).isEqualTo(fixture.extensionsPanel());
+    assertThat(renderModel.footer()).isEqualTo(fixture.footer());
     assertThat(renderModel.generation()).isEqualTo(fixture.generation());
     assertThat(renderModel.startupOverlay()).isEqualTo(fixture.startupOverlay());
   }
@@ -196,50 +192,48 @@ class UiRenderModelTest {
             MetadataPanelSnapshot.SelectorInfo.EMPTY,
             MetadataPanelSnapshot.SelectorInfo.EMPTY);
 
-    private ProjectRequest request = initialState.request();
-    private ValidationReport validation = initialState.validation();
-    private UiRenderStateAssembler.PanelState panelState =
-        new UiRenderStateAssembler.PanelState(
-            new ExtensionsPanelSnapshot(
-                false,
-                false,
-                false,
-                false,
-                false,
-                "",
-                "snapshot",
-                false,
-                false,
-                false,
-                0,
-                "",
-                "",
-                0,
-                0,
-                0,
-                List.of(),
-                List.of(),
-                "",
-                ""),
-            new FooterSnapshot(
-                false,
-                FocusTarget.GROUP_ID,
-                false,
-                false,
-                false,
-                "Ready",
-                "",
-                "",
-                false,
-                "",
-                "",
-                "",
-                "",
-                ""));
+    private ExtensionsPanelSnapshot extensionsPanel =
+        new ExtensionsPanelSnapshot(
+            false,
+            false,
+            false,
+            false,
+            false,
+            "",
+            "snapshot",
+            false,
+            false,
+            false,
+            0,
+            "",
+            "",
+            0,
+            0,
+            0,
+            List.of(),
+            List.of(),
+            "",
+            "");
+    private FooterSnapshot footer =
+        new FooterSnapshot(
+            false,
+            FocusTarget.GROUP_ID,
+            false,
+            false,
+            false,
+            "Ready",
+            "",
+            "",
+            false,
+            "",
+            "",
+            "",
+            "",
+            "");
     private UiState reducerState =
         new UiState(
-            request,
-            validation,
+            initialState.request(),
+            initialState.validation(),
             FocusTarget.GROUP_ID,
             "Ready",
             "",
@@ -263,8 +257,13 @@ class UiRenderModelTest {
       return this;
     }
 
-    UiStateFixtureBuilder withPanelState(UiRenderStateAssembler.PanelState nextPanelState) {
-      panelState = nextPanelState;
+    UiStateFixtureBuilder withExtensionsPanel(ExtensionsPanelSnapshot nextExtensionsPanel) {
+      extensionsPanel = nextExtensionsPanel;
+      return this;
+    }
+
+    UiStateFixtureBuilder withFooter(FooterSnapshot nextFooter) {
+      footer = nextFooter;
       return this;
     }
 
@@ -288,8 +287,8 @@ class UiRenderModelTest {
           reducerState,
           SubmitAlertSnapshot.HIDDEN,
           metadataPanel,
-          panelState.extensionsPanel(),
-          panelState.footer(),
+          extensionsPanel,
+          footer,
           reducerState.postGeneration(),
           generation,
           startupOverlay);
@@ -299,8 +298,12 @@ class UiRenderModelTest {
       return metadataPanel;
     }
 
-    UiRenderStateAssembler.PanelState panelState() {
-      return panelState;
+    ExtensionsPanelSnapshot extensionsPanel() {
+      return extensionsPanel;
+    }
+
+    FooterSnapshot footer() {
+      return footer;
     }
 
     UiState.GenerationView generation() {

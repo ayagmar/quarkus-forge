@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge.runtime;
 
 import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
 import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
+import java.net.InetAddress;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.Locale;
@@ -70,7 +71,8 @@ public record RuntimeConfig(
     }
     return normalizedHost.equals("localhost")
         || normalizedHost.equals("::1")
-        || isIpv4LoopbackHost(normalizedHost);
+        || isIpv4LoopbackHost(normalizedHost)
+        || resolvesToLoopbackAddress(normalizedHost);
   }
 
   private static boolean isIpv4LoopbackHost(String host) {
@@ -84,6 +86,17 @@ public record RuntimeConfig(
       }
     }
     return true;
+  }
+
+  private static boolean resolvesToLoopbackAddress(String host) {
+    if (!host.contains(":")) {
+      return false;
+    }
+    try {
+      return InetAddress.getByName(host).isLoopbackAddress();
+    } catch (RuntimeException | java.net.UnknownHostException ignored) {
+      return false;
+    }
   }
 
   private static boolean isIpv4Octet(String value) {

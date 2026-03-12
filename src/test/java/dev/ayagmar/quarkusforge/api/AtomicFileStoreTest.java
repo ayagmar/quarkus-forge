@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.Arrays;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -64,5 +65,24 @@ class AtomicFileStoreTest {
             PosixFilePermission.OWNER_READ,
             PosixFilePermission.OWNER_WRITE,
             PosixFilePermission.OWNER_EXECUTE);
+  }
+
+  @Test
+  void writeBytesKeepsDefaultPermissionsForUnmanagedPosixFiles() throws Exception {
+    Path targetDirectory = tempDir.resolve("workspace");
+    Files.createDirectories(targetDirectory);
+    Path permissionProbe = Files.createFile(targetDirectory.resolve("permission-probe.json"));
+
+    Assumptions.assumeTrue(Files.getFileStore(permissionProbe).supportsFileAttributeView("posix"));
+    Set<PosixFilePermission> defaultPermissions = Files.getPosixFilePermissions(permissionProbe);
+    Assumptions.assumeFalse(
+        defaultPermissions.equals(
+            Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)));
+    Files.delete(permissionProbe);
+
+    Path target = targetDirectory.resolve("prefs.json");
+    AtomicFileStore.writeBytes(target, "{\"ok\":true}".getBytes(), "atomic-test-");
+
+    assertThat(Files.getPosixFilePermissions(target)).isEqualTo(defaultPermissions);
   }
 }

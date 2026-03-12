@@ -29,15 +29,9 @@ record MetadataPanelSnapshot(
     platformStream = platformStream == null ? "" : platformStream;
     buildTool = buildTool == null ? "" : buildTool;
     javaVersion = javaVersion == null ? "" : javaVersion;
-    if (platformStreamInfo == null) {
-      platformStreamInfo = SelectorInfo.EMPTY;
-    }
-    if (buildToolInfo == null) {
-      buildToolInfo = SelectorInfo.EMPTY;
-    }
-    if (javaVersionInfo == null) {
-      javaVersionInfo = SelectorInfo.EMPTY;
-    }
+    platformStreamInfo = Objects.requireNonNullElse(platformStreamInfo, SelectorInfo.EMPTY);
+    buildToolInfo = Objects.requireNonNullElse(buildToolInfo, SelectorInfo.EMPTY);
+    javaVersionInfo = Objects.requireNonNullElse(javaVersionInfo, SelectorInfo.EMPTY);
   }
 
   record SelectorInfo(int selectedIndex, int totalOptions) {

@@ -55,9 +55,9 @@ class UrlConnectionTransportTest {
       assertThat(response.body()).isEqualTo("catalog");
       assertThat(connection.requestMethod).isEqualTo("GET");
       assertThat(connection.acceptHeader).isEqualTo("application/json");
-      assertThat(connection.allowUserInteraction).isFalse();
-      assertThat(connection.useCaches).isFalse();
-      assertThat(connection.instanceFollowRedirects).isFalse();
+      assertThat(connection.getAllowUserInteraction()).isFalse();
+      assertThat(connection.getUseCaches()).isFalse();
+      assertThat(connection.getInstanceFollowRedirects()).isFalse();
       assertThat(connection.disconnected).isTrue();
     }
   }
@@ -561,9 +561,6 @@ class UrlConnectionTransportTest {
     private String requestMethod;
     private int connectTimeout;
     private int readTimeout;
-    private boolean allowUserInteraction;
-    private boolean useCaches = true;
-    private boolean instanceFollowRedirects = true;
     private boolean disconnected;
 
     private FakeHttpURLConnection(
@@ -616,17 +613,17 @@ class UrlConnectionTransportTest {
 
     @Override
     public void setAllowUserInteraction(boolean allowUserInteraction) {
-      this.allowUserInteraction = allowUserInteraction;
+      super.setAllowUserInteraction(allowUserInteraction);
     }
 
     @Override
     public void setUseCaches(boolean useCaches) {
-      this.useCaches = useCaches;
+      super.setUseCaches(useCaches);
     }
 
     @Override
     public void setInstanceFollowRedirects(boolean followRedirects) {
-      this.instanceFollowRedirects = followRedirects;
+      super.setInstanceFollowRedirects(followRedirects);
     }
 
     @Override
