@@ -16,11 +16,11 @@
       dev/tamboui/tui/bindings/.*\\.properties$
     </native.tui.bindings.resource.pattern>
 
-    <tamboui.core.version>0.2.0-20260307.142456-35</tamboui.core.version>
+    <tamboui.core.version>0.2.0-20260301.102219-30</tamboui.core.version>
     <tamboui.annotations.version>${tamboui.core.version}</tamboui.annotations.version>
     <tamboui.panama-backend.version>${tamboui.core.version}</tamboui.panama-backend.version>
     <tamboui.jline3-backend.version>${tamboui.core.version}</tamboui.jline3-backend.version>
-    <tamboui.tui.version>0.2.0-20260307.142456-33</tamboui.tui.version>
+    <tamboui.tui.version>0.2.0-20260301.102219-28</tamboui.tui.version>
     <tamboui.widgets.version>${tamboui.tui.version}</tamboui.widgets.version>
     <picocli.version>4.7.7</picocli.version>
     <jackson.core.version>2.21.1</jackson.core.version>
