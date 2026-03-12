@@ -17,7 +17,8 @@
     <module name="RedundantModifier"/>
     <module name="NeedBraces"/>
     <module name="IllegalImport">
-      <property name="illegalClasses" value="sun.misc.Unsafe,jdk.internal.*,com.sun.*"/>
+      <property name="illegalClasses" value="sun.misc.Unsafe"/>
+      <property name="illegalPkgs" value="jdk.internal,com.sun"/>
     </module>
   </module>
 </module>

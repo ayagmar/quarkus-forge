@@ -42,6 +42,14 @@ class ReleaseWorkflowTest {
         "headless");
     assertContainsNativeMatrixEntry(
         workflow,
+        "macos-latest",
+        "macos-aarch64",
+        "''",
+        "-Pheadless,native",
+        "quarkus-forge-headless",
+        "headless");
+    assertContainsNativeMatrixEntry(
+        workflow,
         "windows-latest",
         "windows-x86_64",
         "'.exe'",
