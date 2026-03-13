@@ -3,7 +3,25 @@
 All notable changes to Quarkus Forge are documented here.
 This project uses [Conventional Commits](https://www.conventionalcommits.org/). GitHub Releases contain auto-generated notes from [JReleaser](https://jreleaser.org/).
 
-## [Unreleased](https://github.com/ayagmar/quarkus-forge/compare/v0.6.3...HEAD)
+## [Unreleased](https://github.com/ayagmar/quarkus-forge/compare/v0.6.4...HEAD)
+
+## [0.6.4](https://github.com/ayagmar/quarkus-forge/compare/v0.6.3...v0.6.4) (2026-03-13)
+
+### Changed
+
+- fix(build): keep jline backend out of headless jar (64383f8)
+- fix(build): keep Tamboui pin and relax native budget (8d6bc17)
+- fix(runtime): add Windows jline backend provider (88c6e0f)
+- chore(deps): bump actions/checkout from 4 to 6 (fd9bae2)
+- chore(deps): bump actions/setup-java from 4 to 5 (cfcebb7)
+- fix(repo): remove stale paths and tighten hardening (39ce395)
+- test(runtime): increase hardening patch coverage (cc0514d)
+- fix(review): address follow-up review comments (83557d8)
+- fix(runtime): cover security hardening edge cases (bc5505a)
+- fix(repo): harden security posture and simplify packaging (1ed595e)
+- chore(deps-dev): bump the maven-plugins group with 3 updates (a6f8760)
+- chore(release): prepare next iteration 0.6.4-SNAPSHOT (f687e91)
+
 
 ## [0.6.3](https://github.com/ayagmar/quarkus-forge/compare/v0.6.2...v0.6.3) (2026-03-08)
 
