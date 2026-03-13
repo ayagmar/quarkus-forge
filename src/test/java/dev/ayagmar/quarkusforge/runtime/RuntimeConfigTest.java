@@ -203,7 +203,7 @@ class RuntimeConfigTest {
   }
 
   private static boolean invokeBooleanHelper(String methodName, String value) throws Exception {
-    Method method = RuntimeConfig.class.getDeclaredMethod(methodName, String.class);
+    Method method = LoopbackHosts.class.getDeclaredMethod(methodName, String.class);
     method.setAccessible(true);
     return (boolean) method.invoke(null, value);
   }

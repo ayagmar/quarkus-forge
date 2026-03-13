@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
-import picocli.CommandLine;
 
 class QuarkusForgeCliTest {
   private static final MetadataDto METADATA =
@@ -139,7 +138,7 @@ class QuarkusForgeCliTest {
     CliCommandTestSupport.CommandResult result =
         CliCommandTestSupport.captureCommandOutput(
             () ->
-                new CommandLine(cli)
+                CliCommandLineFactory.create(cli)
                     .execute(
                         "--dry-run",
                         "--group-id",

@@ -23,22 +23,19 @@ import dev.ayagmar.quarkusforge.runtime.TuiBootstrapService;
 import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
 
 @Command(
     name = "quarkus-forge",
-    versionProvider = CliVersionProvider.class,
-    subcommands = {GenerateCommand.class},
+    mixinStandardHelpOptions = true,
     description = "Quarkus forge terminal UI")
 public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner {
 
   private static final PostTuiActionExecutor POST_TUI_ACTION_EXECUTOR = new PostTuiActionExecutor();
   private static final TuiBootstrapService TUI_BOOTSTRAP_SERVICE = new TuiBootstrapService();
 
-  @Mixin private RequestOptions requestOptions = new RequestOptions();
+  private RequestOptions requestOptions = new RequestOptions();
 
   private final RuntimeConfig runtimeConfig;
   private final Function<java.net.URI, QuarkusApiClient> apiClientFactory;
@@ -64,18 +61,6 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
 
   @Option(names = "--interactive-smoke-test", hidden = true, defaultValue = "false")
   private boolean interactiveSmokeTest;
-
-  @Option(
-      names = {"-h", "--help"},
-      usageHelp = true,
-      description = "Show this help message and exit.")
-  private boolean helpRequested;
-
-  @Option(
-      names = {"-V", "--version"},
-      versionHelp = true,
-      description = "Print version information and exit.")
-  private boolean versionRequested;
 
   @Option(
       names = "--post-generate-hook",
@@ -158,7 +143,7 @@ public final class QuarkusForgeCli implements Callable<Integer>, HeadlessRunner 
   }
 
   static int runWithArgs(String[] args, RuntimeConfig runtimeConfig) {
-    return new CommandLine(new QuarkusForgeCli(runtimeConfig)).execute(args);
+    return CliCommandLineFactory.create(new QuarkusForgeCli(runtimeConfig)).execute(args);
   }
 
   public static void main(String[] args) {

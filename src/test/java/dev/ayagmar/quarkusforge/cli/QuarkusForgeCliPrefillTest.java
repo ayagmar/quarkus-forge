@@ -9,7 +9,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import picocli.CommandLine;
 
 /**
  * Tests verifying that {@link QuarkusForgeCli} correctly detects explicitly-provided CLI options
@@ -24,12 +23,14 @@ class QuarkusForgeCliPrefillTest {
 
   @TempDir Path tempDir;
 
-  // ── isExplicitlySet with real Picocli @Spec injection ─────────────────────
+  // ── Explicit-option detection from recorded Picocli parse results ─────────────────────
 
   @Test
   void picocliSpecDetectsOptionThatWasExplicitlyProvided() {
     QuarkusForgeCli cli = new QuarkusForgeCli();
-    new CommandLine(cli).parseArgs("--dry-run", "--group-id", "com.example");
+    cli.requestOptions()
+        .recordMatchedOptions(
+            CliCommandLineFactory.create(cli).parseArgs("--dry-run", "--group-id", "com.example"));
 
     assertThat(
             cli.requestOptions()
@@ -42,7 +43,8 @@ class QuarkusForgeCliPrefillTest {
   @Test
   void picocliSpecDetectsOptionThatWasNotProvided() {
     QuarkusForgeCli cli = new QuarkusForgeCli();
-    new CommandLine(cli).parseArgs("--dry-run");
+    cli.requestOptions()
+        .recordMatchedOptions(CliCommandLineFactory.create(cli).parseArgs("--dry-run"));
 
     // --group-id was NOT provided; value equals the default
     assertThat(
@@ -60,7 +62,10 @@ class QuarkusForgeCliPrefillTest {
     // This is the core bug scenario: user passes --group-id org.acme (same as default)
     // and the system must recognise it as explicit input, NOT as "not provided".
     QuarkusForgeCli cli = new QuarkusForgeCli();
-    new CommandLine(cli).parseArgs("--dry-run", "--group-id", RequestOptions.DEFAULT_GROUP_ID);
+    cli.requestOptions()
+        .recordMatchedOptions(
+            CliCommandLineFactory.create(cli)
+                .parseArgs("--dry-run", "--group-id", RequestOptions.DEFAULT_GROUP_ID));
 
     assertThat(
             cli.requestOptions()
@@ -75,8 +80,10 @@ class QuarkusForgeCliPrefillTest {
   @Test
   void picocliSpecDetectsMultipleExplicitOptions() {
     QuarkusForgeCli cli = new QuarkusForgeCli();
-    new CommandLine(cli)
-        .parseArgs("--dry-run", "--group-id", "com.example", "--java-version", "21");
+    cli.requestOptions()
+        .recordMatchedOptions(
+            CliCommandLineFactory.create(cli)
+                .parseArgs("--dry-run", "--group-id", "com.example", "--java-version", "21"));
 
     assertThat(
             cli.requestOptions()
@@ -103,7 +110,10 @@ class QuarkusForgeCliPrefillTest {
   @Test
   void explicitCliPrefillRetainsExplicitDefaultEqualGroupId() {
     QuarkusForgeCli cli = new QuarkusForgeCli();
-    new CommandLine(cli).parseArgs("--dry-run", "--group-id", RequestOptions.DEFAULT_GROUP_ID);
+    cli.requestOptions()
+        .recordMatchedOptions(
+            CliCommandLineFactory.create(cli)
+                .parseArgs("--dry-run", "--group-id", RequestOptions.DEFAULT_GROUP_ID));
 
     assertThat(cli.requestOptions().toExplicitCliPrefill().groupId())
         .as("Explicit --group-id must remain explicit even when it equals the default")
@@ -113,7 +123,8 @@ class QuarkusForgeCliPrefillTest {
   @Test
   void explicitCliPrefillLeavesOmittedDefaultsUnset() {
     QuarkusForgeCli cli = new QuarkusForgeCli();
-    new CommandLine(cli).parseArgs("--dry-run");
+    cli.requestOptions()
+        .recordMatchedOptions(CliCommandLineFactory.create(cli).parseArgs("--dry-run"));
 
     CliPrefill explicitPrefill = cli.requestOptions().toExplicitCliPrefill();
 
@@ -126,8 +137,10 @@ class QuarkusForgeCliPrefillTest {
   @Test
   void explicitCliPrefillPreservesMultipleExplicitOptions() {
     QuarkusForgeCli cli = new QuarkusForgeCli();
-    new CommandLine(cli)
-        .parseArgs("--dry-run", "--group-id", "com.example", "--java-version", "21");
+    cli.requestOptions()
+        .recordMatchedOptions(
+            CliCommandLineFactory.create(cli)
+                .parseArgs("--dry-run", "--group-id", "com.example", "--java-version", "21"));
 
     CliPrefill explicitPrefill = cli.requestOptions().toExplicitCliPrefill();
 

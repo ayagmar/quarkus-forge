@@ -4,20 +4,19 @@ import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.forge.Forgefile;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.Callable;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.ParentCommand;
 
 @Command(
     name = "generate",
     mixinStandardHelpOptions = true,
     description = "Generate a Quarkus project without starting the TUI")
 public final class GenerateCommand implements Callable<Integer> {
-  @ParentCommand private HeadlessRunner rootCommand;
+  private final HeadlessRunner rootCommand;
 
-  @Mixin private RequestOptions requestOptions = new RequestOptions();
+  private RequestOptions requestOptions = new RequestOptions();
 
   @Option(
       names = {"-e", "--extension"},
@@ -64,6 +63,17 @@ public final class GenerateCommand implements Callable<Integer> {
       description = "Validate full generation request without writing files")
   private boolean dryRun;
 
+  public GenerateCommand() {
+    this(
+        command -> {
+          throw new IllegalStateException("Generate command runner not configured");
+        });
+  }
+
+  GenerateCommand(HeadlessRunner rootCommand) {
+    this.rootCommand = Objects.requireNonNull(rootCommand);
+  }
+
   @Override
   public Integer call() {
     return rootCommand.runHeadlessGenerate(this);
@@ -82,6 +92,10 @@ public final class GenerateCommand implements Callable<Integer> {
 
   public void setCliPrefill(CliPrefill prefill) {
     requestOptions = RequestOptions.explicitFromCliPrefill(prefill);
+  }
+
+  RequestOptions requestOptions() {
+    return requestOptions;
   }
 
   public List<String> extensions() {

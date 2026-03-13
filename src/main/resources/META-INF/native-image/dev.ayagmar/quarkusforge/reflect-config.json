@@ -1,0 +1,52 @@
+[
+  {
+    "name": "dev.ayagmar.quarkusforge.cli.GenerateCommand",
+    "fields": [
+      { "name": "dryRun" },
+      { "name": "extensions" },
+      { "name": "fromFile" },
+      { "name": "lock" },
+      { "name": "lockCheck" },
+      { "name": "presets" },
+      { "name": "saveAsFile" }
+    ]
+  },
+  {
+    "name": "dev.ayagmar.quarkusforge.cli.HeadlessCli",
+    "fields": [
+      { "name": "dryRun" },
+      { "name": "verbose" }
+    ]
+  },
+  {
+    "name": "dev.ayagmar.quarkusforge.cli.QuarkusForgeCli",
+    "fields": [
+      { "name": "dryRun" },
+      { "name": "interactiveSmokeTest" },
+      { "name": "postGenerateHookCommand" },
+      { "name": "searchDebounceMs" },
+      { "name": "verbose" }
+    ]
+  },
+  {
+    "name": "dev.ayagmar.quarkusforge.cli.RequestOptions",
+    "fields": [
+      { "name": "artifactId" },
+      { "name": "buildTool" },
+      { "name": "groupId" },
+      { "name": "javaVersion" },
+      { "name": "outputDirectory" },
+      { "name": "packageName" },
+      { "name": "platformStream" },
+      { "name": "version" }
+    ]
+  },
+  {
+    "name": "picocli.CommandLine$AutoHelpMixin",
+    "allDeclaredConstructors": true,
+    "fields": [
+      { "name": "helpRequested" },
+      { "name": "versionRequested" }
+    ]
+  }
+]

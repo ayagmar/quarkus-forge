@@ -13,20 +13,18 @@ class CliVersionProviderTest {
   }
 
   @Test
-  void resolveVersionFallsBackToResourceOrUnknown() {
-    // In test environment, implementation version from manifest is typically null,
-    // so it falls back to version.properties resource or "unknown"
+  void resolveVersionFallsBackToUnknownWhenImplementationVersionIsUnavailable() {
     String version = CliVersionProvider.resolveVersion();
     assertThat(version).isNotNull();
-    // Must be a version string or "unknown"
     assertThat(version).matches("(\\d+\\.\\d+\\.\\d+.*|unknown)");
   }
 
   @Test
-  void getVersionReturnsNonEmptyArray() {
-    CliVersionProvider provider = new CliVersionProvider();
-    String[] versions = provider.getVersion();
-    assertThat(versions).hasSize(1);
-    assertThat(versions[0]).isNotBlank();
+  void resolveVersionIsStableAcrossRepeatedCalls() {
+    String first = CliVersionProvider.resolveVersion();
+    String second = CliVersionProvider.resolveVersion();
+
+    assertThat(first).isEqualTo(second);
+    assertThat(first).isNotBlank();
   }
 }

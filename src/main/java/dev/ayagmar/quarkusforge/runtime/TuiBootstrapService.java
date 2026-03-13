@@ -22,7 +22,6 @@ import dev.tamboui.tui.TuiRunner;
 import dev.tamboui.tui.bindings.Bindings;
 import java.time.Duration;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -30,9 +29,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public final class TuiBootstrapService {
   private static final String BACKEND_PROPERTY_NAME = "tamboui.backend";
-  private static final String BACKEND_ENV_NAME = "TAMBOUI_BACKEND";
-  private static final String PANAMA_BACKEND = "panama";
-  private static final String JLINE3_BACKEND = "jline3";
   private static final ReentrantLock BACKEND_PROPERTY_LOCK = new ReentrantLock();
   public static final Duration STARTUP_SPLASH_MIN_DURATION = Duration.ofMillis(450);
   private static final Duration TUI_TICK_RATE = Duration.ofMillis(40);
@@ -62,45 +58,7 @@ public final class TuiBootstrapService {
   }
 
   public static String defaultBackendPreference() {
-    return defaultBackendPreference(System.getProperty("os.name", ""));
-  }
-
-  private static void configureTerminalBackendPreference() {
-    configureTerminalBackendPreference(
-        System.getProperty(BACKEND_PROPERTY_NAME),
-        System.getenv(BACKEND_ENV_NAME),
-        System.getProperty("os.name", ""));
-  }
-
-  private static void configureTerminalBackendPreference(
-      String propertyValue, String envValue, String osName) {
-    if (isBackendPreferenceExplicitlyConfigured(propertyValue, envValue)) {
-      return;
-    }
-    System.setProperty(BACKEND_PROPERTY_NAME, defaultBackendPreference(osName));
-  }
-
-  private static boolean isBackendPreferenceExplicitlyConfigured(
-      String propertyValue, String envValue) {
-    if (propertyValue != null && !propertyValue.isBlank()) {
-      return true;
-    }
-    return envValue != null && !envValue.isBlank();
-  }
-
-  private static String defaultBackendPreference(String osName) {
-    if (isWindowsOsName(osName)) {
-      return JLINE3_BACKEND;
-    }
-    return PANAMA_BACKEND;
-  }
-
-  private static boolean isWindowsOsName(String osName) {
-    if (osName == null) {
-      return false;
-    }
-    String normalized = osName.strip().toLowerCase(Locale.ROOT);
-    return normalized.startsWith("windows");
+    return TerminalBackendPreference.defaultBackendPreference();
   }
 
   public static void runHeadlessSmoke(RuntimeConfig runtimeConfig, DiagnosticLogger diagnostics) {
@@ -122,7 +80,7 @@ public final class TuiBootstrapService {
     BACKEND_PROPERTY_LOCK.lock();
     String previousBackendPreference = System.getProperty(BACKEND_PROPERTY_NAME);
     try {
-      configureTerminalBackendPreference();
+      TerminalBackendPreference.configure();
       TuiConfig tuiConfig = appTuiConfig();
       try (var tui = TuiRunner.create(tuiConfig);
           RuntimeServices runtimeServices = RuntimeServices.open(runtimeConfig)) {
@@ -159,7 +117,7 @@ public final class TuiBootstrapService {
       }
     } finally {
       try {
-        restoreTerminalBackendPreference(previousBackendPreference);
+        TerminalBackendPreference.restore(previousBackendPreference);
       } finally {
         BACKEND_PROPERTY_LOCK.unlock();
       }
@@ -179,7 +137,7 @@ public final class TuiBootstrapService {
     BACKEND_PROPERTY_LOCK.lock();
     String previousBackendPreference = System.getProperty(BACKEND_PROPERTY_NAME);
     try {
-      configureTerminalBackendPreference();
+      TerminalBackendPreference.configure();
       TuiConfig tuiConfig = appTuiConfig();
       try (var tui = TuiRunner.create(tuiConfig);
           RuntimeServices runtimeServices = RuntimeServices.open(runtimeConfig)) {
@@ -224,7 +182,7 @@ public final class TuiBootstrapService {
       }
     } finally {
       try {
-        restoreTerminalBackendPreference(previousBackendPreference);
+        TerminalBackendPreference.restore(previousBackendPreference);
       } finally {
         BACKEND_PROPERTY_LOCK.unlock();
       }
@@ -343,14 +301,6 @@ public final class TuiBootstrapService {
         scheduler,
         detectedIdes,
         sessionLoop);
-  }
-
-  private static void restoreTerminalBackendPreference(String previousBackendPreference) {
-    if (previousBackendPreference == null) {
-      System.clearProperty(BACKEND_PROPERTY_NAME);
-      return;
-    }
-    System.setProperty(BACKEND_PROPERTY_NAME, previousBackendPreference);
   }
 
   private static String resolvePresetStreamKey(

@@ -9,9 +9,6 @@
       },
       {
         "pattern": "${native.tui.bindings.resource.pattern}"
-      },
-      {
-        "pattern": "version\\.properties$"
       }
     ]
   }
