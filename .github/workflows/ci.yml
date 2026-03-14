@@ -114,6 +114,58 @@ jobs:
         shell: bash
         run: scripts/verify/verify.sh
 
+  windows-interactive-smoke:
+    name: Windows Interactive Smoke
+    needs: quality
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up GraalVM 25
+        uses: graalvm/setup-graalvm@54b4f5a65c1a84b2fdfdc2078fe43df32819e4b1 # v1
+        with:
+          distribution: graalvm
+          java-version: '25'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache: maven
+
+      - name: Set up Visual Studio Build Tools
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Package interactive JVM artifact
+        shell: bash
+        run: ./mvnw -DskipTests package
+
+      - name: Smoke test interactive JVM artifact on Windows
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/native-smoke
+          log_path="target/native-smoke/windows-interactive-jvm.log"
+          if ! java -jar target/quarkus-forge.jar --interactive-smoke-test --verbose 2> "$log_path"; then
+            cat "$log_path"
+            exit 1
+          fi
+          if ! grep -F '"event":"tui.render.ready"' "$log_path" > /dev/null; then
+            cat "$log_path"
+            exit 1
+          fi
+
+      - name: Verify native-image toolchain
+        shell: bash
+        run: native-image --version
+
+      - name: Build interactive native artifact
+        shell: bash
+        run: ./mvnw -Pnative -Dnative.skip=false -DskipTests package
+
+      - name: Smoke test interactive native artifact on Windows
+        shell: bash
+        run: scripts/verify/native-release-smoke.sh target/quarkus-forge.exe interactive-windows
+
   coverage:
     name: Coverage
     needs: quality
@@ -240,13 +292,13 @@ jobs:
   ci-status:
     name: CI Status
     if: always()
-    needs: [quality, tests, coverage, security, native-size]
+    needs: [quality, tests, windows-interactive-smoke, coverage, security, native-size]
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
       - name: Check CI results
         run: |
-          if [[ "${{ needs.quality.result }}" != "success" || "${{ needs.tests.result }}" != "success" || "${{ needs.coverage.result }}" != "success" || "${{ needs.security.result }}" != "success" || "${{ needs.native-size.result }}" != "success" ]]; then
+          if [[ "${{ needs.quality.result }}" != "success" || "${{ needs.tests.result }}" != "success" || "${{ needs.windows-interactive-smoke.result }}" != "success" || "${{ needs.coverage.result }}" != "success" || "${{ needs.security.result }}" != "success" || "${{ needs.native-size.result }}" != "success" ]]; then
             echo "CI failed — see individual job logs above."
             exit 1
           fi
