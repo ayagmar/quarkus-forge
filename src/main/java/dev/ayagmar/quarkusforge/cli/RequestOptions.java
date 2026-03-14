@@ -6,18 +6,12 @@ import dev.ayagmar.quarkusforge.forge.Forgefile;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
-import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.Spec;
+import picocli.CommandLine.ParseResult;
 
 final class RequestOptions {
   private final Set<String> prefilledOptions = new HashSet<>();
-
-  /**
-   * Injected by Picocli after parsing; null when the object is constructed manually (e.g. in tests
-   * or when calling {@link #defaults()}).
-   */
-  @Spec CommandSpec spec;
+  private final Set<String> matchedOptions = new HashSet<>();
 
   static final String DEFAULT_GROUP_ID = ProjectInputDefaults.GROUP_ID;
   static final String DEFAULT_ARTIFACT_ID = ProjectInputDefaults.ARTIFACT_ID;
@@ -181,15 +175,16 @@ final class RequestOptions {
 
   /**
    * Returns {@code true} when the user explicitly supplied the option on the command line. Falls
-   * back to value-equality detection when {@link #spec} is not available (tests, defaults()).
+   * back to value-equality detection when no parse result has been recorded yet (tests,
+   * defaults()).
    *
    * @param optionName canonical option name, e.g. {@code "--group-id"}
    * @param currentValue the current field value
    * @param defaultValue the compiled-in default value
    */
   boolean isExplicitlySet(String optionName, String currentValue, String defaultValue) {
-    if (spec != null && spec.commandLine() != null && spec.commandLine().getParseResult() != null) {
-      return spec.commandLine().getParseResult().hasMatchedOption(optionName);
+    if (matchedOptions.contains(optionName)) {
+      return true;
     }
     if (prefilledOptions.contains(optionName)) {
       return false;
@@ -203,6 +198,16 @@ final class RequestOptions {
       return null;
     }
     return currentValue;
+  }
+
+  void recordMatchedOptions(ParseResult parseResult) {
+    matchedOptions.clear();
+    if (parseResult == null) {
+      return;
+    }
+    parseResult
+        .matchedOptions()
+        .forEach(optionSpec -> matchedOptions.add(optionSpec.longestName()));
   }
 
   private String applyCliValue(

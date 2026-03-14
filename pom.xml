@@ -157,7 +157,6 @@
         <directory>src/main/resources</directory>
         <filtering>true</filtering>
         <includes>
-          <include>version.properties</include>
           <include>META-INF/native-image/dev.ayagmar/quarkusforge/resource-config.json</include>
         </includes>
       </resource>
@@ -165,7 +164,6 @@
         <directory>src/main/resources</directory>
         <filtering>false</filtering>
         <excludes>
-          <exclude>version.properties</exclude>
           <exclude>META-INF/native-image/dev.ayagmar/quarkusforge/resource-config.json</exclude>
         </excludes>
       </resource>
@@ -207,6 +205,8 @@
           </annotationProcessorPaths>
           <compilerArgs>
             <arg>-Aproject=${project.groupId}/${project.artifactId}</arg>
+            <arg>-Adisable.reflect.config</arg>
+            <arg>-Adisable.resource.config</arg>
             <arg>-Adisable.proxy.config</arg>
           </compilerArgs>
         </configuration>
@@ -424,9 +424,33 @@
                 <buildArg>-Os</buildArg>
                 <buildArg>--emit build-report</buildArg>
                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
-                <buildArg>-H:+SharedArenaSupport</buildArg>
+                <buildArg>-Djava.security.properties==${project.basedir}/config/native/no-ldap.java.security</buildArg>
                 <buildArg>--enable-url-protocols=http,https</buildArg>
                 <buildArg>${native.access.flag}</buildArg>
+              </buildArgs>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <profile>
+      <id>unix-native-jline-trim</id>
+      <activation>
+        <os>
+          <family>unix</family>
+        </os>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.graalvm.buildtools</groupId>
+            <artifactId>native-maven-plugin</artifactId>
+            <configuration>
+              <buildArgs combine.children="append">
+                <buildArg>--exclude-config</buildArg>
+                <buildArg>jline-.*\.jar</buildArg>
+                <buildArg>META-INF/native-image/org\.jline/(jansi|jline-native|jline-terminal-jansi|jline-terminal-jna|jline-terminal-jni)/.*</buildArg>
               </buildArgs>
             </configuration>
           </plugin>

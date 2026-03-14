@@ -203,15 +203,14 @@ class TuiBootstrapServiceTest {
   private static void invokeConfigureTerminalBackendPreference(
       String propertyValue, String envValue, String osName) throws Exception {
     Method method =
-        TuiBootstrapService.class.getDeclaredMethod(
-            "configureTerminalBackendPreference", String.class, String.class, String.class);
+        backendPreferenceClass()
+            .getDeclaredMethod("configure", String.class, String.class, String.class);
     method.setAccessible(true);
     method.invoke(null, propertyValue, envValue, osName);
   }
 
   private static void invokeConfigureTerminalBackendPreference() throws Exception {
-    Method method =
-        TuiBootstrapService.class.getDeclaredMethod("configureTerminalBackendPreference");
+    Method method = backendPreferenceClass().getDeclaredMethod("configure");
     method.setAccessible(true);
     method.invoke(null);
   }
@@ -219,15 +218,15 @@ class TuiBootstrapServiceTest {
   private static boolean invokeIsBackendPreferenceExplicitlyConfigured(
       String propertyValue, String envValue) throws Exception {
     Method method =
-        TuiBootstrapService.class.getDeclaredMethod(
-            "isBackendPreferenceExplicitlyConfigured", String.class, String.class);
+        backendPreferenceClass()
+            .getDeclaredMethod("isExplicitlyConfigured", String.class, String.class);
     method.setAccessible(true);
     return (boolean) method.invoke(null, propertyValue, envValue);
   }
 
   private static String invokeDefaultBackendPreference(String osName) throws Exception {
     Method method =
-        TuiBootstrapService.class.getDeclaredMethod("defaultBackendPreference", String.class);
+        backendPreferenceClass().getDeclaredMethod("defaultBackendPreference", String.class);
     method.setAccessible(true);
     return (String) method.invoke(null, osName);
   }
@@ -243,11 +242,13 @@ class TuiBootstrapServiceTest {
 
   private static void invokeRestoreTerminalBackendPreference(String previousBackendPreference)
       throws Exception {
-    Method method =
-        TuiBootstrapService.class.getDeclaredMethod(
-            "restoreTerminalBackendPreference", String.class);
+    Method method = backendPreferenceClass().getDeclaredMethod("restore", String.class);
     method.setAccessible(true);
     method.invoke(null, previousBackendPreference);
+  }
+
+  private static Class<?> backendPreferenceClass() throws ClassNotFoundException {
+    return Class.forName("dev.ayagmar.quarkusforge.runtime.TerminalBackendPreference");
   }
 
   private static String captureStandardError(ThrowingRunnable action) {

@@ -1,0 +1,16 @@
+security.provider.1=SUN
+security.provider.2=SunRsaSign
+security.provider.3=SunEC
+security.provider.4=SunJSSE
+security.provider.5=SunJCE
+security.provider.6=SunJGSS
+security.provider.7=SunSASL
+security.provider.8=XMLDSig
+security.provider.9=SunPCSC
+security.provider.10=JdkSASL
+security.provider.11=SunPKCS11
+keystore.type=pkcs12
+ssl.KeyManagerFactory.algorithm=SunX509
+ssl.TrustManagerFactory.algorithm=PKIX
+securerandom.source=file:/dev/random
+securerandom.strongAlgorithms=NativePRNGBlocking:SUN,DRBG:SUN

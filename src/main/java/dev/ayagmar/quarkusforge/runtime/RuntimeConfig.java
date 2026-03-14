@@ -2,7 +2,6 @@ package dev.ayagmar.quarkusforge.runtime;
 
 import dev.ayagmar.quarkusforge.api.CatalogSnapshotCache;
 import dev.ayagmar.quarkusforge.api.ForgeDataPaths;
-import java.net.InetAddress;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.Locale;
@@ -57,62 +56,10 @@ public record RuntimeConfig(
     if (host == null || host.isBlank()) {
       throw new IllegalArgumentException("apiBaseUri must include a host");
     }
-    if (normalizedScheme.equals("http") && !isLoopbackHost(host)) {
+    if (normalizedScheme.equals("http") && !LoopbackHosts.isLoopbackHost(host)) {
       throw new IllegalArgumentException(
           "apiBaseUri must use https unless it targets localhost or a loopback address");
     }
     return apiBaseUri.normalize();
-  }
-
-  private static boolean isLoopbackHost(String host) {
-    String normalizedHost = host.toLowerCase(Locale.ROOT);
-    if (normalizedHost.startsWith("[") && normalizedHost.endsWith("]")) {
-      normalizedHost = normalizedHost.substring(1, normalizedHost.length() - 1);
-    }
-    return normalizedHost.equals("localhost")
-        || normalizedHost.equals("::1")
-        || isIpv4LoopbackHost(normalizedHost)
-        || resolvesToLoopbackAddress(normalizedHost);
-  }
-
-  private static boolean isIpv4LoopbackHost(String host) {
-    String[] octets = host.split("\\.", -1);
-    if (octets.length != 4 || !octets[0].equals("127")) {
-      return false;
-    }
-    for (int index = 1; index < octets.length; index++) {
-      if (!isIpv4Octet(octets[index])) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  private static boolean resolvesToLoopbackAddress(String host) {
-    if (!host.contains(":")) {
-      return false;
-    }
-    try {
-      return InetAddress.getByName(host).isLoopbackAddress();
-    } catch (RuntimeException | java.net.UnknownHostException ignored) {
-      return false;
-    }
-  }
-
-  private static boolean isIpv4Octet(String value) {
-    if (value.isEmpty()) {
-      return false;
-    }
-    for (int index = 0; index < value.length(); index++) {
-      if (!Character.isDigit(value.charAt(index))) {
-        return false;
-      }
-    }
-    try {
-      int octet = Integer.parseInt(value);
-      return octet >= 0 && octet <= 255;
-    } catch (NumberFormatException ignored) {
-      return false;
-    }
   }
 }

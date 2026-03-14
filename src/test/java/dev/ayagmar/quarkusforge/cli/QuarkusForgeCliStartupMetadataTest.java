@@ -14,7 +14,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import picocli.CommandLine;
 
 class QuarkusForgeCliStartupMetadataTest {
   @TempDir Path tempDir;
@@ -275,7 +274,8 @@ class QuarkusForgeCliStartupMetadataTest {
 
   private CliCommandTestSupport.CommandResult runCommand(QuarkusForgeCli cli, String... args) {
     try {
-      return CliCommandTestSupport.captureCommandOutput(() -> new CommandLine(cli).execute(args));
+      return CliCommandTestSupport.captureCommandOutput(
+          () -> CliCommandLineFactory.create(cli).execute(args));
     } catch (RuntimeException runtimeException) {
       throw runtimeException;
     } catch (Exception exception) {

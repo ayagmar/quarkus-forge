@@ -5,21 +5,15 @@ import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
 import dev.ayagmar.quarkusforge.runtime.RuntimeServices;
 import java.util.Objects;
 import java.util.concurrent.Callable;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.Spec;
 
 @Command(
     name = "quarkus-forge",
     mixinStandardHelpOptions = true,
-    versionProvider = CliVersionProvider.class,
-    subcommands = {GenerateCommand.class},
     description = "Quarkus forge headless CLI")
 public final class HeadlessCli implements Callable<Integer>, HeadlessRunner {
   private final RuntimeConfig runtimeConfig;
-
-  @Spec CommandLine.Model.CommandSpec spec;
 
   @Option(
       names = "--verbose",
@@ -43,7 +37,7 @@ public final class HeadlessCli implements Callable<Integer>, HeadlessRunner {
 
   @Override
   public Integer call() {
-    spec.commandLine().usage(System.out);
+    CliCommandLineFactory.create(this).usage(System.out);
     return ExitCodes.OK;
   }
 
@@ -60,7 +54,7 @@ public final class HeadlessCli implements Callable<Integer>, HeadlessRunner {
   }
 
   static int runWithArgs(String[] args, RuntimeConfig runtimeConfig) {
-    return new CommandLine(new HeadlessCli(runtimeConfig)).execute(args);
+    return CliCommandLineFactory.create(new HeadlessCli(runtimeConfig)).execute(args);
   }
 
   public static void main(String[] args) {
