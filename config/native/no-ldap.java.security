@@ -10,7 +10,6 @@ security.provider.9=SunPCSC
 security.provider.10=JdkSASL
 security.provider.11=SunPKCS11
 keystore.type=pkcs12
-keystore.type.compat=true
 ssl.KeyManagerFactory.algorithm=SunX509
 ssl.TrustManagerFactory.algorithm=PKIX
 securerandom.source=file:/dev/random
