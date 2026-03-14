@@ -108,7 +108,7 @@ just docs-linkcheck    # docs link checking
 just verify            # format-check + headless-check + test
 ----
 
-CI runs both docs build and docs link checking as separate verification steps. Docs Pages uses the same shared entrypoints when publishing the site.
+CI runs both docs build and docs link checking as separate verification steps. Docs Pages uses the same shared entrypoints when publishing the site. CI also builds and smoke-tests the interactive Windows JVM jar plus the interactive Windows native executable so the shared terminal bootstrap path is exercised before release.
 
 Release packaging uses `scripts/verify/native-release-smoke.sh` for both headless and interactive native artifacts, selecting the platform-specific interactive smoke mode through the release workflow matrix.
 

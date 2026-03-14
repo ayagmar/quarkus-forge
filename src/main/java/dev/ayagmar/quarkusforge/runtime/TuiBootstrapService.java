@@ -31,8 +31,10 @@ import java.util.concurrent.locks.ReentrantLock;
 public final class TuiBootstrapService {
   private static final String BACKEND_PROPERTY_NAME = "tamboui.backend";
   private static final String BACKEND_ENV_NAME = "TAMBOUI_BACKEND";
+  private static final String JLINE_DUMB_PROPERTY_NAME = "org.jline.terminal.dumb";
   private static final String PANAMA_BACKEND = "panama";
   private static final String JLINE3_BACKEND = "jline3";
+  private static final String WINDOWS_BACKEND_PREFERENCE = JLINE3_BACKEND + "," + PANAMA_BACKEND;
   private static final ReentrantLock BACKEND_PROPERTY_LOCK = new ReentrantLock();
   public static final Duration STARTUP_SPLASH_MIN_DURATION = Duration.ofMillis(450);
   private static final Duration TUI_TICK_RATE = Duration.ofMillis(40);
@@ -74,10 +76,11 @@ public final class TuiBootstrapService {
 
   private static void configureTerminalBackendPreference(
       String propertyValue, String envValue, String osName) {
-    if (isBackendPreferenceExplicitlyConfigured(propertyValue, envValue)) {
-      return;
+    String backendPreference = resolveBackendPreference(propertyValue, envValue, osName);
+    if (!isBackendPreferenceExplicitlyConfigured(propertyValue, envValue)) {
+      System.setProperty(BACKEND_PROPERTY_NAME, backendPreference);
     }
-    System.setProperty(BACKEND_PROPERTY_NAME, defaultBackendPreference(osName));
+    configureWindowsJlineDumbTerminalFallback(osName, backendPreference);
   }
 
   private static boolean isBackendPreferenceExplicitlyConfigured(
@@ -90,9 +93,43 @@ public final class TuiBootstrapService {
 
   private static String defaultBackendPreference(String osName) {
     if (isWindowsOsName(osName)) {
-      return JLINE3_BACKEND;
+      return WINDOWS_BACKEND_PREFERENCE;
     }
     return PANAMA_BACKEND;
+  }
+
+  private static String resolveBackendPreference(
+      String propertyValue, String envValue, String osName) {
+    if (propertyValue != null && !propertyValue.isBlank()) {
+      return propertyValue;
+    }
+    if (envValue != null && !envValue.isBlank()) {
+      return envValue;
+    }
+    return defaultBackendPreference(osName);
+  }
+
+  private static void configureWindowsJlineDumbTerminalFallback(
+      String osName, String backendPreference) {
+    if (!isWindowsOsName(osName) || !backendPreferenceContains(backendPreference, JLINE3_BACKEND)) {
+      return;
+    }
+    String jlineDumbPropertyValue = System.getProperty(JLINE_DUMB_PROPERTY_NAME);
+    if (jlineDumbPropertyValue != null && !jlineDumbPropertyValue.isBlank()) {
+      return;
+    }
+    // JLine logs the Windows warning and returns a DumbTerminal. That leaves the TUI stuck,
+    // so disable the dumb fallback and let Tamboui try the next backend instead.
+    System.setProperty(JLINE_DUMB_PROPERTY_NAME, Boolean.FALSE.toString());
+  }
+
+  private static boolean backendPreferenceContains(String backendPreference, String backendName) {
+    if (backendPreference == null || backendPreference.isBlank()) {
+      return false;
+    }
+    return java.util.Arrays.stream(backendPreference.split(","))
+        .map(String::trim)
+        .anyMatch(backendName::equals);
   }
 
   private static boolean isWindowsOsName(String osName) {
@@ -121,6 +158,7 @@ public final class TuiBootstrapService {
       throws Exception {
     BACKEND_PROPERTY_LOCK.lock();
     String previousBackendPreference = System.getProperty(BACKEND_PROPERTY_NAME);
+    String previousJlineDumbPreference = System.getProperty(JLINE_DUMB_PROPERTY_NAME);
     try {
       configureTerminalBackendPreference();
       TuiConfig tuiConfig = appTuiConfig();
@@ -160,6 +198,7 @@ public final class TuiBootstrapService {
     } finally {
       try {
         restoreTerminalBackendPreference(previousBackendPreference);
+        restoreJlineDumbTerminalPreference(previousJlineDumbPreference);
       } finally {
         BACKEND_PROPERTY_LOCK.unlock();
       }
@@ -178,6 +217,7 @@ public final class TuiBootstrapService {
         of("searchDebounceMs", Math.max(0, searchDebounceMs)));
     BACKEND_PROPERTY_LOCK.lock();
     String previousBackendPreference = System.getProperty(BACKEND_PROPERTY_NAME);
+    String previousJlineDumbPreference = System.getProperty(JLINE_DUMB_PROPERTY_NAME);
     try {
       configureTerminalBackendPreference();
       TuiConfig tuiConfig = appTuiConfig();
@@ -225,6 +265,7 @@ public final class TuiBootstrapService {
     } finally {
       try {
         restoreTerminalBackendPreference(previousBackendPreference);
+        restoreJlineDumbTerminalPreference(previousJlineDumbPreference);
       } finally {
         BACKEND_PROPERTY_LOCK.unlock();
       }
@@ -346,11 +387,19 @@ public final class TuiBootstrapService {
   }
 
   private static void restoreTerminalBackendPreference(String previousBackendPreference) {
-    if (previousBackendPreference == null) {
-      System.clearProperty(BACKEND_PROPERTY_NAME);
+    restoreSystemProperty(BACKEND_PROPERTY_NAME, previousBackendPreference);
+  }
+
+  private static void restoreJlineDumbTerminalPreference(String previousJlineDumbPreference) {
+    restoreSystemProperty(JLINE_DUMB_PROPERTY_NAME, previousJlineDumbPreference);
+  }
+
+  private static void restoreSystemProperty(String propertyName, String previousValue) {
+    if (previousValue == null) {
+      System.clearProperty(propertyName);
       return;
     }
-    System.setProperty(BACKEND_PROPERTY_NAME, previousBackendPreference);
+    System.setProperty(propertyName, previousValue);
   }
 
   private static String resolvePresetStreamKey(

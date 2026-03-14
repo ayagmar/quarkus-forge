@@ -45,9 +45,9 @@ class TuiBootstrapServiceTest {
   }
 
   @Test
-  void defaultBackendPreferenceUsesJlineOnWindows() {
+  void defaultBackendPreferenceUsesJlineThenPanamaOnWindows() {
     systemProperties.set("os.name", "Windows 11");
-    assertThat(TuiBootstrapService.defaultBackendPreference()).isEqualTo("jline3");
+    assertThat(TuiBootstrapService.defaultBackendPreference()).isEqualTo("jline3,panama");
   }
 
   @Test
@@ -80,20 +80,69 @@ class TuiBootstrapServiceTest {
 
   @Test
   void configureTerminalBackendPreferenceSetsDefaultOnlyWhenUnset() throws Exception {
+    systemProperties.clear("org.jline.terminal.dumb");
+
     invokeConfigureTerminalBackendPreference(null, null, "Linux");
     assertThat(System.getProperty("tamboui.backend")).isEqualTo("panama");
+    assertThat(System.getProperty("org.jline.terminal.dumb")).isNull();
 
     System.setProperty("tamboui.backend", "custom");
 
     invokeConfigureTerminalBackendPreference("custom", null, "Linux");
 
     assertThat(System.getProperty("tamboui.backend")).isEqualTo("custom");
+    assertThat(System.getProperty("org.jline.terminal.dumb")).isNull();
   }
 
   @Test
-  void configureTerminalBackendPreferenceUsesJlineDefaultOnWindows() throws Exception {
+  void configureTerminalBackendPreferenceUsesWindowsFallbackChainAndDisablesJlineDumbTerminal()
+      throws Exception {
     invokeConfigureTerminalBackendPreference(null, null, "Windows 11");
-    assertThat(System.getProperty("tamboui.backend")).isEqualTo("jline3");
+    assertThat(System.getProperty("tamboui.backend")).isEqualTo("jline3,panama");
+    assertThat(System.getProperty("org.jline.terminal.dumb")).isEqualTo("false");
+  }
+
+  @Test
+  void configureTerminalBackendPreferenceDisablesJlineDumbTerminalForExplicitWindowsJline()
+      throws Exception {
+    systemProperties.clear("tamboui.backend");
+
+    invokeConfigureTerminalBackendPreference("jline3", null, "Windows 11");
+
+    assertThat(System.getProperty("tamboui.backend")).isNull();
+    assertThat(System.getProperty("org.jline.terminal.dumb")).isEqualTo("false");
+  }
+
+  @Test
+  void configureTerminalBackendPreferenceDisablesJlineDumbTerminalForEnvProvidedWindowsJline()
+      throws Exception {
+    systemProperties.clear("tamboui.backend");
+
+    invokeConfigureTerminalBackendPreference(null, "jline3", "Windows 11");
+
+    assertThat(System.getProperty("tamboui.backend")).isNull();
+    assertThat(System.getProperty("org.jline.terminal.dumb")).isEqualTo("false");
+  }
+
+  @Test
+  void
+      configureTerminalBackendPreferenceLeavesJlineDumbTerminalUntouchedWhenWindowsBackendSkipsJline()
+          throws Exception {
+    systemProperties.clear("org.jline.terminal.dumb");
+
+    invokeConfigureTerminalBackendPreference("panama", null, "Windows 11");
+
+    assertThat(System.getProperty("org.jline.terminal.dumb")).isNull();
+  }
+
+  @Test
+  void configureTerminalBackendPreferenceDoesNotOverrideExplicitJlineDumbTerminalSetting()
+      throws Exception {
+    systemProperties.set("org.jline.terminal.dumb", "true");
+
+    invokeConfigureTerminalBackendPreference(null, null, "Windows 11");
+
+    assertThat(System.getProperty("org.jline.terminal.dumb")).isEqualTo("true");
   }
 
   @Test
@@ -147,6 +196,24 @@ class TuiBootstrapServiceTest {
     invokeRestoreTerminalBackendPreference("previous");
 
     assertThat(System.getProperty("tamboui.backend")).isEqualTo("previous");
+  }
+
+  @Test
+  void restoreJlineDumbTerminalPreferenceClearsPropertyWhenPreviousValueMissing() throws Exception {
+    systemProperties.set("org.jline.terminal.dumb", "false");
+
+    invokeRestoreJlineDumbTerminalPreference(null);
+
+    assertThat(System.getProperty("org.jline.terminal.dumb")).isNull();
+  }
+
+  @Test
+  void restoreJlineDumbTerminalPreferenceRestoresPreviousValue() throws Exception {
+    systemProperties.set("org.jline.terminal.dumb", "false");
+
+    invokeRestoreJlineDumbTerminalPreference("true");
+
+    assertThat(System.getProperty("org.jline.terminal.dumb")).isEqualTo("true");
   }
 
   @Test
@@ -248,6 +315,15 @@ class TuiBootstrapServiceTest {
             "restoreTerminalBackendPreference", String.class);
     method.setAccessible(true);
     method.invoke(null, previousBackendPreference);
+  }
+
+  private static void invokeRestoreJlineDumbTerminalPreference(String previousJlineDumbPreference)
+      throws Exception {
+    Method method =
+        TuiBootstrapService.class.getDeclaredMethod(
+            "restoreJlineDumbTerminalPreference", String.class);
+    method.setAccessible(true);
+    method.invoke(null, previousJlineDumbPreference);
   }
 
   private static String captureStandardError(ThrowingRunnable action) {
