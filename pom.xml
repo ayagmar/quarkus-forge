@@ -424,6 +424,7 @@
                 <buildArg>-Os</buildArg>
                 <buildArg>--emit build-report</buildArg>
                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
+                <buildArg>-Djava.security.properties==${project.basedir}/config/native/no-ldap.java.security</buildArg>
                 <buildArg>--enable-url-protocols=http,https</buildArg>
                 <buildArg>${native.access.flag}</buildArg>
               </buildArgs>

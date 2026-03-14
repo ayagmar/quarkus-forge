@@ -1,0 +1,4 @@
+include ${java.home}/conf/security/java.security
+security.provider.10=JdkSASL
+security.provider.11=SunPKCS11
+security.provider.12=
