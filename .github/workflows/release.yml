@@ -71,7 +71,7 @@ jobs:
             ext: '.exe'
             profiles: -Pnative
             binary_name: quarkus-forge
-            smoke_mode: interactive-windows
+            smoke_mode: headless
           - os: ubuntu-latest
             platform: linux-x86_64
             ext: ''

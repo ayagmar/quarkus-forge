@@ -17,5 +17,8 @@
     "http-server": "14.1.1",
     "linkinator": "7.6.1",
     "tailwindcss": "^4.2.1"
+  },
+  "overrides": {
+    "undici": "7.24.4"
   }
 }
