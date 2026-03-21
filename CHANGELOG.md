@@ -3,7 +3,17 @@
 All notable changes to Quarkus Forge are documented here.
 This project uses [Conventional Commits](https://www.conventionalcommits.org/). GitHub Releases contain auto-generated notes from [JReleaser](https://jreleaser.org/).
 
-## [Unreleased](https://github.com/ayagmar/quarkus-forge/compare/v0.6.4...HEAD)
+## [Unreleased](https://github.com/ayagmar/quarkus-forge/compare/v0.6.5...HEAD)
+
+## [0.6.5](https://github.com/ayagmar/quarkus-forge/compare/v0.6.4...v0.6.5) (2026-03-21)
+
+### Changed
+
+- fix(review): address coverage and nitpicks (f19c211)
+- fix(ci): drop Windows terminal smoke and patch docs audit (099c734)
+- fix(runtime): harden Windows interactive terminal fallback (31b7b99)
+- chore(release): prepare next iteration 0.6.5-SNAPSHOT (fae66c7)
+
 
 ## [0.6.4](https://github.com/ayagmar/quarkus-forge/compare/v0.6.3...v0.6.4) (2026-03-13)
 
