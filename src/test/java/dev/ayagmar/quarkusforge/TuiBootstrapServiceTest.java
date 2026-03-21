@@ -4,8 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
+import dev.ayagmar.quarkusforge.api.MetadataDto;
+import dev.ayagmar.quarkusforge.api.PlatformStream;
+import dev.ayagmar.quarkusforge.application.InputResolutionService;
 import dev.ayagmar.quarkusforge.cli.CliCommandTestSupport;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
+import dev.ayagmar.quarkusforge.domain.CliPrefill;
+import dev.ayagmar.quarkusforge.domain.ForgeUiState;
+import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.runtime.RuntimeConfig;
 import dev.ayagmar.quarkusforge.runtime.TuiBootstrapService;
 import dev.tamboui.tui.TuiConfig;
@@ -17,6 +23,8 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
@@ -155,6 +163,22 @@ class TuiBootstrapServiceTest {
   }
 
   @Test
+  void resolveBackendPreferencePrefersPropertyThenEnvThenDefault() throws Exception {
+    assertThat(invokeResolveBackendPreference("jline3", "panama", "Windows 11"))
+        .isEqualTo("jline3");
+    assertThat(invokeResolveBackendPreference("   ", "panama", "Windows 11")).isEqualTo("panama");
+    assertThat(invokeResolveBackendPreference(null, null, "Windows 11")).isEqualTo("jline3,panama");
+  }
+
+  @Test
+  void backendPreferenceContainsHandlesBlankAndCommaSeparatedEntries() throws Exception {
+    assertThat(invokeBackendPreferenceContains(null, "jline3")).isFalse();
+    assertThat(invokeBackendPreferenceContains("   ", "jline3")).isFalse();
+    assertThat(invokeBackendPreferenceContains(" panama , jline3 ", "jline3")).isTrue();
+    assertThat(invokeBackendPreferenceContains(" panama ", "jline3")).isFalse();
+  }
+
+  @Test
   void resolvePresetStreamKeyPrefersCurrentThenRecommendedThenBlank() throws Exception {
     dev.ayagmar.quarkusforge.api.MetadataDto metadata =
         new dev.ayagmar.quarkusforge.api.MetadataDto(
@@ -213,6 +237,38 @@ class TuiBootstrapServiceTest {
 
     invokeRestoreJlineDumbTerminalPreference("true");
 
+    assertThat(System.getProperty("org.jline.terminal.dumb")).isEqualTo("true");
+  }
+
+  @Test
+  void runInteractiveSmokeRestoresJlineDumbTerminalPreferenceWhenBackendCreationFails() {
+    systemProperties.set("tamboui.backend", "missing-backend");
+    systemProperties.set("org.jline.terminal.dumb", "true");
+
+    assertThatThrownBy(
+            () ->
+                new TuiBootstrapService()
+                    .runInteractiveSmoke(
+                        defaultState(), runtimeConfigForTests(), DiagnosticLogger.create(false)))
+        .hasMessageContaining("missing-backend");
+
+    assertThat(System.getProperty("tamboui.backend")).isEqualTo("missing-backend");
+    assertThat(System.getProperty("org.jline.terminal.dumb")).isEqualTo("true");
+  }
+
+  @Test
+  void runRestoresJlineDumbTerminalPreferenceWhenBackendCreationFails() {
+    systemProperties.set("tamboui.backend", "missing-backend");
+    systemProperties.set("org.jline.terminal.dumb", "true");
+
+    assertThatThrownBy(
+            () ->
+                new TuiBootstrapService()
+                    .run(
+                        defaultState(), 0, runtimeConfigForTests(), DiagnosticLogger.create(false)))
+        .hasMessageContaining("missing-backend");
+
+    assertThat(System.getProperty("tamboui.backend")).isEqualTo("missing-backend");
     assertThat(System.getProperty("org.jline.terminal.dumb")).isEqualTo("true");
   }
 
@@ -299,6 +355,24 @@ class TuiBootstrapServiceTest {
     return (String) method.invoke(null, osName);
   }
 
+  private static String invokeResolveBackendPreference(
+      String propertyValue, String envValue, String osName) throws Exception {
+    Method method =
+        TuiBootstrapService.class.getDeclaredMethod(
+            "resolveBackendPreference", String.class, String.class, String.class);
+    method.setAccessible(true);
+    return (String) method.invoke(null, propertyValue, envValue, osName);
+  }
+
+  private static boolean invokeBackendPreferenceContains(
+      String backendPreference, String backendName) throws Exception {
+    Method method =
+        TuiBootstrapService.class.getDeclaredMethod(
+            "backendPreferenceContains", String.class, String.class);
+    method.setAccessible(true);
+    return (boolean) method.invoke(null, backendPreference, backendName);
+  }
+
   private static String invokeResolvePresetStreamKey(
       String currentStreamKey, dev.ayagmar.quarkusforge.api.MetadataDto metadata) throws Exception {
     Method method =
@@ -324,6 +398,27 @@ class TuiBootstrapServiceTest {
             "restoreJlineDumbTerminalPreference", String.class);
     method.setAccessible(true);
     method.invoke(null, previousJlineDumbPreference);
+  }
+
+  private RuntimeConfig runtimeConfigForTests() {
+    return new RuntimeConfig(
+        URI.create("http://127.0.0.1"),
+        tempDir.resolve("catalog.json"),
+        tempDir.resolve("favorites.json"),
+        tempDir.resolve("preferences.json"));
+  }
+
+  private static ForgeUiState defaultState() {
+    MetadataDto metadata =
+        new MetadataDto(
+            List.of("21", "25"),
+            List.of("maven"),
+            Map.of("maven", List.of("21", "25")),
+            List.of(
+                new PlatformStream("io.quarkus.platform:3.31", "3.31", true, List.of("21", "25"))));
+    return InputResolutionService.resolveInitialState(
+        new CliPrefill("com.example", "forge-app", "1.0.0", "", ".", "", "maven", "25"),
+        MetadataCompatibilityContext.success(metadata));
   }
 
   private static String captureStandardError(ThrowingRunnable action) {

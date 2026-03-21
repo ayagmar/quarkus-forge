@@ -32,6 +32,7 @@ class CiWorkflowTest {
         .contains("needs: [quality, tests, coverage, security, native-size]")
         .contains("needs.security.result")
         .contains("needs.native-size.result")
+        // CI intentionally stays headless; Windows-native smoke remains in release.yml.
         .doesNotContain("name: Windows Interactive Smoke")
         .doesNotContain("uses: ilammy/msvc-dev-cmd@")
         .doesNotContain("needs.windows-interactive-smoke.result");
