@@ -54,15 +54,17 @@ public final class CatalogDataService {
       throw new ApiContractException("Catalog load returned no extensions");
     }
 
-    CacheWriteOutcome writeOutcome = snapshotCache.write(metadataSelection.metadata(), extensions);
     String detailMessage = metadataSelection.detailMessage();
-    if (!writeOutcome.written()) {
-      String cacheWriteDetail =
-          writeOutcome.rejected()
-              ? "Live catalog loaded; cache update skipped (%s)".formatted(writeOutcome.detail())
-              : "Live catalog loaded; cache update failed (%s)".formatted(writeOutcome.detail());
-      detailMessage =
-          detailMessage.isBlank() ? cacheWriteDetail : detailMessage + " | " + cacheWriteDetail;
+    if (metadataSelection.liveMetadata()) {
+      CacheWriteOutcome writeOutcome = snapshotCache.write(metadataSelection.metadata(), extensions);
+      if (!writeOutcome.written()) {
+        String cacheWriteDetail =
+            writeOutcome.rejected()
+                ? "Live catalog loaded; cache update skipped (%s)".formatted(writeOutcome.detail())
+                : "Live catalog loaded; cache update failed (%s)".formatted(writeOutcome.detail());
+        detailMessage =
+            detailMessage.isBlank() ? cacheWriteDetail : detailMessage + " | " + cacheWriteDetail;
+      }
     }
     return new CatalogData(
         metadataSelection.metadata(), extensions, CatalogSource.LIVE, false, detailMessage);
@@ -71,7 +73,7 @@ public final class CatalogDataService {
   private CompletableFuture<MetadataSelection> loadMetadataSelection() {
     return apiClient
         .fetchMetadata()
-        .thenApply(metadata -> new MetadataSelection(metadata, ""))
+        .thenApply(metadata -> new MetadataSelection(metadata, true, ""))
         .exceptionally(this::fallbackMetadataSelection);
   }
 
@@ -81,6 +83,7 @@ public final class CatalogDataService {
       MetadataDto snapshotMetadata = MetadataSnapshotLoader.loadDefault();
       return new MetadataSelection(
           snapshotMetadata,
+          false,
           "Live metadata unavailable (%s); using bundled metadata snapshot"
               .formatted(ErrorMessageMapper.simpleError(cause)));
     } catch (RuntimeException snapshotFailure) {

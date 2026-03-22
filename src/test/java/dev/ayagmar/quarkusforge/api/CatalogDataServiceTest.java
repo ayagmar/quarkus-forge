@@ -118,7 +118,37 @@ class CatalogDataServiceTest {
       assertThat(liveData.source()).isEqualTo(CatalogSource.LIVE);
       assertThat(liveData.extensions()).hasSize(2);
       assertThat(liveData.detailMessage()).contains("Live metadata unavailable");
-      assertThat(new CatalogSnapshotCache(cacheFile).read()).isPresent();
+      assertThat(new CatalogSnapshotCache(cacheFile).read()).isEmpty();
+    }
+  }
+
+  @Test
+  void bundledMetadataFallbackDoesNotOverwriteExistingCacheSnapshot() {
+    stubExtensionsWithMetadataUnavailable();
+    Path cacheFile = tempDir.resolve("catalog-snapshot.json");
+    CatalogSnapshotCache snapshotCache = snapshotCache(cacheFile, "2026-02-22T00:00:00Z");
+    MetadataDto cachedMetadata =
+        new MetadataDto(
+            java.util.List.of("21"),
+            java.util.List.of("maven"),
+            java.util.Map.of("maven", java.util.List.of("21")),
+            java.util.List.of(
+                new PlatformStream(
+                    "io.quarkus.platform:3.20", "3.20", true, java.util.List.of("21"))));
+    java.util.List<ExtensionDto> cachedExtensions =
+        java.util.List.of(new ExtensionDto("io.quarkus:cached", "Cached", "cached"));
+    assertThat(snapshotCache.write(cachedMetadata, cachedExtensions).written()).isTrue();
+
+    try (QuarkusApiClient onlineApiClient = onlineClient()) {
+      CatalogDataService service = new CatalogDataService(onlineApiClient, snapshotCache);
+
+      CatalogData liveData = service.load().join();
+      CachedCatalogSnapshot cachedSnapshot = new CatalogSnapshotCache(cacheFile).read().orElseThrow();
+
+      assertThat(liveData.source()).isEqualTo(CatalogSource.LIVE);
+      assertThat(liveData.detailMessage()).contains("using bundled metadata snapshot");
+      assertThat(cachedSnapshot.metadata()).isEqualTo(cachedMetadata);
+      assertThat(cachedSnapshot.extensions()).isEqualTo(cachedExtensions);
     }
   }
 

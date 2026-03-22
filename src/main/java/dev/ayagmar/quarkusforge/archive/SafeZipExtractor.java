@@ -20,6 +20,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
+import java.util.function.BooleanSupplier;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -37,9 +39,18 @@ public final class SafeZipExtractor {
 
   public ExtractionResult extract(
       Path zipFile, Path outputDirectory, OverwritePolicy overwritePolicy) {
+    return extract(zipFile, outputDirectory, overwritePolicy, () -> false);
+  }
+
+  public ExtractionResult extract(
+      Path zipFile,
+      Path outputDirectory,
+      OverwritePolicy overwritePolicy,
+      BooleanSupplier cancelled) {
     Objects.requireNonNull(zipFile);
     Objects.requireNonNull(outputDirectory);
     Objects.requireNonNull(overwritePolicy);
+    Objects.requireNonNull(cancelled);
 
     Map<String, ZipEntryMetadata> metadataByEntry = ZipCentralDirectoryReader.read(zipFile);
     validateEntryMetadata(metadataByEntry);
@@ -65,7 +76,11 @@ public final class SafeZipExtractor {
     Path stagingContent = stagingRoot.resolve("content");
     try {
       Files.createDirectories(stagingContent);
-      ExtractionResult stagedResult = extractIntoStaging(zipFile, stagingContent, metadataByEntry);
+      ExtractionResult stagedResult =
+          extractIntoStaging(zipFile, stagingContent, metadataByEntry, cancelled);
+      if (cancelled.getAsBoolean()) {
+        throw new CancellationException("Generation cancelled during extraction");
+      }
       Path extractedRoot = stagedResult.extractedRoot();
       applyOverwritePolicy(extractedRoot, absoluteTarget, overwritePolicy);
       return new ExtractionResult(
@@ -129,7 +144,10 @@ public final class SafeZipExtractor {
   }
 
   private ExtractionResult extractIntoStaging(
-      Path zipFile, Path stagingContent, Map<String, ZipEntryMetadata> metadataByEntry)
+      Path zipFile,
+      Path stagingContent,
+      Map<String, ZipEntryMetadata> metadataByEntry,
+      BooleanSupplier cancelled)
       throws IOException {
     Set<String> seenEntries = new LinkedHashSet<>();
     Set<String> topLevelSegments = new LinkedHashSet<>();
@@ -139,6 +157,7 @@ public final class SafeZipExtractor {
     try (ZipInputStream zipInputStream = new ZipInputStream(Files.newInputStream(zipFile))) {
       ZipEntry zipEntry;
       while ((zipEntry = zipInputStream.getNextEntry()) != null) {
+        throwIfCancelled(cancelled);
         String normalizedName = normalizeEntryName(zipEntry.getName());
         ZipEntryMetadata metadata = metadataByEntry.get(normalizedName);
         if (metadata == null) {
@@ -176,7 +195,8 @@ public final class SafeZipExtractor {
                 destination,
                 normalizedName,
                 metadata.uncompressedSize(),
-                extractedBytes);
+                extractedBytes,
+                cancelled);
         long copied = copyResult.entryBytes();
         extractedBytes = copyResult.totalExtractedBytes();
 
@@ -255,7 +275,8 @@ public final class SafeZipExtractor {
       Path destination,
       String entryName,
       long expectedUncompressedSize,
-      long extractedBytesSoFar)
+      long extractedBytesSoFar,
+      BooleanSupplier cancelled)
       throws IOException {
     long copied = 0L;
     long totalExtractedBytes = extractedBytesSoFar;
@@ -265,6 +286,7 @@ public final class SafeZipExtractor {
             destination, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
       int read;
       while ((read = inputStream.read(buffer)) != -1) {
+        throwIfCancelled(cancelled);
         long nextCopied = safeAdd(copied, read);
         if (nextCopied > expectedUncompressedSize) {
           throw new ArchiveException(
@@ -288,6 +310,12 @@ public final class SafeZipExtractor {
       }
     }
     return new CopyResult(copied, totalExtractedBytes);
+  }
+
+  private static void throwIfCancelled(BooleanSupplier cancelled) {
+    if (cancelled.getAsBoolean()) {
+      throw new CancellationException("Generation cancelled during extraction");
+    }
   }
 
   static String normalizeEntryName(String rawName) {

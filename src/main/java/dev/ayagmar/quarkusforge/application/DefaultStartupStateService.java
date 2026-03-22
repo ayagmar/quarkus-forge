@@ -33,6 +33,16 @@ public final class DefaultStartupStateService implements StartupStateService {
       CliPrefill requestedPrefill, CliPrefill storedPrefill, CliPrefill defaults) {
     CliPrefill safeRequestedPrefill =
         Objects.requireNonNull(requestedPrefill, "requestedPrefill must not be null");
+    boolean coordinatesOverridden =
+        overridesStoredOrDefault(
+            safeRequestedPrefill.groupId(), storedPrefill, CliPrefill::groupId, defaults)
+            || overridesStoredOrDefault(
+                safeRequestedPrefill.artifactId(), storedPrefill, CliPrefill::artifactId, defaults);
+    String packageName =
+        coordinatesOverridden && !hasText(safeRequestedPrefill.packageName())
+            ? defaults.packageName()
+            : preferRequested(
+                safeRequestedPrefill.packageName(), storedPrefill, CliPrefill::packageName, defaults);
     return new CliPrefill(
         preferRequested(
             safeRequestedPrefill.groupId(), storedPrefill, CliPrefill::groupId, defaults),
@@ -40,8 +50,7 @@ public final class DefaultStartupStateService implements StartupStateService {
             safeRequestedPrefill.artifactId(), storedPrefill, CliPrefill::artifactId, defaults),
         preferRequested(
             safeRequestedPrefill.version(), storedPrefill, CliPrefill::version, defaults),
-        preferRequested(
-            safeRequestedPrefill.packageName(), storedPrefill, CliPrefill::packageName, defaults),
+        packageName,
         preferRequested(
             safeRequestedPrefill.outputDirectory(),
             storedPrefill,
@@ -70,6 +79,16 @@ public final class DefaultStartupStateService implements StartupStateService {
       }
     }
     return field.read(defaults);
+  }
+
+  private static boolean overridesStoredOrDefault(
+      String requestedValue, CliPrefill storedPrefill, PrefillField field, CliPrefill defaults) {
+    if (!hasText(requestedValue)) {
+      return false;
+    }
+    String requested = requestedValue.strip();
+    String baseline = preferRequested(null, storedPrefill, field, defaults);
+    return !requested.equals(baseline);
   }
 
   private static boolean hasText(String value) {

@@ -51,12 +51,39 @@ class DefaultStartupStateServiceTest {
     assertThat(startupState.initialState().request().groupId()).isEqualTo("com.requested");
     assertThat(startupState.initialState().request().artifactId()).isEqualTo("saved-app");
     assertThat(startupState.initialState().request().version()).isEqualTo("2.0.0");
-    assertThat(startupState.initialState().request().packageName()).isEqualTo("org.saved.app");
+    assertThat(startupState.initialState().request().packageName())
+        .isEqualTo("com.requested.saved.app");
     assertThat(startupState.initialState().request().outputDirectory()).isEqualTo(".");
     assertThat(startupState.initialState().request().platformStream())
         .isEqualTo("io.quarkus.platform:3.20");
     assertThat(startupState.initialState().request().buildTool()).isEqualTo("gradle");
     assertThat(startupState.initialState().request().javaVersion()).isEqualTo("21");
+  }
+
+  @Test
+  void resolveRecomputesPackageNameWhenCoordinatesAreExplicitlyOverridden() {
+    StartupMetadataSelection selection =
+        new StartupMetadataSelection(MetadataCompatibilityContext.success(METADATA), "live", "");
+    StartupRequest request =
+        new StartupRequest(
+            new CliPrefill("com.requested", "fresh-app", null, "", null, null, null, null),
+            new CliPrefill(
+                "org.saved",
+                "saved-app",
+                "2.0.0",
+                "org.saved.app",
+                "saved-out",
+                "io.quarkus.platform:3.20",
+                "gradle",
+                "21"),
+            () -> selection);
+
+    StartupState startupState = service.resolve(request);
+
+    assertThat(startupState.initialState().request().groupId()).isEqualTo("com.requested");
+    assertThat(startupState.initialState().request().artifactId()).isEqualTo("fresh-app");
+    assertThat(startupState.initialState().request().packageName())
+        .isEqualTo("com.requested.fresh.app");
   }
 
   @Test

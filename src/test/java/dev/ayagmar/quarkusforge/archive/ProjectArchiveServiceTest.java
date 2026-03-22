@@ -267,6 +267,7 @@ class ProjectArchiveServiceTest {
                     .withStatus(200)
                     .withBody(createZipPayload("demo/pom.xml", "<project/>"))));
 
+    Path output = tempDir.resolve("generated-project");
     Path tempArchive = tempDir.resolve("download.zip");
     try (QuarkusApiClient apiClient = newClient()) {
       ProjectArchiveService service =
@@ -280,7 +281,7 @@ class ProjectArchiveServiceTest {
                   service
                       .downloadAndExtract(
                           request,
-                          tempDir.resolve("generated-project"),
+                          output,
                           OverwritePolicy.FAIL_IF_EXISTS,
                           cancelled::get,
                           progress -> {
@@ -291,6 +292,48 @@ class ProjectArchiveServiceTest {
                       .join())
           .isInstanceOf(CompletionException.class)
           .hasCauseInstanceOf(java.util.concurrent.CancellationException.class);
+      assertThat(Files.exists(tempArchive)).isFalse();
+      assertThat(Files.exists(output)).isFalse();
+    }
+  }
+
+  @Test
+  void cancellationAfterExtractionStartsDoesNotReplaceExistingOutput() throws Exception {
+    stubFor(
+        get(urlPathEqualTo("/api/download"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withBody(createZipPayload("demo/pom.xml", "<project/>"))));
+
+    Path output = tempDir.resolve("generated-project");
+    Files.createDirectories(output);
+    Files.writeString(output.resolve("pom.xml"), "existing-project");
+
+    Path tempArchive = tempDir.resolve("download.zip");
+    try (QuarkusApiClient apiClient = newClient()) {
+      ProjectArchiveService service =
+          new ProjectArchiveService(apiClient, new SafeZipExtractor(), () -> tempArchive);
+
+      AtomicBoolean cancelled = new AtomicBoolean(false);
+      assertThatThrownBy(
+              () ->
+                  service
+                      .downloadAndExtract(
+                          defaultGenerationRequest(),
+                          output,
+                          OverwritePolicy.REPLACE_EXISTING,
+                          cancelled::get,
+                          progress -> {
+                            if (progress == ProjectArchiveService.ProgressStep.EXTRACTING_ARCHIVE) {
+                              cancelled.set(true);
+                            }
+                          })
+                      .join())
+          .isInstanceOf(CompletionException.class)
+          .hasCauseInstanceOf(java.util.concurrent.CancellationException.class);
+
+      assertThat(Files.readString(output.resolve("pom.xml"))).isEqualTo("existing-project");
       assertThat(Files.exists(tempArchive)).isFalse();
     }
   }
