@@ -16,7 +16,7 @@
     "antora": "3.1.14",
     "http-server": "14.1.1",
     "linkinator": "7.6.1",
-    "tailwindcss": "^4.2.1"
+    "tailwindcss": "^4.2.2"
   },
   "// overrides": "Pin undici to 7.24.4 so all transitive docs dependencies stay on the v7.24.0+ security-fix line.",
   "overrides": {
