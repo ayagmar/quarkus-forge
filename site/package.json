@@ -12,7 +12,7 @@
   },
   "devDependencies": {
     "@antora/lunr-extension": "1.0.0-alpha.13",
-    "@tailwindcss/cli": "^4.2.1",
+    "@tailwindcss/cli": "^4.2.2",
     "antora": "3.1.14",
     "http-server": "14.1.1",
     "linkinator": "7.6.1",
