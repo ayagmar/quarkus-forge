@@ -38,13 +38,31 @@ public final class HeadlessOutputPrinter {
   }
 
   public static void printDryRunSummary(
-      ProjectRequest request, List<String> extensionIds, String sourceLabel) {
+      ProjectRequest request,
+      List<String> extensionIds,
+      String catalogSourceLabel,
+      String metadataSourceLabel,
+      String metadataDetail) {
     System.out.println("Dry-run validated successfully:");
     printRequestFields(request);
     System.out.println(" - extensions: " + extensionIds);
-    String effectiveSourceLabel =
-        (sourceLabel == null || sourceLabel.isBlank()) ? "unknown" : sourceLabel;
-    System.out.println(" - catalogSource: " + effectiveSourceLabel);
+    String effectiveCatalogSourceLabel =
+        (catalogSourceLabel == null || catalogSourceLabel.isBlank())
+            ? "unknown"
+            : catalogSourceLabel;
+    System.out.println(" - catalogSource: " + effectiveCatalogSourceLabel);
+
+    String effectiveMetadataSourceLabel =
+        metadataSourceLabel == null ? "" : metadataSourceLabel.strip();
+    boolean hasMetadataDetail = metadataDetail != null && !metadataDetail.isBlank();
+    if (!effectiveMetadataSourceLabel.isBlank()
+        && (!effectiveMetadataSourceLabel.equals(effectiveCatalogSourceLabel)
+            || hasMetadataDetail)) {
+      System.out.println(" - metadataSource: " + effectiveMetadataSourceLabel);
+    }
+    if (hasMetadataDetail) {
+      System.out.println(" - metadataDetail: " + metadataDetail);
+    }
     System.out.println(" - generatedProjectDirectory: " + resolveProjectDirectory(request));
   }
 

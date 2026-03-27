@@ -8,6 +8,7 @@ import dev.ayagmar.quarkusforge.api.CatalogData;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
+import dev.ayagmar.quarkusforge.api.MetadataSource;
 import dev.ayagmar.quarkusforge.diagnostics.DiagnosticLogger;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -63,6 +64,7 @@ class CatalogLoadDiagnosticsTest {
             new MetadataDto(java.util.List.of("25"), java.util.List.of("maven"), Map.of()),
             java.util.List.of(new ExtensionDto("io.quarkus:quarkus-rest", "REST", "web")),
             CatalogSource.LIVE,
+            MetadataSource.SNAPSHOT,
             false,
             "fresh");
 
@@ -73,11 +75,13 @@ class CatalogLoadDiagnosticsTest {
 
     assertThat(result.extensions()).hasSize(1);
     assertThat(result.source()).isEqualTo(CatalogSource.LIVE);
+    assertThat(result.metadataSource()).isEqualTo(MetadataSource.SNAPSHOT);
     assertThat(result.detailMessage()).isEqualTo("fresh");
     assertThat(stderr.toString(StandardCharsets.UTF_8))
         .contains("\"event\":\"catalog.load.success\"")
         .contains("\"mode\":\"headless-smoke\"")
-        .contains("\"source\":\"live\"");
+        .contains("\"source\":\"live\"")
+        .contains("\"metadataSource\":\"bundled snapshot\"");
   }
 
   @Test

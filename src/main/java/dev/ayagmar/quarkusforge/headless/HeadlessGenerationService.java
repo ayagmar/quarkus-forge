@@ -120,7 +120,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
     if (!validatedState.canSubmit()) {
       return validationFailure(
           validatedState.validation(),
-          catalogData.sourceLabel(),
+          catalogData.metadataSourceLabel(),
           catalogData.detailMessage(),
           diagnostics);
     }
@@ -157,6 +157,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
     diagnostics.info(
         "catalog.load.success",
         of("source", catalogData.sourceLabel()),
+        of("metadataSource", catalogData.metadataSourceLabel()),
         of("stale", catalogData.stale()),
         of("detail", catalogData.detailMessage()));
     return catalogData;
@@ -188,7 +189,7 @@ public final class HeadlessGenerationService implements AutoCloseable {
         of("errorCount", validationException.errors().size()));
     HeadlessOutputPrinter.printValidationErrors(
         new ValidationReport(validationException.errors()),
-        catalogData.sourceLabel(),
+        catalogData.metadataSourceLabel(),
         catalogData.detailMessage());
     return ExitCodes.VALIDATION;
   }
@@ -203,8 +204,14 @@ public final class HeadlessGenerationService implements AutoCloseable {
         "generate.dry-run.validated",
         of("extensionCount", extensionIds.size()),
         of("catalogSource", catalogData.sourceLabel()),
+        of("metadataSource", catalogData.metadataSourceLabel()),
         of("stale", catalogData.stale()));
-    HeadlessOutputPrinter.printDryRunSummary(request, extensionIds, catalogData.sourceLabel());
+    HeadlessOutputPrinter.printDryRunSummary(
+        request,
+        extensionIds,
+        catalogData.sourceLabel(),
+        catalogData.metadataSourceLabel(),
+        catalogData.detailMessage());
     return persistForgefileAndReturn(inputs, request, extensionIds, diagnostics, ExitCodes.OK);
   }
 

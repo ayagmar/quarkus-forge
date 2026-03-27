@@ -327,6 +327,7 @@ public final class TuiBootstrapService {
                                   new ExtensionCatalogLoadResult(
                                       loadResult.extensions(),
                                       loadResult.source(),
+                                      loadResult.metadataSource(),
                                       loadResult.stale(),
                                       loadResult.detailMessage(),
                                       loadResult.metadata(),

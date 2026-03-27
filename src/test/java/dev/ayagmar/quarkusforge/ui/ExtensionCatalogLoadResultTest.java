@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
+import dev.ayagmar.quarkusforge.api.MetadataSource;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +35,25 @@ class ExtensionCatalogLoadResultTest {
             List.of(extension("rest")), CatalogSource.CACHE, true, "stale data", null);
 
     assertThat(result.stale()).isTrue();
+    assertThat(result.metadataSource()).isEqualTo(MetadataSource.CACHE);
+    assertThat(result.metadataSourceLabel()).isEqualTo("cache [stale]");
     assertThat(result.detailMessage()).isEqualTo("stale data");
+  }
+
+  @Test
+  void supportsLiveCatalogWithBundledSnapshotMetadata() {
+    var result =
+        new ExtensionCatalogLoadResult(
+            List.of(extension("rest")),
+            CatalogSource.LIVE,
+            MetadataSource.SNAPSHOT,
+            false,
+            "snapshot fallback",
+            null,
+            Map.of());
+
+    assertThat(result.metadataSource()).isEqualTo(MetadataSource.SNAPSHOT);
+    assertThat(result.metadataSourceLabel()).isEqualTo("bundled snapshot");
   }
 
   @Test
@@ -54,6 +73,22 @@ class ExtensionCatalogLoadResultTest {
             List.of(extension("rest")), CatalogSource.LIVE, false, null, null);
 
     assertThat(result.detailMessage()).isEmpty();
+  }
+
+  @Test
+  void incompatibleMetadataSourceIsRejected() {
+    assertThatThrownBy(
+            () ->
+                new ExtensionCatalogLoadResult(
+                    List.of(extension("rest")),
+                    CatalogSource.CACHE,
+                    MetadataSource.SNAPSHOT,
+                    false,
+                    "",
+                    null,
+                    Map.of()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("cache metadata");
   }
 
   @Test

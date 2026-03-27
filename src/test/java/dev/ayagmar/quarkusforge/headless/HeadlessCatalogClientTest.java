@@ -65,6 +65,8 @@ class HeadlessCatalogClientTest {
       CatalogData catalogData = client.loadCatalogData(Duration.ofSeconds(1));
 
       assertThat(catalogData.source()).isEqualTo(CatalogSource.LIVE);
+      assertThat(catalogData.metadataSource())
+          .isEqualTo(dev.ayagmar.quarkusforge.api.MetadataSource.LIVE);
       assertThat(catalogData.extensions())
           .extracting(ExtensionDto::id)
           .containsExactly("io.quarkus:quarkus-rest");
@@ -116,6 +118,8 @@ class HeadlessCatalogClientTest {
       CatalogData catalogData = client.loadCatalogData(Duration.ofMillis(100));
 
       assertThat(catalogData.source()).isEqualTo(CatalogSource.CACHE);
+      assertThat(catalogData.metadataSource())
+          .isEqualTo(dev.ayagmar.quarkusforge.api.MetadataSource.CACHE);
       assertThat(catalogData.detailMessage()).contains("timed out after 100ms");
       assertThat(catalogData.detailMessage()).contains("cached snapshot");
       assertThat(catalogData.extensions())

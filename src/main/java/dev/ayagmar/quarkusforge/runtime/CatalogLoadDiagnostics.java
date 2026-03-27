@@ -30,14 +30,17 @@ final class CatalogLoadDiagnostics {
             "catalog.load.success",
             of("mode", mode),
             of("source", catalogData.source().label()),
+            of("metadataSource", catalogData.metadataSourceLabel()),
             of("stale", catalogData.stale()),
             of("detail", catalogData.detailMessage()));
         return new ExtensionCatalogLoadResult(
             catalogData.extensions(),
             catalogData.source(),
+            catalogData.metadataSource(),
             catalogData.stale(),
             catalogData.detailMessage(),
-            catalogData.metadata());
+            catalogData.metadata(),
+            Map.of());
       }
       BoundaryFailure.Details failure = BoundaryFailure.fromThrowable(throwable);
       switch (failure.kind()) {

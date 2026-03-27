@@ -87,7 +87,12 @@ class HeadlessOutputPrinterTest {
             "maven",
             "21");
 
-    HeadlessOutputPrinter.printDryRunSummary(request, List.of("io.quarkus:quarkus-rest"), "live");
+    HeadlessOutputPrinter.printDryRunSummary(
+        request,
+        List.of("io.quarkus:quarkus-rest"),
+        "live",
+        "bundled snapshot",
+        "Live metadata unavailable");
 
     String output = stdout.toString(StandardCharsets.UTF_8);
     assertThat(output)
@@ -95,7 +100,29 @@ class HeadlessOutputPrinterTest {
         .contains("groupId: com.example")
         .contains("artifactId: demo")
         .contains("extensions: [io.quarkus:quarkus-rest]")
-        .contains("catalogSource: live");
+        .contains("catalogSource: live")
+        .contains("metadataSource: bundled snapshot")
+        .contains("metadataDetail: Live metadata unavailable");
+  }
+
+  @Test
+  void printDryRunSummaryOmitsRedundantMetadataSource() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "com.example",
+            "demo",
+            "1.0.0",
+            "com.example.demo",
+            "/output",
+            "io.quarkus.platform:3.31",
+            "maven",
+            "21");
+
+    HeadlessOutputPrinter.printDryRunSummary(
+        request, List.of("io.quarkus:quarkus-rest"), "live", "live", "");
+
+    String output = stdout.toString(StandardCharsets.UTF_8);
+    assertThat(output).contains("catalogSource: live").doesNotContain("metadataSource");
   }
 
   @Test
@@ -103,10 +130,13 @@ class HeadlessOutputPrinterTest {
     ProjectRequest request =
         new ProjectRequest("org.acme", "app", "1.0.0", "", ".", "", "maven", "25");
 
-    HeadlessOutputPrinter.printDryRunSummary(request, List.of(), null);
+    HeadlessOutputPrinter.printDryRunSummary(request, List.of(), null, null, null);
 
     String output = stdout.toString(StandardCharsets.UTF_8);
-    assertThat(output).contains("catalogSource: unknown");
+    assertThat(output)
+        .contains("catalogSource: unknown")
+        .doesNotContain("metadataSource")
+        .doesNotContain("metadataDetail");
   }
 
   @Test
@@ -190,10 +220,13 @@ class HeadlessOutputPrinterTest {
     ProjectRequest request =
         new ProjectRequest("org.acme", "app", "1.0.0", "", ".", "", "maven", "25");
 
-    HeadlessOutputPrinter.printDryRunSummary(request, List.of(), "");
+    HeadlessOutputPrinter.printDryRunSummary(request, List.of(), "", "", "");
 
     String output = stdout.toString(StandardCharsets.UTF_8);
-    assertThat(output).contains("catalogSource: unknown");
+    assertThat(output)
+        .contains("catalogSource: unknown")
+        .doesNotContain("metadataSource")
+        .doesNotContain("metadataDetail");
   }
 
   @Test

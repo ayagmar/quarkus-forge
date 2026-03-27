@@ -51,6 +51,7 @@ public final class SafeZipExtractor {
     Objects.requireNonNull(outputDirectory);
     Objects.requireNonNull(overwritePolicy);
     Objects.requireNonNull(cancelled);
+    throwIfCancelled(cancelled);
 
     Map<String, ZipEntryMetadata> metadataByEntry = ZipCentralDirectoryReader.read(zipFile);
     validateEntryMetadata(metadataByEntry);

@@ -55,8 +55,11 @@ public final class CatalogDataService {
     }
 
     String detailMessage = metadataSelection.detailMessage();
+    MetadataSource metadataSource =
+        metadataSelection.liveMetadata() ? MetadataSource.LIVE : MetadataSource.SNAPSHOT;
     if (metadataSelection.liveMetadata()) {
-      CacheWriteOutcome writeOutcome = snapshotCache.write(metadataSelection.metadata(), extensions);
+      CacheWriteOutcome writeOutcome =
+          snapshotCache.write(metadataSelection.metadata(), extensions);
       if (!writeOutcome.written()) {
         String cacheWriteDetail =
             writeOutcome.rejected()
@@ -67,7 +70,12 @@ public final class CatalogDataService {
       }
     }
     return new CatalogData(
-        metadataSelection.metadata(), extensions, CatalogSource.LIVE, false, detailMessage);
+        metadataSelection.metadata(),
+        extensions,
+        CatalogSource.LIVE,
+        metadataSource,
+        false,
+        detailMessage);
   }
 
   private CompletableFuture<MetadataSelection> loadMetadataSelection() {

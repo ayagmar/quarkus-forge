@@ -3,6 +3,7 @@ package dev.ayagmar.quarkusforge.ui;
 import dev.ayagmar.quarkusforge.api.CatalogSource;
 import dev.ayagmar.quarkusforge.api.ExtensionDto;
 import dev.ayagmar.quarkusforge.api.MetadataDto;
+import dev.ayagmar.quarkusforge.api.MetadataSource;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -12,6 +13,7 @@ import java.util.Objects;
 public record ExtensionCatalogLoadResult(
     List<ExtensionDto> extensions,
     CatalogSource source,
+    MetadataSource metadataSource,
     boolean stale,
     String detailMessage,
     MetadataDto metadata,
@@ -19,12 +21,36 @@ public record ExtensionCatalogLoadResult(
   public ExtensionCatalogLoadResult {
     extensions = List.copyOf(Objects.requireNonNull(extensions));
     source = Objects.requireNonNull(source);
+    metadataSource = Objects.requireNonNull(metadataSource);
     detailMessage = detailMessage == null ? "" : detailMessage.strip();
     presetExtensionsByName = normalizePresetMap(presetExtensionsByName);
 
     if (source != CatalogSource.CACHE && stale) {
       throw new IllegalArgumentException("stale flag is allowed only for cache source");
     }
+    if (source == CatalogSource.CACHE && metadataSource != MetadataSource.CACHE) {
+      throw new IllegalArgumentException("cache source must use cache metadata");
+    }
+    if (source == CatalogSource.LIVE && metadataSource == MetadataSource.CACHE) {
+      throw new IllegalArgumentException("live source cannot use cache metadata");
+    }
+  }
+
+  public ExtensionCatalogLoadResult(
+      List<ExtensionDto> extensions,
+      CatalogSource source,
+      boolean stale,
+      String detailMessage,
+      MetadataDto metadata,
+      Map<String, List<String>> presetExtensionsByName) {
+    this(
+        extensions,
+        source,
+        source == CatalogSource.CACHE ? MetadataSource.CACHE : MetadataSource.LIVE,
+        stale,
+        detailMessage,
+        metadata,
+        presetExtensionsByName);
   }
 
   public ExtensionCatalogLoadResult(
@@ -38,7 +64,13 @@ public record ExtensionCatalogLoadResult(
 
   public static ExtensionCatalogLoadResult live(List<ExtensionDto> extensions) {
     return new ExtensionCatalogLoadResult(
-        extensions, CatalogSource.LIVE, false, "", null, Map.of());
+        extensions, CatalogSource.LIVE, MetadataSource.LIVE, false, "", null, Map.of());
+  }
+
+  public String metadataSourceLabel() {
+    return metadataSource == MetadataSource.CACHE && stale
+        ? metadataSource.label() + " [stale]"
+        : metadataSource.label();
   }
 
   private static Map<String, List<String>> normalizePresetMap(

@@ -35,14 +35,17 @@ public final class DefaultStartupStateService implements StartupStateService {
         Objects.requireNonNull(requestedPrefill, "requestedPrefill must not be null");
     boolean coordinatesOverridden =
         overridesStoredOrDefault(
-            safeRequestedPrefill.groupId(), storedPrefill, CliPrefill::groupId, defaults)
+                safeRequestedPrefill.groupId(), storedPrefill, CliPrefill::groupId, defaults)
             || overridesStoredOrDefault(
                 safeRequestedPrefill.artifactId(), storedPrefill, CliPrefill::artifactId, defaults);
     String packageName =
         coordinatesOverridden && !hasText(safeRequestedPrefill.packageName())
             ? defaults.packageName()
             : preferRequested(
-                safeRequestedPrefill.packageName(), storedPrefill, CliPrefill::packageName, defaults);
+                safeRequestedPrefill.packageName(),
+                storedPrefill,
+                CliPrefill::packageName,
+                defaults);
     return new CliPrefill(
         preferRequested(
             safeRequestedPrefill.groupId(), storedPrefill, CliPrefill::groupId, defaults),
