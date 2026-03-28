@@ -34,6 +34,14 @@ class ReleaseWorkflowTest {
         "interactive-posix");
     assertContainsNativeMatrixEntry(
         workflow,
+        "windows-latest",
+        "windows-x86_64",
+        "'.exe'",
+        "-Pnative",
+        "quarkus-forge",
+        "headless");
+    assertContainsNativeMatrixEntry(
+        workflow,
         "ubuntu-latest",
         "linux-x86_64",
         "''",
@@ -57,8 +65,8 @@ class ReleaseWorkflowTest {
         "quarkus-forge-headless",
         "headless");
     assertThat(workflow).contains("smoke_mode: interactive-posix");
-    assertThat(workflow).contains("smoke_mode: interactive-windows");
     assertThat(workflow).contains("smoke_mode: headless");
+    assertThat(workflow).doesNotContain("smoke_mode: interactive-windows");
     assertThat(workflow).doesNotContain("\"$binary\" --help > /dev/null");
   }
 
