@@ -42,7 +42,7 @@
     <spotless.plugin.version>3.6.0</spotless.plugin.version>
     <maven.checkstyle.plugin.version>3.6.0</maven.checkstyle.plugin.version>
     <checkstyle.version>13.4.2</checkstyle.version>
-    <graalvm.native.plugin.version>1.1.1</graalvm.native.plugin.version>
+    <graalvm.native.plugin.version>1.1.2</graalvm.native.plugin.version>
     <jacoco.plugin.version>0.8.14</jacoco.plugin.version>
     <native.skip>true</native.skip>
   </properties>
