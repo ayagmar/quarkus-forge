@@ -11,6 +11,7 @@ import dev.ayagmar.quarkusforge.domain.ForgeUiState;
 import dev.ayagmar.quarkusforge.domain.MetadataCompatibilityContext;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ProjectRequestValidator;
+import dev.ayagmar.quarkusforge.runtime.TuiBootstrapService;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.KeyModifiers;
@@ -26,6 +27,10 @@ import org.junit.jupiter.api.parallel.Resources;
 
 class CoreTuiShellPilotTest {
   @RegisterExtension final SystemPropertyExtension systemProperties = new SystemPropertyExtension();
+
+  private static KeyEvent appChar(char character) {
+    return KeyEvent.ofChar(character, TuiBootstrapService.appBindingsProfile());
+  }
 
   @Test
   void focusTraversalCyclesWithTabAndShiftTab() {
@@ -79,9 +84,9 @@ class CoreTuiShellPilotTest {
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     String firstId = controller.focusedListExtensionId();
 
-    controller.onEvent(KeyEvent.ofChar('j'));
+    controller.onEvent(appChar('j'));
     String secondId = controller.focusedListExtensionId();
-    controller.onEvent(KeyEvent.ofChar('k'));
+    controller.onEvent(appChar('k'));
 
     assertThat(secondId).isNotEqualTo(firstId);
     assertThat(controller.focusedListExtensionId()).isEqualTo(firstId);
@@ -461,7 +466,7 @@ class CoreTuiShellPilotTest {
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
 
     controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
-    controller.onEvent(KeyEvent.ofChar('j'));
+    controller.onEvent(appChar('j'));
     controller.onEvent(KeyEvent.ofKey(KeyCode.ENTER));
 
     assertThat(controller.commandPaletteVisible()).isFalse();
@@ -480,6 +485,22 @@ class CoreTuiShellPilotTest {
     assertThat(controller.commandPaletteVisible()).isFalse();
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
     assertThat(controller.statusMessage()).contains("Focus moved to extensionList");
+  }
+
+  @Test
+  void commandPaletteHandlesNavigationKeysAndIgnoresModifiedDigits() {
+    CoreTuiController controller = UiControllerTestHarness.controller();
+
+    controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.UP));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.HOME));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.END));
+    controller.onEvent(KeyEvent.ofChar('2', KeyModifiers.CTRL));
+    controller.onEvent(KeyEvent.ofChar('2', KeyModifiers.ALT));
+
+    assertThat(controller.commandPaletteVisible()).isTrue();
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
   }
 
   @Test
@@ -609,11 +630,11 @@ class CoreTuiShellPilotTest {
     CoreTuiController controller = UiControllerTestHarness.controller();
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.SUBMIT);
 
-    controller.onEvent(KeyEvent.ofChar('k'));
+    controller.onEvent(appChar('k'));
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.EXTENSION_LIST);
 
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.SUBMIT);
-    controller.onEvent(KeyEvent.ofChar('j'));
+    controller.onEvent(appChar('j'));
     assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
   }
 
@@ -1112,11 +1133,11 @@ class CoreTuiShellPilotTest {
     assertThat(controller.focusedListExtensionId()).isEmpty();
     assertThat(controller.statusMessage()).contains("Moved to section: Core");
 
-    controller.onEvent(KeyEvent.ofChar('l'));
+    controller.onEvent(appChar('l'));
     assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
     assertThat(controller.statusMessage()).contains("Moved to first item in section: Core");
 
-    controller.onEvent(KeyEvent.ofChar('h'));
+    controller.onEvent(appChar('h'));
     controller.onEvent(KeyEvent.ofKey(KeyCode.LEFT));
     assertThat(controller.statusMessage()).contains("Closed category: Core");
     assertThat(UiControllerTestHarness.renderToString(controller)).contains("▶ Core ");
@@ -1217,7 +1238,7 @@ class CoreTuiShellPilotTest {
     assertThat(UiControllerTestHarness.renderToString(controller)).contains("CDI");
     assertThat(UiControllerTestHarness.renderToString(controller)).contains("▼ Core");
 
-    controller.onEvent(KeyEvent.ofChar('j'));
+    controller.onEvent(appChar('j'));
     assertThat(controller.focusedListExtensionId()).isEqualTo("io.quarkus:quarkus-arc");
   }
 
@@ -1240,9 +1261,9 @@ class CoreTuiShellPilotTest {
 
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.EXTENSION_LIST);
     controller.onEvent(KeyEvent.ofChar('c'));
-    controller.onEvent(KeyEvent.ofChar('j'));
+    controller.onEvent(appChar('j'));
     controller.onEvent(KeyEvent.ofChar('c'));
-    controller.onEvent(KeyEvent.ofChar('j'));
+    controller.onEvent(appChar('j'));
     controller.onEvent(KeyEvent.ofChar('c'));
 
     String allCollapsed = UiControllerTestHarness.renderToString(controller);
@@ -1254,7 +1275,7 @@ class CoreTuiShellPilotTest {
     assertThat(allCollapsed).doesNotContain("JDBC PostgreSQL");
     assertThat(controller.focusedListExtensionId()).isEmpty();
 
-    controller.onEvent(KeyEvent.ofChar('k'));
+    controller.onEvent(appChar('k'));
     controller.onEvent(KeyEvent.ofChar('c'));
 
     assertThat(controller.statusMessage()).contains("Opened category: Web");
@@ -1309,7 +1330,7 @@ class CoreTuiShellPilotTest {
     // Selector uses "Platform:" prefix in compact mode
     assertThat(UiControllerTestHarness.renderToString(controller)).contains("Platform:");
 
-    controller.onEvent(KeyEvent.ofChar('l'));
+    controller.onEvent(appChar('l'));
     assertThat(controller.request().platformStream()).isEqualTo("io.quarkus.platform:3.20");
     assertThat(controller.uiState().request().platformStream())
         .isEqualTo("io.quarkus.platform:3.20");
@@ -1318,7 +1339,7 @@ class CoreTuiShellPilotTest {
     assertThat(controller.validation().errors().getFirst().field()).isEqualTo("compatibility");
 
     UiControllerTestHarness.moveFocusTo(controller, FocusTarget.JAVA_VERSION);
-    controller.onEvent(KeyEvent.ofChar('h'));
+    controller.onEvent(appChar('h'));
     assertThat(controller.request().javaVersion()).isEqualTo("21");
     assertThat(controller.uiState().request().javaVersion()).isEqualTo("21");
     assertThat(controller.validation().isValid()).isTrue();
@@ -1329,7 +1350,7 @@ class CoreTuiShellPilotTest {
     controller.onEvent(KeyEvent.ofChar('x'));
     assertThat(controller.request().buildTool()).isEqualTo(originalBuildTool);
 
-    controller.onEvent(KeyEvent.ofChar('l'));
+    controller.onEvent(appChar('l'));
     assertThat(controller.request().buildTool()).isEqualTo("gradle");
     assertThat(controller.uiState().request().buildTool()).isEqualTo("gradle");
     assertThat(controller.statusMessage()).isEqualTo("Build tool selected: gradle");

@@ -13,9 +13,11 @@ class AppKeyActionsTest {
   @Test
   void keyChecksPreserveRawShortcutParity() {
     assertThat(AppKeyActions.isCatalogReloadKey(KeyEvent.ofChar('r', KeyModifiers.CTRL))).isTrue();
+    assertThat(AppKeyActions.isCatalogReloadKey(KeyEvent.ofChar('R', KeyModifiers.CTRL))).isTrue();
     assertThat(AppKeyActions.isGenerateShortcutKey(KeyEvent.ofChar('g', KeyModifiers.ALT)))
         .isTrue();
     assertThat(AppKeyActions.isFavoriteToggleKey(KeyEvent.ofChar('f'))).isTrue();
+    assertThat(AppKeyActions.isFavoriteToggleKey(KeyEvent.ofChar('F'))).isTrue();
     assertThat(AppKeyActions.isSelectedOnlyFilterToggleKey(KeyEvent.ofChar('s', KeyModifiers.ALT)))
         .isTrue();
     assertThat(AppKeyActions.isSelectedOnlyFilterToggleKey(KeyEvent.ofChar('S', KeyModifiers.ALT)))
@@ -35,6 +37,8 @@ class AppKeyActionsTest {
         .isTrue();
     assertThat(AppKeyActions.isPreviousInvalidFieldKey(KeyEvent.ofChar('p', KeyModifiers.ALT)))
         .isTrue();
+    assertThat(AppKeyActions.isCatalogReloadKey(KeyEvent.ofChar('z'))).isFalse();
+    assertThat(AppKeyActions.isFavoriteToggleKey(KeyEvent.ofChar('f', KeyModifiers.ALT))).isFalse();
     assertThat(AppKeyActions.isGenerateShortcutKey(KeyEvent.ofChar('g', KeyModifiers.CTRL)))
         .isFalse();
     assertThat(AppKeyActions.isHelpOverlayToggleKey(KeyEvent.ofChar('?'))).isTrue();

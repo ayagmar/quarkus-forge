@@ -36,10 +36,10 @@ final class PostGenerationMenuState {
     if (keyEvent.isCancel()) {
       return new UiIntent.PostGenerationCommand.Quit();
     }
-    if (keyEvent.isUp() || UiKeyMatchers.isVimUpKey(keyEvent)) {
+    if (keyEvent.isUp()) {
       return new UiIntent.PostGenerationCommand.MoveActionSelection(-1);
     }
-    if (keyEvent.isDown() || UiKeyMatchers.isVimDownKey(keyEvent)) {
+    if (keyEvent.isDown()) {
       return new UiIntent.PostGenerationCommand.MoveActionSelection(1);
     }
     if (keyEvent.isFocusPrevious()) {
@@ -48,8 +48,8 @@ final class PostGenerationMenuState {
     if (keyEvent.isFocusNext()) {
       return new UiIntent.PostGenerationCommand.MoveActionSelection(1);
     }
-    if (UiKeyMatchers.isDigitKey(keyEvent)) {
-      int selected = Character.digit(keyEvent.character(), 10) - 1;
+    if (UiKeyPredicates.isDigitKey(keyEvent)) {
+      int selected = Character.digit(keyEvent.codePoint(), 10) - 1;
       if (selected >= 0 && selected < view.actions().size()) {
         return new UiIntent.PostGenerationCommand.SelectActionIndex(selected);
       }
@@ -68,10 +68,10 @@ final class PostGenerationMenuState {
     if (keyEvent.isCancel()) {
       return new UiIntent.PostGenerationCommand.CancelGithubVisibility();
     }
-    if (keyEvent.isUp() || UiKeyMatchers.isVimUpKey(keyEvent)) {
+    if (keyEvent.isUp()) {
       return new UiIntent.PostGenerationCommand.MoveGithubVisibilitySelection(-1);
     }
-    if (keyEvent.isDown() || UiKeyMatchers.isVimDownKey(keyEvent)) {
+    if (keyEvent.isDown()) {
       return new UiIntent.PostGenerationCommand.MoveGithubVisibilitySelection(1);
     }
     if (keyEvent.isFocusPrevious()) {
@@ -80,8 +80,8 @@ final class PostGenerationMenuState {
     if (keyEvent.isFocusNext()) {
       return new UiIntent.PostGenerationCommand.MoveGithubVisibilitySelection(1);
     }
-    if (UiKeyMatchers.isDigitKey(keyEvent)) {
-      int selected = Character.digit(keyEvent.character(), 10) - 1;
+    if (UiKeyPredicates.isDigitKey(keyEvent)) {
+      int selected = Character.digit(keyEvent.codePoint(), 10) - 1;
       if (selected >= 0 && selected < UiTextConstants.GITHUB_VISIBILITY_LABELS.size()) {
         return new UiIntent.PostGenerationCommand.SelectGithubVisibilityIndex(selected);
       }

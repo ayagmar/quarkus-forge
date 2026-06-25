@@ -1,6 +1,5 @@
 package dev.ayagmar.quarkusforge.ui;
 
-import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 
 public final class AppKeyActions {
@@ -84,10 +83,7 @@ public final class AppKeyActions {
   }
 
   static boolean isFocusExtensionSearchSlashKey(KeyEvent keyEvent) {
-    return keyEvent.code() == KeyCode.CHAR
-        && !keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && keyEvent.character() == '/';
+    return !keyEvent.hasCtrl() && !keyEvent.hasAlt() && keyEvent.isChar('/');
   }
 
   static boolean isFocusExtensionSearchCtrlKey(KeyEvent keyEvent) {
@@ -107,25 +103,20 @@ public final class AppKeyActions {
   }
 
   private static boolean hasAction(KeyEvent keyEvent, String action) {
-    return keyEvent.action().filter(action::equals).isPresent();
+    return keyEvent.matches(action);
   }
 
   private static boolean isPlainChar(KeyEvent keyEvent, char lower, char upper) {
-    return keyEvent.code() == KeyCode.CHAR
-        && !keyEvent.hasCtrl()
+    return !keyEvent.hasCtrl()
         && !keyEvent.hasAlt()
-        && (keyEvent.character() == lower || keyEvent.character() == upper);
+        && (keyEvent.isChar(lower) || keyEvent.isChar(upper));
   }
 
   private static boolean isCtrlChar(KeyEvent keyEvent, char lower, char upper) {
-    return keyEvent.code() == KeyCode.CHAR
-        && keyEvent.hasCtrl()
-        && (keyEvent.character() == lower || keyEvent.character() == upper);
+    return keyEvent.hasCtrl() && (keyEvent.isChar(lower) || keyEvent.isChar(upper));
   }
 
   private static boolean isAltChar(KeyEvent keyEvent, char lower, char upper) {
-    return keyEvent.code() == KeyCode.CHAR
-        && keyEvent.hasAlt()
-        && (keyEvent.character() == lower || keyEvent.character() == upper);
+    return keyEvent.hasAlt() && (keyEvent.isChar(lower) || keyEvent.isChar(upper));
   }
 }

@@ -111,14 +111,16 @@ $actual -eq $expected
 | `Ctrl+R` | Reload catalog |
 | `Ctrl+K` | Toggle favorites-only |
 | `Alt+S` | Toggle selected-only view |
+| `Alt+N` / `Alt+P` | Jump to next/previous invalid field |
 | `v` | Cycle category filter |
 | `c` | Toggle current category |
 | `C` | Open all categories |
 | `x` | Clear selected extensions |
+| `j` `k` `h` `l` `g` `G` | Vim-style list and hierarchy motion |
 | `Esc` | Unwind filter context / exit |
 | `Ctrl+C` | Quit immediately |
 
-Full keybindings: [docs/modules/ROOT/pages/ui/keybindings.adoc](docs/modules/ROOT/pages/ui/keybindings.adoc)
+Letter shortcuts are case-insensitive, and each `Ctrl`/`Alt` shortcut also accepts its `Shift` variant. Full keybindings: [docs/modules/ROOT/pages/ui/keybindings.adoc](docs/modules/ROOT/pages/ui/keybindings.adoc)
 
 ## Requirements
 

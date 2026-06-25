@@ -46,7 +46,9 @@ NOTE: `--enable-native-access=ALL-UNNAMED` suppresses Panama FFM warnings from t
 * `Ctrl+P`: command palette.
 * `?`: help overlay.
 * `Ctrl+K`: toggle favorites-only mode.
+* `Alt+S`: toggle selected-only mode.
 * `Ctrl+J`: jump to next favorite.
+* `Alt+N` / `Alt+P`: jump to the next/previous invalid field.
 
 == Submit and Exit
 

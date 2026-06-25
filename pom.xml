@@ -16,12 +16,7 @@
       dev/tamboui/tui/bindings/.*\\.properties$
     </native.tui.bindings.resource.pattern>
 
-    <tamboui.core.version>0.3.0</tamboui.core.version>
-    <tamboui.annotations.version>0.3.0</tamboui.annotations.version>
-    <tamboui.panama-backend.version>${tamboui.core.version}</tamboui.panama-backend.version>
-    <tamboui.jline3-backend.version>${tamboui.core.version}</tamboui.jline3-backend.version>
-    <tamboui.tui.version>0.3.0</tamboui.tui.version>
-    <tamboui.widgets.version>${tamboui.tui.version}</tamboui.widgets.version>
+    <tamboui.version>0.4.0</tamboui.version>
     <picocli.version>4.7.7</picocli.version>
     <jackson.core.version>2.21.3</jackson.core.version>
     <junit.version>6.0.3</junit.version>
@@ -47,51 +42,14 @@
     <native.skip>true</native.skip>
   </properties>
 
-  <repositories>
-    <repository>
-      <id>ossrh-snapshots</id>
-      <url>https://central.sonatype.com/repository/maven-snapshots/</url>
-      <releases>
-        <enabled>false</enabled>
-      </releases>
-      <snapshots>
-        <enabled>true</enabled>
-        <updatePolicy>never</updatePolicy>
-      </snapshots>
-    </repository>
-  </repositories>
-
   <dependencyManagement>
     <dependencies>
       <dependency>
         <groupId>dev.tamboui</groupId>
-        <artifactId>tamboui-annotations</artifactId>
-        <version>${tamboui.annotations.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>dev.tamboui</groupId>
-        <artifactId>tamboui-core</artifactId>
-        <version>${tamboui.core.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>dev.tamboui</groupId>
-        <artifactId>tamboui-panama-backend</artifactId>
-        <version>${tamboui.panama-backend.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>dev.tamboui</groupId>
-        <artifactId>tamboui-jline3-backend</artifactId>
-        <version>${tamboui.jline3-backend.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>dev.tamboui</groupId>
-        <artifactId>tamboui-tui</artifactId>
-        <version>${tamboui.tui.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>dev.tamboui</groupId>
-        <artifactId>tamboui-widgets</artifactId>
-        <version>${tamboui.widgets.version}</version>
+        <artifactId>tamboui-bom</artifactId>
+        <version>${tamboui.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -100,18 +58,19 @@
     <dependency>
       <groupId>dev.tamboui</groupId>
       <artifactId>tamboui-tui</artifactId>
-      <version>${tamboui.tui.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>dev.tamboui</groupId>
+      <artifactId>tamboui-toolkit</artifactId>
     </dependency>
     <dependency>
       <groupId>dev.tamboui</groupId>
       <artifactId>tamboui-panama-backend</artifactId>
-      <version>${tamboui.panama-backend.version}</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>dev.tamboui</groupId>
       <artifactId>tamboui-jline3-backend</artifactId>
-      <version>${tamboui.jline3-backend.version}</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
@@ -447,19 +406,21 @@
         <dependency>
           <groupId>dev.tamboui</groupId>
           <artifactId>tamboui-tui</artifactId>
-          <version>${tamboui.tui.version}</version>
+          <scope>provided</scope>
+        </dependency>
+        <dependency>
+          <groupId>dev.tamboui</groupId>
+          <artifactId>tamboui-toolkit</artifactId>
           <scope>provided</scope>
         </dependency>
         <dependency>
           <groupId>dev.tamboui</groupId>
           <artifactId>tamboui-panama-backend</artifactId>
-          <version>${tamboui.panama-backend.version}</version>
           <scope>provided</scope>
         </dependency>
         <dependency>
           <groupId>dev.tamboui</groupId>
           <artifactId>tamboui-jline3-backend</artifactId>
-          <version>${tamboui.jline3-backend.version}</version>
           <scope>provided</scope>
         </dependency>
       </dependencies>

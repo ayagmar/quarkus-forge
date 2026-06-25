@@ -3,6 +3,7 @@ package dev.ayagmar.quarkusforge.ui;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import dev.tamboui.tui.bindings.BindingSets;
 import dev.tamboui.tui.event.KeyEvent;
 import java.util.List;
 import java.util.Set;
@@ -99,19 +100,23 @@ class ExtensionCatalogNavigationTest {
     ExtensionCatalogNavigation navigation = new ExtensionCatalogNavigation();
     ExtensionCatalogRows rows = rows(false);
 
-    assertThat(navigation.handleNavigationKey(rows, KeyEvent.ofChar('j'))).isTrue();
+    assertThat(navigation.handleNavigationKey(rows, vimChar('j'))).isTrue();
     assertThat(navigation.selectedRow()).isEqualTo(1);
     assertThat(navigation.isSelectionAtTop(rows)).isTrue();
 
-    assertThat(navigation.handleNavigationKey(rows, KeyEvent.ofChar('G'))).isTrue();
+    assertThat(navigation.handleNavigationKey(rows, vimChar('G'))).isTrue();
     assertThat(navigation.selectedRow()).isEqualTo(5);
     assertThat(navigation.isSelectionAtTop(rows)).isFalse();
 
     navigation.listState().select(2);
-    assertThat(navigation.handleNavigationKey(rows, KeyEvent.ofChar('g'))).isTrue();
+    assertThat(navigation.handleNavigationKey(rows, vimChar('g'))).isTrue();
     assertThat(navigation.selectedRow()).isZero();
 
     assertThat(navigation.handleNavigationKey(rows, KeyEvent.ofChar('x'))).isFalse();
+  }
+
+  private static KeyEvent vimChar(char character) {
+    return KeyEvent.ofChar(character, BindingSets.vim());
   }
 
   private static ExtensionCatalogRows rows(boolean collapseWeb) {

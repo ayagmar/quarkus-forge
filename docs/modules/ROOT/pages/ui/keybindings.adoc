@@ -1,11 +1,13 @@
 = TUI Keybindings
 
+Bindings build on the Vim binding set, so motion keys work alongside the arrow keys. Letter shortcuts (`v`, `x`, `f`) are case-insensitive, and every `Ctrl`/`Alt` shortcut also responds to its `Shift` variant (for example `Ctrl+R` and `Ctrl+Shift+R` both reload the catalog).
+
 == Navigation
 
 * `Tab` / `Shift+Tab`: move focus across form, search, list, and submit.
 * `Up` / `Down` (or `j` / `k`): list navigation.
 * `Left` / `Right` (or `h` / `l`): navigate category hierarchy.
-* `Home` / `End`: first/last row.
+* `Home` / `End` (or `g` / `G`): first/last row.
 * `PgUp` / `PgDn`: previous/next category.
 
 == Focus and Search
@@ -24,7 +26,13 @@
 * `f`: favorite focused extension.
 * `Ctrl+J`: jump to next favorite.
 * `Ctrl+K`: toggle favorites-only filter.
+* `Alt+S`: toggle selected-only filter.
 * `Ctrl+Y`: cycle preset-only filter (presets loaded from `code.quarkus.io`).
+
+== Form Validation
+
+* `Alt+N`: focus the next invalid field.
+* `Alt+P`: focus the previous invalid field.
 
 == Global Actions
 
