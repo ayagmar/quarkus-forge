@@ -27,7 +27,7 @@ Actions:
 java --enable-native-access=ALL-UNNAMED -jar target/quarkus-forge.jar
 ----
 . Verify your terminal supports 256-color or true-color (e.g., `echo $TERM`). Recommended: `xterm-256color`, `alacritty`, `kitty`, or `wezterm`.
-. On Windows, use Windows Terminal or a recent ConEmu/Git Bash with VT mode enabled. Forge now defaults to the JLine backend on Windows to preserve arrow-key navigation; avoid forcing `tamboui.backend=panama` unless you are debugging backend behavior.
+. On Windows, run inside a real console (Windows Terminal, PowerShell, or `cmd.exe`) so the Panama backend can enable virtual-terminal input; Git Bash/MSYS `mintty` does not expose a Win32 console and leaves keys unregistered without `winpty`. Forge defaults to the Panama backend on every platform; set `tamboui.backend=jline3` (or `TAMBOUI_BACKEND=jline3`) only if you need to fall back to JLine.
 
 [id="metadata-fallback"]
 == Metadata fallback on startup
