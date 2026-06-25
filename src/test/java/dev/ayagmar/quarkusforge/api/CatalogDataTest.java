@@ -37,6 +37,32 @@ class CatalogDataTest {
   }
 
   @Test
+  void metadataSourceDefaultsMatchCatalogSource() {
+    CatalogData liveData = new CatalogData(METADATA, EXTENSIONS, CatalogSource.LIVE, false, "");
+    CatalogData cachedData =
+        new CatalogData(METADATA, EXTENSIONS, CatalogSource.CACHE, true, "stale");
+
+    assertThat(liveData.metadataSource()).isEqualTo(MetadataSource.LIVE);
+    assertThat(cachedData.metadataSource()).isEqualTo(MetadataSource.CACHE);
+    assertThat(cachedData.metadataSourceLabel()).isEqualTo("cache [stale]");
+  }
+
+  @Test
+  void supportsLiveCatalogWithBundledSnapshotMetadata() {
+    CatalogData data =
+        new CatalogData(
+            METADATA,
+            EXTENSIONS,
+            CatalogSource.LIVE,
+            MetadataSource.SNAPSHOT,
+            false,
+            "snapshot fallback");
+
+    assertThat(data.metadataSource()).isEqualTo(MetadataSource.SNAPSHOT);
+    assertThat(data.metadataSourceLabel()).isEqualTo("bundled snapshot");
+  }
+
+  @Test
   void rejectsStaleWithNonCacheSource() {
     assertThatThrownBy(() -> new CatalogData(METADATA, EXTENSIONS, CatalogSource.LIVE, true, ""))
         .isInstanceOf(IllegalArgumentException.class)
@@ -48,6 +74,16 @@ class CatalogDataTest {
     assertThatThrownBy(() -> new CatalogData(METADATA, List.of(), CatalogSource.LIVE, false, ""))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("must not be empty");
+  }
+
+  @Test
+  void rejectsIncompatibleMetadataSource() {
+    assertThatThrownBy(
+            () ->
+                new CatalogData(
+                    METADATA, EXTENSIONS, CatalogSource.CACHE, MetadataSource.SNAPSHOT, false, ""))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("cache metadata");
   }
 
   @Test

@@ -55,6 +55,24 @@ class SafeZipExtractorTest {
   }
 
   @Test
+  void extractFailsFastWhenAlreadyCancelled() throws IOException {
+    Path zipPath = tempDir.resolve("corrupt.zip");
+    Files.writeString(zipPath, "not-a-zip", StandardCharsets.UTF_8);
+
+    SafeZipExtractor extractor = new SafeZipExtractor();
+
+    assertThatThrownBy(
+            () ->
+                extractor.extract(
+                    zipPath,
+                    tempDir.resolve("generated-project"),
+                    OverwritePolicy.FAIL_IF_EXISTS,
+                    () -> true))
+        .isInstanceOf(java.util.concurrent.CancellationException.class)
+        .hasMessageContaining("cancelled");
+  }
+
+  @Test
   void acceptsBackslashEntryNamesFromTheCentralDirectory() throws IOException {
     Path zipPath =
         ArchiveTestUtils.createZip(

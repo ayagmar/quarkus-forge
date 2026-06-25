@@ -28,8 +28,6 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 public final class QuarkusApiClient implements AutoCloseable {
-  private static final List<String> FALLBACK_BUILD_TOOLS =
-      List.of("maven", "gradle", "gradle-kotlin-dsl");
   private static final Duration MAX_RETRY_DELAY = Duration.ofSeconds(30);
 
   private final ApiTransport transport;
@@ -100,8 +98,7 @@ public final class QuarkusApiClient implements AutoCloseable {
         sendWithRetry(() -> transport.sendStringAsync(openApiRequest), 1)
             .thenApply(this::assertSuccessful)
             .thenApply(ApiStringResponse::body)
-            .thenApply(ApiPayloadParser::parseBuildToolsFromOpenApiPayload)
-            .exceptionally(ignored -> fallbackBuildTools());
+            .thenApply(ApiPayloadParser::parseBuildToolsFromOpenApiPayload);
 
     return streamsMetadataFuture.thenCombine(buildToolsFuture, QuarkusApiClient::toMetadata);
   }
@@ -136,14 +133,6 @@ public final class QuarkusApiClient implements AutoCloseable {
     }
     return new MetadataDto(
         javaVersions, buildTools, compatibility, streamsMetadata.platformStreams());
-  }
-
-  private static List<String> fallbackBuildTools() {
-    try {
-      return MetadataSnapshotLoader.loadDefault().buildTools();
-    } catch (RuntimeException ignored) {
-      return FALLBACK_BUILD_TOOLS;
-    }
   }
 
   public CompletableFuture<Path> downloadProjectZipToFile(

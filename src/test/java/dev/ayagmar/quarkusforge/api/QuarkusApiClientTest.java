@@ -513,21 +513,20 @@ class QuarkusApiClientTest {
   }
 
   @Test
-  void fetchMetadataFallsBackToDefaultBuildToolsWhenOpenApiIsUnavailable() {
+  void fetchMetadataFailsWhenOpenApiIsUnavailable() {
     stubStreamsPayload(List.of(17, 21, 25));
     stubFor(get(urlEqualTo("/q/openapi")).willReturn(aResponse().withStatus(404)));
 
     try (QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper())) {
-      MetadataDto metadata = client.fetchMetadata().join();
-
-      assertThat(metadata.buildTools()).containsExactly("maven", "gradle", "gradle-kotlin-dsl");
-      assertThat(metadata.compatibility().get("gradle-kotlin-dsl"))
-          .containsExactly("17", "21", "25");
+      assertThatThrownBy(() -> client.fetchMetadata().join())
+          .hasRootCauseInstanceOf(ApiHttpException.class)
+          .rootCause()
+          .hasMessageContaining("Unexpected HTTP status 404");
     }
   }
 
   @Test
-  void fetchMetadataFallsBackToDefaultBuildToolsWhenOpenApiEnumContainsBlankValue() {
+  void fetchMetadataFailsWhenOpenApiEnumContainsBlankValue() {
     stubStreamsPayload(List.of(17, 21, 25));
     stubFor(
         get(urlEqualTo("/q/openapi"))
@@ -548,12 +547,10 @@ class QuarkusApiClientTest {
                     """)));
 
     try (QuarkusApiClient client = newClient(RetryPolicy.defaults(), new RecordingSleeper())) {
-      MetadataDto metadata = client.fetchMetadata().join();
-
-      assertThat(metadata.buildTools())
-          .containsExactlyInAnyOrder("maven", "gradle", "gradle-kotlin-dsl");
-      assertThat(metadata.compatibility().keySet())
-          .containsExactlyInAnyOrder("maven", "gradle", "gradle-kotlin-dsl");
+      assertThatThrownBy(() -> client.fetchMetadata().join())
+          .hasRootCauseInstanceOf(ApiContractException.class)
+          .rootCause()
+          .hasMessageContaining("must not contain blank values");
     }
   }
 

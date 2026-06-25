@@ -61,6 +61,7 @@ class CatalogDataServiceTest {
 
       CatalogData cachedData = offlineService.load().join();
       assertThat(cachedData.source()).isEqualTo(CatalogSource.CACHE);
+      assertThat(cachedData.metadataSource()).isEqualTo(MetadataSource.CACHE);
       assertThat(cachedData.stale()).isFalse();
       assertThat(cachedData.detailMessage()).contains("using cached snapshot");
       assertThat(cachedData.extensions()).isEqualTo(liveData.extensions());
@@ -84,6 +85,7 @@ class CatalogDataServiceTest {
 
       CatalogData cachedData = offlineService.load().join();
       assertThat(cachedData.source()).isEqualTo(CatalogSource.CACHE);
+      assertThat(cachedData.metadataSource()).isEqualTo(MetadataSource.CACHE);
       assertThat(cachedData.stale()).isTrue();
       assertThat(cachedData.detailMessage()).contains("stale");
     }
@@ -116,9 +118,42 @@ class CatalogDataServiceTest {
       CatalogData liveData = service.load().join();
 
       assertThat(liveData.source()).isEqualTo(CatalogSource.LIVE);
+      assertThat(liveData.metadataSource()).isEqualTo(MetadataSource.SNAPSHOT);
       assertThat(liveData.extensions()).hasSize(2);
       assertThat(liveData.detailMessage()).contains("Live metadata unavailable");
-      assertThat(new CatalogSnapshotCache(cacheFile).read()).isPresent();
+      assertThat(new CatalogSnapshotCache(cacheFile).read()).isEmpty();
+    }
+  }
+
+  @Test
+  void bundledMetadataFallbackDoesNotOverwriteExistingCacheSnapshot() {
+    stubExtensionsWithMetadataUnavailable();
+    Path cacheFile = tempDir.resolve("catalog-snapshot.json");
+    CatalogSnapshotCache snapshotCache = snapshotCache(cacheFile, "2026-02-22T00:00:00Z");
+    MetadataDto cachedMetadata =
+        new MetadataDto(
+            java.util.List.of("21"),
+            java.util.List.of("maven"),
+            java.util.Map.of("maven", java.util.List.of("21")),
+            java.util.List.of(
+                new PlatformStream(
+                    "io.quarkus.platform:3.20", "3.20", true, java.util.List.of("21"))));
+    java.util.List<ExtensionDto> cachedExtensions =
+        java.util.List.of(new ExtensionDto("io.quarkus:cached", "Cached", "cached"));
+    assertThat(snapshotCache.write(cachedMetadata, cachedExtensions).written()).isTrue();
+
+    try (QuarkusApiClient onlineApiClient = onlineClient()) {
+      CatalogDataService service = new CatalogDataService(onlineApiClient, snapshotCache);
+
+      CatalogData liveData = service.load().join();
+      CachedCatalogSnapshot cachedSnapshot =
+          new CatalogSnapshotCache(cacheFile).read().orElseThrow();
+
+      assertThat(liveData.source()).isEqualTo(CatalogSource.LIVE);
+      assertThat(liveData.metadataSource()).isEqualTo(MetadataSource.SNAPSHOT);
+      assertThat(liveData.detailMessage()).contains("using bundled metadata snapshot");
+      assertThat(cachedSnapshot.metadata()).isEqualTo(cachedMetadata);
+      assertThat(cachedSnapshot.extensions()).isEqualTo(cachedExtensions);
     }
   }
 
@@ -187,6 +222,7 @@ class CatalogDataServiceTest {
       CatalogData startupData = startupService.loadForStartup().join();
 
       assertThat(startupData.source()).isEqualTo(CatalogSource.CACHE);
+      assertThat(startupData.metadataSource()).isEqualTo(MetadataSource.CACHE);
       assertThat(startupData.detailMessage()).contains("startup");
       wireMockServer.verify(0, getRequestedFor(urlEqualTo("/api/extensions")));
       wireMockServer.verify(0, getRequestedFor(urlEqualTo("/api/streams")));
@@ -213,6 +249,7 @@ class CatalogDataServiceTest {
       CatalogData startupData = startupService.loadForStartup().join();
 
       assertThat(startupData.source()).isEqualTo(CatalogSource.CACHE);
+      assertThat(startupData.metadataSource()).isEqualTo(MetadataSource.CACHE);
       assertThat(startupData.stale()).isTrue();
       assertThat(startupData.detailMessage()).contains("stale").contains("startup");
     }
@@ -231,6 +268,7 @@ class CatalogDataServiceTest {
 
       // No cache -> falls back to load() which hits live endpoints
       assertThat(startupData.source()).isEqualTo(CatalogSource.LIVE);
+      assertThat(startupData.metadataSource()).isEqualTo(MetadataSource.LIVE);
       assertThat(startupData.extensions()).hasSize(2);
     }
   }

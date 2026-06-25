@@ -110,10 +110,8 @@ public final class ProjectArchiveService {
                       }
                       progressListener.accept(ProgressStep.EXTRACTING_ARCHIVE);
                       ExtractionResult result =
-                          zipExtractor.extract(archivePath, outputDirectory, overwritePolicy);
-                      if (cancelled.getAsBoolean()) {
-                        throw new CancellationException("Generation cancelled during extraction");
-                      }
+                          zipExtractor.extract(
+                              archivePath, outputDirectory, overwritePolicy, cancelled);
                       return result.extractedRoot();
                     },
                     extractionExecutor);
