@@ -12,14 +12,14 @@
   },
   "devDependencies": {
     "@antora/lunr-extension": "1.0.0-alpha.13",
-    "@tailwindcss/cli": "^4.2.1",
-    "antora": "3.1.14",
+    "@tailwindcss/cli": "^4.3.1",
+    "antora": "3.1.15",
     "http-server": "14.1.1",
     "linkinator": "7.6.1",
-    "tailwindcss": "^4.2.1"
+    "tailwindcss": "^4.3.1"
   },
-  "// overrides": "Pin undici to 7.24.4 so all transitive docs dependencies stay on the v7.24.0+ security-fix line.",
+  "// overrides": "Pin undici to the latest v7 security-fix line compatible with linkinator.",
   "overrides": {
-    "undici": "7.24.4"
+    "undici": "7.28.0"
   }
 }
