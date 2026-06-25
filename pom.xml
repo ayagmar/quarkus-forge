@@ -26,7 +26,7 @@
     <jackson.core.version>2.21.2</jackson.core.version>
     <junit.version>6.0.3</junit.version>
     <assertj.version>3.27.7</assertj.version>
-    <archunit.version>1.4.1</archunit.version>
+    <archunit.version>1.4.2</archunit.version>
     <wiremock.version>3.13.2</wiremock.version>
 
     <forge.main.class>dev.ayagmar.quarkusforge.cli.QuarkusForgeCli</forge.main.class>
