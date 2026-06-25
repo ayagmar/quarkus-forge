@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.tamboui.tui.bindings.BindingSets;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
+import dev.tamboui.tui.event.KeyModifiers;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -608,6 +609,21 @@ class CoreUiReducerTest {
   }
 
   @Test
+  void extensionInteractionIntentRoutesArrowNavigationKeysThroughEffect() {
+    UiState state = stateWithFocus(baseState(), FocusTarget.EXTENSION_LIST);
+
+    for (KeyCode keyCode : List.of(KeyCode.DOWN, KeyCode.HOME, KeyCode.END)) {
+      KeyEvent keyEvent = KeyEvent.ofKey(keyCode);
+      ReduceResult result =
+          reducer.reduce(state, new UiIntent.ExtensionInteractionIntent(keyEvent));
+
+      assertThat(result.action()).isEqualTo(UiAction.handled(false));
+      assertThat(result.effects())
+          .containsExactly(new UiEffect.ApplyExtensionNavigationKey(keyEvent));
+    }
+  }
+
+  @Test
   void extensionInteractionIntentMovesSearchFocusToListOnDown() {
     ReduceResult result =
         reducer.reduce(
@@ -768,15 +784,19 @@ class CoreUiReducerTest {
 
   @Test
   void metadataIntentWithOptionsProducesSelectorEffect() {
-    ReduceResult result =
-        reducer.reduce(
-            stateWithFocus(baseState(), FocusTarget.BUILD_TOOL),
-            new UiIntent.MetadataInputIntent(
-                KeyEvent.ofKey(KeyCode.LEFT), FocusTarget.BUILD_TOOL, true));
+    UiState state = stateWithFocus(baseState(), FocusTarget.BUILD_TOOL);
 
-    assertThat(result.action()).isEqualTo(UiAction.handled(false));
-    assertThat(result.effects()).hasSize(1);
-    assertThat(result.effects().getFirst()).isInstanceOf(UiEffect.ApplyMetadataSelectorKey.class);
+    for (KeyCode keyCode :
+        List.of(KeyCode.LEFT, KeyCode.UP, KeyCode.RIGHT, KeyCode.DOWN, KeyCode.HOME, KeyCode.END)) {
+      KeyEvent keyEvent = KeyEvent.ofKey(keyCode);
+      ReduceResult result =
+          reducer.reduce(
+              state, new UiIntent.MetadataInputIntent(keyEvent, FocusTarget.BUILD_TOOL, true));
+
+      assertThat(result.action()).isEqualTo(UiAction.handled(false));
+      assertThat(result.effects())
+          .containsExactly(new UiEffect.ApplyMetadataSelectorKey(FocusTarget.BUILD_TOOL, keyEvent));
+    }
   }
 
   @Test
@@ -821,15 +841,19 @@ class CoreUiReducerTest {
 
   @Test
   void textInputIntentWithUnsupportedKeyIsIgnored() {
-    ReduceResult result =
-        reducer.reduce(
-            baseState(),
-            new UiIntent.TextInputIntent(
-                KeyEvent.ofChar('a', dev.tamboui.tui.event.KeyModifiers.CTRL),
-                FocusTarget.ARTIFACT_ID));
+    for (KeyEvent keyEvent :
+        List.of(
+            KeyEvent.ofChar('a', KeyModifiers.CTRL),
+            KeyEvent.ofChar('a', KeyModifiers.ALT),
+            KeyEvent.ofChar((char) 31),
+            KeyEvent.ofChar((char) 127))) {
+      ReduceResult result =
+          reducer.reduce(
+              baseState(), new UiIntent.TextInputIntent(keyEvent, FocusTarget.ARTIFACT_ID));
 
-    assertThat(result.action()).isEqualTo(UiAction.ignored());
-    assertThat(result.effects()).isEmpty();
+      assertThat(result.action()).isEqualTo(UiAction.ignored());
+      assertThat(result.effects()).isEmpty();
+    }
   }
 
   @Test

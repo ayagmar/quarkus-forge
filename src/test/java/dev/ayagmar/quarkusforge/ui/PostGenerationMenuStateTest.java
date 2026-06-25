@@ -108,14 +108,24 @@ class PostGenerationMenuStateTest {
             true, true, 0, 0, UiTextConstants.postGenerationActions(List.of()), null, "cmd", null);
 
     UiIntent.PostGenerationCommand down = menuState.handleKey(view, KeyEvent.ofKey(KeyCode.DOWN));
+    UiIntent.PostGenerationCommand up = menuState.handleKey(view, KeyEvent.ofKey(KeyCode.UP));
     UiIntent.PostGenerationCommand escape =
         menuState.handleKey(view, KeyEvent.ofKey(KeyCode.ESCAPE));
     UiIntent.PostGenerationCommand choosePublic = menuState.handleKey(view, KeyEvent.ofChar('2'));
+    UiIntent.PostGenerationCommand ctrlDigit =
+        menuState.handleKey(view, KeyEvent.ofChar('2', KeyModifiers.CTRL));
+    UiIntent.PostGenerationCommand altDigit =
+        menuState.handleKey(view, KeyEvent.ofChar('2', KeyModifiers.ALT));
+    UiIntent.PostGenerationCommand letter = menuState.handleKey(view, KeyEvent.ofChar('x'));
 
     assertThat(down).isEqualTo(new UiIntent.PostGenerationCommand.MoveGithubVisibilitySelection(1));
+    assertThat(up).isEqualTo(new UiIntent.PostGenerationCommand.MoveGithubVisibilitySelection(-1));
     assertThat(escape).isInstanceOf(UiIntent.PostGenerationCommand.CancelGithubVisibility.class);
     assertThat(choosePublic)
         .isEqualTo(new UiIntent.PostGenerationCommand.SelectGithubVisibilityIndex(1));
+    assertThat(ctrlDigit).isInstanceOf(UiIntent.PostGenerationCommand.Noop.class);
+    assertThat(altDigit).isInstanceOf(UiIntent.PostGenerationCommand.Noop.class);
+    assertThat(letter).isInstanceOf(UiIntent.PostGenerationCommand.Noop.class);
     assertThat(view.githubVisibilitySelection()).isZero();
   }
 }

@@ -488,6 +488,22 @@ class CoreTuiShellPilotTest {
   }
 
   @Test
+  void commandPaletteHandlesNavigationKeysAndIgnoresModifiedDigits() {
+    CoreTuiController controller = UiControllerTestHarness.controller();
+
+    controller.onEvent(KeyEvent.ofChar('p', KeyModifiers.CTRL));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.DOWN));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.UP));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.HOME));
+    controller.onEvent(KeyEvent.ofKey(KeyCode.END));
+    controller.onEvent(KeyEvent.ofChar('2', KeyModifiers.CTRL));
+    controller.onEvent(KeyEvent.ofChar('2', KeyModifiers.ALT));
+
+    assertThat(controller.commandPaletteVisible()).isTrue();
+    assertThat(controller.focusTarget()).isEqualTo(FocusTarget.GROUP_ID);
+  }
+
+  @Test
   void shortcutAndPaletteSharedQuickActionsStayInSync() {
     CoreTuiController controller = UiControllerTestHarness.controller();
     controller.loadExtensionCatalogAsync(

@@ -91,14 +91,34 @@ class InputEffectsTest {
   @Test
   void unsupportedTextInputKeyDoesNotTriggerSubmitRecoveryOrSearchRefresh() {
     TestFixture fixture = new TestFixture();
+    fixture.inputStates.remove(FocusTarget.BUILD_TOOL);
 
     List<UiIntent> intents =
         fixture.inputEffects.applyTextInputKey(FocusTarget.ARTIFACT_ID, KeyEvent.ofKey(KeyCode.UP));
+    List<UiIntent> nonTextInputIntents =
+        fixture.inputEffects.applyTextInputKey(FocusTarget.BUILD_TOOL, KeyEvent.ofChar('x'));
 
     assertThat(intents).isEmpty();
+    assertThat(nonTextInputIntents).isEmpty();
     assertThat(fixture.callbacks.submitRecoveryCalls).isZero();
     assertThat(fixture.callbacks.scheduledQuery).isNull();
     assertThat(fixture.callbacks.dispatchedIntents).isEmpty();
+  }
+
+  @Test
+  void metadataSelectorEffectHandlesVerticalNavigationKeys() {
+    for (KeyCode keyCode : List.of(KeyCode.UP, KeyCode.DOWN)) {
+      TestFixture fixture = new TestFixture();
+
+      List<UiIntent> intents =
+          fixture.inputEffects.applyMetadataSelectorKey(
+              FocusTarget.BUILD_TOOL, KeyEvent.ofKey(keyCode));
+
+      assertThat(intents).hasSize(3);
+      assertThat(intents.getFirst()).isInstanceOf(UiIntent.FormStateUpdatedIntent.class);
+      assertThat(intents.get(1)).isInstanceOf(UiIntent.StatusMessageIntent.class);
+      assertThat(intents.get(2)).isInstanceOf(UiIntent.SubmitEditRecoveryIntent.class);
+    }
   }
 
   @Test
