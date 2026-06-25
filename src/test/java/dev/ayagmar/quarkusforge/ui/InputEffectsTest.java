@@ -73,6 +73,35 @@ class InputEffectsTest {
   }
 
   @Test
+  void noOpDeleteDoesNotTriggerSubmitRecoveryOrSearchRefresh() {
+    TestFixture fixture = new TestFixture();
+    String artifactId = fixture.inputStates.get(FocusTarget.ARTIFACT_ID).text();
+
+    List<UiIntent> intents =
+        fixture.inputEffects.applyTextInputKey(
+            FocusTarget.ARTIFACT_ID, KeyEvent.ofKey(KeyCode.DELETE));
+
+    assertThat(intents).isEmpty();
+    assertThat(fixture.inputStates.get(FocusTarget.ARTIFACT_ID).text()).isEqualTo(artifactId);
+    assertThat(fixture.callbacks.submitRecoveryCalls).isZero();
+    assertThat(fixture.callbacks.scheduledQuery).isNull();
+    assertThat(fixture.callbacks.dispatchedIntents).isEmpty();
+  }
+
+  @Test
+  void unsupportedTextInputKeyDoesNotTriggerSubmitRecoveryOrSearchRefresh() {
+    TestFixture fixture = new TestFixture();
+
+    List<UiIntent> intents =
+        fixture.inputEffects.applyTextInputKey(FocusTarget.ARTIFACT_ID, KeyEvent.ofKey(KeyCode.UP));
+
+    assertThat(intents).isEmpty();
+    assertThat(fixture.callbacks.submitRecoveryCalls).isZero();
+    assertThat(fixture.callbacks.scheduledQuery).isNull();
+    assertThat(fixture.callbacks.dispatchedIntents).isEmpty();
+  }
+
+  @Test
   void metadataSelectorEffectCyclesBuildToolAndEmitsStatus() {
     TestFixture fixture = new TestFixture();
     String expectedBuildTool =

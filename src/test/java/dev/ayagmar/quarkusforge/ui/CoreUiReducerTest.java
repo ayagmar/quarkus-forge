@@ -833,6 +833,17 @@ class CoreUiReducerTest {
   }
 
   @Test
+  void textInputIntentWithNavigationKeyIsIgnored() {
+    ReduceResult result =
+        reducer.reduce(
+            stateWithFocus(baseState(), FocusTarget.ARTIFACT_ID),
+            new UiIntent.TextInputIntent(KeyEvent.ofKey(KeyCode.UP), FocusTarget.ARTIFACT_ID));
+
+    assertThat(result.action()).isEqualTo(UiAction.ignored());
+    assertThat(result.effects()).isEmpty();
+  }
+
+  @Test
   void focusNavigationIntentUpdatesFocusStateDirectly() {
     ReduceResult result =
         reducer.reduce(
