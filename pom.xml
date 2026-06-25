@@ -16,17 +16,17 @@
       dev/tamboui/tui/bindings/.*\\.properties$
     </native.tui.bindings.resource.pattern>
 
-    <tamboui.core.version>0.2.0-20260301.102219-30</tamboui.core.version>
-    <tamboui.annotations.version>${tamboui.core.version}</tamboui.annotations.version>
+    <tamboui.core.version>0.3.0</tamboui.core.version>
+    <tamboui.annotations.version>0.3.0</tamboui.annotations.version>
     <tamboui.panama-backend.version>${tamboui.core.version}</tamboui.panama-backend.version>
     <tamboui.jline3-backend.version>${tamboui.core.version}</tamboui.jline3-backend.version>
-    <tamboui.tui.version>0.2.0-20260301.102219-28</tamboui.tui.version>
+    <tamboui.tui.version>0.3.0</tamboui.tui.version>
     <tamboui.widgets.version>${tamboui.tui.version}</tamboui.widgets.version>
     <picocli.version>4.7.7</picocli.version>
-    <jackson.core.version>2.21.2</jackson.core.version>
+    <jackson.core.version>2.21.3</jackson.core.version>
     <junit.version>6.0.3</junit.version>
     <assertj.version>3.27.7</assertj.version>
-    <archunit.version>1.4.1</archunit.version>
+    <archunit.version>1.4.2</archunit.version>
     <wiremock.version>3.13.2</wiremock.version>
 
     <forge.main.class>dev.ayagmar.quarkusforge.cli.QuarkusForgeCli</forge.main.class>
@@ -41,7 +41,7 @@
     <maven.shade.plugin.version>3.6.2</maven.shade.plugin.version>
     <spotless.plugin.version>3.6.0</spotless.plugin.version>
     <maven.checkstyle.plugin.version>3.6.0</maven.checkstyle.plugin.version>
-    <checkstyle.version>13.3.0</checkstyle.version>
+    <checkstyle.version>13.4.2</checkstyle.version>
     <graalvm.native.plugin.version>1.1.1</graalvm.native.plugin.version>
     <jacoco.plugin.version>0.8.14</jacoco.plugin.version>
     <native.skip>true</native.skip>
