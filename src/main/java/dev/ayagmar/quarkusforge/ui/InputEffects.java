@@ -4,7 +4,7 @@ import dev.ayagmar.quarkusforge.domain.CliPrefill;
 import dev.ayagmar.quarkusforge.domain.CliPrefillMapper;
 import dev.ayagmar.quarkusforge.domain.ProjectRequest;
 import dev.ayagmar.quarkusforge.domain.ValidationReport;
-import dev.tamboui.tui.event.KeyCode;
+import dev.tamboui.toolkit.Toolkit;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.widgets.input.TextInputState;
 import java.util.EnumMap;
@@ -64,16 +64,10 @@ final class InputEffects {
   }
 
   List<UiIntent> applyMetadataSelectorKey(FocusTarget target, KeyEvent keyEvent) {
-    if (keyEvent.isLeft()
-        || UiKeyMatchers.isVimLeftKey(keyEvent)
-        || keyEvent.isUp()
-        || UiKeyMatchers.isVimUpKey(keyEvent)) {
+    if (keyEvent.isLeft() || keyEvent.isUp()) {
       return applySelectorCycle(target, -1);
     }
-    if (keyEvent.isRight()
-        || UiKeyMatchers.isVimRightKey(keyEvent)
-        || keyEvent.isDown()
-        || UiKeyMatchers.isVimDownKey(keyEvent)) {
+    if (keyEvent.isRight() || keyEvent.isDown()) {
       return applySelectorCycle(target, 1);
     }
     if (keyEvent.isHome()) {
@@ -200,35 +194,18 @@ final class InputEffects {
   }
 
   private static TextInputEffectResult handleTextInputKey(TextInputState state, KeyEvent event) {
-    if (state == null || !UiTextInputKeys.isSupportedEditKey(event)) {
+    if (state == null) {
       return TextInputEffectResult.IGNORED;
     }
-    if (event.code() == KeyCode.CHAR) {
-      state.insert(event.character());
+    String previousText = state.text();
+    int previousCursorPosition = state.cursorPosition();
+    if (!Toolkit.handleTextInputKey(state, event)) {
+      return TextInputEffectResult.IGNORED;
+    }
+    if (!state.text().equals(previousText)) {
       return TextInputEffectResult.MUTATED;
     }
-    if (event.isDeleteBackward()) {
-      state.deleteBackward();
-      return TextInputEffectResult.MUTATED;
-    }
-    if (event.isDeleteForward()) {
-      state.deleteForward();
-      return TextInputEffectResult.MUTATED;
-    }
-    if (event.isLeft()) {
-      state.moveCursorLeft();
-      return TextInputEffectResult.CURSOR_MOVED;
-    }
-    if (event.isRight()) {
-      state.moveCursorRight();
-      return TextInputEffectResult.CURSOR_MOVED;
-    }
-    if (event.isHome()) {
-      state.moveCursorToStart();
-      return TextInputEffectResult.CURSOR_MOVED;
-    }
-    if (event.isEnd()) {
-      state.moveCursorToEnd();
+    if (state.cursorPosition() != previousCursorPosition) {
       return TextInputEffectResult.CURSOR_MOVED;
     }
     return TextInputEffectResult.IGNORED;

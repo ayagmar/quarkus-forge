@@ -541,12 +541,10 @@ final class CoreUiReducer implements UiReducer {
         && state.extensions().listSelectionAtTop()) {
       return reduceSharedAction(state, CommandPaletteAction.FOCUS_EXTENSION_SEARCH);
     }
-    if (focusTarget == FocusTarget.EXTENSION_LIST
-        && (keyEvent.isLeft() || UiKeyMatchers.isVimLeftKey(keyEvent))) {
+    if (focusTarget == FocusTarget.EXTENSION_LIST && keyEvent.isLeft()) {
       return reduceExtensionCommand(state, UiIntent.ExtensionCommand.HIERARCHY_LEFT);
     }
-    if (focusTarget == FocusTarget.EXTENSION_LIST
-        && (keyEvent.isRight() || UiKeyMatchers.isVimRightKey(keyEvent))) {
+    if (focusTarget == FocusTarget.EXTENSION_LIST && keyEvent.isRight()) {
       return reduceExtensionCommand(state, UiIntent.ExtensionCommand.HIERARCHY_RIGHT);
     }
     if (focusTarget == FocusTarget.EXTENSION_LIST && keyEvent.isPageDown()) {
@@ -649,10 +647,10 @@ final class CoreUiReducer implements UiReducer {
       return moveFocus(state, focusTarget, 1);
     }
     if (focusTarget == FocusTarget.SUBMIT) {
-      if (UiKeyMatchers.isVimDownKey(keyEvent)) {
+      if (keyEvent.isDown()) {
         return moveFocus(state, focusTarget, 1);
       }
-      if (UiKeyMatchers.isVimUpKey(keyEvent)) {
+      if (keyEvent.isUp()) {
         return moveFocus(state, focusTarget, -1);
       }
     }
@@ -715,18 +713,11 @@ final class CoreUiReducer implements UiReducer {
   }
 
   private static boolean isExtensionNavigationKey(KeyEvent keyEvent) {
-    return keyEvent.isUp()
-        || UiKeyMatchers.isVimUpKey(keyEvent)
-        || keyEvent.isDown()
-        || UiKeyMatchers.isVimDownKey(keyEvent)
-        || keyEvent.isHome()
-        || UiKeyMatchers.isVimHomeKey(keyEvent)
-        || keyEvent.isEnd()
-        || UiKeyMatchers.isVimEndKey(keyEvent);
+    return keyEvent.isUp() || keyEvent.isDown() || keyEvent.isHome() || keyEvent.isEnd();
   }
 
   private static boolean isUpNavigation(KeyEvent keyEvent) {
-    return keyEvent.isUp() || UiKeyMatchers.isVimUpKey(keyEvent);
+    return keyEvent.isUp();
   }
 
   private static ReduceResult reduceMetadataInput(
@@ -736,16 +727,7 @@ final class CoreUiReducer implements UiReducer {
     if (!MetadataSelectorManager.isSelectorFocus(focusTarget)) {
       return new ReduceResult(state, List.of(), UiAction.ignored());
     }
-    if (!keyEvent.isLeft()
-        && !UiKeyMatchers.isVimLeftKey(keyEvent)
-        && !keyEvent.isUp()
-        && !UiKeyMatchers.isVimUpKey(keyEvent)
-        && !keyEvent.isRight()
-        && !UiKeyMatchers.isVimRightKey(keyEvent)
-        && !keyEvent.isDown()
-        && !UiKeyMatchers.isVimDownKey(keyEvent)
-        && !keyEvent.isHome()
-        && !keyEvent.isEnd()) {
+    if (!isMetadataSelectionKey(keyEvent)) {
       return new ReduceResult(state, List.of(), UiAction.ignored());
     }
     if (!metadataIntent.optionsAvailable()) {
@@ -759,14 +741,33 @@ final class CoreUiReducer implements UiReducer {
 
   private static ReduceResult reduceTextInput(UiState state, KeyEvent keyEvent) {
     FocusTarget focusTarget = state.focusTarget();
-    if (!UiFocusPredicates.isTextInputFocus(focusTarget)
-        || !UiTextInputKeys.isSupportedEditKey(keyEvent)) {
+    if (!UiFocusPredicates.isTextInputFocus(focusTarget) || !isTextInputEditKey(keyEvent)) {
       return new ReduceResult(state, List.of(), UiAction.ignored());
     }
     return new ReduceResult(
         state,
         List.of(new UiEffect.ApplyTextInputKey(focusTarget, keyEvent)),
         UiAction.handled(false));
+  }
+
+  private static boolean isMetadataSelectionKey(KeyEvent keyEvent) {
+    return keyEvent.isLeft()
+        || keyEvent.isUp()
+        || keyEvent.isRight()
+        || keyEvent.isDown()
+        || keyEvent.isHome()
+        || keyEvent.isEnd();
+  }
+
+  private static boolean isTextInputEditKey(KeyEvent keyEvent) {
+    if (keyEvent.code() == KeyCode.CHAR) {
+      int codePoint = keyEvent.codePoint();
+      return !keyEvent.hasCtrl() && !keyEvent.hasAlt() && codePoint >= 32 && codePoint != 127;
+    }
+    return switch (keyEvent.code()) {
+      case BACKSPACE, DELETE, LEFT, RIGHT, HOME, END -> true;
+      default -> false;
+    };
   }
 
   private static ReduceResult reducePostGeneration(

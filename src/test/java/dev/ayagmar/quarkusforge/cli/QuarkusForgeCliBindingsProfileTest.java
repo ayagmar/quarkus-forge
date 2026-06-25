@@ -23,49 +23,75 @@ class QuarkusForgeCliBindingsProfileTest {
   void profilePreservesNavigationBindings() {
     Bindings bindings = TuiBootstrapService.appBindingsProfile();
 
-    assertThat(bindings.actionFor(KeyEvent.ofChar('j'))).contains(Actions.MOVE_DOWN);
-    assertThat(bindings.actionFor(KeyEvent.ofChar('k'))).contains(Actions.MOVE_UP);
-    assertThat(bindings.actionFor(KeyEvent.ofChar('h'))).contains(Actions.MOVE_LEFT);
-    assertThat(bindings.actionFor(KeyEvent.ofChar('l'))).contains(Actions.MOVE_RIGHT);
-    assertThat(bindings.actionFor(KeyEvent.ofChar('g'))).contains(Actions.HOME);
-    assertThat(bindings.actionFor(KeyEvent.ofChar('G'))).contains(Actions.END);
+    assertThat(bindings.matches(KeyEvent.ofChar('j'), Actions.MOVE_DOWN)).isTrue();
+    assertThat(bindings.matches(KeyEvent.ofChar('k'), Actions.MOVE_UP)).isTrue();
+    assertThat(bindings.matches(KeyEvent.ofChar('h'), Actions.MOVE_LEFT)).isTrue();
+    assertThat(bindings.matches(KeyEvent.ofChar('l'), Actions.MOVE_RIGHT)).isTrue();
+    assertThat(bindings.matches(KeyEvent.ofChar('g'), Actions.HOME)).isTrue();
+    assertThat(bindings.matches(KeyEvent.ofChar('G'), Actions.END)).isTrue();
   }
 
   @Test
   void profilePreservesGlobalShortcutBindings() {
     Bindings bindings = TuiBootstrapService.appBindingsProfile();
 
-    assertThat(bindings.actionFor(KeyEvent.ofChar('/')))
-        .contains(AppKeyActions.FOCUS_EXTENSION_SEARCH);
-    assertThat(bindings.actionFor(KeyEvent.ofChar('f', KeyModifiers.CTRL)))
-        .contains(AppKeyActions.FOCUS_EXTENSION_SEARCH);
-    assertThat(bindings.actionFor(KeyEvent.ofChar('l', KeyModifiers.CTRL)))
-        .contains(AppKeyActions.FOCUS_EXTENSION_LIST);
-    assertThat(bindings.actionFor(KeyEvent.ofChar('r', KeyModifiers.CTRL)))
-        .contains(AppKeyActions.RELOAD_CATALOG);
-    assertThat(bindings.actionFor(KeyEvent.ofChar('p', KeyModifiers.CTRL)))
-        .contains(AppKeyActions.OPEN_COMMAND_PALETTE);
-    assertThat(bindings.actionFor(KeyEvent.ofChar('g', KeyModifiers.ALT)))
-        .contains(AppKeyActions.SUBMIT_GENERATION);
+    assertThat(bindings.matches(KeyEvent.ofChar('/'), AppKeyActions.FOCUS_EXTENSION_SEARCH))
+        .isTrue();
+    assertThat(
+            bindings.matches(
+                KeyEvent.ofChar('f', KeyModifiers.CTRL), AppKeyActions.FOCUS_EXTENSION_SEARCH))
+        .isTrue();
+    assertThat(
+            bindings.matches(
+                KeyEvent.ofChar('l', KeyModifiers.CTRL), AppKeyActions.FOCUS_EXTENSION_LIST))
+        .isTrue();
+    assertThat(
+            bindings.matches(KeyEvent.ofChar('r', KeyModifiers.CTRL), AppKeyActions.RELOAD_CATALOG))
+        .isTrue();
+    assertThat(
+            bindings.matches(
+                KeyEvent.ofChar('p', KeyModifiers.CTRL), AppKeyActions.OPEN_COMMAND_PALETTE))
+        .isTrue();
+    assertThat(
+            bindings.matches(
+                KeyEvent.ofChar('g', KeyModifiers.ALT), AppKeyActions.SUBMIT_GENERATION))
+        .isTrue();
   }
 
   @Test
   void profilePreservesExtensionShortcutBindings() {
     Bindings bindings = TuiBootstrapService.appBindingsProfile();
 
-    assertThat(bindings.actionFor(KeyEvent.ofChar('v')))
-        .contains(AppKeyActions.CATEGORY_FILTER_CYCLE);
-    assertThat(bindings.actionFor(KeyEvent.ofChar('c'))).contains(AppKeyActions.TOGGLE_CATEGORY);
-    assertThat(bindings.actionFor(KeyEvent.ofChar('C')))
-        .contains(AppKeyActions.OPEN_ALL_CATEGORIES);
-    assertThat(bindings.actionFor(KeyEvent.ofChar('x')))
-        .contains(AppKeyActions.CLEAR_SELECTED_EXTENSIONS);
-    assertThat(bindings.actionFor(KeyEvent.ofChar('f'))).contains(AppKeyActions.FAVORITE_TOGGLE);
-    assertThat(bindings.actionFor(KeyEvent.ofChar('k', KeyModifiers.CTRL)))
-        .contains(AppKeyActions.TOGGLE_FAVORITES_FILTER);
-    assertThat(bindings.actionFor(KeyEvent.ofChar('j', KeyModifiers.CTRL)))
-        .contains(AppKeyActions.JUMP_TO_FAVORITE);
-    assertThat(bindings.actionFor(KeyEvent.ofChar('e', KeyModifiers.CTRL)))
-        .contains(AppKeyActions.TOGGLE_ERROR_DETAILS);
+    assertThat(bindings.matches(KeyEvent.ofChar('v'), AppKeyActions.CATEGORY_FILTER_CYCLE))
+        .isTrue();
+    assertThat(bindings.matches(KeyEvent.ofChar('c'), AppKeyActions.TOGGLE_CATEGORY)).isTrue();
+    assertThat(bindings.matches(KeyEvent.ofChar('C'), AppKeyActions.OPEN_ALL_CATEGORIES)).isTrue();
+    assertThat(bindings.matches(KeyEvent.ofChar('x'), AppKeyActions.CLEAR_SELECTED_EXTENSIONS))
+        .isTrue();
+    assertThat(bindings.matches(KeyEvent.ofChar('f'), AppKeyActions.FAVORITE_TOGGLE)).isTrue();
+    assertThat(
+            bindings.matches(
+                KeyEvent.ofChar('k', KeyModifiers.CTRL), AppKeyActions.TOGGLE_FAVORITES_FILTER))
+        .isTrue();
+    assertThat(
+            bindings.matches(
+                KeyEvent.ofChar('j', KeyModifiers.CTRL), AppKeyActions.JUMP_TO_FAVORITE))
+        .isTrue();
+    assertThat(
+            bindings.matches(
+                KeyEvent.ofChar('e', KeyModifiers.CTRL), AppKeyActions.TOGGLE_ERROR_DETAILS))
+        .isTrue();
+    assertThat(
+            bindings.matches(
+                KeyEvent.ofChar('s', KeyModifiers.ALT), AppKeyActions.TOGGLE_SELECTED_FILTER))
+        .isTrue();
+    assertThat(
+            bindings.matches(
+                KeyEvent.ofChar('n', KeyModifiers.ALT), AppKeyActions.NEXT_INVALID_FIELD))
+        .isTrue();
+    assertThat(
+            bindings.matches(
+                KeyEvent.ofChar('p', KeyModifiers.ALT), AppKeyActions.PREVIOUS_INVALID_FIELD))
+        .isTrue();
   }
 }

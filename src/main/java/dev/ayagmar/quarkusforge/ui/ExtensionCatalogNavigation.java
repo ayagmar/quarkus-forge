@@ -193,19 +193,19 @@ final class ExtensionCatalogNavigation {
     if (navigationRowIndexes.isEmpty()) {
       return false;
     }
-    if (keyEvent.isUp() || UiKeyMatchers.isVimUpKey(keyEvent)) {
+    if (keyEvent.isUp()) {
       selectPrevious(navigationRowIndexes);
       return true;
     }
-    if (keyEvent.isDown() || UiKeyMatchers.isVimDownKey(keyEvent)) {
+    if (keyEvent.isDown()) {
       selectNext(navigationRowIndexes);
       return true;
     }
-    if (keyEvent.isHome() || UiKeyMatchers.isVimHomeKey(keyEvent)) {
+    if (keyEvent.isHome()) {
       listState.select(navigationRowIndexes.getFirst());
       return true;
     }
-    if (keyEvent.isEnd() || UiKeyMatchers.isVimEndKey(keyEvent)) {
+    if (keyEvent.isEnd()) {
       listState.select(navigationRowIndexes.getLast());
       return true;
     }

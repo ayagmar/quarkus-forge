@@ -17,6 +17,7 @@ import dev.ayagmar.quarkusforge.postgen.IdeDetector;
 import dev.ayagmar.quarkusforge.util.OutputPathResolver;
 import dev.tamboui.terminal.Frame;
 import dev.tamboui.tui.event.Event;
+import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.ResizeEvent;
 import dev.tamboui.tui.event.TickEvent;
@@ -797,12 +798,12 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
       return routeIntent(
           new UiIntent.CommandPaletteIntent(new UiIntent.CommandPaletteCommand.Dismiss()));
     }
-    if (keyEvent.isUp() || UiKeyMatchers.isVimUpKey(keyEvent)) {
+    if (keyEvent.isUp()) {
       dispatchIntent(
           new UiIntent.CommandPaletteIntent(new UiIntent.CommandPaletteCommand.MoveSelection(-1)));
       return UiAction.handled(false);
     }
-    if (keyEvent.isDown() || UiKeyMatchers.isVimDownKey(keyEvent)) {
+    if (keyEvent.isDown()) {
       dispatchIntent(
           new UiIntent.CommandPaletteIntent(new UiIntent.CommandPaletteCommand.MoveSelection(1)));
       return UiAction.handled(false);
@@ -817,8 +818,8 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
           new UiIntent.CommandPaletteIntent(new UiIntent.CommandPaletteCommand.JumpEnd()));
       return UiAction.handled(false);
     }
-    if (UiKeyMatchers.isDigitKey(keyEvent)) {
-      int selected = Character.digit(keyEvent.character(), 10) - 1;
+    if (isDigitKey(keyEvent)) {
+      int selected = Character.digit(keyEvent.codePoint(), 10) - 1;
       if (selected >= 0 && selected < UiTextConstants.COMMAND_PALETTE_ENTRIES.size()) {
         dispatchIntent(
             new UiIntent.CommandPaletteIntent(
@@ -834,6 +835,13 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
           new UiIntent.CommandPaletteIntent(new UiIntent.CommandPaletteCommand.ConfirmSelection()));
     }
     return UiAction.handled(false);
+  }
+
+  private static boolean isDigitKey(KeyEvent keyEvent) {
+    return keyEvent.code() == KeyCode.CHAR
+        && !keyEvent.hasCtrl()
+        && !keyEvent.hasAlt()
+        && Character.isDigit(keyEvent.codePoint());
   }
 
   @Override

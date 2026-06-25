@@ -2,6 +2,7 @@ package dev.ayagmar.quarkusforge.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.tamboui.tui.bindings.BindingSets;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import java.nio.file.Path;
@@ -593,14 +594,15 @@ class CoreUiReducerTest {
 
   @Test
   void extensionInteractionIntentRoutesListMovementThroughEffect() {
+    KeyEvent keyEvent = vimChar('j');
     ReduceResult result =
         reducer.reduce(
             stateWithFocus(baseState(), FocusTarget.EXTENSION_LIST),
-            new UiIntent.ExtensionInteractionIntent(KeyEvent.ofChar('j')));
+            new UiIntent.ExtensionInteractionIntent(keyEvent));
 
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
     assertThat(result.effects())
-        .containsExactly(new UiEffect.ApplyExtensionNavigationKey(KeyEvent.ofChar('j')));
+        .containsExactly(new UiEffect.ApplyExtensionNavigationKey(keyEvent));
     assertThat(result.nextState())
         .isEqualTo(stateWithFocus(baseState(), FocusTarget.EXTENSION_LIST));
   }
@@ -626,13 +628,17 @@ class CoreUiReducerTest {
             UiState.ExtensionView.snapshot(7, 7, 0, false, false, "", "", "", "", true, true));
 
     ReduceResult result =
-        reducer.reduce(state, new UiIntent.ExtensionInteractionIntent(KeyEvent.ofChar('k')));
+        reducer.reduce(state, new UiIntent.ExtensionInteractionIntent(vimChar('k')));
 
     assertThat(result.action()).isEqualTo(UiAction.handled(false));
     assertThat(result.effects())
         .containsExactly(new UiEffect.MoveTextInputCursorToEnd(FocusTarget.EXTENSION_SEARCH));
     assertThat(result.nextState().focusTarget()).isEqualTo(FocusTarget.EXTENSION_SEARCH);
     assertThat(result.nextState().statusMessage()).isEqualTo("Focus moved to extensionSearch");
+  }
+
+  private static KeyEvent vimChar(char character) {
+    return KeyEvent.ofChar(character, BindingSets.vim());
   }
 
   @Test

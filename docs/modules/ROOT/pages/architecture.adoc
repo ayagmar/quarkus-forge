@@ -113,7 +113,7 @@ Startup policy now lives under `application/`: `LiveStartupMetadataLoader` owns 
 
 == UI Layer Design
 
-The TUI layer uses an immediate-mode rendering architecture built on the https://github.com/ayagmar/tamboui[TamboUI] framework.
+The TUI layer uses an immediate-mode rendering architecture built on the https://github.com/tamboui/tamboui[TamboUI] framework.
 
 === Component Decomposition
 
@@ -172,8 +172,7 @@ CoreTuiController (Orchestration Shell)
             ├── UiTextConstants              UI text content
             ├── CatalogLoadCoordinator       Async catalog lifecycle + startup-overlay timing via reducer intents
             ├── GenerationFlowCoordinator    Async generation lifecycle
-            ├── GenerationStateMachine       Allowed generation-state transitions
-            └── UiTextInputKeys              Text-input edit-key normalization
+            └── GenerationStateMachine       Allowed generation-state transitions
 ....
 
 Reducer-visible UI semantics are now converged for form and extension read-model state. `ProjectRequest`, `ValidationReport`, extension search/filter/read-model summaries, catalog lifecycle semantics, and overlay visibility flags update through reducer intents/effects and live in reducer-owned `UiState`. `UiRenderModel` is assembled immediately before render and carries the derived `metadataPanel`, `extensionsPanel`, `footer`, `generation`, and `startupOverlay` slices. Mutable widget internals such as `TextInputState` and `ListState` stay in adapter/runtime context rather than `UiState`.
