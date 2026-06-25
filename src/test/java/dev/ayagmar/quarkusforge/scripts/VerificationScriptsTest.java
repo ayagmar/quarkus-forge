@@ -86,6 +86,16 @@ class VerificationScriptsTest {
     assertThat(nativeSize).doesNotContain("set -o pipefail");
   }
 
+  @Test
+  void nativeSizeScriptKeepsExplicitSizeBudgets() throws Exception {
+    String nativeSize =
+        Files.readString(VERIFY_DIR.resolve("native-size.sh"), StandardCharsets.UTF_8);
+
+    assertThat(nativeSize)
+        .contains("--max-bytes 24500000")
+        .contains("--max-bytes 28750000");
+  }
+
   private static List<Path> listScripts() throws IOException {
     try (var stream = Files.list(VERIFY_DIR)) {
       return stream.filter(path -> path.getFileName().toString().endsWith(".sh")).toList();
