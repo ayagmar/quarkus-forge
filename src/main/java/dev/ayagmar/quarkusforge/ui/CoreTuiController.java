@@ -17,7 +17,6 @@ import dev.ayagmar.quarkusforge.postgen.IdeDetector;
 import dev.ayagmar.quarkusforge.util.OutputPathResolver;
 import dev.tamboui.terminal.Frame;
 import dev.tamboui.tui.event.Event;
-import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.ResizeEvent;
 import dev.tamboui.tui.event.TickEvent;
@@ -818,7 +817,7 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
           new UiIntent.CommandPaletteIntent(new UiIntent.CommandPaletteCommand.JumpEnd()));
       return UiAction.handled(false);
     }
-    if (isDigitKey(keyEvent)) {
+    if (UiKeyPredicates.isDigitKey(keyEvent)) {
       int selected = Character.digit(keyEvent.codePoint(), 10) - 1;
       if (selected >= 0 && selected < UiTextConstants.COMMAND_PALETTE_ENTRIES.size()) {
         dispatchIntent(
@@ -835,13 +834,6 @@ public final class CoreTuiController implements UiRoutingContext, GenerationFlow
           new UiIntent.CommandPaletteIntent(new UiIntent.CommandPaletteCommand.ConfirmSelection()));
     }
     return UiAction.handled(false);
-  }
-
-  private static boolean isDigitKey(KeyEvent keyEvent) {
-    return keyEvent.code() == KeyCode.CHAR
-        && !keyEvent.hasCtrl()
-        && !keyEvent.hasAlt()
-        && Character.isDigit(keyEvent.codePoint());
   }
 
   @Override
